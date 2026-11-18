@@ -218,14 +218,14 @@ def test_a_second_click_on_an_open_dialog_combo_closes_it() -> None:
         assert modal.view_state().form_rows[0].value == 0
 
 
-def test_navigator_expand_draws_as_a_combo_with_three_options() -> None:
+def test_navigator_expand_draws_as_a_combo_with_four_options() -> None:
     expand = RowDescriptor(RowKind.SETTINGS_NAVIGATOR_EXPAND_CLICK)
     with _inspector("settings.ui") as (host, controls):
         _frame(host, (0, 0))
         _frame(host, rect_center(host.inspector.values.choice_rects[expand]), click=True)
         view = controls.inline_edit.choice_view
         assert view is not None and view.target == expand
-        assert len(host.inspector.values.choice_list_rows) == 3
+        assert len(host.inspector.values.choice_list_rows) == 4
 
 
 def test_the_open_list_draws_over_the_panel_focus_outline() -> None:

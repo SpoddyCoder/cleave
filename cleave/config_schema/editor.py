@@ -84,19 +84,23 @@ DEFAULT_CRASH_LOG = False
 
 # What a click on an expandable navigator row's label does. The twisty
 # button always opens or closes the row with one click.
-NavigatorExpandClick = Literal["click-expand", "click-toggle", "button-only"]
+NavigatorExpandClick = Literal[
+    "dbl-click", "click-expand", "click-toggle", "button-only"
+]
 
 NAVIGATOR_EXPAND_CLICKS: tuple[NavigatorExpandClick, ...] = (
+    "dbl-click",
     "click-expand",
     "click-toggle",
     "button-only",
 )
 NAVIGATOR_EXPAND_CLICK_LABELS: dict[NavigatorExpandClick, str] = {
+    "dbl-click": "dbl-click",
     "click-expand": "click / dbl-click",
     "click-toggle": "click",
     "button-only": "arrow only",
 }
-DEFAULT_NAVIGATOR_EXPAND_CLICK: NavigatorExpandClick = "click-expand"
+DEFAULT_NAVIGATOR_EXPAND_CLICK: NavigatorExpandClick = "dbl-click"
 
 
 def clamp_beat_sensitivity(value: float) -> float:

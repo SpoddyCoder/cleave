@@ -245,6 +245,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_entries=(("Left/Right", "choose how rows open"),),
         help_description=(
             "What a click on a navigator row with pages under it does.",
+            "Dbl-click: a click selects the row; a double-click opens or closes it.",
             "Click / dbl-click: a click opens the row; a double-click closes it.",
             "Click: each click opens or closes the row.",
             "Arrow only: a click selects the row; only its arrow opens or closes it.",

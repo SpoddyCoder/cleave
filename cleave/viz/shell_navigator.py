@@ -179,7 +179,7 @@ class NavLabelClick:
 
     ``toggle`` opens or closes the row. ``opened_by_click`` is the row a click
     just opened, so the double-click it starts does not close it again.
-    ``swallow_release`` skips the release that ends a closing double-click,
+    ``swallow_release`` skips the release that ends a toggling double-click,
     which would otherwise open the row again.
     """
 
@@ -203,15 +203,17 @@ def navigator_label_click(
     """Outcome of a label click under the ``navigator_expand_click`` *mode*.
 
     Selectable reports a click on release, but ImGui flags a double-click on
-    the second press, so a closing double-click acts on that press.
+    the second press, so a double-click acts on that press.
     """
+    if mode == "dbl-click" and expandable and double_pressed:
+        return NavLabelClick(select=True, toggle=True, swallow_release=True)
     if mode == "click-expand" and expandable and double_pressed:
         if expanded and opened_by_click != node_id:
             return NavLabelClick(select=True, toggle=True, swallow_release=True)
         return NavLabelClick(opened_by_click=opened_by_click)
     if not clicked:
         return NavLabelClick(opened_by_click=opened_by_click)
-    if swallowing or not expandable or mode == "button-only":
+    if swallowing or not expandable or mode in ("dbl-click", "button-only"):
         return NavLabelClick(select=True)
     if mode == "click-toggle":
         return NavLabelClick(select=True, toggle=True)

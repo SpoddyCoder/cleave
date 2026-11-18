@@ -1329,6 +1329,8 @@ def test_navigator_expand_click_steps_and_writes_user_config(tmp_path) -> None:
     assert controls.cfg.editor.navigator_expand_click == DEFAULT_NAVIGATOR_EXPAND_CLICK
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_NAVIGATOR_EXPAND_CLICK)
     press_main_row(controls, keydown(pygame.K_RIGHT))
+    assert controls.cfg.editor.navigator_expand_click == "click-expand"
+    press_main_row(controls, keydown(pygame.K_RIGHT))
     assert controls.cfg.editor.navigator_expand_click == "click-toggle"
     assert load_user_config(user_path).editor.navigator_expand_click == "click-toggle"
     press_main_row(controls, keydown(pygame.K_RIGHT))

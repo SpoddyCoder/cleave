@@ -576,6 +576,16 @@ def test_click_expand_double_click_on_a_closed_row_leaves_it_open() -> None:
     assert release.select and not release.toggle and release.opened_by_click is None
 
 
+def test_dbl_click_opens_and_closes_on_double_click_only() -> None:
+    for expanded in (False, True):
+        single = _label_click("dbl-click", expanded=expanded, clicked=True)
+        assert single.select and not single.toggle
+        double = _label_click("dbl-click", expanded=expanded, double_pressed=True)
+        assert double.select and double.toggle and double.swallow_release
+    release = _label_click("dbl-click", expanded=True, clicked=True, swallowing=True)
+    assert release.select and not release.toggle
+
+
 def test_click_toggle_opens_and_closes_on_each_click() -> None:
     assert _label_click("click-toggle", expanded=False, clicked=True).toggle
     assert _label_click("click-toggle", expanded=True, clicked=True).toggle

@@ -527,7 +527,7 @@ def test_navigator_expand_click_defaults_round_trips_and_rejects_unknown(
         yaml.safe_dump({"editor": {"preview_quality": "balanced"}}, sort_keys=False),
         encoding="utf-8",
     )
-    assert DEFAULT_NAVIGATOR_EXPAND_CLICK == "click-expand"
+    assert DEFAULT_NAVIGATOR_EXPAND_CLICK == "dbl-click"
     assert (
         load_user_config(config_path).editor.navigator_expand_click
         == DEFAULT_NAVIGATOR_EXPAND_CLICK
