@@ -27,7 +27,7 @@ STRIP_HIT_PX: int = 4
 CLIP_EDGE_HIT_PX: int = 5
 # Where two clips butt, the pointer within this many pixels of the boundary
 # rolls it; the edge zones lie beyond it, one inside each clip.
-CLIP_ROLL_HIT_PX: int = 2
+CLIP_ROLL_HIT_PX: int = 3
 
 
 @dataclass(frozen=True)
