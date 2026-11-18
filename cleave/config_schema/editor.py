@@ -54,7 +54,7 @@ NOTIFICATION_DISPLAY_MAX_SEC = 20
 # Half again the design mock's 330px column, so labels and stepped values fit.
 # The navigator and the inspector share this stack width.
 DEFAULT_INSPECTOR_WIDTH = 495
-DEFAULT_HELP_WIDTH = 480
+DEFAULT_HELP_WIDTH = 460
 # Navigator height in the shared stack. 0 fits the navigator to its rows.
 DEFAULT_NAVIGATOR_HEIGHT = 0
 # Timeline band height. 0 fits the band to its rows.

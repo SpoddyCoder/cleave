@@ -65,7 +65,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
-- The help column now opens wider by default, 480 pixels instead of 320, so more of each help page fits without wrapping. A width already saved in your settings is kept.
+- The help column now opens wider by default, 460 pixels instead of 320, so more of each help page fits without wrapping. A width already saved in your settings is kept.
 
 - Opening a project no longer re-reads every preset each time. Cleave re-indexes only when a preset pack folder is added, removed, or renamed in the presets folder, and the loading screen then says "New Milkdrop presets found, re-indexing". Otherwise a 135k preset collection opens in a fraction of a second. Changes inside an existing pack are picked up by Settings > Rescan presets.
 - Menu items and buttons that open a dialog before acting end in a single ellipsis character, and ones that act at once have none. File picker titles and the overlay body text dialog no longer end in dots. Add to preset list, Download packages, Full screen editor, Play full screen, and Exit full screen use sentence case like the rest of the menus.

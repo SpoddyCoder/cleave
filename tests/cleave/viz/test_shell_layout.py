@@ -339,22 +339,22 @@ def test_narrow_display_keeps_open_help_in_the_column_row() -> None:
         assert layout.help[3] == 200
 
     assert default.navigator[0] == 0
-    assert default.navigator[2] == 60
+    assert default.navigator[2] == 51
     assert default.inspector[0] == 0
-    assert default.inspector[2] == 60
-    assert default.visualiser == (60, 0, 1, 200)
-    assert default.help == (61, 0, 39, 200)
+    assert default.inspector[2] == 51
+    assert default.visualiser == (51, 0, 1, 200)
+    assert default.help == (52, 0, 48, 200)
 
     assert both_right.visualiser == (0, 0, 1, 200)
-    assert both_right.navigator[2] == 60
+    assert both_right.navigator[2] == 51
     assert both_right.navigator[0] == 1
     assert both_right.inspector == (
         1,
         both_right.navigator[3],
-        60,
+        51,
         200 - both_right.navigator[3],
     )
-    assert both_right.help == (61, 0, 39, 200)
+    assert both_right.help == (52, 0, 48, 200)
 
 
 def test_closed_help_matches_open_column_geometry() -> None:

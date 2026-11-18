@@ -218,7 +218,7 @@ def test_editor_config_from_settings_defaults() -> None:
     assert cfg.preview_quality == DEFAULT_EDITOR_PREVIEW_QUALITY
     assert cfg.notification_display_sec == DEFAULT_NOTIFICATION_DISPLAY_SEC
     assert cfg.inspector_width == DEFAULT_INSPECTOR_WIDTH == 495
-    assert cfg.help_width == DEFAULT_HELP_WIDTH == 480
+    assert cfg.help_width == DEFAULT_HELP_WIDTH == 460
     assert cfg.navigator_side == DEFAULT_NAVIGATOR_SIDE == "left"
     assert cfg.help_side == DEFAULT_HELP_SIDE == "right"
 
