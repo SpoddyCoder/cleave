@@ -119,9 +119,8 @@ No GPU compositing. See [docs/dev/windows-freeze.md](../../docs/dev/windows-free
    `workflow_call` with a non-empty `release_tag` input uses `gh release upload`
    for both and does not retain a workflow artifact.
 
-Updating libprojectM for a release: rebuild on Windows with vcpkg, replace the
-two DLLs in `packaging/windows/`, refresh `NOTICE.txt` and `dumpbin` notes if
-the dependency set changes, and commit.
+Updating libprojectM (and the other dependencies) for a release:
+[docs/dev/dependency-updates.md](../../docs/dev/dependency-updates.md).
 
 ## Installer
 

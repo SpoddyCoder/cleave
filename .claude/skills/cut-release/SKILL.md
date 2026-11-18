@@ -107,7 +107,7 @@ Leave `docs/dev/todos.md` items that are still open. Strike or remove only work 
 
 ### Completed plans
 
-Live design plans sit in `docs/dev/plans/`. Living references never move out of `docs/dev/`: `structured-releases.md`, `windows-freeze.md`, `roadmap.md`, `todos.md`, `projectm-api-coverage.md`.
+Live design plans sit in `docs/dev/plans/`. Living references never move out of `docs/dev/`: `structured-releases.md`, `windows-freeze.md`, `dependency-updates.md`, `roadmap.md`, `todos.md`, `projectm-api-coverage.md`.
 
 Move a plan to `docs/dev/plans-completed/` only when remaining work is shipped **or** explicitly parked in `todos.md` / `roadmap.md`. Mixed plans: extract shipped slices to `plans-completed/`; leave outstanding slices in `plans/`.
 
@@ -150,7 +150,7 @@ Useful, still in-tree only:
 
 - If Unreleased mixed several milestones, do not split versions unless the user asked. One dated section for this cut.
 - If README still tells testers to grab 5-day Actions artifacts *instead of* a Release, fix that once this tag will attach the zip.
-- Do not refresh requirement pins or freeze sidecars unless the user asked; note them in the handoff if they look stale.
+- Do not refresh requirement pins or freeze sidecars unless the user asked; note them in the handoff if they look stale, and point to [docs/dev/dependency-updates.md](../../../docs/dev/dependency-updates.md) for the update procedure (done before the cut, as its own change).
 
 ## 5. Handoff (no commit)
 
