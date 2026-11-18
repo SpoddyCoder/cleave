@@ -119,12 +119,6 @@ def clamp_timeline_height(value: int | float) -> int:
     return max(0, int(round(value)))
 
 
-def navigator_height_label(px: int) -> str:
-    if px <= 0:
-        return "fit to rows"
-    return f"{px} px"
-
-
 def clamp_ui_scale(value: int | float) -> int:
     return max(UI_SCALE_MIN, min(UI_SCALE_MAX, int(round(value))))
 

@@ -577,9 +577,6 @@ def publish_shell_layout(runtime: LiveVisualizerRuntime, layout: ShellLayout) ->
         runtime.controls.visualiser_resolution.note_draw_rect(None)
         return
     shell.set_layout(layout)
-    runtime.controls.settings.note_shell_stack(
-        layout.navigator[3], layout.navigator[3] + layout.inspector[3]
-    )
     present = layout.visualiser
     if runtime.controls.window.play_fullscreen:
         display_w, display_h = runtime.overlay_surface.get_size()

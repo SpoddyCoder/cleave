@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import time
+from collections.abc import Callable
+
 from cleave.viz.shell_context import ShellContext
 from cleave.viz.shell_layout import (
     clamp_timeline_band_height,
@@ -10,6 +13,7 @@ from cleave.viz.shell_layout import (
     splitter_request_timeline_height,
     splitter_request_width,
 )
+from cleave.viz.timeline_pointer import DOUBLE_CLICK_PX, DOUBLE_CLICK_SEC
 from cleave.viz.timeline_strip_layout import timeline_band_height_px
 
 
@@ -18,10 +22,19 @@ class SplitterDrag:
 
     The four requests are live sizes while a drag is held. A drag that
     moves at least 1px persists its size on release, then clears them.
+    A double-click on a splitter puts it back at its default.
     """
 
-    def __init__(self, context: ShellContext) -> None:
+    def __init__(
+        self,
+        context: ShellContext,
+        *,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
         self._ctx = context
+        self._clock = clock
+        # Last press: (time, x, y, splitter), for double-click detection.
+        self._last_press: tuple[float, float, float, str] | None = None
         self.insp_width: int | None = None
         self.help_width: int | None = None
         self.navigator_height: int | None = None
@@ -62,6 +75,21 @@ class SplitterDrag:
         which = self.at(float(pos[0]), float(pos[1]))
         if which is None:
             return False
+        x, y = float(pos[0]), float(pos[1])
+        now = self._clock()
+        last = self._last_press
+        if (
+            last is not None
+            and last[3] == which
+            and now - last[0] <= DOUBLE_CLICK_SEC
+            and abs(x - last[1]) <= DOUBLE_CLICK_PX
+            and abs(y - last[2]) <= DOUBLE_CLICK_PX
+        ):
+            self._last_press = None
+            self.cancel()
+            self._ctx.controls.settings.reset_splitter(which)
+            return True
+        self._last_press = (now, x, y, which)
         self.active = which
         self._down = (float(pos[0]), float(pos[1]))
         layout = self._ctx.layout

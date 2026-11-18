@@ -705,6 +705,18 @@ _PLAY_FULLSCREEN = Command(
     run=_play_fullscreen,
 )
 
+def _reset_panel_layout(controls: TuningControls) -> None:
+    controls.settings.reset_panel_layout()
+
+
+_RESET_PANEL_LAYOUT = Command(
+    id="view.reset_panel_layout",
+    label="Reset panel layout",
+    kind="command",
+    enabled=_enabled,
+    run=_reset_panel_layout,
+)
+
 def _can_page_back(ctx: CommandContext) -> bool:
     return ctx.page_back_id is not None
 
@@ -845,6 +857,8 @@ def build_menus(
                     SEPARATOR,
                     _PLAY_FULLSCREEN,
                     _FULLSCREEN_EDITOR,
+                    SEPARATOR,
+                    _RESET_PANEL_LAYOUT,
                     SEPARATOR,
                     _CURATION,
                 ),

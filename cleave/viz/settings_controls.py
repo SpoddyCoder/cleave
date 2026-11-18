@@ -8,6 +8,10 @@ from dataclasses import replace
 from cleave.config import CleaveConfig, EditorPreviewQuality
 from cleave.config_schema.editor import (
     COLUMN_SIDES,
+    DEFAULT_HELP_WIDTH,
+    DEFAULT_INSPECTOR_WIDTH,
+    DEFAULT_NAVIGATOR_HEIGHT,
+    DEFAULT_TIMELINE_HEIGHT,
     EDITOR_PREVIEW_QUALITIES,
     NAVIGATOR_EXPAND_CLICKS,
     clamp_residual_latency_ms,
@@ -20,7 +24,6 @@ from cleave.config_schema.editor import (
 from cleave.user_config import persist_editor_settings
 from cleave.choice import step_choice
 from cleave.viz.session import TuningSession
-from cleave.viz.shell_layout import navigator_row_px
 from cleave.viz.theme import (
     palette_for_theme,
     set_palette,
@@ -44,15 +47,6 @@ class SettingsControls:
         self.cfg = cfg
         self._on_notification = on_notification
         self._on_notification_display_changed = on_notification_display_changed
-        # Last drawn navigator height and stack band, so stepping the
-        # navigator height starts from what is on screen.
-        self._drawn_navigator_px = 0
-        self._stack_band_px = 0
-
-    def note_shell_stack(self, navigator_px: int, band_px: int) -> None:
-        """Remember the frame's navigator height and navigator+inspector band."""
-        self._drawn_navigator_px = max(0, int(navigator_px))
-        self._stack_band_px = max(0, int(band_px))
 
     def adjust_residual_latency_ms(self, *, forward: bool, large: bool) -> None:
         step = 50 if large else 10
@@ -133,34 +127,6 @@ class SettingsControls:
         )
         persist_editor_settings(self.cfg)
 
-    def adjust_navigator_height(self, *, forward: bool, large: bool) -> None:
-        """Step the navigator height from the drawn height.
-
-        Fit to rows sits below the one-row minimum: Left from the minimum
-        returns to fit, and a step from fit starts at the drawn height.
-        """
-        step = 50 if large else 10
-        row = navigator_row_px()
-        band = self._stack_band_px
-        max_px = band - row if band >= row * 2 else None
-        current = self.cfg.editor.navigator_height
-        base = current if current > 0 else self._drawn_navigator_px
-        if base <= 0:
-            base = row
-        if max_px is not None:
-            base = min(base, max_px)
-        base = max(row, base)
-        if not forward and current > 0 and base <= row:
-            new_value = 0
-        else:
-            new_value = base + (step if forward else -step)
-            if max_px is not None:
-                new_value = min(new_value, max_px)
-            new_value = max(row, new_value)
-        if new_value == current:
-            return
-        self.set_navigator_height(new_value)
-
     def set_navigator_height(self, height: int) -> None:
         self.cfg.editor = replace(
             self.cfg.editor, navigator_height=clamp_navigator_height(height)
@@ -170,6 +136,32 @@ class SettingsControls:
     def set_timeline_height(self, height: int) -> None:
         self.cfg.editor = replace(
             self.cfg.editor, timeline_height=clamp_timeline_height(height)
+        )
+        persist_editor_settings(self.cfg)
+
+    def reset_splitter(self, which: str) -> None:
+        """Put one splitter back at its default: ``insp``, ``help``, ``nav``, or ``timeline``."""
+        if which == "nav":
+            self.set_navigator_height(DEFAULT_NAVIGATOR_HEIGHT)
+        elif which == "timeline":
+            self.set_timeline_height(DEFAULT_TIMELINE_HEIGHT)
+        elif which == "insp":
+            self.set_shell_column_widths(
+                DEFAULT_INSPECTOR_WIDTH, self.cfg.editor.help_width
+            )
+        elif which == "help":
+            self.set_shell_column_widths(
+                self.cfg.editor.inspector_width, DEFAULT_HELP_WIDTH
+            )
+
+    def reset_panel_layout(self) -> None:
+        """Put every column width and band height back at its default."""
+        self.cfg.editor = replace(
+            self.cfg.editor,
+            inspector_width=DEFAULT_INSPECTOR_WIDTH,
+            help_width=DEFAULT_HELP_WIDTH,
+            navigator_height=DEFAULT_NAVIGATOR_HEIGHT,
+            timeline_height=DEFAULT_TIMELINE_HEIGHT,
         )
         persist_editor_settings(self.cfg)
 

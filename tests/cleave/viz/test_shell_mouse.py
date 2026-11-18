@@ -362,6 +362,7 @@ def _host() -> Iterator[ShellHost]:
         cfg=SimpleNamespace(editor=editor),
         settings=SimpleNamespace(
             set_shell_column_widths=MagicMock(),
+            reset_splitter=MagicMock(),
             set_navigator_height=MagicMock(),
             set_timeline_height=MagicMock(),
         ),
@@ -417,6 +418,9 @@ def _stack_edge(host: ShellHost) -> int:
 
 def test_splitter_drag_updates_session_widths_without_imgui_buttons() -> None:
     with _host() as host:
+        # Presses a second apart, so the second press starts a drag.
+        clock = iter(float(n) for n in range(10))
+        host.splitters._clock = lambda: next(clock)
         edge = _stack_edge(host)
         host.process_event(_motion((edge, 100)))
         assert _gesture_pointer(host) is PointerShape.RESIZE_EW
@@ -521,6 +525,29 @@ def test_splitter_mouseup_under_one_pixel_does_not_persist() -> None:
         assert host.insp_width is None
         assert host.help_width == 360
         assert host.splitters.active is None
+
+
+def test_splitter_double_click_resets_that_splitter() -> None:
+    with _host() as host:
+        edge = _stack_edge(host)
+        for _ in range(2):
+            host.process_event(_button(pygame.MOUSEBUTTONDOWN, (edge, 100)))
+            host.process_event(_button(pygame.MOUSEBUTTONUP, (edge, 100)))
+        settings = host.context.controls.settings
+        settings.reset_splitter.assert_called_once_with("insp")
+        settings.set_shell_column_widths.assert_not_called()
+        assert host.splitters.active is None
+
+
+def test_splitter_presses_far_apart_do_not_reset() -> None:
+    with _host() as host:
+        clock = iter((0.0, 1.0))
+        host.splitters._clock = lambda: next(clock)
+        edge = _stack_edge(host)
+        for _ in range(2):
+            host.process_event(_button(pygame.MOUSEBUTTONDOWN, (edge, 100)))
+            host.process_event(_button(pygame.MOUSEBUTTONUP, (edge, 100)))
+        host.context.controls.settings.reset_splitter.assert_not_called()
 
 
 def test_help_splitter_drag_persists_requested_width() -> None:

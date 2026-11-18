@@ -34,6 +34,8 @@ from cleave.config_schema.editor import (
     DEFAULT_EDITOR_PREVIEW_QUALITY,
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
     DEFAULT_HELP_SIDE,
+    DEFAULT_HELP_WIDTH,
+    DEFAULT_INSPECTOR_WIDTH,
     DEFAULT_NAVIGATOR_SIDE,
     MIN_COLUMN_WIDTH,
 )
@@ -4267,6 +4269,45 @@ def test_settings_set_shell_column_widths_clamps_and_persists(tmp_path: Path) ->
     assert loaded.editor.inspector_width == 510
     assert loaded.editor.help_width == 360
     assert "navigator_width" not in user_path.read_text(encoding="utf-8")
+    assert not controls.config_dirty
+
+
+def test_settings_reset_splitter_resets_only_that_size(tmp_path: Path) -> None:
+    controls = make_controls(("layer_1",))
+    controls.cfg.user_config_path = tmp_path / "user.yaml"
+    settings = controls.settings
+    settings.set_shell_column_widths(510, 360)
+    settings.set_navigator_height(200)
+    settings.set_timeline_height(300)
+
+    settings.reset_splitter("insp")
+    assert controls.cfg.editor.inspector_width == DEFAULT_INSPECTOR_WIDTH
+    assert controls.cfg.editor.help_width == 360
+    settings.reset_splitter("help")
+    assert controls.cfg.editor.help_width == DEFAULT_HELP_WIDTH
+    settings.reset_splitter("nav")
+    assert controls.cfg.editor.navigator_height == 0
+    assert controls.cfg.editor.timeline_height == 300
+    settings.reset_splitter("timeline")
+    assert controls.cfg.editor.timeline_height == 0
+    assert not controls.config_dirty
+
+
+def test_reset_panel_layout_resets_every_size_and_persists(tmp_path: Path) -> None:
+    controls = make_controls(("layer_1",))
+    user_path = tmp_path / "user.yaml"
+    controls.cfg.user_config_path = user_path
+    settings = controls.settings
+    settings.set_shell_column_widths(510, 360)
+    settings.set_navigator_height(200)
+    settings.set_timeline_height(300)
+
+    command_by_id("view.reset_panel_layout").run(controls)
+    editor = load_user_config(user_path).editor
+    assert editor.inspector_width == DEFAULT_INSPECTOR_WIDTH
+    assert editor.help_width == DEFAULT_HELP_WIDTH
+    assert editor.navigator_height == 0
+    assert editor.timeline_height == 0
     assert not controls.config_dirty
 
 

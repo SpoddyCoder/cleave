@@ -8,7 +8,6 @@ from cleave.config_schema.editor import (
     EDITOR_PREVIEW_QUALITY_HELP_ENTRIES,
     NAVIGATOR_EXPAND_CLICKS,
     navigator_expand_click_label,
-    navigator_height_label,
     ui_scale_label,
     notification_display_label,
 )
@@ -58,11 +57,6 @@ def _format_settings_ui_scale(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
     return ui_scale_label(state.settings.ui_scale)
-
-def _format_settings_ui_navigator_height(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return navigator_height_label(state.settings.navigator_height)
 
 def _format_settings_residual_latency_ms(
     state: TuningViewState, _desc: RowDescriptor
@@ -155,11 +149,6 @@ def _apply_settings_ui_scale(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
 ) -> None:
     controls.settings.adjust_ui_scale(forward=forward, large=large)
-
-def _apply_settings_ui_navigator_height(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, large: bool,
-) -> None:
-    controls.settings.adjust_navigator_height(forward=forward, large=large)
 
 def _apply_settings_residual_latency_ms(
     controls: TuningControls,
@@ -453,28 +442,6 @@ SPECS: dict[RowKind, RowSpec] = {
         help_description=(
             "Size of all editor text and the spacing around it.",
             "It does not change the credits cards.",
-        ),
-        is_pinned=True,
-        repeatable=True,
-        parent_group="settings_ui",
-    ),
-    RowKind.SETTINGS_UI_NAVIGATOR_HEIGHT: RowSpec(
-        affordance=RowAffordance.VALUE_STEP,
-        panel_label="navigator height",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_settings_ui_navigator_height,
-        apply_horizontal=_apply_settings_ui_navigator_height,
-        help_title="Navigator Height",
-        help_entries=(
-            ("Left/Right", "adjust height (10 px)"),
-            ("PgUp/PgDn", "large step (50 px)"),
-            ("Drag", "move the line between navigator and inspector"),
-        ),
-        help_description=(
-            "Height of the navigator.",
-            "The inspector fills the space below it.",
-            "Fit to rows makes the navigator as tall as its tree, up to half the column.",
-            "Press Left at the smallest height to go back to Fit to rows.",
         ),
         is_pinned=True,
         repeatable=True,

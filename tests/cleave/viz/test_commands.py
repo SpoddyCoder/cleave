@@ -63,6 +63,7 @@ _STATIC_IDS = (
     "view.page_forward",
     "view.play_fullscreen",
     "view.fullscreen_editor",
+    "view.reset_panel_layout",
     "view.preset_curation",
     *_PROJECT_PAGE_IDS,
     "project.separate",
@@ -202,6 +203,8 @@ def test_menus_list_taxonomy_ids_once() -> None:
         None,
         "view.play_fullscreen",
         "view.fullscreen_editor",
+        None,
+        "view.reset_panel_layout",
         None,
         "view.preset_curation",
     ]
