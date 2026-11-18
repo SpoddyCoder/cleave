@@ -7,7 +7,7 @@ their own mutations, so the inspector and form dialogs share the look.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum, auto
 
 from imgui_bundle import imgui
@@ -293,12 +293,14 @@ class ChoiceListPointer:
 
     ``hovered`` is the option under the pointer. ``picked`` is the option
     clicked. ``outside`` is a click anywhere else, which should close the list.
+    ``rect`` is the list window.
     """
 
     hovered: int | None = None
     picked: int | None = None
     outside: bool = False
     rows: tuple[Rect, ...] = ()
+    rect: Rect | None = None
 
 
 @dataclass
@@ -388,10 +390,10 @@ def draw_choice_list(
             imgui.end()
     finally:
         imgui.pop_style_var(2)
+    rect = (int(x), int(y), int(width), int(height))
     clicked = imgui.is_mouse_clicked(0) and not just_opened
-    if clicked and result.picked is None and not hovered_window:
-        return ChoiceListPointer(hovered=result.hovered, outside=True, rows=result.rows)
-    return result
+    outside = clicked and result.picked is None and not hovered_window
+    return replace(result, outside=outside, rect=rect)
 
 
 def _draw_list_rows(

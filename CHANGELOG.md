@@ -185,6 +185,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Fixed
 
 - An inspector dropdown list that opens over the edge between the navigator and the inspector now draws above the focused panel's outline, instead of the outline crossing its options.
+- An inspector dropdown list that hangs over the timeline strip now takes every click on its options. A click on an option that sat over the ruler or a row used to reach the strip instead.
 - The transport bar's play state, clock, and bar centre between the menu rule and the rule below, the navigator rows centre between its top and bottom borders, and the inspector title line, with its icons and Back and Forward arrows, centres between the panel's top border and the rule below it. Each sat a pixel or so off.
 - The inspector's title line, with its breadcrumb and Back and Forward arrows, stays at the top of the panel while a long page scrolls, and the scrollbar runs beside the rows only.
 - The editor no longer slows down as layers gain preset list entries. It was rechecking for unsaved changes several times a frame, reading the disk for every preset each time; it now checks once a frame without touching the disk.

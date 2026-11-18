@@ -172,6 +172,7 @@ class TopLayer:
         self._pending: list[TopLayerSurface] = []
         self._lifts: list[tuple[str, Rect]] = []
         self._rects: list[Rect] = []
+        self._claims: list[Rect] = []
         self._modal = False
 
     def push(self, surface: TopLayerSurface) -> None:
@@ -184,6 +185,14 @@ class TopLayer:
         pointer, so it scrolls; a press in it does not cancel the modal.
         """
         self._lifts.append((window_name, rect))
+
+    def claim(self, rect: Rect) -> None:
+        """Take the pointer in *rect* for a window drawn outside the top layer.
+
+        An inspector choice list draws inside the shell, so a press on it
+        must not reach the timeline strip under it.
+        """
+        self._claims.append(rect)
 
     def lifted_rects(self) -> tuple[Rect, ...]:
         """Rects lifted this frame. Surfaces read it while ``draw`` runs."""
@@ -213,7 +222,7 @@ class TopLayer:
         """
         pending = self._pending
         modal = any(surface.modal for surface in pending)
-        rects: list[Rect] = []
+        rects: list[Rect] = list(self._claims)
         try:
             if modal:
                 rects.append(_draw_scrim())
@@ -226,3 +235,4 @@ class TopLayer:
             self._modal = modal
             self._pending.clear()
             self._lifts.clear()
+            self._claims.clear()

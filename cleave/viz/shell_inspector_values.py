@@ -459,6 +459,8 @@ class ValueControls:
             "inspector-choice-list", view, ImguiTextSizer(), anchor=anchor
         )
         self.choice_list_rows = pointer.rows
+        if pointer.rect is not None:
+            self._ctx.top_layer.claim(pointer.rect)
         if pointer.picked is not None:
             inline.pick_choice(pointer.picked)
         elif pointer.outside:

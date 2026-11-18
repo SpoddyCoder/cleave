@@ -242,3 +242,17 @@ def test_the_open_list_draws_over_the_panel_focus_outline() -> None:
         draw_shell(host)
         names = [str(draw_list._owner_name) for draw_list in imgui.get_draw_data().cmd_lists]
     assert names.index("##shell-focus-border") < names.index("##inspector-choice-list")
+
+
+def test_a_press_on_the_open_list_does_not_reach_the_strip_under_it() -> None:
+    with _inspector("settings.preview") as (host, controls):
+        _frame(host, (0, 0))
+        _frame(host, rect_center(host.inspector.values.choice_rects[_QUALITY]), click=True)
+        row = rect_center(host.inspector.values.choice_list_rows[1])
+        assert host.top_layer.captures_pointer(*row)
+        presses: list[tuple[float, float]] = []
+        host.strip.press = lambda x, y, button=0: presses.append((x, y))
+        _frame(host, row, click=True)
+        assert presses == []
+        assert controls.cfg.editor.preview_quality == "performance"
+        assert not host.top_layer.captures_pointer(*row)

@@ -170,7 +170,14 @@ class ShellHost:
             y = float(event.pos[1])
             self.splitters.track_motion(x, y)
             if self.strip.pointer is not None:
-                self.strip.pointer.motion(x, y)
+                held = imgui_host.button_held(0) or imgui_host.button_held(
+                    MIDDLE_BUTTON
+                )
+                if not held and self.top_layer.captures_pointer(x, y):
+                    # A choice list or menu over the strip keeps its hover.
+                    self.strip.pointer.clear_hover()
+                else:
+                    self.strip.pointer.motion(x, y)
             return
         if event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP):
             if self._page_history_button(event):
