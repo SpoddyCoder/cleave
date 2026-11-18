@@ -24,8 +24,11 @@ from cleave.paths import (
 from cleave.model_weights import (
     DEMUCS_HQ_MODEL,
     DEMUCS_MODEL,
+    demucs_bag,
+    demucs_checkpoint_name,
     demucs_weight_spec,
     ensure_weight_files,
+    hub_checkpoints_dir,
 )
 from cleave.project import load_manifest, manifest_path, mix_path, write_manifest
 from cleave.signals import SIGNALS_VERSION
@@ -304,26 +307,26 @@ def _prepare_project_mix(
     return dest, audio_path
 
 
-def _load_demucs_track(audio_path: Path, audio_channels: int, samplerate: int):
-    """Load mix audio as a ``(channels, samples)`` float tensor for Demucs.
+def _load_demucs_bag(model: str):
+    """Build Demucs bag *model* from the safetensors :func:`ensure_weight_files` fetched."""
+    from demucs.apply import BagOfModels
+    from demucs.hf import load_safetensors_model
 
-    Frozen: decode with the sidecar from :func:`cleave.ffmpeg.ffmpeg_executable`
-    (Demucs 4.0.1 ``load_track`` also shells out to ``ffprobe``, which we do
-    not ship). Checkout: ``demucs.separate.load_track``.
+    bag = demucs_bag(model)
+    root = hub_checkpoints_dir()
+    models = [
+        load_safetensors_model(root / demucs_checkpoint_name(sig))
+        for sig in bag.signatures
+    ]
+    return BagOfModels(models, bag.weights, bag.segment)
+
+
+def _decode_mix(audio_path: Path, audio_channels: int, samplerate: int):
+    """Decode *audio_path* into a ``(channels, samples)`` float tensor for Demucs.
+
+    Uses :func:`cleave.ffmpeg.ffmpeg_executable`: the sidecar when frozen,
+    PATH ffmpeg in a checkout. Demucs has no public track loader.
     """
-    if is_frozen():
-        return _load_track_with_sidecar_ffmpeg(
-            audio_path, audio_channels, samplerate
-        )
-    from demucs.separate import load_track
-
-    return load_track(audio_path, audio_channels, samplerate)
-
-
-def _load_track_with_sidecar_ffmpeg(
-    audio_path: Path, audio_channels: int, samplerate: int
-):
-    """Decode *audio_path* with sidecar ffmpeg into a Demucs input tensor."""
     import numpy as np
     import torch
 
@@ -484,76 +487,74 @@ def _write_demucs_stems(
 ) -> None:
     """Load *model* in-process and write stem wavs into *dest_paths*.
 
-    Uses ``demucs.pretrained.get_model`` and ``demucs.apply.apply_model``.
-    Imports stay lazy so play/render never load torch. Frozen: sidecar
-    ffmpeg is on PATH for the Demucs call, and mix load uses that binary
-    rather than Demucs ``load_track`` (which also needs ``ffprobe``).
-    Stem wavs are written with soundfile, not Demucs torchaudio export
-    (TorchCodec).
+    Loads the bag with :func:`_load_demucs_bag` and runs ``demucs.apply.apply_model``.
+    Imports stay lazy so play/render never load torch. The mix is decoded
+    with ffmpeg (:func:`_decode_mix`) and stem wavs are written with
+    soundfile, so Demucs never runs ffmpeg, ffprobe, or TorchCodec.
+    A missing ffmpeg fails here, before the weight download.
     """
-    from cleave.ffmpeg import sidecar_ffmpeg_on_path
+    from cleave.ffmpeg import ffmpeg_executable
 
-    with sidecar_ffmpeg_on_path():
-        import torch
-        from demucs.apply import apply_model
-        from demucs.pretrained import get_model
+    ffmpeg_executable()
+    import torch
+    from demucs.apply import apply_model
 
-        torch.hub.set_dir(str(model_cache_dir()))
-        ensure_weight_files(demucs_weight_spec(model), on_progress=on_progress)
-        _report_separation(on_progress, 0.0)
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+    torch.hub.set_dir(str(model_cache_dir()))
+    ensure_weight_files(demucs_weight_spec(model), on_progress=on_progress)
+    _report_separation(on_progress, 0.0)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        try:
-            model_obj = get_model(model)
-            model_obj.cpu()
-            model_obj.eval()
-            _report_separation(on_progress, _SEP_FRAC_MODEL)
-            wav = _load_demucs_track(
-                audio_path, model_obj.audio_channels, model_obj.samplerate
-            )
-            _report_separation(on_progress, _SEP_FRAC_TRACK)
-            ref = wav.mean(0)
-            wav -= ref.mean()
-            wav /= ref.std()
-            with _intercept_demucs_tqdm(
-                on_progress, _SEP_MESSAGE, _SEP_FRAC_TRACK, _SEP_FRAC_APPLY_END
-            ):
-                sources = apply_model(
-                    model_obj,
-                    wav[None],
-                    device=device,
-                    shifts=1,
-                    split=True,
-                    overlap=0.25,
-                    progress=True,
-                )[0]
-            sources *= ref.std()
-            sources += ref.mean()
-        except FileNotFoundError:
-            raise
-        except SystemExit as exc:
-            raise RuntimeError(f"demucs failed to load {audio_path}") from exc
-        except Exception as exc:
-            _reraise_torchcodec(exc)
-            raise RuntimeError(f"demucs failed for {audio_path}") from exc
+    try:
+        model_obj = _load_demucs_bag(model)
+        model_obj.cpu()
+        model_obj.eval()
+        _report_separation(on_progress, _SEP_FRAC_MODEL)
+        wav = _decode_mix(
+            audio_path, model_obj.audio_channels, model_obj.samplerate
+        )
+        _report_separation(on_progress, _SEP_FRAC_TRACK)
+        ref = wav.mean(0)
+        wav -= ref.mean()
+        wav /= ref.std()
+        with _intercept_demucs_tqdm(
+            on_progress, _SEP_MESSAGE, _SEP_FRAC_TRACK, _SEP_FRAC_APPLY_END
+        ):
+            sources = apply_model(
+                model_obj,
+                wav[None],
+                device=device,
+                shifts=1,
+                split=True,
+                overlap=0.25,
+                progress=True,
+            )[0]
+        sources *= ref.std()
+        sources += ref.mean()
+    except FileNotFoundError:
+        raise
+    except SystemExit as exc:
+        raise RuntimeError(f"demucs failed to load {audio_path}") from exc
+    except Exception as exc:
+        _reraise_torchcodec(exc)
+        raise RuntimeError(f"demucs failed for {audio_path}") from exc
 
-        _report_separation(on_progress, _SEP_FRAC_APPLY_END)
-        try:
-            for index, name in enumerate(model_obj.sources):
-                dest = dest_paths.get(name)
-                if dest is None:
-                    continue
-                _save_stem_wav(sources[index], dest, model_obj.samplerate)
-        except Exception as exc:
-            _reraise_torchcodec(exc)
-            raise RuntimeError(f"demucs failed to write stems for {audio_path}") from exc
+    _report_separation(on_progress, _SEP_FRAC_APPLY_END)
+    try:
+        for index, name in enumerate(model_obj.sources):
+            dest = dest_paths.get(name)
+            if dest is None:
+                continue
+            _save_stem_wav(sources[index], dest, model_obj.samplerate)
+    except Exception as exc:
+        _reraise_torchcodec(exc)
+        raise RuntimeError(f"demucs failed to write stems for {audio_path}") from exc
 
-        _report_separation(on_progress, 1.0)
-        missing_src = [name for name, dst in dest_paths.items() if not dst.is_file()]
-        if missing_src:
-            raise RuntimeError(
-                f"demucs output missing stem files: {', '.join(missing_src)}"
-            )
+    _report_separation(on_progress, 1.0)
+    missing_src = [name for name, dst in dest_paths.items() if not dst.is_file()]
+    if missing_src:
+        raise RuntimeError(
+            f"demucs output missing stem files: {', '.join(missing_src)}"
+        )
 
 
 def _run_demucs(

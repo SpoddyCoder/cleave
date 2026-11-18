@@ -21,6 +21,8 @@ packaging/windows/
     libprojectM/
       LICENSE.txt                # LGPL-2.1 (from upstream)
       NOTICE.txt                 # version, source, build notes
+  vcpkg-overlay/
+    projectm/                    # vcpkg port pinned to the shipped projectM commit
   README.md
 ```
 
@@ -38,10 +40,11 @@ are `FFMPEG_URL` and `FFMPEG_SHA256` in that script.
 | Item | Value |
 | --- | --- |
 | Version | 4.2.0 (embedded in committed DLLs; Cleave requires 4.2+) |
-| Build | vcpkg + Visual Studio 2022, `x64-windows` shared triplet |
+| Source | projectM master at `eae22de` (2026-10-13); 4.2.0 has no upstream release yet |
+| Build | vcpkg + Visual Studio 2022, `x64-windows` shared triplet, with the pinned overlay port in [vcpkg-overlay/projectm/](vcpkg-overlay/projectm/); recipe in [licenses/libprojectM/NOTICE.txt](licenses/libprojectM/NOTICE.txt) |
 | Upstream | [projectM-visualizer/projectm](https://github.com/projectM-visualizer/projectm) (LGPL-2.1) |
 
-### `dumpbin /dependents` (committed DLLs)
+### Dependent DLLs (committed DLLs)
 
 Checked with `objdump -p` on the committed PE files. Neither DLL pulls in
 extra vcpkg runtime DLLs (for example zlib) in this build:
@@ -51,7 +54,7 @@ UCRT (`api-ms-win-crt-*`).
 
 **projectM-4-playlist.dll:** `projectM-4.dll`, same MSVC/UCRT set.
 
-Re-run `dumpbin /dependents` after rebuilding DLLs. Commit any new non-system
+Re-run `dumpbin /dependents` (Developer PowerShell) or `objdump -p` (WSL) after rebuilding DLLs. Commit any new non-system
 DLLs into this directory so [scripts/windows_stage_freeze.py](../../scripts/windows_stage_freeze.py)
 copies them beside the exe. OpenGL comes from the GPU driver
 (`opengl32.dll`); do not bundle it.
@@ -83,7 +86,7 @@ From a native Windows checkout (not WSL). Do not `pip install -r requirements.tx
 
 1. `pip install -r requirements-freeze.txt`
 2. `pip install -r requirements-torch-cpu.txt`
-3. `pip install demucs==4.0.1 beat-this==1.1.0 librosa==0.11.0 einops==0.8.2 rotary-embedding-torch==0.9.1 tqdm==4.67.3 setuptools==80.8.0`
+3. `pip install demucs==4.1.0 beat-this==1.1.0 librosa==1.0.1 einops==0.8.2 rotary-embedding-torch==0.9.2 tqdm==4.70.1 setuptools==84.2.1`
 4. `pyinstaller packaging/cleave.spec`
 5. `python scripts/windows_stage_freeze.py --dist dist/cleave`
    (copies `packaging/windows/*.dll` and libprojectM licenses, fetches pinned

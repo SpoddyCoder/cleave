@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import subprocess
 import sys
 from contextlib import contextmanager
@@ -24,7 +23,7 @@ from cleave.project import (
 )
 from cleave.model_weights import WeightDownloadError
 from cleave.separate import (
-    _load_demucs_track,
+    _decode_mix,
     _run_demucs,
     _save_stem_wav,
     _write_demucs_stems,
@@ -60,16 +59,16 @@ def _mock_demucs_writes_stems() -> Iterator[dict[str, MagicMock]]:
         patch("cleave.separate.ensure_weight_files") as ensure,
         patch("torch.hub.set_dir") as set_dir,
         patch("torch.cuda.is_available", return_value=False),
-        patch("demucs.pretrained.get_model", return_value=model_obj) as get_model,
-        patch("demucs.separate.load_track", return_value=MagicMock()) as load_track,
+        patch("cleave.separate._load_demucs_bag", return_value=model_obj) as load_bag,
+        patch("cleave.separate._decode_mix", return_value=MagicMock()) as decode_mix,
         patch("demucs.apply.apply_model", return_value=[MagicMock()]),
         patch("cleave.separate._save_stem_wav", side_effect=fake_save_stem),
     ):
         yield {
             "ensure": ensure,
             "set_dir": set_dir,
-            "get_model": get_model,
-            "load_track": load_track,
+            "load_bag": load_bag,
+            "decode_mix": decode_mix,
             "model": model_obj,
         }
 
@@ -356,8 +355,8 @@ def test_write_demucs_stems_reports_progress_phases(
         patch("cleave.separate.ensure_weight_files"),
         patch("torch.hub.set_dir"),
         patch("torch.cuda.is_available", return_value=False),
-        patch("demucs.pretrained.get_model", return_value=model_obj),
-        patch("demucs.separate.load_track", return_value=MagicMock()),
+        patch("cleave.separate._load_demucs_bag", return_value=model_obj),
+        patch("cleave.separate._decode_mix", return_value=MagicMock()),
         patch("demucs.apply.apply_model", return_value=[MagicMock()]),
         patch("cleave.separate._save_stem_wav", side_effect=fake_save_stem),
     ):
@@ -530,13 +529,13 @@ def test_run_demucs_skips_copy_when_mix_in_project(
     with _mock_demucs_writes_stems() as mocks:
         _run_demucs(mix, project, high_quality=False, force=True)
 
-    mocks["get_model"].assert_called_once_with("htdemucs")
+    mocks["load_bag"].assert_called_once_with("htdemucs")
     mocks["set_dir"].assert_called_once_with(str(model_cache_dir()))
     mocks["ensure"].assert_called_once()
     assert mocks["ensure"].call_args.args[0].label == "Demucs htdemucs"
     assert mix.read_bytes() == b"mix"
-    mocks["load_track"].assert_called_once()
-    assert mocks["load_track"].call_args.args[0] == mix
+    mocks["decode_mix"].assert_called_once()
+    assert mocks["decode_mix"].call_args.args[0] == mix
     for name in STEM_NAMES:
         assert (stems_dir(project) / f"{name}.wav").is_file()
 
@@ -553,13 +552,13 @@ def test_run_demucs_high_quality_loads_htdemucs_ft(
     with _mock_demucs_writes_stems() as mocks:
         _run_demucs(mix, project, high_quality=True, force=True)
 
-    mocks["get_model"].assert_called_once_with("htdemucs_ft")
+    mocks["load_bag"].assert_called_once_with("htdemucs_ft")
     mocks["ensure"].assert_called_once()
     assert mocks["ensure"].call_args.args[0].label == "Demucs htdemucs_ft"
     assert load_manifest(project).demucs_model == "htdemucs_ft"
 
 
-def test_run_demucs_wraps_get_model_failure(
+def test_run_demucs_wraps_model_load_failure(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
@@ -572,8 +571,8 @@ def test_run_demucs_wraps_get_model_failure(
         patch("cleave.separate.ensure_weight_files"),
         patch("torch.hub.set_dir"),
         patch("torch.cuda.is_available", return_value=False),
-        patch("demucs.pretrained.get_model", side_effect=RuntimeError("hub down")),
-        patch("demucs.separate.load_track"),
+        patch("cleave.separate._load_demucs_bag", side_effect=RuntimeError("weights corrupt")),
+        patch("cleave.separate._decode_mix"),
         patch("demucs.apply.apply_model"),
         pytest.raises(RuntimeError, match="demucs failed"),
     ):
@@ -597,7 +596,7 @@ def test_run_demucs_propagates_weight_download_error(
         patch("cleave.separate.ensure_weight_files", side_effect=err),
         patch("torch.hub.set_dir"),
         patch("torch.cuda.is_available", return_value=False),
-        patch("demucs.pretrained.get_model"),
+        patch("cleave.separate._load_demucs_bag"),
         pytest.raises(WeightDownloadError, match="network connection is required"),
     ):
         _run_demucs(mix, project, high_quality=False, force=True)
@@ -618,8 +617,8 @@ def test_run_demucs_raises_when_stems_not_written(
         patch("cleave.separate.ensure_weight_files"),
         patch("torch.hub.set_dir"),
         patch("torch.cuda.is_available", return_value=False),
-        patch("demucs.pretrained.get_model", return_value=model_obj),
-        patch("demucs.separate.load_track", return_value=MagicMock()),
+        patch("cleave.separate._load_demucs_bag", return_value=model_obj),
+        patch("cleave.separate._decode_mix", return_value=MagicMock()),
         patch("demucs.apply.apply_model", return_value=[MagicMock()]),
         patch("cleave.separate._save_stem_wav"),
         pytest.raises(RuntimeError, match="missing stem files"),
@@ -805,8 +804,8 @@ def test_run_separate_creates_project_and_renders(
         "pcm_s16le",
         str(project.resolve() / ".song.ingest.wav"),
     ]
-    mocks["load_track"].assert_called_once()
-    assert mocks["load_track"].call_args.args[0] == project.resolve() / "song.wav"
+    mocks["decode_mix"].assert_called_once()
+    assert mocks["decode_mix"].call_args.args[0] == project.resolve() / "song.wav"
 
 
 def test_run_separate_force_deletes_stale_mix(
@@ -890,7 +889,7 @@ def test_run_demucs_frozen_missing_ffmpeg_names_sidecar(
         _run_demucs(mix, project, high_quality=False, force=True)
 
 
-def test_write_demucs_stems_frozen_prepends_install_dir_and_skips_load_track(
+def test_write_demucs_stems_frozen_decodes_with_the_sidecar(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
@@ -907,8 +906,7 @@ def test_write_demucs_stems_frozen_prepends_install_dir_and_skips_load_track(
     model_obj.samplerate = 44100
     seen: dict[str, object] = {}
 
-    def fake_get_model(_name: str) -> MagicMock:
-        seen["path"] = os.environ["PATH"]
+    def fake_load_bag(_name: str) -> MagicMock:
         return model_obj
 
     def fake_run(cmd: list[str], **_kwargs: object) -> MagicMock:
@@ -933,8 +931,7 @@ def test_write_demucs_stems_frozen_prepends_install_dir_and_skips_load_track(
         patch("cleave.separate.ensure_weight_files"),
         patch("torch.hub.set_dir"),
         patch("torch.cuda.is_available", return_value=False),
-        patch("demucs.pretrained.get_model", side_effect=fake_get_model),
-        patch("demucs.separate.load_track") as load_track,
+        patch("cleave.separate._load_demucs_bag", side_effect=fake_load_bag),
         patch("demucs.apply.apply_model", return_value=[MagicMock()]),
         patch("demucs.audio.save_audio") as save_audio,
         patch("cleave.separate._save_stem_wav", side_effect=fake_save_stem),
@@ -942,26 +939,26 @@ def test_write_demucs_stems_frozen_prepends_install_dir_and_skips_load_track(
     ):
         _write_demucs_stems(audio, dest_paths, model="htdemucs")
 
-    load_track.assert_not_called()
     save_audio.assert_not_called()
-    path = seen["path"]
-    assert isinstance(path, str)
-    assert path.split(os.pathsep)[0] == str(tmp_path.resolve())
     cmd = seen["ffmpeg_cmd"]
     assert isinstance(cmd, list)
     assert cmd[0] == str(sidecar.resolve())
 
 
-def test_load_demucs_track_checkout_uses_load_track(
+def test_decode_mix_checkout_uses_path_ffmpeg(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setattr(sys, "frozen", False, raising=False)
+    monkeypatch.setattr("cleave.ffmpeg.shutil.which", lambda _name: "/usr/bin/ffmpeg")
     audio = tmp_path / "mix.wav"
-    fake = MagicMock(name="wav")
-    with patch("demucs.separate.load_track", return_value=fake) as load_track:
-        wav = _load_demucs_track(audio, 2, 44100)
-    load_track.assert_called_once_with(audio, 2, 44100)
-    assert wav is fake
+    result = MagicMock()
+    result.stdout = b"\x00\x00\x80\x3f" * 4
+    with patch("cleave.separate.subprocess.run", return_value=result) as run:
+        wav = _decode_mix(audio, 2, 44100)
+    cmd = run.call_args.args[0]
+    assert cmd[0] == "/usr/bin/ffmpeg"
+    assert cmd[cmd.index("-i") + 1] == str(audio)
+    assert tuple(wav.shape) == (2, 2)
 
 
 def test_separate_module_does_not_use_torchaudio_or_save_audio() -> None:
@@ -1022,8 +1019,8 @@ def test_write_demucs_stems_skips_save_audio(
         patch("cleave.separate.ensure_weight_files"),
         patch("torch.hub.set_dir"),
         patch("torch.cuda.is_available", return_value=False),
-        patch("demucs.pretrained.get_model", return_value=model_obj),
-        patch("demucs.separate.load_track", return_value=MagicMock()),
+        patch("cleave.separate._load_demucs_bag", return_value=model_obj),
+        patch("cleave.separate._decode_mix", return_value=MagicMock()),
         patch("demucs.apply.apply_model", return_value=[MagicMock()]),
         patch("demucs.audio.save_audio") as save_audio,
         patch("cleave.separate._save_stem_wav", side_effect=fake_save_stem) as save_stem,
@@ -1053,8 +1050,8 @@ def test_write_demucs_stems_torchcodec_error_is_friendly(
         patch("cleave.separate.ensure_weight_files"),
         patch("torch.hub.set_dir"),
         patch("torch.cuda.is_available", return_value=False),
-        patch("demucs.pretrained.get_model", return_value=model_obj),
-        patch("demucs.separate.load_track", return_value=MagicMock()),
+        patch("cleave.separate._load_demucs_bag", return_value=model_obj),
+        patch("cleave.separate._decode_mix", return_value=MagicMock()),
         patch("demucs.apply.apply_model", return_value=[MagicMock()]),
         patch(
             "cleave.separate._save_stem_wav",
@@ -1092,8 +1089,8 @@ def test_run_separate_copies_wav_without_ffmpeg(
     manifest = load_manifest(project)
     assert manifest.mix_filename == "song.wav"
     assert manifest.original_path == str(audio.resolve())
-    mocks["load_track"].assert_called_once()
-    assert mocks["load_track"].call_args.args[0] == project.resolve() / "song.wav"
+    mocks["decode_mix"].assert_called_once()
+    assert mocks["decode_mix"].call_args.args[0] == project.resolve() / "song.wav"
 
 
 def test_run_separate_preparing_precedes_demucs_on_compressed_input(
@@ -1122,7 +1119,7 @@ def test_run_separate_preparing_precedes_demucs_on_compressed_input(
     assert separating
     assert preparing[0] < separating[0]
     assert (project / "song.wav").read_bytes() == b"PCM"
-    assert mocks["load_track"].call_args.args[0] == project.resolve() / "song.wav"
+    assert mocks["decode_mix"].call_args.args[0] == project.resolve() / "song.wav"
     manifest = load_manifest(project)
     assert manifest.mix_filename == "song.wav"
     assert manifest.original_path == str(audio.resolve())
@@ -1272,4 +1269,4 @@ def test_force_new_compressed_source_replaces_mix_and_preserves_markers(
     assert manifest.mix_filename == "song.wav"
     assert manifest.original_path == str(audio.resolve())
     assert [marker.time for marker in manifest.song_markers] == [3.0, 9.5]
-    assert mocks["load_track"].call_args.args[0] == project.resolve() / "song.wav"
+    assert mocks["decode_mix"].call_args.args[0] == project.resolve() / "song.wav"

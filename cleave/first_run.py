@@ -140,7 +140,7 @@ def _weight_item(
 
 
 def _cuda_item() -> FirstRunItem | None:
-    """Offered only on the frozen Windows build with a CUDA 13 NVIDIA driver."""
+    """Offered only on the frozen Windows build with a CUDA 13.2 NVIDIA driver."""
     from cleave.cuda_extra import (
         CUDA_EXTRA_SIZE_MB,
         cuda_extra_installed,

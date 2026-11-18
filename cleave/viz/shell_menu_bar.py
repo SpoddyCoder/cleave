@@ -70,7 +70,7 @@ def _draw_mnemonic_underline(label: str, color: tuple[int, int, int]) -> None:
     if not letter:
         return
     origin_x, origin_y = selectable_label_origin()
-    glyph = imgui.get_font().find_glyph(ord(letter))
+    glyph = imgui.get_font_baked().find_glyph(ord(letter))
     letter_width = imgui.calc_text_size(letter).x
     # Two pixels under the glyph. The line box still has descent below that.
     y = origin_y + glyph.y1 + 2.0

@@ -36,7 +36,7 @@ def imgui_color_roles() -> dict[imgui.Col_, tuple[tuple[int, int, int], float]]:
         imgui.Col_.check_mark: (p.value, 1.0),
         imgui.Col_.separator: (p.transport_rule, 1.0),
         imgui.Col_.text_selected_bg: (p.row_select_tint, 0.5),
-        imgui.Col_.nav_highlight: (p.row_focus_edge, 1.0),
+        imgui.Col_.nav_cursor: (p.row_focus_edge, 1.0),
         imgui.Col_.scrollbar_bg: (p.scrollbar_track, 1.0),
         imgui.Col_.scrollbar_grab: (p.scrollbar_thumb, 1.0),
         imgui.Col_.scrollbar_grab_hovered: (p.scrollbar_thumb_hover, 1.0),
@@ -95,11 +95,13 @@ def floating_surface() -> Iterator[None]:
         imgui.pop_style_color(3)
 
 
-# Every size ``ImGuiStyle::ScaleAllSizes`` scales, as imgui-bundle attributes.
+# The sizes ``ImGuiStyle::ScaleAllSizes`` scales, as imgui-bundle attributes,
+# except border widths, which stay as the theme sets them.
 _STYLE_SIZE_FIELDS = (
     "window_padding",
     "window_rounding",
     "window_min_size",
+    "window_border_hover_padding",
     "child_rounding",
     "popup_rounding",
     "frame_padding",
@@ -111,12 +113,14 @@ _STYLE_SIZE_FIELDS = (
     "indent_spacing",
     "columns_min_spacing",
     "scrollbar_size",
+    "scrollbar_padding",
     "scrollbar_rounding",
     "grab_min_size",
     "grab_rounding",
     "log_slider_deadzone",
     "tab_rounding",
-    "tab_min_width_for_close_button",
+    "tab_min_width_base",
+    "tab_min_width_shrink",
     "separator_text_padding",
     "display_window_padding",
     "display_safe_area_padding",

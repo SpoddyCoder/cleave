@@ -60,7 +60,7 @@ Every version is written out in full. Change all copies of a pin in the same edi
 | [requirements.txt](../../requirements.txt) | Full checkout set (analyse, editor, render) |
 | [requirements-freeze.txt](../../requirements-freeze.txt) | Windows freeze set for play / render, plus PyInstaller |
 | [requirements-torch-cpu.txt](../../requirements-torch-cpu.txt) | CPU torch, torchaudio, torchcodec, and the PyTorch CPU index |
-| [requirements-torch-cu130.txt](../../requirements-torch-cu130.txt) | CUDA torch, torchaudio, torchcodec, and the PyTorch CUDA index |
+| [requirements-torch-cu132.txt](../../requirements-torch-cu132.txt) | CUDA torch, torchaudio, torchcodec, and the PyTorch CUDA index |
 | [requirements-dev.txt](../../requirements-dev.txt) | pytest |
 
 The analyse pins (demucs, beat-this, librosa, einops, rotary-embedding-torch, tqdm, setuptools) are also typed out on one `pip install` line in three more places. Keep them identical to `requirements.txt`:
@@ -69,9 +69,11 @@ The analyse pins (demucs, beat-this, librosa, einops, rotary-embedding-torch, tq
 - [windows-freeze.md](windows-freeze.md), the freeze venv recipe
 - [packaging/windows/README.md](../../packaging/windows/README.md), the local freeze steps
 
-Packages shared between files (pygame, imgui-bundle, numpy, soxr, moderngl, PyOpenGL, soundfile, PyYAML) must carry the same version in `requirements.txt` and `requirements-freeze.txt`.
+Demucs weights are pinned separately: `_DEMUCS_HF_REPOS` in [cleave/model_weights.py](../../cleave/model_weights.py) holds each bag's Hugging Face repo commit and the SHA-256 of every safetensors file (from `https://huggingface.co/api/models/adefossez/<repo>/tree/main`, the LFS `oid`). When demucs moves, check that the bags in its `remote/*.yaml` still match.
 
-If PyTorch has moved to a newer CUDA build than cu130, rename `requirements-torch-cu130.txt` and change the index URL, every reference to the file, and the CUDA wording in [windows-freeze.md](windows-freeze.md) and [structured-releases.md](structured-releases.md) (driver minimum, "CUDA 13").
+Packages shared between files (pygame-ce, imgui-bundle, numpy, soxr, moderngl, PyOpenGL, soundfile, PyYAML) must carry the same version in `requirements.txt` and `requirements-freeze.txt`.
+
+If PyTorch has moved to a newer CUDA build than cu132, rename `requirements-torch-cu132.txt` and change the index URL, every reference to the file, and the CUDA wording in [windows-freeze.md](windows-freeze.md) and [structured-releases.md](structured-releases.md) (driver minimum, "CUDA 13.2"). A new CUDA minor version raises the driver minimum: change `MIN_CUDA_DRIVER_VERSION` in [cleave/cuda_extra.py](../../cleave/cuda_extra.py) (`cuDriverGetVersion` value, such as 13020 for 13.2) and the driver wording in [README.md](../../README.md), [docs/user-guide/README.md](../user-guide/README.md) if it names one, and CHANGELOG.md. NVIDIA no longer publishes a Windows build number per CUDA release, only a driver branch (R595 for 13.2), so name the branch.
 
 ## 2. CUDA extra wheels
 
@@ -110,24 +112,26 @@ Bump `actions/checkout`, `actions/setup-python`, and `actions/upload-artifact` i
    Then update the env from the new pins. Use the CPU torch file instead on a box without CUDA:
 
    ```bash
-   /home/fernpa/anaconda3/envs/cleave/bin/pip install -r requirements-torch-cu130.txt
+   /home/fernpa/anaconda3/envs/cleave/bin/pip install -r requirements-torch-cu132.txt
    ```
 
    ```bash
    /home/fernpa/anaconda3/envs/cleave/bin/pip install -r requirements-dev.txt
    ```
 
-2. Rebuild FFmpeg and libprojectM with [wsl-builds](https://github.com/spoddycoder/wsl-builds). If it pins a libprojectM tag, move that to the latest release first.
+2. Rebuild FFmpeg and libprojectM with [wsl-builds](https://github.com/spoddycoder/wsl-builds). Pick the libprojectM source first (see [libprojectM source](#libprojectm-source)). For `master`, answer yes to "Install bleeding-edge libprojectM from git master"; `--force` offers a clean rebuild of an existing install.
 
    ```bash
-   ./wsl-builder.sh media ffmpeg,libprojectm
+   ./wsl-builder.sh media ffmpeg,libprojectm --force
    ```
 
 3. Confirm the new library is the one Cleave loads. On a Linux checkout the search order is `PROJECTM_LIB` / `PROJECTM_PLAYLIST_LIB`, then pkg-config, then system `.so` paths, so an old build earlier in that order wins.
 
    ```bash
-   pkg-config --modversion libprojectM
+   pkg-config --modversion projectM-4
    ```
+
+   wsl-builds sets `PKG_CONFIG_PATH` in the shell rc, so check from a new shell.
 
 4. Run the full test suite (dependency changes are cross-cutting):
 
@@ -141,11 +145,15 @@ Bump `actions/checkout`, `actions/setup-python`, and `actions/upload-artifact` i
 
 CI does not build libprojectM. The committed DLLs in [packaging/windows/](../../packaging/windows/) are what ships. Build on native Windows, not WSL. First time on a machine, do [Windows host setup](#windows-host-setup-one-time) first.
 
+### libprojectM source
+
+Cleave needs libprojectM 4.2+. Use the newest upstream release when one meets that; until 4.2 is released, build `master` at one pinned commit on both Linux and Windows and record it in `NOTICE.txt`. The vcpkg `projectm` port only builds releases.
+
 1. Update vcpkg from a Developer PowerShell for VS 2022: `git pull`, then `.\bootstrap-vcpkg.bat`, in the vcpkg folder.
-2. Build the shared x64 triplet with the playlist library (see [Playlist library](#playlist-library) for the exact port spec): `vcpkg install projectm:x64-windows`. If the vcpkg port is older than the latest projectM release, use an overlay port pointing at the release tag.
+2. Build the shared x64 triplet with the playlist library (see [Playlist library](#playlist-library)) from the same libprojectM source as WSL. The committed overlay port [packaging/windows/vcpkg-overlay/projectm/](../../packaging/windows/vcpkg-overlay/projectm/) pins it: to move it, set `REF` to the new commit or tag and `SHA512` to the SHA-512 of `https://github.com/projectM-visualizer/projectm/archive/<ref>.tar.gz`, compare the rest with vcpkg's own `ports/projectm` (drop patches that no longer apply), and set `version`. Then `vcpkg install projectm:x64-windows --overlay-ports=<repo>\packaging\windows\vcpkg-overlay` (the repo can be the WSL share).
 3. Check the version you built (see [Check the built version](#check-the-built-version)), then copy `projectM-4.dll` and `projectM-4-playlist.dll` from `installed\x64-windows\bin\` in the vcpkg folder into `packaging/windows/` (see [Getting the DLLs into the repo](#getting-the-dlls-into-the-repo)).
-4. Run `dumpbin /dependents` on both DLLs. Commit any non-system DLL it lists (zlib is the usual one) into the same directory; the staging script copies every DLL there.
-5. Update the version in [packaging/windows/licenses/libprojectM/NOTICE.txt](../../packaging/windows/licenses/libprojectM/NOTICE.txt), and the version table and dependents list in [packaging/windows/README.md](../../packaging/windows/README.md). Replace `LICENSE.txt` if upstream changed it.
+4. List both DLLs' imports: `dumpbin /dependents` in a Developer PowerShell, or `objdump -p <dll> | grep "DLL Name"` from WSL after copying. Commit any non-system DLL listed (zlib is the usual one) into the same directory; the staging script copies every DLL there.
+5. Update the version, source commit, and install command in [packaging/windows/licenses/libprojectM/NOTICE.txt](../../packaging/windows/licenses/libprojectM/NOTICE.txt), and the version table and dependents list in [packaging/windows/README.md](../../packaging/windows/README.md). Replace `LICENSE.txt` if upstream changed it.
 6. Optional local freeze, following [packaging/windows/README.md](../../packaging/windows/README.md), then `cleave.exe play` on a real project.
 
 ## 7. projectM minimum version (only if raised)

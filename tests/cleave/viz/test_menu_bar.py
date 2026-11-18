@@ -832,7 +832,8 @@ def _popup_row_ink_gaps(
         if int(vtx.col) == ink and x0 < float(vtx.pos.x) < _x1
     ]
     assert tops
-    font = imgui.get_font()
+    size = imgui.get_style().font_size_base
+    font = imgui.get_io().font_default.get_font_baked(size)
     label = next(
         item.label
         for item in MENUS[0].items
@@ -844,7 +845,7 @@ def _popup_row_ink_gaps(
         if not char.isspace()
     )
     text_top = min(tops) - min_y0
-    return (text_top - y0), (y1 - (text_top + font.font_size))
+    return (text_top - y0), (y1 - (text_top + size))
 
 
 def _color_u32_alpha(rgb: tuple[int, int, int], alpha: float) -> int:

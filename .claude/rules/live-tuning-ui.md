@@ -49,7 +49,7 @@ The inspector holds live properties. Commands are buttons. A command that needs 
 - Dialog titles, modal headings, and confirm buttons never end in an ellipsis. The confirm button is a plain verb (Blacklist, Delete).
 - In-progress status (loading screen, progress modals, toasts) ends in an ellipsis (Separating stems). Truncated text ends in one too (`text_fit.py`).
 - Menu items, context menu items, and buttons use sentence case (Add to preset list, Play full screen). Page and block names (Pattern Mask, Post-FX) and proper nouns keep their capitals. Help column titles (`RowSpec.help_title`) stay in title case.
-- The ellipsis is in the shell font's glyph ranges (`imgui_host._shell_glyph_ranges`); a new font or atlas must keep it.
+- The ellipsis comes from the shell font (DejaVu Sans Mono, glyphs loaded on demand); a replacement font must have it.
 
 A button is a command in `commands.py`, placed with `SectionNode(commands=...)` or `SectionDef.trailing_commands`. Commands that have no menu row go in `_INSPECTOR_COMMANDS`. `build_inspector_rows` moves every button row to the bottom of the page, in page order, under a `DIVIDER_ROW` (or, with `SectionDef.commands_divider=False`, straight under the page's last group of rows, as Settings > UI does for UI scale and Theme) (a thin, non-navigable rule shorter than a row; one also sits under the page title). A leaf `SectionNode(with_commands=True)` joins the buttons under the divider, as Settings > Preview does for audio latency. `help_content._INSPECTOR_COMMAND_KINDS` maps a command to the `RowAffordance.COMMAND` row that holds its help text.
 

@@ -66,7 +66,7 @@ The first time Cleave starts, the **Welcome to Cleave** step lists the downloads
 | Demucs | The AI model that splits a song into stems. | Yes |
 | BeatThis! | The AI model that finds the beats and bars in a song. | Yes |
 | Demucs HQ | A slower, higher quality splitting model. | No |
-| CUDA Toolkit | Windows with an NVIDIA graphics card only. Makes stem splitting much faster (about 1.8 GB). | No |
+| CUDA Toolkit | Windows with an NVIDIA graphics card only. Makes stem splitting much faster (about 2 GB). | No |
 
 Each download shows its own progress. You can cancel partway, and anything that fails is listed with a Retry button. Anything you skip downloads later, when it is first needed.
 

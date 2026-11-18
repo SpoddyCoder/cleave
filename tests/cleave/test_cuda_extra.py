@@ -162,7 +162,7 @@ def test_unsupported_outside_the_frozen_windows_build() -> None:
 def test_pins_match_requirements_file() -> None:
     from cleave.paths import repo_root
 
-    text = (repo_root() / "requirements-torch-cu130.txt").read_text(encoding="utf-8")
+    text = (repo_root() / "requirements-torch-cu132.txt").read_text(encoding="utf-8")
     for wheel in cuda_extra.CUDA_WHEELS:
         name, version = wheel.filename.split("-")[:2]
         assert f"{name}=={version.split('+')[0]}" in text

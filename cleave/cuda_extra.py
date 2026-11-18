@@ -1,7 +1,7 @@
 """Optional CUDA torch for the frozen Windows build, kept in local app data.
 
-The freeze ships CPU torch. On a machine whose NVIDIA driver supports CUDA 13,
-the welcome step (``cleave.first_run``) can download the pinned PyTorch cu130
+The freeze ships CPU torch. On a machine whose NVIDIA driver supports CUDA 13.2,
+the welcome step (``cleave.first_run``) can download the pinned PyTorch cu132
 wheels, verify them, and unpack them under :func:`cuda_extra_dir`. At startup
 :func:`activate_cuda_extra` puts an import finder ahead of PyInstaller's, so
 ``torch``, ``torchaudio``, and ``torchcodec`` load from that folder instead of
@@ -33,9 +33,9 @@ CudaProgress = Callable[[str, float | None], None]
 
 # Folder name under cuda_extra_root(). Change it with the pins so an app
 # upgrade never loads wheels built for another torch.
-CUDA_EXTRA_KEY = "cu130-torch2.12.0"
-# cuDriverGetVersion value for CUDA 13.0 (NVIDIA driver 580.88 or newer).
-MIN_CUDA_DRIVER_VERSION = 13000
+CUDA_EXTRA_KEY = "cu132-torch2.15.0"
+# cuDriverGetVersion value for CUDA 13.2 (an R595 NVIDIA driver or newer).
+MIN_CUDA_DRIVER_VERSION = 13020
 
 _PACKAGES = frozenset({"torch", "functorch", "torchgen", "torchaudio", "torchcodec"})
 _REQUIRED_DIRS = ("torch", "torchaudio", "torchcodec")
@@ -64,32 +64,36 @@ class CudaWheel:
     size: int
 
 
-def _wheel(name: str, version: str, sha256: str, size: int) -> CudaWheel:
-    filename = f"{name}-{version}+cu130-cp310-cp310-win_amd64.whl"
+def _wheel(
+    name: str, version: str, sha256: str, size: int, tag: str = "cp314-cp314"
+) -> CudaWheel:
+    filename = f"{name}-{version}+cu132-{tag}-win_amd64.whl"
     # %2B: the PyTorch CDN is more reliable with the encoded "+".
-    url = "https://download.pytorch.org/whl/cu130/" + filename.replace("+", "%2B")
+    url = "https://download.pytorch.org/whl/cu132/" + filename.replace("+", "%2B")
     return CudaWheel(filename, url, sha256, size)
 
 
-# Match requirements-torch-cu130.txt and the freeze CPython (cp310 win_amd64).
+# Match requirements-torch-cu132.txt and the freeze CPython (cp314 win_amd64).
 CUDA_WHEELS: tuple[CudaWheel, ...] = (
     _wheel(
         "torch",
-        "2.12.0",
-        "9cde3a3dbe675ee1558e7ee2d6be60aaa2b9562552d1b0a659c8edd6edd29318",
-        1926375050,
+        "2.15.0",
+        "f070bea62298fa4964c365b0d8788754a2f50610ea5885f7a3d1d103bb8de64b",
+        2115653661,
     ),
+    # torchaudio ships one py3 wheel per platform, not one per CPython.
     _wheel(
         "torchaudio",
-        "2.11.0",
-        "9bbd4470c74172be32d0e11efbcf5e8dc785f7403b8232c07aac575c8d96715f",
-        1722730,
+        "2.11.1",
+        "c3a9228e74828810bc7afcf6cc3df5bd8f6557ba07fc73d14d66c981b221b3ab",
+        1774928,
+        tag="py3-none",
     ),
     _wheel(
         "torchcodec",
-        "0.14.0",
-        "b4cfae4d2fd58467fccc528a1e31a0ec6fed6a4a49b9495dab50d2aada1918cf",
-        3574648,
+        "0.17.0",
+        "637992360ba0aca06dc56855ee392922209ef745d7b97e32510cfe13aa4345fd",
+        14722138,
     ),
 )
 CUDA_EXTRA_SIZE_MB = sum(wheel.size for wheel in CUDA_WHEELS) // (1024 * 1024)
@@ -113,7 +117,7 @@ def cuda_driver_version() -> int | None:
 
 
 def cuda_extra_supported() -> bool:
-    """True on the frozen Windows build with an NVIDIA driver new enough for cu130."""
+    """True on the frozen Windows build with an NVIDIA driver new enough for cu132."""
     if not is_frozen() or sys.platform != "win32":
         return False
     version = cuda_driver_version()

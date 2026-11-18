@@ -38,7 +38,7 @@ class IconButtonState:
 
 def glyph_drop(glyph: str) -> float:
     """Pixels to lower a merged icon so it centres on the capitals beside it."""
-    font = imgui.get_font()
+    font = imgui.get_font_baked()
     icon = font.find_glyph(ord(glyph))
     cap = font.find_glyph(ord("A"))
     return float(round(((cap.y0 + cap.y1) - (icon.y0 + icon.y1)) * 0.5))
@@ -46,7 +46,7 @@ def glyph_drop(glyph: str) -> float:
 
 def glyph_ink(glyph: str) -> FRect:
     """Painted bounds of *glyph* in the current font, relative to its draw origin."""
-    g = imgui.get_font().find_glyph(ord(glyph))
+    g = imgui.get_font_baked().find_glyph(ord(glyph))
     return g.x0, g.y0, g.x1 - g.x0, g.y1 - g.y0
 
 

@@ -110,7 +110,9 @@ def test_request_resets_to_arrow_each_frame_and_the_last_request_wins() -> None:
         io = imgui.get_io()
         io.set_ini_filename(os.devnull)
         io.display_size = imgui.ImVec2(320.0, 200.0)
-        io.fonts.get_tex_data_as_rgba32()
+        io.backend_flags = int(io.backend_flags) | int(
+            imgui.BackendFlags_.renderer_has_textures
+        )
         imgui.new_frame()
         request_pointer(PointerShape.HAND)
         request_pointer(PointerShape.TEXT)

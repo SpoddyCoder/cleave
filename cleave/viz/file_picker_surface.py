@@ -187,7 +187,8 @@ def location_text(location: str, content_w: int, text_width: TextWidth) -> str:
 
 def location_text_lift() -> int:
     """Pixels to raise the path so its caps center on the folder mark."""
-    font = _imgui().get_io().font_default
+    imgui = _imgui()
+    font = imgui.get_io().font_default.get_font_baked(imgui.get_style().font_size_base)
     icon = font.find_glyph(ord(FOLDER_GLYPH))
     cap = font.find_glyph(ord("A"))
     icon_mid = (icon.y0 + icon.y1) * 0.5

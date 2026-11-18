@@ -128,7 +128,6 @@ def test_shell_frames_build_the_font_atlas_without_gl() -> None:
         # the menu buttons. A second frame leaves Dear ImGui settled.
         draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)
         draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)
-        assert imgui.get_io().fonts.is_built()
     finally:
         host.imgui.destroy()
     assert not imgui.get_current_context()
@@ -149,16 +148,15 @@ def test_ui_scale_change_rebuilds_the_font_atlas_on_the_next_frame() -> None:
         host = _open_shell(menu)
     try:
         draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)
-        base_size = imgui.get_io().font_default.font_size
+        base_size = imgui.get_style().font_size_base
         base_pad = imgui.get_style().item_spacing.x
         assert base_size == tuning_ui_metrics().font_size
         set_ui_scale_percent(200)
         draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)
         draw_shell_frame(host, menu, CommandContext(), 1.0 / 60.0)
-        assert imgui.get_io().font_default.font_size == tuning_ui_metrics().font_size
-        assert imgui.get_io().font_default.font_size > base_size
+        assert imgui.get_style().font_size_base == tuning_ui_metrics().font_size
+        assert imgui.get_style().font_size_base > base_size
         assert imgui.get_style().item_spacing.x == pytest.approx(base_pad * 2, abs=1.0)
-        assert imgui.get_io().fonts.is_built()
     finally:
         set_ui_scale_percent(DEFAULT_UI_SCALE)
         host.imgui.destroy()

@@ -29,10 +29,10 @@ class _HasDeviceId(Protocol):
 
 
 def _sdl_library_candidates() -> list[str]:
-    """SDL2 libraries pygame ships, for Linux, Windows, and macOS wheels."""
+    """SDL2 libraries pygame-ce ships, for Linux, Windows, and macOS wheels."""
     pkg_dir = os.path.dirname(pygame.__file__)
     patterns = (
-        os.path.join(pkg_dir, os.pardir, "pygame.libs", "libSDL2-*.so*"),
+        os.path.join(pkg_dir, os.pardir, "pygame_ce.libs", "libSDL2-*.so*"),
         os.path.join(pkg_dir, "SDL2.dll"),
         os.path.join(pkg_dir, ".dylibs", "libSDL2*.dylib"),
     )

@@ -87,17 +87,17 @@ Hand the user the commands from the doc's section 5, one fenced `bash` block per
 
 Wait for them to report back, then:
 
-1. Ask for the output of `pkg-config --modversion libprojectM` and confirm it is the new version. If not, walk through the `PROJECTM_LIB` / pkg-config / system path order to find the stale copy.
+1. Ask for the output of `pkg-config --modversion projectM-4` (from a new shell) and confirm it is the new version. If not, walk through the `PROJECTM_LIB` / pkg-config / system path order to find the stale copy.
 2. Run the full test suite yourself and report failures with output. Fix failures caused by the upgrades (API changes, deprecations) as part of this step, one at a time, explaining each.
 3. Ask the user to do the manual editor check from section 5 (play with layers, short render, split a new file) and report anything odd. After an imgui-bundle jump, also ask them to open every menu, the inspector, and a modal, since unit tests do not draw the UI.
 
 ## 6. Windows libprojectM DLLs (user, then agent)
 
 1. Ask whether their Windows machine has built the DLLs before. If not, or they are unsure, walk them through the doc's "Windows host setup (one time)" section first (build tools, vcpkg), one block at a time, and wait for each to finish. Skip the "Local freeze" part unless they want to freeze locally.
-2. Tell the user the latest projectM release tag, and whether the vcpkg `projectm` port already has it (check the vcpkg repo's port version). If not, explain the overlay port option. Check `ports/projectm/vcpkg.json` upstream for how the playlist library is built and give the exact install command (doc: "Playlist library"). Compare with the recipe recorded in `NOTICE.txt`.
-3. Give the Windows steps from the doc's section 6 as a numbered list, with commands for a Developer PowerShell for VS 2022, including the version check and the copy over `\\wsl.localhost\` (the distro name is `$WSL_DISTRO_NAME` in the agent shell). Ask them to paste the version the DLL reports, the `dumpbin /dependents` output for both DLLs, and the exact vcpkg install command they ran, then wait.
-4. When they have copied the DLLs into `packaging/windows/`, confirm with `git status` that both changed. Optionally check dependents with `objdump -p` from WSL to confirm what they pasted.
-5. Edit `NOTICE.txt` (version, and the exact install command in Build recipe) and the version table and dependents list in [packaging/windows/README.md](../../../packaging/windows/README.md). If `dumpbin` listed a new non-system DLL, make sure it is in `packaging/windows/` and named in the README.
+2. Tell the user which libprojectM source to build (doc: "libprojectM source"): the newest release if it meets Cleave's minimum, otherwise `master` at the same commit as the WSL build. Update the committed overlay port in `packaging/windows/vcpkg-overlay/projectm/` to it (`REF`, `SHA512` of the GitHub archive, `version`; compare with upstream `ports/projectm` and drop patches that no longer apply). Check upstream `ports/projectm` for how the playlist library is built (doc: "Playlist library") and give the exact install command with `--overlay-ports`. Compare with the recipe recorded in `NOTICE.txt`.
+3. Give the Windows steps from the doc's section 6 as a numbered list, with commands for a Developer PowerShell for VS 2022, including the version check and the copy over `\\wsl.localhost\` (the distro name is `$WSL_DISTRO_NAME` in the agent shell). Ask them to paste the version the DLL reports and any build errors, then wait. `dumpbin` is optional: `objdump -p` from WSL on the copied DLLs gives the same import list.
+4. When they have copied the DLLs into `packaging/windows/`, confirm with `git status` that both changed, and list their imports with `objdump -p <dll> | grep "DLL Name"`.
+5. Edit `NOTICE.txt` (version, source commit, and the exact install command in Build recipe) and the version table and dependents list in [packaging/windows/README.md](../../../packaging/windows/README.md). If the import list has a new non-system DLL, make sure it is in `packaging/windows/` and named in the README.
 
 ## 7. projectM minimum version (agent, only if needed)
 

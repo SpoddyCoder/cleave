@@ -29,7 +29,9 @@ from OpenGL.GL import (
     glUseProgram,
 )
 from imgui_bundle import imgui
-from imgui_bundle.python_backends.opengl_backend import ProgrammablePipelineRenderer
+from imgui_bundle.python_backends.opengl_backend_programmable import (
+    ProgrammablePipelineRenderer,
+)
 
 from cleave.gl_state import restore_gl_state, save_gl_state
 from cleave.viz.imgui_theme import apply_imgui_style_scale, apply_imgui_theme
@@ -54,13 +56,35 @@ _ContextGetter = Callable[[], int | None]
 
 
 class _HeadlessRenderer:
-    """No GL device objects. Used only when ``create`` has no current context."""
+    """No GL device objects. Used only when ``create`` has no current context.
+
+    Claims ``RendererHasTextures`` like the GL renderer, so ImGui builds font
+    glyphs on demand, then accepts each texture request without uploading it.
+    """
+
+    def __init__(self) -> None:
+        io = imgui.get_io()
+        io.backend_flags = int(io.backend_flags) | int(
+            imgui.BackendFlags_.renderer_has_textures
+        )
 
     def shutdown(self) -> None:
-        return None
+        io = imgui.get_io()
+        io.backend_flags = int(io.backend_flags) & ~int(
+            imgui.BackendFlags_.renderer_has_textures
+        )
 
     def render(self, _draw_data: Any) -> None:
-        return None
+        status = imgui.ImTextureStatus
+        for tex in imgui.get_platform_io().textures:
+            if tex.status == status.want_create:
+                tex.set_tex_id(1)
+                tex.status = status.ok
+            elif tex.status == status.want_updates:
+                tex.status = status.ok
+            elif tex.status == status.want_destroy:
+                tex.set_tex_id(0)
+                tex.status = status.destroyed
 
 
 def mouse_button(event: pygame.event.Event) -> int | None:
@@ -183,135 +207,52 @@ def _select_renderer_class() -> type[ProgrammablePipelineRenderer] | type[_Headl
     return _HeadlessRenderer
 
 
-def _merge_icon_glyphs(fonts: Any, size_pixels: float) -> tuple[Any, list[int]]:
-    """Merge the shell's icons into the font just added. Not the whole icon font."""
-    from cleave.viz.material_icons import (
-        ARROW_BACK_GLYPH,
-        ARROW_DOWNWARD_GLYPH,
-        ARROW_FORWARD_GLYPH,
-        ARROW_UPWARD_GLYPH,
-        FILE_GLYPH,
-        FOLDER_GLYPH,
-        LOCK_GLYPH,
-        LOCK_OPEN_GLYPH,
-        ADD_GLYPH,
-        DELETE_GLYPH,
-        POWER_GLYPH,
-        SOLO_GLYPH,
-        PREVIEW_GLYPH,
-        DRAG_INDICATOR_GLYPH,
-        font_path,
-    )
+def _merge_icon_font(fonts: Any, size_pixels: float) -> None:
+    """Merge Material Icons into the font just added.
+
+    Glyphs rasterize on first use, so only the icons the shell draws reach the
+    atlas. The text font is the first source, so it wins for any shared code point.
+    """
+    from cleave.viz.material_icons import font_path
 
     config = imgui.ImFontConfig()
     config.merge_mode = True
     config.pixel_snap_h = True
-    ranges: list[int] = []
-    for glyph in (
-        FOLDER_GLYPH,
-        FILE_GLYPH,
-        ARROW_UPWARD_GLYPH,
-        ARROW_DOWNWARD_GLYPH,
-        ARROW_BACK_GLYPH,
-        ARROW_FORWARD_GLYPH,
-        LOCK_GLYPH,
-        LOCK_OPEN_GLYPH,
-        ADD_GLYPH,
-        DELETE_GLYPH,
-        POWER_GLYPH,
-        SOLO_GLYPH,
-        PREVIEW_GLYPH,
-        DRAG_INDICATOR_GLYPH,
-    ):
-        ranges.extend((ord(glyph), ord(glyph)))
-    ranges.append(0)
-    fonts.add_font_from_file_ttf(
-        str(font_path()),
-        size_pixels,
-        config,
-        ranges,
-    )
-    return config, ranges
+    fonts.add_font_from_file_ttf(str(font_path()), size_pixels, config)
 
 
-def _shell_glyph_ranges() -> list[int]:
-    """Default Latin plus the glyphs the shell draws outside that range.
-
-    Dear ImGui stops the default range at U+00FF. Disclosure triangles, the
-    transport play and pause marks, and the menu check then rasterize as "?".
-    """
-    ranges = list(imgui.get_io().fonts.get_glyph_ranges_default())
-    if ranges and ranges[-1] == 0:
-        ranges = ranges[:-1]
-    ranges.extend(
-        (
-            ord("…"),
-            ord("…"),
-            ord(PLAY_GLYPH),
-            ord(TWISTY_EXPANDED),
-            ord("✓"),
-            ord("✓"),
-            ord(PAUSE_GLYPH[0]),
-            ord(PAUSE_GLYPH[0]),
-            0,
-        )
-    )
-    return ranges
+def _shell_font_size() -> float:
+    return float(tuning_ui_metrics().font_size)
 
 
-def _load_shell_fonts() -> tuple[Any, ...]:
-    """Replace the atlas fonts with the shell font at the live UI scale.
+def _load_shell_fonts() -> None:
+    """Replace the atlas fonts with the shell font and its merged icons.
 
-    Returns the glyph-range buffers, which must outlive the atlas build.
+    Dear ImGui 1.92 loads glyphs on demand at any size, so the ellipsis,
+    disclosure triangles, transport marks, and menu check need no glyph ranges.
     """
     io = imgui.get_io()
     io.fonts.clear()
-    font_size = float(tuning_ui_metrics().font_size)
-    text_ranges = _shell_glyph_ranges()
-    font = io.fonts.add_font_from_file_ttf(
-        str(overlay_font_path()),
-        font_size,
-        None,
-        text_ranges,
-    )
+    font_size = _shell_font_size()
+    font = io.fonts.add_font_from_file_ttf(str(overlay_font_path()), font_size)
     io.font_default = font
-    icon_config, icon_ranges = _merge_icon_glyphs(io.fonts, font_size)
-    # Second atlas font, after the icon merge so the merge targets the default.
-    io.fonts.add_font_from_file_ttf(
-        str(overlay_font_path()),
-        font_size * PROGRESS_LABEL_FONT_SCALE,
-        None,
-        text_ranges,
-    )
-    return (text_ranges, icon_config, icon_ranges)
+    _merge_icon_font(io.fonts, font_size)
+    _apply_shell_font_size()
+
+
+def _apply_shell_font_size() -> None:
+    """Size every chrome font from the live UI scale."""
+    imgui.get_style().font_size_base = _shell_font_size()
 
 
 @contextmanager
 def progress_label_font() -> Iterator[None]:
-    """Make the larger progress-label font current. Valid only inside a frame."""
-    fonts = imgui.get_io().fonts.fonts
-    if len(fonts) < 2:
-        yield
-        return
-    imgui.push_font(fonts[1])
+    """Draw with the shell font at the progress-label size. Valid only inside a frame."""
+    imgui.push_font(None, _shell_font_size() * PROGRESS_LABEL_FONT_SCALE)
     try:
         yield
     finally:
         imgui.pop_font()
-
-
-def _ensure_font_atlas() -> None:
-    """Build the atlas before ``imgui.new_frame``.
-
-    ``ProgrammablePipelineRenderer`` does this while uploading the font
-    texture. The headless renderer never uploads, and ``new_frame`` asserts
-    if ``GetTexDataAsRGBA32`` has not run.
-    """
-    fonts = imgui.get_io().fonts
-    if fonts.is_built():
-        return
-    fonts.get_tex_data_as_rgba32()
-    fonts.clear_tex_data()
 
 
 def _keep_keyboard_nav_off() -> None:
@@ -373,8 +314,6 @@ class ImGuiHost:
         self._wheel_y = 0.0
         # Font and style match this UI scale generation.
         self._ui_scale_generation = ui_scale_generation()
-        # ImFontConfig is copied, but the glyph-range buffers must outlive Build.
-        self._glyph_ranges: tuple[Any, ...] = ()
         self.pointer = PointerCursors()
 
     @classmethod
@@ -385,7 +324,7 @@ class ImGuiHost:
             io = imgui.get_io()
             _keep_keyboard_nav_off()
             io.set_ini_filename(os.devnull)
-            glyph_ranges = _load_shell_fonts()
+            _load_shell_fonts()
             apply_imgui_style_scale(shell_scale())
             apply_imgui_theme()
             renderer = _select_renderer_class()()
@@ -397,24 +336,19 @@ class ImGuiHost:
             display_size = (1, 1)
         else:
             display_size = surface.get_size()
-        host = cls(context, renderer, display_size)
-        host._glyph_ranges = glyph_ranges
-        return host
+        return cls(context, renderer, display_size)
 
     def set_display_size(self, width: int, height: int) -> None:
         """Track the window size; the window owns it and pushes every change."""
         self.display_size = (int(width), int(height))
 
     def apply_ui_scale(self) -> None:
-        """Rebuild the font atlas and style sizes at the live UI scale.
+        """Resize the shell font and style sizes to the live UI scale.
 
-        Call between frames only. ImGui 1.90 bakes the font size into the atlas.
+        Call between frames only. Glyphs at the new size rasterize on demand.
         """
-        self._glyph_ranges = _load_shell_fonts()
+        _apply_shell_font_size()
         apply_imgui_style_scale(shell_scale())
-        refresh = getattr(self.renderer, "refresh_font_texture", None)
-        if refresh is not None:
-            refresh()
         self._ui_scale_generation = ui_scale_generation()
 
     @property
@@ -456,7 +390,6 @@ class ImGuiHost:
             self.apply_ui_scale()
         self._submit_input(dt)
         _keep_keyboard_nav_off()
-        _ensure_font_atlas()
         apply_imgui_theme()
         imgui.new_frame()
 
@@ -505,7 +438,10 @@ class ImGuiHost:
 
     def _render_draw_data(self) -> None:
         renderer = self.renderer
+        if renderer is None:
+            return
         if not isinstance(renderer, ProgrammablePipelineRenderer):
+            renderer.render(imgui.get_draw_data())
             return
         saved = save_gl_state()
         extra = _ExtraGlState()

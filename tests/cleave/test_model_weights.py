@@ -13,6 +13,7 @@ import pytest
 from cleave.model_weights import (
     WeightDownloadError,
     beat_this_weight_spec,
+    demucs_bag,
     demucs_weight_spec,
     download_done_message,
     download_failed_message,
@@ -63,20 +64,20 @@ def _write_cached(spec, cache: Path) -> None:
         (dest / item.filename).write_bytes(b"ckpt")
 
 
-def test_demucs_htdemucs_spec_matches_installed_repo() -> None:
+def test_demucs_htdemucs_spec_is_pinned_hugging_face_safetensors() -> None:
     spec = demucs_weight_spec("htdemucs")
     assert spec.label == "Demucs htdemucs"
     assert spec.size_hint == "~80 MB"
     assert len(spec.files) == 1
-    assert spec.files[0].filename == "955717e8-8726e21a.th"
-    mirror, upstream = spec.files[0].urls
-    assert mirror == (
-        "https://github.com/SpoddyCoder/cleave-resources/releases/download/"
-        "demucs-hybrid-transformer-v1/955717e8-8726e21a.th"
+    item = spec.files[0]
+    assert item.filename == "demucs-955717e8.safetensors"
+    assert item.urls == (
+        "https://huggingface.co/adefossez/HTDemucs/resolve/"
+        "cbc8a9b1a87023b7fd74e7b3412e6321c0eab003/955717e8.safetensors",
     )
-    assert upstream.startswith("https://dl.fbaipublicfiles.com/demucs/")
-    assert upstream.endswith("hybrid_transformer/955717e8-8726e21a.th")
-    assert spec.files[0].hash_prefix == "8726e21a"
+    assert item.hash_prefix == (
+        "d9fa14133cfcc034a6758923bb3a8ca9f8dfd0b582134643bbf83f72c17576dd"
+    )
 
 
 def test_demucs_htdemucs_ft_spec_is_four_file_bag() -> None:
@@ -84,11 +85,24 @@ def test_demucs_htdemucs_ft_spec_is_four_file_bag() -> None:
     assert spec.label == "Demucs htdemucs_ft"
     assert spec.size_hint == "~320 MB"
     assert [item.filename for item in spec.files] == [
-        "f7e0c4bc-ba3fe64a.th",
-        "d12395a8-e57c48e6.th",
-        "92cfc3b6-ef3bcb9c.th",
-        "04573f0d-f3cf25b2.th",
+        "demucs-f7e0c4bc.safetensors",
+        "demucs-d12395a8.safetensors",
+        "demucs-92cfc3b6.safetensors",
+        "demucs-04573f0d.safetensors",
     ]
+    assert all(len(item.hash_prefix or "") == 64 for item in spec.files)
+
+
+def test_demucs_bag_reads_the_installed_bag_definition() -> None:
+    bag = demucs_bag("htdemucs_ft")
+    assert bag.signatures == ("f7e0c4bc", "d12395a8", "92cfc3b6", "04573f0d")
+    assert bag.weights is not None and len(bag.weights) == 4
+    assert demucs_bag("htdemucs").weights is None
+
+
+def test_unknown_demucs_model_is_rejected() -> None:
+    with pytest.raises(ValueError, match="unknown Demucs model"):
+        demucs_weight_spec("mdx_extra")
 
 
 def test_beat_this_final0_spec() -> None:

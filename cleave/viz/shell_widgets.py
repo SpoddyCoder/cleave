@@ -180,14 +180,7 @@ def draw_item_focus_ring() -> None:
     if rect_max.x <= rect_min.x or rect_max.y <= rect_min.y:
         return
     color = imgui.get_color_u32(rgba(palette().row_focus_edge))
-    imgui.get_window_draw_list().add_rect(
-        rect_min,
-        rect_max,
-        color,
-        0.0,
-        0,
-        1.0,
-    )
+    imgui.get_window_draw_list().add_rect(rect_min, rect_max, color, thickness=1.0)
 
 
 def drawn_row_rect(left_x: float) -> tuple[int, int, int, int] | None:

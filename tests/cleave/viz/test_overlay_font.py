@@ -53,8 +53,8 @@ def test_overlay_font_bold_uses_bold_face() -> None:
     bold = overlay_font(24, bold=True)
     assert not regular.get_bold()
     assert bold.get_bold()
-    regular_px = pygame.image.tostring(
+    regular_px = pygame.image.tobytes(
         regular.render("M", True, (255, 255, 255)), "RGBA"
     )
-    bold_px = pygame.image.tostring(bold.render("M", True, (255, 255, 255)), "RGBA")
+    bold_px = pygame.image.tobytes(bold.render("M", True, (255, 255, 255)), "RGBA")
     assert regular_px != bold_px

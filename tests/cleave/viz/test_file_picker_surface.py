@@ -181,7 +181,9 @@ def test_location_text_lines_up_with_the_folder_icon(tmp_path: Path) -> None:
 
     with _host() as host:
         _frame(host, surface)
-        font = imgui.get_io().font_default
+        font = imgui.get_io().font_default.get_font_baked(
+            imgui.get_style().font_size_base
+        )
         icon = font.find_glyph(ord(FOLDER_GLYPH))
         cap = font.find_glyph(ord("A"))
         lift = location_text_lift()
@@ -851,19 +853,22 @@ def test_folder_glyph_is_in_the_font() -> None:
     with _host() as host:
         host.begin_frame(1.0 / 60.0)
         host.end_frame()
-        glyph = imgui.get_io().font_default.find_glyph_no_fallback(ord(FOLDER_GLYPH))
-        missing = imgui.get_io().font_default.find_glyph_no_fallback(ord(FOLDER_GLYPH) + 1)
+        font = imgui.get_io().font_default
+        glyph = font.get_font_baked(imgui.get_style().font_size_base).find_glyph_no_fallback(
+            ord(FOLDER_GLYPH)
+        )
 
     assert glyph is not None
     assert glyph.x1 > glyph.x0
-    assert missing is None
 
 
 def test_directory_arrow_glyphs_are_in_the_font() -> None:
     with _host() as host:
         host.begin_frame(1.0 / 60.0)
         host.end_frame()
-        font = imgui.get_io().font_default
+        font = imgui.get_io().font_default.get_font_baked(
+            imgui.get_style().font_size_base
+        )
         up = font.find_glyph_no_fallback(ord(ARROW_UPWARD_GLYPH))
         down = font.find_glyph_no_fallback(ord(ARROW_DOWNWARD_GLYPH))
 

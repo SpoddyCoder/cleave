@@ -224,7 +224,7 @@ def _sdl_library_paths() -> list[str]:
     search = [
         package,
         package.parent,
-        package.parent / "pygame.libs",
+        package.parent / "pygame_ce.libs",
         package / ".libs",
     ]
     paths: list[str] = []

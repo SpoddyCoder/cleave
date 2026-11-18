@@ -29,7 +29,7 @@ User data is never written into the app folder.
 
 Preset and texture defaults are `data_dir() / "presets"` and `data_dir() / "textures"` ([cleave/paths.py](../../cleave/paths.py) `default_preset_root` / `default_texture_paths`). First write still creates directories; import does not.
 
-Stem split calls Demucs in-process (`demucs.pretrained.get_model` and `demucs.apply.apply_model` in [cleave/separate.py](../../cleave/separate.py)), not `python -m demucs`. Frozen mix load uses the sidecar ffmpeg CLI rather than Demucs `load_track`. Stem wavs are written with soundfile (16-bit PCM), not Demucs `save_audio` / torchaudio. Beat This runs as `Audio2Beats` on audio already loaded with librosa/soundfile, not `File2Beats` (`torchaudio.load`). Before model load, Demucs and Beat This call `torch.hub.set_dir` so checkpoints land in `data_dir() / "models"` (`model_cache_dir()`). First-run download still happens; weights are not baked into the freeze.
+Stem split calls Demucs in-process (`demucs.apply.apply_model` in [cleave/separate.py](../../cleave/separate.py)), not `python -m demucs`. Cleave downloads each model's safetensors from its pinned Hugging Face commit (`demucs_weight_spec` in [cleave/model_weights.py](../../cleave/model_weights.py), full SHA-256 checked) and builds the bag with `demucs.hf.load_safetensors_model`; it does not call `demucs.pretrained.get_model`, which would fetch into the Hugging Face cache outside the data dir. Mix load uses ffmpeg rather than a Demucs loader. Stem wavs are written with soundfile (16-bit PCM), not Demucs `save_audio` / torchaudio. Beat This runs as `Audio2Beats` on audio already loaded with librosa/soundfile, not `File2Beats` (`torchaudio.load`). Before model load, Demucs and Beat This call `torch.hub.set_dir` so checkpoints land in `data_dir() / "models"` (`model_cache_dir()`). First-run download still happens; weights are not baked into the freeze.
 
 ---
 
@@ -70,11 +70,11 @@ Phase 3.1 GPU proof (met): the same play path from a `workflow_dispatch` zip bui
 
 Frozen lookup: `install_dir() / "ffmpeg.exe"` (Windows) or `install_dir() / "ffmpeg"` (Linux freeze). If missing, raise `FileNotFoundError` naming that path. No PATH fallback when frozen. Checkout still uses `shutil.which` and the "not on PATH" error.
 
-Demucs 4.0.1 `load_track` (`demucs.audio.AudioFile`) shells out to `ffmpeg` and `ffprobe` by name on PATH, then falls back to torchaudio/torchcodec (shared FFmpeg DLLs). `save_audio` always uses `torchaudio.save`, which loads TorchCodec. The freeze ships static `ffmpeg.exe` only, not ffprobe or those DLLs. Frozen stem split prepends `install_dir()` to PATH (`sidecar_ffmpeg_on_path` in [cleave/ffmpeg.py](../../cleave/ffmpeg.py)) and decodes the mix with `ffmpeg_executable()` into a tensor for `apply_model`. Checkout still uses Demucs `load_track` and PATH ffmpeg for mix decode. Before that, wav sources are copied into the project and other supported inputs (mp3, flac, m4a, aac, ogg, aiff, aif) are converted to PCM WAV with `ffmpeg_executable()` (`-vn`, `pcm_s16le`, native sample rate). An existing project mix stays as stored, including an older non-wav filename. Demucs then runs on that project mix. Both frozen and checkout write stem wavs with soundfile. A missing sidecar raises `FileNotFoundError` naming `install_dir() / ffmpeg.exe`.
+Cleave decodes the mix for Demucs itself with `ffmpeg_executable()` (`_decode_mix` in [cleave/separate.py](../../cleave/separate.py)) into a tensor for `apply_model`: the sidecar when frozen, PATH ffmpeg in a checkout. Demucs 4.1 has no public track loader, and its own loader reads with `sphn` and falls back to `ffmpeg` and `ffprobe`; Cleave uses neither. `_write_demucs_stems` calls `ffmpeg_executable()` first, so a missing sidecar fails before the weight download. Before that, wav sources are copied into the project and other supported inputs (mp3, flac, m4a, aac, ogg, aiff, aif) are converted to PCM WAV with `ffmpeg_executable()` (`-vn`, `pcm_s16le`, native sample rate). An existing project mix stays as stored, including an older non-wav filename. Demucs then runs on that project mix. Stem wavs are written with soundfile, so Demucs never loads TorchCodec. A missing sidecar raises `FileNotFoundError` naming `install_dir() / ffmpeg.exe`.
 
 Do not commit a Windows FFmpeg binary. [scripts/windows_stage_freeze.py](../../scripts/windows_stage_freeze.py) downloads a pinned official Windows essentials build, verifies SHA-256, copies `ffmpeg.exe` next to `cleave.exe`, and drops that build's LICENSE/COPYING/NOTICE files into `licenses/ffmpeg/`. URL and checksum are the `FFMPEG_URL` and `FFMPEG_SHA256` constants at the top of that script. The zip is cached at `.cache/ffmpeg-windows.zip` (gitignored).
 
-Pinned build: GyanD/codexffmpeg 9.0.1 essentials (64-bit Windows, static, GPLv3; the gyan.dev release essentials zip, versioned GitHub asset). Essentials includes libx264 and aac for Cleave's MP4 render. Ship the zip's LICENSE (GPLv3) with the freeze.
+Pinned build: GyanD/codexffmpeg 9.0.2 essentials (64-bit Windows, static, GPLv3; the gyan.dev release essentials zip, versioned GitHub asset). Essentials includes libx264 and aac for Cleave's MP4 render. Ship the zip's LICENSE (GPLv3) with the freeze.
 
 ---
 
@@ -91,7 +91,7 @@ From the repo root:
 ```
 python -m pip install -r requirements-freeze.txt
 python -m pip install -r requirements-torch-cpu.txt
-python -m pip install demucs==4.0.1 beat-this==1.1.0 librosa==0.11.0 einops==0.8.2 rotary-embedding-torch==0.9.1 tqdm==4.67.3 setuptools==80.8.0
+python -m pip install demucs==4.1.0 beat-this==1.1.0 librosa==1.0.1 einops==0.8.2 rotary-embedding-torch==0.9.2 tqdm==4.70.1 setuptools==84.2.1
 ```
 
 1. [requirements-freeze.txt](../../requirements-freeze.txt) is the play/render freeze set (PyInstaller, pygame, soxr, numpy, soundfile, ...). It does not install torch.
@@ -121,9 +121,9 @@ That copies `packaging/windows/*.dll` and libprojectM licenses, fetches the pinn
 
 ### What the spec collects
 
-`collect_all` for pygame and soxr, then torch, torchaudio, torchcodec, demucs, beat_this, librosa, and the installed packages those need that carry binaries or package data: soundfile, audioread, numba, scipy, sklearn, julius, lameenc, openunmix, einops, rotary_embedding_torch, omegaconf, dora, joblib, pooch.
+`collect_all` for pygame and soxr, then torch, torchaudio, torchcodec, demucs, beat_this, librosa, and the installed packages those need that carry binaries or package data: soundfile, numba, scipy, sklearn, julius, lameenc, safetensors, einops, rotary_embedding_torch, joblib, pooch.
 
-Hidden imports cover Demucs pickle/load (`demucs.pretrained`, `demucs.hdemucs`, `demucs.htdemucs`, `demucs.apply`, `demucs.audio`), Beat This inference (`beat_this.inference`, `beat_this.model.beat_tracker`), librosa / soundfile / audioread, and numpy 2 `_core` internals.
+Hidden imports cover Demucs model load (`demucs.hf`, `demucs.hdemucs`, `demucs.htdemucs`, `demucs.apply`, `demucs.audio`), Beat This inference (`beat_this.inference`, `beat_this.model.beat_tracker`), librosa / soundfile, and numpy 2 `_core` internals.
 
 `datas`: `assets/cleave-viz.yaml` and `assets/fonts/`. Demucs `remote/*.yaml` travels with `collect_all("demucs")`.
 
@@ -255,19 +255,19 @@ Manual GPU proof (met): install from the setup exe into Program Files; `cleave.e
 
 Product decision: [structured-releases.md](structured-releases.md) 3.3.3. The setup exe and the zip are CPU-only. CUDA torch is an optional download in the editor's Welcome to Cleave step, on first launch and from Settings > Download packages. Cleave does not build or host a CUDA payload. The installer has no CUDA page and no `/CUDA=1`.
 
-The extra is the PyTorch CUDA wheels in [requirements-torch-cu130.txt](../../requirements-torch-cu130.txt) (cu130), not NVIDIA's developer CUDA Toolkit from nvidia.com. Do not download that Toolkit. User-facing copy still says "CUDA Toolkit". Wheels come from `https://download.pytorch.org/whl/cu130/`. Match the freeze CPython (`cp310`, `win_amd64`).
+The extra is the PyTorch CUDA wheels in [requirements-torch-cu132.txt](../../requirements-torch-cu132.txt) (cu132), not NVIDIA's developer CUDA Toolkit from nvidia.com. Do not download that Toolkit. User-facing copy still says "CUDA Toolkit". Wheels come from `https://download.pytorch.org/whl/cu132/`. Match the freeze CPython (`cp314`, `win_amd64`).
 
-Windows cu130 does not need separate `nvidia-*` wheels. A platform-tagged pip resolve of [requirements-torch-cu130.txt](../../requirements-torch-cu130.txt) for `cp310` `win_amd64` yields only the three CUDA wheels below plus pure-Python torch deps already in the CPU freeze (`filelock`, `typing-extensions`, `setuptools`, `sympy`, `networkx`, `jinja2`, `fsspec`, ...). Torch METADATA on that wheel has no `nvidia-*` Requires-Dist. The CUDA 13 runtime DLLs (cudart, cublas, cudnn, cufft, curand, cusolver, cusparse, nvrtc, ...) live inside `torch/lib/` of the Windows torch wheel. Linux cu130 is different: it pulls `nvidia-*` packages.
+Windows cu132 does not need separate `nvidia-*` wheels. A platform-tagged pip resolve of [requirements-torch-cu132.txt](../../requirements-torch-cu132.txt) for `cp314` `win_amd64` yields only the three CUDA wheels below plus pure-Python torch deps already in the CPU freeze (`filelock`, `typing-extensions`, `setuptools`, `sympy`, `networkx`, `jinja2`, `fsspec`, ...). Torch METADATA on that wheel has no `nvidia-*` Requires-Dist. The CUDA 13.2 runtime DLLs (cudart, cublas, cudnn, cufft, curand, cusolver, cusparse, nvrtc, ...) live inside `torch/lib/` of the Windows torch wheel. Linux cu132 is different: it pulls `nvidia-*` packages.
 
 Pinned wheels: `CUDA_WHEELS` in [cleave/cuda_extra.py](../../cleave/cuda_extra.py) (filename, URL, SHA-256, size). Do not scrape the PyTorch index at run time. Do not `pip install` into the freeze (no pip in the onedir). Do not attach the wheels as Release assets. When the pins change, change `CUDA_EXTRA_KEY` with them.
 
-- `torch-2.12.0+cu130-cp310-cp310-win_amd64.whl`, 1926375050 bytes
-- `torchaudio-2.11.0+cu130-cp310-cp310-win_amd64.whl`, 1722730 bytes
-- `torchcodec-0.14.0+cu130-cp310-cp310-win_amd64.whl`, 3574648 bytes
+- `torch-2.15.0+cu132-cp314-cp314-win_amd64.whl`, 2115653661 bytes
+- `torchaudio-2.11.1+cu132-py3-none-win_amd64.whl`, 1774928 bytes (one py3 wheel per platform, so `_wheel` takes a `tag`)
+- `torchcodec-0.17.0+cu132-cp314-cp314-win_amd64.whl`, 14722138 bytes
 
-Sum: 1931672428 bytes (1842 MiB, the size the welcome step shows). URLs use `%2B` for the `+` in the wheel filename; the PyTorch R2 CDN (behind a 301 from `download.pytorch.org`) handles the encoded form more reliably.
+Sum: 2132150727 bytes (2033 MiB, the size the welcome step shows). URLs use `%2B` for the `+` in the wheel filename; the PyTorch R2 CDN (behind a 301 from `download.pytorch.org`) handles the encoded form more reliably.
 
-Offer (`cleave.first_run`, item `CUDA Toolkit`, default off): only on the frozen Windows build, when `nvcuda.dll` loads and `cuDriverGetVersion` reports 13000 or more (CUDA 13.0, NVIDIA driver 580.88 or newer), and the overlay is not installed yet. An off-by-default item never brings the welcome step back on its own.
+Offer (`cleave.first_run`, item `CUDA Toolkit`, default off): only on the frozen Windows build, when `nvcuda.dll` loads and `cuDriverGetVersion` reports 13020 or more (CUDA 13.2, an R595 NVIDIA driver or newer), and the overlay is not installed yet. An off-by-default item never brings the welcome step back on its own.
 
 Download (`download_cuda_extra`, on the welcome step's worker thread): stream each wheel into a staging folder with a running SHA-256, then unpack all three with `zipfile` and check that `torch`, `torchaudio`, and `torchcodec` exist. Only then write the `complete` marker and rename staging into place, so a failure, hash mismatch, or Cancel leaves nothing half-installed. Older `CUDA_EXTRA_KEY` folders are removed after a successful install. The progress bar spends 90% on the download and 10% on the unpack.
 

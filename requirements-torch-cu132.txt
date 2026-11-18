@@ -1,0 +1,4 @@
+--extra-index-url https://download.pytorch.org/whl/cu132
+torch==2.15.0
+torchaudio==2.11.1
+torchcodec==0.17.0

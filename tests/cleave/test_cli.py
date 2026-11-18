@@ -1200,8 +1200,8 @@ def test_module_help_lists_subcommands() -> None:
     assert "project_dir" in render_usage
     assert "project_dir" in render.stdout
     assert "Cleave project directory" in render.stdout
-    assert "-c CONFIG, --config CONFIG" in render.stdout
-    assert "-o OUTPUT, --output OUTPUT" in render.stdout
+    assert "-c, --config CONFIG" in render.stdout
+    assert "-o, --output OUTPUT" in render.stdout
     assert "--start SEC" in render.stdout
     assert "--end SEC" in render.stdout
     assert "--width PX" in render.stdout

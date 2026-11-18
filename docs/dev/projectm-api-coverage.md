@@ -20,7 +20,7 @@ Living API audit, not a todo list. Related: [todos.md](todos.md).
 | `projectm_pcm_add_float` | bound, used | Stem PCM feed |
 | `projectm_pcm_add_int16` | ignored | Cleave normalizes to float32 |
 | `projectm_pcm_add_uint8` | ignored | Cleave normalizes to float32 |
-| `projectm_pcm_get_max_samples` | bound, used | Chunk sizing; also target for block-peak PCM fold |
+| `projectm_pcm_get_max_samples` | bound, used | Chunk sizing; also target for block-peak PCM fold. Read at run time: 576 per channel in the shipped 4.2.0 build (480 before upstream `dd89dfba`) |
 | `projectm_opengl_render_frame` | ignored | Cleave renders to layer FBOs |
 | `projectm_opengl_render_frame_fbo` | bound, used | Per-layer render |
 | `projectm_opengl_burn_texture` | ignored | No burn pass in Cleave |

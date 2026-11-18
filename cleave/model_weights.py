@@ -7,7 +7,6 @@ are silent. Failed fetches raise :class:`WeightDownloadError`.
 
 from __future__ import annotations
 
-import re
 import sys
 import time
 from collections.abc import Callable, Iterator
@@ -20,22 +19,52 @@ from cleave.paths import model_cache_dir
 
 WeightProgress = Callable[[str, float | None], None]
 
-# Demucs 4.0.1 ``remote/files.txt`` has no byte sizes. Typical Hybrid Transformer
-# ``.th`` is ~80 MB; Beat This ``final0`` is ~78 MB (hub file_name below).
+# Each Hybrid Transformer safetensors file is 84,025,440 bytes (~80 MB);
+# Beat This ``final0`` is ~78 MB (hub file_name below).
 _DEMUCS_CHECKPOINT_MB = 80
 _BEAT_THIS_CHECKPOINT_MB = 78
-_DEMUCS_ROOT_URL = "https://dl.fbaipublicfiles.com/demucs/"
-# Cleave's own copy of the MIT-licensed Demucs weights, tried before Meta's
-# server. Files keep their upstream names, whose hash prefix torch hub checks.
-_DEMUCS_MIRROR_URL = (
-    "https://github.com/SpoddyCoder/cleave-resources/releases/download/"
-    "demucs-hybrid-transformer-v1"
-)
+_DEMUCS_HF_URL = "https://huggingface.co/adefossez/{repo}/resolve/{revision}/{sig}.safetensors"
 # Matches ``beat_this.inference.CHECKPOINT_URL`` (beat_this 1.1.0); do not import
 # that module here (it pulls torch).
 _BEAT_THIS_CHECKPOINT_URL = (
     "https://cloud.cp.jku.at/public.php/dav/files/7ik4RrBKTS273gp"
 )
+
+
+@dataclass(frozen=True)
+class _DemucsHfRepo:
+    """A Demucs bag's Hugging Face repo, pinned to one commit.
+
+    *sha256* maps each model signature in the bag to its safetensors hash.
+    """
+
+    repo: str
+    revision: str
+    sha256: tuple[tuple[str, str], ...]
+
+
+# Demucs 4.1 publishes its pretrained bags as safetensors on the Hugging Face
+# hub (``demucs.hf``). Cleave downloads them itself, with window progress, into
+# the data dir. Hashes from the hub API (LFS sha256) at these commits.
+_DEMUCS_HF_REPOS = {
+    "htdemucs": _DemucsHfRepo(
+        repo="HTDemucs",
+        revision="cbc8a9b1a87023b7fd74e7b3412e6321c0eab003",
+        sha256=(
+            ("955717e8", "d9fa14133cfcc034a6758923bb3a8ca9f8dfd0b582134643bbf83f72c17576dd"),
+        ),
+    ),
+    "htdemucs_ft": _DemucsHfRepo(
+        repo="HTDemucs-ft",
+        revision="d74ac89c3a1e874fc78f152555cf4d8533f06cd4",
+        sha256=(
+            ("f7e0c4bc", "2c85ab3c62dd6edd8e0b965e38b16fd1cdde357cc25de6b6bc9ce7c83f60925f"),
+            ("d12395a8", "5b01a97567ae9a3178a6236fb520251045c03eb8834bc8c24a4eec11d6c8fb56"),
+            ("92cfc3b6", "a241863551f30d01c42bd7b97da40839922ead3acb0f1fcab25682f55b4eeb59"),
+            ("04573f0d", "68854b0d7c2b3274723b5761f6fd9f5aec5f1bcd3f0de7c1669546fdb7871b7c"),
+        ),
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -67,7 +96,6 @@ _BEAT_THIS_PINNED = {
         ),
     ),
 }
-_HUB_HASH_REGEX = re.compile(r"-([a-f0-9]*)\.")
 _PROGRESS_MIN_INTERVAL_SEC = 0.1
 _PROGRESS_MIN_DELTA = 0.01
 
@@ -75,6 +103,15 @@ BEAT_THIS_CHECKPOINT = "final0"
 # Demucs bags Cleave separates with: default and High Quality (``-hq``).
 DEMUCS_MODEL = "htdemucs"
 DEMUCS_HQ_MODEL = "htdemucs_ft"
+
+
+@dataclass(frozen=True)
+class DemucsBag:
+    """A Demucs bag of models: signatures in order, per-source weights, segment."""
+
+    signatures: tuple[str, ...]
+    weights: list[list[float]] | None
+    segment: float | None
 
 
 class WeightDownloadError(RuntimeError):
@@ -151,49 +188,53 @@ def beat_this_weight_spec(checkpoint: str = BEAT_THIS_CHECKPOINT) -> WeightSpec:
     )
 
 
-def demucs_weight_spec(model: str) -> WeightSpec:
-    """Resolve Demucs bag *model* to hub ``.th`` files from the installed repo.
-
-    Reads ``demucs/remote/*.yaml`` and ``files.txt`` (no torch). Cleave uses
-    ``htdemucs`` (one file) and ``htdemucs_ft`` (four-file bag).
-    """
+def demucs_bag(model: str) -> DemucsBag:
+    """Read bag *model* from the installed Demucs ``remote/<model>.yaml`` (no torch)."""
     import yaml
 
     import demucs
 
-    remote = Path(demucs.__file__).resolve().parent / "remote"
-    urls = _parse_demucs_remote_files(remote / "files.txt")
-    yaml_path = remote / f"{model}.yaml"
-    if yaml_path.is_file():
-        bag = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
-        signatures = list(bag["models"])
-    elif model in urls:
-        signatures = [model]
-    else:
+    yaml_path = Path(demucs.__file__).resolve().parent / "remote" / f"{model}.yaml"
+    if not yaml_path.is_file():
         raise ValueError(f"unknown Demucs model: {model}")
+    bag = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
+    return DemucsBag(
+        signatures=tuple(bag["models"]),
+        weights=bag.get("weights"),
+        segment=bag.get("segment"),
+    )
 
+
+def demucs_checkpoint_name(signature: str) -> str:
+    """Cache filename under ``checkpoints/`` for one Demucs model signature."""
+    return f"demucs-{signature}.safetensors"
+
+
+def demucs_weight_spec(model: str) -> WeightSpec:
+    """Hugging Face safetensors for Demucs bag *model*, one per model in the bag.
+
+    Cleave uses ``htdemucs`` (one file) and ``htdemucs_ft`` (four-file bag).
+    """
+    pinned = _DEMUCS_HF_REPOS.get(model)
+    if pinned is None:
+        raise ValueError(f"unknown Demucs model: {model}")
+    hashes = dict(pinned.sha256)
     files: list[WeightFile] = []
-    for sig in signatures:
-        try:
-            url = urls[sig]
-        except KeyError as exc:
+    for sig in demucs_bag(model).signatures:
+        sha = hashes.get(sig)
+        if sha is None:
             raise ValueError(
-                f"Demucs model {model!r} references missing signature {sig!r}"
-            ) from exc
-        filename = url.rsplit("/", 1)[-1]
-        files.append(
-            WeightFile(
-                filename=filename,
-                urls=(f"{_DEMUCS_MIRROR_URL}/{filename}", url),
-                hash_prefix=_hub_hash_prefix(filename),
+                f"Demucs model {model!r} references unpinned signature {sig!r}"
             )
+        url = _DEMUCS_HF_URL.format(repo=pinned.repo, revision=pinned.revision, sig=sig)
+        files.append(
+            WeightFile(filename=demucs_checkpoint_name(sig), urls=(url,), hash_prefix=sha)
         )
     if not files:
         raise ValueError(f"Demucs model {model!r} has no checkpoint files")
-    size_mb = _DEMUCS_CHECKPOINT_MB * len(files)
     return WeightSpec(
         label=f"Demucs {model}",
-        size_mb=size_mb,
+        size_mb=_DEMUCS_CHECKPOINT_MB * len(files),
         files=tuple(files),
     )
 
@@ -279,28 +320,6 @@ def _download_first_working(
 
 def _checkpoint_present(path: Path) -> bool:
     return path.is_file() and path.stat().st_size > 0
-
-
-def _hub_hash_prefix(filename: str) -> str | None:
-    match = _HUB_HASH_REGEX.search(filename)
-    prefix = match.group(1) if match else None
-    return prefix or None
-
-
-def _parse_demucs_remote_files(remote_file_list: Path) -> dict[str, str]:
-    """Same layout as ``demucs.pretrained._parse_remote_files`` (no torch)."""
-    root = ""
-    models: dict[str, str] = {}
-    for raw in remote_file_list.read_text(encoding="utf-8").splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#"):
-            continue
-        if line.startswith("root:"):
-            root = line.split(":", 1)[1].strip()
-            continue
-        sig = line.split("-", 1)[0]
-        models[sig] = _DEMUCS_ROOT_URL + root + line
-    return models
 
 
 def _report(

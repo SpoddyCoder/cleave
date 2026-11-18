@@ -124,7 +124,7 @@ class _OverlaySlotState:
 
 def _overlay_surface_rgba(surface: pygame.Surface) -> bytes:
     """RGBA pixel bytes with Y flipped for OpenGL upload."""
-    return pygame.image.tostring(surface, "RGBA", True)
+    return pygame.image.tobytes(surface, "RGBA", True)
 
 
 def _overlay_subimage_y(dest_y: int, active_h: int, capacity_h: int) -> int:

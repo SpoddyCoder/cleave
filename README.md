@@ -1,6 +1,6 @@
 # `Cleave`
 
-[![Version](https://img.shields.io/badge/version-v0.3.0--344%20%28dev%20build%29-orange)](https://github.com/SpoddyCoder/cleave/compare/v0.3.0...ui-refactor) [![Tests](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml/badge.svg)](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml)
+[![Version](https://img.shields.io/badge/version-v0.3.0--345%20%28dev%20build%29-orange)](https://github.com/SpoddyCoder/cleave/compare/v0.3.0...ui-refactor) [![Tests](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml/badge.svg)](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml)
 
 Stem-separated music visualizer. Layer together drums, bass, vocals and other stems - each driving Milkdrop presets to create your own unique visual masterpieces.
 
@@ -66,7 +66,7 @@ The build is unsigned. If SmartScreen warns on the setup exe or the zip, choose 
 
 ### CUDA (NVIDIA GPU)
 
-Stem separation on CPU is slow. When your NVIDIA driver supports CUDA 13 (driver 580.88 or newer), the Welcome to Cleave step offers a CUDA Toolkit download from PyTorch (about 1.8 GB) for much faster splitting. It is off by default; tick it on first launch, or later from Settings > Download packages. It goes into `%LOCALAPPDATA%\Cleave\cuda`, so the installer and the zip both stay CPU-only and work the same. Skip or fail leaves CPU split working fine.
+Stem separation on CPU is slow. When your NVIDIA driver supports CUDA 13.2 (driver 595 or newer), the Welcome to Cleave step offers a CUDA Toolkit download from PyTorch (about 2 GB) for much faster splitting. It is off by default; tick it on first launch, or later from Settings > Download packages. It goes into `%LOCALAPPDATA%\Cleave\cuda`, so the installer and the zip both stay CPU-only and work the same. Skip or fail leaves CPU split working fine.
 
 ---
 
@@ -76,7 +76,7 @@ Developed on WSL2, but should work on any Linux with a display.
 
 ### Requirements
 
-* Python 3.10+
+* Python 3.14+
 * FFmpeg
 * libprojectM 4.2+ (needs `_opengl_render_frame_fbo` and `_set_frame_time`)
 * Optional: NVIDIA GPU + CUDA for faster Demucs separation
@@ -97,15 +97,15 @@ python3 -m venv cleave
 source cleave/bin/activate
 
 # or using conda
-conda create -n cleave python=3.10
+conda create -n cleave python=3.14
 conda activate cleave
 ```
 
 Install dependencies:
 
 ```bash
-# CUDA 13.0 (Linux + NVIDIA GPU)
-pip install -r requirements-torch-cu130.txt
+# CUDA 13.2 (Linux + NVIDIA GPU)
+pip install -r requirements-torch-cu132.txt
 # or CPU-only
 pip install -r requirements-torch-cpu.txt
 # rest of deps

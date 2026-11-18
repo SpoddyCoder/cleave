@@ -17,7 +17,7 @@ LICENSE/COPYING/NOTICE files into ``licenses/ffmpeg/``.
 Pinned FFmpeg
 -------------
 
-GyanD/codexffmpeg **9.0.1 essentials** (64-bit Windows, static, GPLv3).
+GyanD/codexffmpeg **9.0.2 essentials** (64-bit Windows, static, GPLv3).
 
 This is the well-known gyan.dev "release essentials" Windows build, mirrored
 as a versioned GitHub Release asset so the URL does not float. Essentials
@@ -44,13 +44,13 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-# GyanD/codexffmpeg 9.0.1 essentials (gyan.dev Windows release essentials).
-# Asset: https://github.com/GyanD/codexffmpeg/releases/tag/9.0.1
+# GyanD/codexffmpeg 9.0.2 essentials (gyan.dev Windows release essentials).
+# Asset: https://github.com/GyanD/codexffmpeg/releases/tag/9.0.2
 FFMPEG_URL = (
     "https://github.com/GyanD/codexffmpeg/releases/download/"
-    "9.0.1/ffmpeg-9.0.1-essentials_build.zip"
+    "9.0.2/ffmpeg-9.0.2-essentials_build.zip"
 )
-FFMPEG_SHA256 = "fec81ae03971d9dd4be3ebe02e263bd2ec1d789483f931bdba5f5715e65da2e9"
+FFMPEG_SHA256 = "60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba"
 
 REQUIRED_DLLS = ("projectM-4.dll", "projectM-4-playlist.dll")
 SIDECAR_NAMES = ("ffmpeg.exe", *REQUIRED_DLLS)

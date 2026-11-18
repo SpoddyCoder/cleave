@@ -24,7 +24,7 @@ from PyInstaller.utils.hooks import collect_all
 SPECDIR = Path(SPECPATH).resolve()
 REPO = SPECDIR.parent
 
-# Inspected from Demucs 4.0.1, beat_this 1.1.0, librosa 0.11.0, and their
+# Inspected from Demucs 4.1.0, beat_this 1.1.0, librosa 1.0.1, and their
 # installed runtime deps (CPU torch extra). Native or data-bearing packages
 # plus the lazy-imported analyse stack that Analysis will not see from
 # cleave.py (those imports live in function bodies).
@@ -39,24 +39,21 @@ COLLECT_PACKAGES = (
     "beat_this",
     "librosa",
     "soundfile",
-    "audioread",
     "numba",
     "scipy",
     "sklearn",
     "julius",
     "lameenc",
-    "openunmix",
+    "safetensors",
     "einops",
     "rotary_embedding_torch",
-    "omegaconf",
-    "dora",
     "joblib",
     "pooch",
 )
 
 # pickle/dynamic imports that collect_all can still miss.
 EXTRA_HIDDENIMPORTS = (
-    "demucs.pretrained",
+    "demucs.hf",
     "demucs.hdemucs",
     "demucs.htdemucs",
     "demucs.demucs",
@@ -69,9 +66,6 @@ EXTRA_HIDDENIMPORTS = (
     "librosa.feature",
     "librosa.onset",
     "soundfile",
-    "audioread",
-    "audioread.ffdec",
-    "audioread.rawread",
     "numpy._core._multiarray_umath",
     "numpy._core.multiarray",
     "numpy._core.umath",

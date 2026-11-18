@@ -2,7 +2,7 @@
 
 Binds through ctypes to the SDL2 library pygame already loaded. On Windows
 ``SDL2.dll`` is already in the process, so loading it by name returns that
-module. Elsewhere the library sits in ``pygame.libs`` next to the package.
+module. Elsewhere the library sits in ``pygame_ce.libs`` next to the package.
 When the library or the window cannot be found, every call is a no-op.
 """
 
@@ -29,7 +29,7 @@ def _sdl_library_candidates() -> list[str]:
         # The bare name resolves to the module pygame already loaded.
         return ["SDL2.dll", os.path.join(package_dir, "SDL2.dll")]
     patterns = (
-        os.path.join(package_dir, os.pardir, "pygame.libs", "libSDL2-2*.so*"),
+        os.path.join(package_dir, os.pardir, "pygame_ce.libs", "libSDL2-2*.so*"),
         os.path.join(package_dir, ".dylibs", "libSDL2*.dylib"),
         os.path.join(package_dir, "libSDL2*"),
     )
