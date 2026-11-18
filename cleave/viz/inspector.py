@@ -69,6 +69,8 @@ class InspectorRow:
     command_ids: tuple[str, ...] = ()
     status: str | None = None
     divider: bool = False
+    # Drawn in the page's button group, under the divider.
+    with_commands: bool = False
 
 
 # A thin rule between rows. It is not a row: no cursor, no click, and less
@@ -138,9 +140,10 @@ def build_inspector_rows(
 
     Settings, Project, and an unknown id are empty. A layer or timeline row
     not yet in *state* (added this frame, after the view state was built) is
-    empty until the next frame. Button rows go to the bottom of the page in their
-    page order, under a divider when other rows sit above them, unless the
-    section sets ``commands_divider=False``.
+    empty until the next frame. Button rows, and leaf rows marked
+    ``with_commands``, go to the bottom of the page in their page order, under
+    a divider when other rows sit above them, unless the section sets
+    ``commands_divider=False``.
     """
     section = page_section(state, node_id)
     if section is None:
@@ -156,11 +159,15 @@ def build_inspector_rows(
 def _commands_last(
     rows: list[InspectorRow], *, divider: bool
 ) -> tuple[InspectorRow, ...]:
-    fields = [row for row in rows if not row.command_ids]
-    commands = [replace(row, depth=0) for row in rows if row.command_ids]
+    fields = [row for row in rows if not _in_command_group(row)]
+    commands = [replace(row, depth=0) for row in rows if _in_command_group(row)]
     if divider and fields and commands:
         return (*fields, DIVIDER_ROW, *commands)
     return (*fields, *commands)
+
+
+def _in_command_group(row: InspectorRow) -> bool:
+    return bool(row.command_ids) or row.with_commands
 
 
 def _inspector_row(
@@ -169,12 +176,14 @@ def _inspector_row(
     slot: str | None,
     card: str | None,
     depth: int,
+    with_commands: bool = False,
 ) -> InspectorRow:
     return InspectorRow(
         descriptor=RowDescriptor(kind, slot=slot, card=card),
         is_heading=False,
         depth=depth,
         navigable=row_spec(kind).navigable,
+        with_commands=with_commands,
     )
 
 
@@ -271,6 +280,7 @@ def _append_nodes(
                     slot=leaf_slot,
                     card=leaf_card,
                     depth=depth,
+                    with_commands=child.with_commands,
                 )
             )
         elif child.commands is not None:

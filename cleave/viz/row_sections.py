@@ -40,6 +40,8 @@ class SectionNode:
     ``commands`` is one row of buttons, as ids in the command registry.
     ``status`` is a line of text at the start of that row.
     ``divider`` is a thin rule between rows.
+    ``with_commands`` moves a leaf row down to the page's buttons, under the
+    divider, for a setting that belongs with the command beside it.
     """
 
     leaf_kind: RowKind | None = None
@@ -48,6 +50,7 @@ class SectionNode:
     commands: tuple[str, ...] | None = None
     status: str | None = None
     divider: bool = False
+    with_commands: bool = False
 
     def __post_init__(self) -> None:
         set_count = self.divider + sum(
@@ -56,6 +59,8 @@ class SectionNode:
         )
         if set_count != 1:
             raise ValueError("SectionNode requires exactly one child type")
+        if self.with_commands and self.leaf_kind is None:
+            raise ValueError("with_commands applies only to a leaf row")
 
 
 @dataclass(frozen=True)
@@ -130,7 +135,9 @@ SETTINGS_PREVIEW_SECTION = SectionDef(
     context="global",
     children=(
         SectionNode(leaf_kind=RowKind.SETTINGS_PREVIEW_QUALITY),
-        SectionNode(leaf_kind=RowKind.SETTINGS_RESIDUAL_LATENCY_MS),
+        SectionNode(
+            leaf_kind=RowKind.SETTINGS_RESIDUAL_LATENCY_MS, with_commands=True
+        ),
         SectionNode(commands=("settings.measure_latency",)),
     ),
 )

@@ -184,6 +184,10 @@ def test_settings_pages() -> None:
     ]
     assert preview[-1].command_ids == ("settings.measure_latency",)
     assert preview[-1].depth == 0
+    # Audio latency sits under the divider with Measure audio latency.
+    assert preview[-3].divider
+    assert preview[-2].descriptor is not None
+    assert preview[-2].descriptor.kind == RowKind.SETTINGS_RESIDUAL_LATENCY_MS
     ui = build_inspector_rows(state, "settings.ui")
     assert _kinds(ui) == [
         RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY,
@@ -515,10 +519,15 @@ def test_buttons_sit_at_page_bottom_under_one_divider(node_id: str) -> None:
     state = _layer_view(("layer_1",))
     state.timeline.song_marker_times = (1.0, 4.0)
     rows = build_inspector_rows(state, node_id)
-    first_command = next(i for i, row in enumerate(rows) if row.command_ids)
+    first_command = next(
+        i for i, row in enumerate(rows) if row.command_ids or row.with_commands
+    )
     assert rows[first_command - 1].divider
     assert not rows[first_command - 2].divider
-    assert all(row.command_ids and row.depth == 0 for row in rows[first_command:])
+    assert all(
+        (row.command_ids or row.with_commands) and row.depth == 0
+        for row in rows[first_command:]
+    )
 
 
 def test_cue_fades_divider_sits_between_hard_and_soft_cuts() -> None:
