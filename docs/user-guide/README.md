@@ -150,7 +150,7 @@ Many navigator rows have small icons on the right:
 - **Lock**: protects that part from accidental changes. Locked settings turn red and cannot be changed until you unlock them.
 - **Preview** (on Overlay only): keeps the credits cards on screen at any time so you can see your edits.
 
-The same icons sit at the right of the inspector's title. When a page or the part it belongs to is off or locked, its settings dim, and hovering the icon tells you which switch to change.
+The same icons, in the same order, sit at the right of the inspector's title, so a layer's pages can solo the layer and the Overlay pages can preview the cards. When a page or the part it belongs to is off or locked, its settings dim, and hovering the icon tells you which switch to change.
 
 ### Undo
 
@@ -437,7 +437,7 @@ Open **Overlay > Opening Card** or **Closing Card** in the navigator. Each card 
 
 Click a text row to type into it. Click a colour swatch to pick a colour, with a live preview. The body text can have several lines.
 
-Cards normally show only at their set times. Turn on **preview** (the icon on the Overlay row, or press V on the Overlay page) to keep them on screen while you edit.
+Cards normally show only at their set times. Turn on **preview** (the icon on the Overlay row or at the right of an Overlay page's title, or press V on the Overlay page) to keep them on screen while you edit.
 
 ---
 

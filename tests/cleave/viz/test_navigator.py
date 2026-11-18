@@ -608,12 +608,19 @@ def test_page_toggles_come_from_the_nearest_owner() -> None:
         ]
     assert owners("overlay.opening_card") == [
         (TOGGLE_ENABLED, "overlay.opening_card"),
+        (TOGGLE_PREVIEW, "overlay"),
         (TOGGLE_LOCK, "overlay"),
     ]
+    assert owners("overlay") == [(TOGGLE_PREVIEW, "overlay"), (TOGGLE_LOCK, "overlay")]
     compositing = layer_page_node_id("layer_1", "compositing")
     layer = layer_node_id("layer_1")
-    assert owners(compositing) == [(TOGGLE_ENABLED, layer), (TOGGLE_LOCK, layer)]
-    lock = page_toggles(session, compositing)[1]
+    assert owners(compositing) == [
+        (TOGGLE_ENABLED, layer),
+        (TOGGLE_SOLO, layer),
+        (TOGGLE_LOCK, layer),
+    ]
+    assert owners(layer) == owners(compositing)
+    lock = page_toggles(session, compositing)[2]
     assert lock.toggle.active and lock.owner_label.startswith("1")
     assert owners(timeline_row_node_id("layer_1")) == [
         (TOGGLE_ENABLED, "timeline"),

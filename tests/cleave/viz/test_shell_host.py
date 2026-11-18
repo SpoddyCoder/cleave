@@ -13,12 +13,14 @@ from cleave.viz.material_icons import (
     LOCK_GLYPH,
     LOCK_OPEN_GLYPH,
     POWER_GLYPH,
+    PREVIEW_GLYPH,
     SOLO_GLYPH,
 )
 from cleave.viz.navigator import (
     TOGGLE_ADD,
     TOGGLE_ENABLED,
     TOGGLE_LOCK,
+    TOGGLE_PREVIEW,
     TOGGLE_SOLO,
     TWISTY_COLLAPSED,
     TWISTY_EXPANDED,
@@ -509,6 +511,18 @@ def test_page_toggle_buttons_draw_like_navigator_icons() -> None:
     assert off.enabled and "Post-FX is off" in off.tooltip()
     assert (lock.id, lock.glyph, lock.fill) == (TOGGLE_LOCK, LOCK_GLYPH, palette().nav_lock_bg)
     assert lock.enabled and lock.tooltip() == "Post-FX is locked: click to unlock"
+
+
+def test_page_toggle_buttons_draw_solo_and_preview_like_navigator_icons() -> None:
+    solo = PageToggle(NavToggle(TOGGLE_SOLO, True), "layer:layer_1", "1 Drums")
+    preview = PageToggle(NavToggle(TOGGLE_PREVIEW, False), "overlay", "Overlay")
+    soloed, previewing = page_toggle_buttons((solo, preview), PageStatus(locked_by="1 Drums"))
+    assert (soloed.id, soloed.glyph, soloed.fill) == (TOGGLE_SOLO, SOLO_GLYPH, palette().solo_bg)
+    assert soloed.enabled and soloed.tooltip() == "1 Drums is soloed: click to end solo"
+    assert (previewing.id, previewing.glyph, previewing.fill) == (
+        TOGGLE_PREVIEW, PREVIEW_GLYPH, None
+    )
+    assert previewing.tooltip() == "Click to preview cards"
 
 
 def test_page_toggle_buttons_show_a_parent_that_is_off_or_locked() -> None:

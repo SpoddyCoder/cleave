@@ -327,9 +327,13 @@ def page_status(
     return PageStatus(off_by=off_by, locked_by=locked_by)
 
 
+# Title-line icons, in the navigator's column order.
+_PAGE_TOGGLE_ORDER = (TOGGLE_ENABLED, TOGGLE_SOLO, TOGGLE_PREVIEW, TOGGLE_LOCK)
+
+
 @dataclass(frozen=True)
 class PageToggle:
-    """A navigator on/off or lock icon that acts for an inspector page.
+    """A navigator on/off, solo, preview, or lock icon that acts for an inspector page.
 
     ``owner_id`` is the nearest node, the page itself or a parent, that
     carries the icon, and ``owner_label`` its name.
@@ -345,20 +349,22 @@ def page_toggles(
     node_id: str,
     nodes: Sequence[NavNode] | None = None,
 ) -> tuple[PageToggle, ...]:
-    """The on/off then lock icons that act for the inspector page *node_id*.
+    """The on/off, solo or preview, then lock icons that act for the
+    inspector page *node_id*, in the navigator's column order.
 
     Each comes from the nearest node in the page's chain that has it, so a
-    Post-FX child page acts on Post-FX and a card's on/off acts on the card
-    while its lock is Overlay's. Config pages and preset curation have none.
+    Post-FX child page acts on Post-FX, a layer page solos its layer, and a
+    card's on/off acts on the card while its preview and lock are Overlay's.
+    Config pages and preset curation have none.
     """
     found: dict[str, PageToggle] = {}
     for node in _page_chain(session, node_id, nodes):
         for toggle in node.toggles:
-            if toggle.id in (TOGGLE_ENABLED, TOGGLE_LOCK) and toggle.id not in found:
+            if toggle.id in _PAGE_TOGGLE_ORDER and toggle.id not in found:
                 found[toggle.id] = PageToggle(
                     toggle, node.id, " ".join(node.label.split())
                 )
-    return tuple(found[key] for key in (TOGGLE_ENABLED, TOGGLE_LOCK) if key in found)
+    return tuple(found[key] for key in _PAGE_TOGGLE_ORDER if key in found)
 
 
 def navigator_row_bright(node: NavNode) -> bool:

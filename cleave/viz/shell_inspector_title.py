@@ -20,6 +20,8 @@ from cleave.viz.navigator import (
     PageStatus,
     PageToggle,
     TOGGLE_ENABLED,
+    TOGGLE_PREVIEW,
+    TOGGLE_SOLO,
     timeline_row_slot_of,
     timeline_row_title,
 )
@@ -112,7 +114,7 @@ class TitleButton:
 
 
 def page_toggle_tooltip(item: PageToggle, status: PageStatus) -> str:
-    """Hover text for a page's on/off or lock button on the title line."""
+    """Hover text for a page's on/off, solo, preview, or lock button on the title line."""
     toggle = item.toggle
     name = item.owner_label
     if toggle.blocked:
@@ -128,6 +130,14 @@ def page_toggle_tooltip(item: PageToggle, status: PageStatus) -> str:
                 f"{status.off_by} is turned on. Click to turn {name} off"
             )
         return f"{name} is on: click to turn off"
+    if toggle.id == TOGGLE_SOLO:
+        if toggle.active:
+            return f"{name} is soloed: click to end solo"
+        return f"Click to solo {name}"
+    if toggle.id == TOGGLE_PREVIEW:
+        if toggle.active:
+            return "Previewing cards: click to end preview"
+        return "Click to preview cards"
     if toggle.active:
         return f"{name} is locked: click to unlock"
     return f"{name} is unlocked: click to lock"
@@ -136,7 +146,7 @@ def page_toggle_tooltip(item: PageToggle, status: PageStatus) -> str:
 def page_toggle_buttons(
     toggles: Sequence[PageToggle], status: PageStatus
 ) -> tuple[TitleButton, ...]:
-    """The page's on/off and lock icons as title buttons, drawn like the
+    """The page's on/off, solo or preview, and lock icons as title buttons, drawn like the
     navigator's. Each button's id is its toggle id.
 
     An on switch under a parent that is off draws its fill at half strength.
