@@ -240,8 +240,7 @@ class PresetListController:
                 ),
                 on_cancel=lambda: self._unlock_preset_after_modal(slot),
                 help=(
-                    "Replaces the layer's whole preset list.",
-                    "The layer's preset switching then works through the new list.",
+                    "Replaces the layer's entire preset list; switching then cycles through the new one.",
                 ),
             )
         )

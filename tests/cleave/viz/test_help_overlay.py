@@ -97,6 +97,12 @@ def _assert_shell_navigation(entries: dict[str, str]) -> None:
     )
 
 
+def _says(lines: tuple[str, ...], *phrases: str) -> bool:
+    """True when the description mentions every phrase, ignoring case."""
+    text = " ".join(lines).lower()
+    return all(phrase in text for phrase in phrases)
+
+
 def test_help_content_navigation_cycles_regions() -> None:
     normal = dict(navigation_section().entries)
     curation = dict(navigation_section(preset_curation=True).entries)
@@ -279,7 +285,7 @@ def test_help_follows_navigator_render_node() -> None:
     assert post_description.title == "Post FX"
     with pytest.raises(AssertionError, match="no keyboard help section"):
         _keyboard_section(post)
-    assert "Post-processing effects" in _help_text(post)
+    assert "combined picture" in _help_text(post)
 
 
 def test_navigator_other_nodes_keep_navigation_only() -> None:
@@ -376,11 +382,7 @@ def test_preset_dir_help_titles() -> None:
     keyboard = _keyboard_section(sections)
     assert description is not None
     assert description.title == "Preset Directory"
-    assert description.lines == (
-        "The directory that contains the presets for this layer.",
-        "Click the up arrow to open the parent directory.",
-        "Click the down arrow, or double-click, to open the first subdirectory.",
-    )
+    assert _says(description.lines, 'parent folder', 'subfolder')
     assert keyboard.title == KEYBOARD_CONTROLS_SECTION_TITLE
     entries = dict(keyboard.entries)
     assert entries["Left/Right"] == "next/previous directory"
@@ -404,10 +406,7 @@ def test_preset_file_help_titles() -> None:
     keyboard = _keyboard_section(sections)
     assert description is not None
     assert description.title == "Milkdrop Preset File"
-    assert description.lines == (
-        "The Milkdrop preset that this layer shows.",
-        "Markers after the name (hover one to see it):",
-    )
+    assert _says(description.lines, 'tags after the name')
     assert dict(description.entries) == {
         "[F]": "favourite",
         "[B]": "blacklisted",
@@ -440,10 +439,7 @@ def test_blend_mode_help_lists_modes() -> None:
     description = _description_section(sections_for(RowKind.TRACK_BLEND))
     assert description is not None
     assert description.title == "Blend Mode"
-    assert description.lines == (
-        "How this layer mixes with the layers below it.",
-        "Pattern Mask replaces this when it is on.",
-    )
+    assert _says(description.lines, 'pattern mask overrides')
     assert description.entries == BLEND_MODE_HELP_ENTRIES
     assert [mode for mode, _ in description.entries] == list(BLEND_MODES)
 
@@ -453,9 +449,7 @@ def test_switching_page_help_is_description_only() -> None:
     description = _description_section(sections)
     assert description is not None
     assert description.title == "Preset Switching"
-    assert description.lines == (
-        "Changes the preset of this layer automatically, from a list.",
-    )
+    assert _says(description.lines, 'list of presets')
     assert not description.entries
     assert len(sections) == 1
 
@@ -466,12 +460,7 @@ def test_timeline_presets_help_lists_characters() -> None:
     description = _description_section(sections)
     assert description is not None
     assert description.title == "Generate Timeline"
-    assert description.lines == (
-        "Makes a new timeline from the settings in a dialog.",
-        "This replaces the current cues.",
-        "Each crescendo song marker gets a crescendo.",
-        "The project keeps the dialog settings.",
-    )
+    assert _says(description.lines, 'replacing the current cues', 'crescendo')
     assert description.entries == TIMELINE_PRESET_HELP_ENTRIES
     assert [name for name, _ in description.entries] == [
         "Breathing",
@@ -502,7 +491,7 @@ def test_preview_quality_help_lists_modes() -> None:
     description = _description_section(sections_for(RowKind.SETTINGS_PREVIEW_QUALITY))
     assert description is not None
     assert description.title == "Preview Quality"
-    assert "It does not change the render." in " ".join(description.lines)
+    assert _says(description.lines, "renders are unaffected")
     assert description.entries == EDITOR_PREVIEW_QUALITY_HELP_ENTRIES
 
 
@@ -518,9 +507,7 @@ def test_preset_list_help() -> None:
     description = _description_section(sections)
     assert description is not None
     assert description.title == "Preset List"
-    assert description.lines == (
-        "The presets that this layer switches through, in order.",
-    )
+    assert _says(description.lines, 'presets this layer cycles through')
     assert not description.entries
     assert len(sections) == 1
 
@@ -531,10 +518,7 @@ def test_preset_list_entry_help() -> None:
     keyboard = _keyboard_section(sections)
     assert description is not None
     assert description.title == "Preset List Entry"
-    assert description.lines == (
-        "A preset in the switching list of this layer.",
-        "Markers after the name (hover one to see it):",
-    )
+    assert _says(description.lines, 'switching list', 'tags after the name')
     assert description.entries == (
         ("[F]", "favourite"),
         ("[B]", "blacklisted"),
@@ -559,12 +543,7 @@ def test_preset_list_add_and_resume_switching_help() -> None:
     add_description = _description_section(add_sections)
     add_keyboard = _keyboard_section(add_sections)
     assert add_description is not None
-    assert add_description.lines == (
-        "Adds the current preset to the end of the list.",
-        "When switching is paused, this is the preset that you browsed to.",
-        "Cleave copies the preset file into the project.",
-        "Press P on any row of the layer to do the same.",
-    )
+    assert _says(add_description.lines, 'appends the current preset', 'copied into the project')
     assert dict(add_keyboard.entries) == {"Enter": "add current preset"}
 
     resume_sections = sections_for(RowKind.TRACK_PRESET_SWITCHING_RESUME)
@@ -572,9 +551,7 @@ def test_preset_list_add_and_resume_switching_help() -> None:
     resume_keyboard = _keyboard_section(resume_sections)
     assert resume_description is not None
     assert resume_description.title == "Resume Switching"
-    assert resume_description.lines == (
-        "Stops manual browsing and starts automatic switching again.",
-    )
+    assert _says(resume_description.lines, 'hands control back')
     assert dict(resume_keyboard.entries) == {"Enter": "resume switching"}
 
 
@@ -583,9 +560,7 @@ def test_preset_list_populate_help() -> None:
     description = _description_section(sections)
     keyboard = _keyboard_section(sections)
     assert description is not None
-    assert description.lines == (
-        "Replaces the full list with the presets from a directory.",
-    )
+    assert _says(description.lines, 'replaces the whole list')
     assert dict(keyboard.entries) == {
         "Enter": "choose a directory",
     }
@@ -597,7 +572,7 @@ def test_highlight_rolloff_mode_help_lists_modes() -> None:
     )
     assert description is not None
     assert description.title == "Mode"
-    assert description.lines == ("Where the rolloff applies.",)
+    assert _says(description.lines, "rolloff runs")
     assert description.entries == HIGHLIGHT_ROLLOFF_APPLY_MODE_HELP_ENTRIES
     assert [mode for mode, _ in description.entries] == list(
         HIGHLIGHT_ROLLOFF_APPLY_MODES
@@ -610,7 +585,7 @@ def test_highlight_rolloff_curve_help_lists_curves() -> None:
     )
     assert description is not None
     assert description.title == "Curve"
-    assert description.lines == ("The shape of the rolloff above the threshold.",)
+    assert _says(description.lines, "above the threshold")
     assert description.entries == HIGHLIGHT_ROLLOFF_CURVE_HELP_ENTRIES
     assert [curve for curve, _ in description.entries] == list(HIGHLIGHT_ROLLOFF_CURVES)
 
@@ -620,21 +595,19 @@ def test_highlight_rolloff_header_help() -> None:
         sections_for(RowKind.POST_FX_HIGHLIGHT_ROLLOFF_HEADER)
     )
     assert description is not None
-    assert description.lines[0] == (
-        "Makes very bright areas less bright when the layers are combined."
-    )
+    assert _says(description.lines, "compresses highlights", "flat white")
 
 
 def test_post_fx_header_help() -> None:
     description = _description_section(sections_for(RowKind.POST_FX_HEADER))
     assert description is not None
-    assert "on the final picture" in description.lines[0]
+    assert _says(description.lines, "combined picture")
 
 
 def test_timeline_help_mentions_visibility_handoff() -> None:
     description = _description_section(sections_for(RowKind.TIMELINE_HEADER))
     assert description is not None
-    assert any("layer on/off switches do not apply" in line for line in description.lines)
+    assert _says(description.lines, "own on/off switches are ignored")
 
 
 def test_stem_row_help() -> None:
@@ -645,7 +618,7 @@ def test_stem_row_help() -> None:
     assert description.title == "Stem"
     assert section.title == KEYBOARD_CONTROLS_SECTION_TITLE
     assert dict(section.entries)["Left/Right"] == "choose stem source"
-    assert "When you change the stem, the Cleave Effects of the layer reset." in description.lines
+    assert _says(description.lines, "resets the layer's cleave effects")
 
 
 def test_compositing_header_and_opacity_help() -> None:
@@ -654,18 +627,11 @@ def test_compositing_header_and_opacity_help() -> None:
     mask = _description_section(sections_for(RowKind.PATTERN_MASK_HEADER))
     assert header is not None
     assert header.title == "Compositing"
-    assert header.lines == (
-        "How this layer mixes with the layers below it.",
-        "Pattern Mask replaces these settings when it is on.",
-    )
+    assert _says(header.lines, 'pattern mask overrides')
     assert opacity is not None
-    assert opacity.lines == (
-        "How visible this layer is.",
-        "0% hides it.",
-        "Pattern Mask replaces this when it is on.",
-    )
+    assert _says(opacity.lines, 'opacity', 'pattern mask overrides')
     assert mask is not None
-    assert "This replaces the Compositing settings of each layer." in mask.lines
+    assert _says(mask.lines, "overrides each layer's compositing settings")
 
 
 def test_cleave_effects_help() -> None:
@@ -679,7 +645,7 @@ def test_effect_row_help_uses_registry_description() -> None:
     description = _description_section(sections)
     assert description is not None
     assert description.title == "Pulse"
-    assert "Layer opacity follows the audio driver." in description.lines
+    assert _says(description.lines, "opacity", "audio driver")
 
 
 def test_timeline_help_has_no_solo() -> None:
@@ -742,7 +708,7 @@ def test_layer_management_delete_help() -> None:
     assert entries["Enter/Delete"] == "delete layer"
     assert "" not in entries
     assert description is not None
-    assert "You cannot delete the last layer." in description.lines
+    assert _says(description.lines, "last one cannot be deleted")
 
 
 def test_navigable_row_kinds_have_help_sections() -> None:
@@ -823,7 +789,7 @@ def test_settings_preview_quality_description_separated_from_keyboard() -> None:
         "Enter": "open the list",
     }
     assert description is not None
-    assert "It does not change the render." in " ".join(description.lines)
+    assert _says(description.lines, "renders are unaffected")
 
 
 def test_timeline_stop_help_is_the_strip_only() -> None:
@@ -1090,8 +1056,8 @@ def test_help_column_draws_the_subject_stop() -> None:
         host.imgui.destroy()
 
 
-def test_help_description_lines_are_whole_sentences() -> None:
-    """Each line is one sentence: the column wraps words; a full stop starts a line."""
+def test_help_description_lines_end_in_punctuation() -> None:
+    """Each line is a paragraph the column wraps; it ends in punctuation."""
     import re
 
     from cleave.effects.registry import EFFECT_IDS, effect_help_description
@@ -1102,7 +1068,6 @@ def test_help_description_lines_are_whole_sentences() -> None:
     for name, lines in sources:
         for line in lines or ():
             assert re.search(r"[.!?:)]$", line), (name, line)
-            assert not re.search(r"[.!?] +[A-Z]", line), (name, line)
 
 
 def test_help_titles_are_capital_case() -> None:

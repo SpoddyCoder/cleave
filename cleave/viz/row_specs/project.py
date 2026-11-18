@@ -101,7 +101,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="ProjectM",
         help_description=(
-            "The default beat sensitivity for the project.",
+            "Project-wide projectM defaults.",
         ),
         is_pinned=True,
         parent_group="project",
@@ -118,8 +118,7 @@ SPECS: dict[RowKind, RowSpec] = {
             ("PgUp/PgDn", "large step (0.5)"),
         ),
         help_description=(
-            "Layers with no beat sensitivity of their own use this value.",
-            "New layers start at this value.",
+            "The beat sensitivity for any layer that does not set its own, and the starting value for new layers.",
         ),
         is_pinned=True,
         repeatable=True,
@@ -132,8 +131,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Compositor",
         help_description=(
-            "The colour depth that Cleave uses to combine the layers.",
-            "Preset curation always uses 8-bit.",
+            "The bit depth used when combining layers. Preset curation always uses 8-bit.",
         ),
         is_pinned=True,
         parent_group="project",
@@ -148,11 +146,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="HDR Compositing",
         help_entries=(("Left/Right", "off / on"),),
         help_description=(
-            "When on, Cleave combines the layers in 16-bit colour.",
-            "When off, it uses 8-bit.",
-            "This applies to the live view and to the render.",
-            "The video file is 8-bit in both cases.",
-            "When on, a light highlight rolloff also runs.",
+            "Composites layers at 16 bits per channel instead of 8, in both the live view and the render, which avoids banding and clipping when many bright layers stack. The output video is 8-bit either way. Also enables a gentle highlight rolloff.",
         ),
         is_pinned=True,
         repeatable=True,
@@ -165,9 +159,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Resolution",
         help_description=(
-            "The width and height of the video, in pixels.",
-            "The render uses this size.",
-            "The live preview uses its shape.",
+            "The output video's frame size. Renders use it exactly; the live preview matches its aspect ratio.",
         ),
         is_pinned=True,
         parent_group="project",
@@ -184,7 +176,7 @@ SPECS: dict[RowKind, RowSpec] = {
             ("PgUp/PgDn", f"large step ({RESOLUTION_STEP_LARGE} px)"),
         ),
         help_description=(
-            "Width of the video, in pixels.",
+            "Output width, in pixels.",
         ),
         is_pinned=True,
         repeatable=True,
@@ -202,7 +194,7 @@ SPECS: dict[RowKind, RowSpec] = {
             ("PgUp/PgDn", f"large step ({RESOLUTION_STEP_LARGE} px)"),
         ),
         help_description=(
-            "Height of the video, in pixels.",
+            "Output height, in pixels.",
         ),
         is_pinned=True,
         repeatable=True,

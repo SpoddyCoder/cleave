@@ -1,10 +1,10 @@
 # Custom Themes
 
-Cleave comes with four themes: Ultraviolet (the default), Chocolate, and Mint are dark, and Daylight is light. You can also make your own. Each theme is a small text file in the `themes` folder (see [Where your files live](README.md#where-your-files-live)). Choose **Settings > UI > Open themes folder** to open it.
+Cleave ships with four themes: three dark ones (Ultraviolet, the default, plus Chocolate and Mint) and the light Daylight. You can add your own as small YAML files in the `themes` folder (see [Where your files live](README.md#where-your-files-live)); **Settings > UI > Open themes folder** takes you there.
 
 ## Making a theme
 
-A theme starts from a built-in theme and changes only the colours you list. Name the file after your theme, such as `midnight.yaml`:
+A custom theme inherits everything from a built-in base and overrides only the colours you list, so a useful theme can be a handful of lines. Name the file after the theme, for example `midnight.yaml`:
 
 ```yaml
 name: Midnight
@@ -14,18 +14,18 @@ hover: [128, 84, 255]
 button_bg: "#202040"
 ```
 
-- **name** is what the Theme setting shows. Leave it out to use the file name.
-- **base** is the built-in theme to start from: `ultraviolet`, `chocolate`, or `mint` for a dark theme, `daylight` for a light one. Leave it out to start from Ultraviolet.
-- Every other line sets one colour. Write a colour as `"#rrggbb"` in quotes, or as red, green, and blue from 0 to 255 in square brackets.
-- A few settings are numbers, not colours:
-  - Those ending in `_alpha` are 0 to 255, or two numbers from 0 to 1 for the row bands.
-  - `button_sheen` and `button_shade` are 0 to 1.
-  - `icon_lit_hover_lift` and `icon_lit_hover_edge_lift` are -1 to 1. A positive number lightens a lit icon under the pointer and a negative one darkens it.
+- **name** is the label shown in the Theme setting. If omitted, the file name is used.
+- **base** is the built-in theme to inherit from: `ultraviolet`, `chocolate`, or `mint` for a dark theme, or `daylight` for a light one. If omitted, it defaults to Ultraviolet.
+- Every other key sets one colour, either as a quoted hex string (`"#rrggbb"`) or as an `[r, g, b]` list with values from 0 to 255.
+- A few keys take numbers rather than colours:
+  - Keys ending in `_alpha` take 0 to 255, except the row bands, which take a pair of values from 0 to 1.
+  - `button_sheen` and `button_shade` take 0 to 1.
+  - `icon_lit_hover_lift` and `icon_lit_hover_edge_lift` take -1 to 1: positive values lighten a lit icon under the pointer, negative values darken it.
 - `timeline_track_colors` is a list of up to eight colours, one per timeline row.
 
 ## Text on panels and text on fills
 
-Most text sits straight on the panel, so `value`, `label`, `muted`, and the other text colours need to read on `background`. Text on a solid fill has its own colour instead, so a light theme can put dark text on its panels and light text on a strong button:
+Most text is drawn directly on the panel, so `value`, `label`, `muted`, and the other text colours need enough contrast against `background`. Text on a solid fill takes a separate colour, which is what lets a light theme use dark text on its panels and light text on a saturated button:
 
 | Colour name | Text on |
 | --- | --- |
@@ -35,15 +35,15 @@ Most text sits straight on the panel, so `value`, `label`, `muted`, and the othe
 | `on_accent` | Headings on the blue-to-violet title bar |
 | `on_lit_icon` | Navigator and timeline icons that are switched on (on, solo, record) |
 
-`modal_scrim` and `modal_scrim_alpha` set the colour and strength of the wash over the window behind a dialog. A light theme usually wants a dark wash that is weaker than Ultraviolet's.
+`modal_scrim` and `modal_scrim_alpha` set the colour and opacity of the overlay that dims the window behind a dialog. Light themes usually look best with a dark scrim at lower opacity than Ultraviolet's.
 
 ## Using your theme
 
-Pick your theme in **Settings > UI > Theme**. After editing a file, choose **Settings > UI > Reload themes** to see the change straight away. If a file has a mistake, such as a misspelt colour name or a colour without quotes, Cleave lists it in a message when it starts and when you reload, and uses the base theme's colour instead.
+Select your theme in **Settings > UI > Theme**. While iterating, use **Settings > UI > Reload themes** to apply edits without restarting. Errors such as a misspelt key or an unquoted hex value are reported in a message at startup and on reload, and the affected colour falls back to the base theme's.
 
 ## Colour names
 
-The colour names, grouped by where they show:
+Every key a theme can set, grouped by where it appears:
 
 | Area | Colour names |
 | --- | --- |
@@ -60,7 +60,7 @@ The colour names, grouped by where they show:
 
 ## Starter theme
 
-This file sets every colour to Ultraviolet's, so it looks the same until you change something. Copy it into a new file in the `themes` folder, change the name, then change the colours you want. You can delete any line you leave alone. For a light theme, change `base` to `daylight` and delete the lines you have not changed, so they come from Daylight instead.
+This file sets every key to Ultraviolet's value, so it renders identically until you change something. Copy it into a new file in the `themes` folder, rename it, and edit the colours you want; any line you leave unchanged can be deleted. For a light theme, set `base` to `daylight` and delete the lines you haven't changed, so they inherit from Daylight instead.
 
 ```yaml
 name: My Theme

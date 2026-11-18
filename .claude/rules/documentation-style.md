@@ -19,8 +19,9 @@ alwaysApply: false
 
 [README.md](../../README.md) is the landing page: what Cleave is, install, a short getting started, CLI, and data locations. [docs/user-guide/README.md](../../docs/user-guide/README.md) is the full end-user guide. Both change with every user-visible change (see AGENTS.md).
 
-- Write for someone with no technical background. Say what a thing does for them, not how it works inside. Avoid internal names (`RowKind`, config keys, YAML paths, libprojectM) in the guide.
+- Write for a capable adult who knows music, video, or VJ work but not Cleave's internals. Use the field's own terms (blend mode, opacity, crossfade, saturation, tone curve) without defining the obvious, and explain what a setting is for and when you would change it, not only what it is. Avoid internal names (`RowKind`, config keys, YAML paths, libprojectM) in the guide.
 - Lead with the in-app path: menu items as **Menu > Item**, keys as they appear in the help column (Ctrl+R, Left/Right, PgUp/PgDn).
 - Keep H and the help column as the first source of help. Do not copy every option the help column already explains; name the setting and point to H.
-- Prefer short tables for keys, options, and choices. One idea per sentence.
+- Prefer short tables for keys, options, and choices.
+- Use plain, natural sentences; combine related points rather than splitting every clause.
 - Screenshots live in `docs/user-guide/images/` as PNG, referenced with a relative path. Add one only where it helps a reader find something.

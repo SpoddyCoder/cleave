@@ -1,6 +1,6 @@
 # `Cleave`
 
-[![Version](https://img.shields.io/badge/version-v0.3.0--349%20%28dev%20build%29-orange)](https://github.com/SpoddyCoder/cleave/compare/v0.3.0...ui-refactor) [![Tests](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml/badge.svg)](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml)
+[![Version](https://img.shields.io/badge/version-v0.3.0--350%20%28dev%20build%29-orange)](https://github.com/SpoddyCoder/cleave/compare/v0.3.0...ui-refactor) [![Tests](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml/badge.svg)](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml)
 
 Stem-separated music visualizer. Layer together drums, bass, vocals and other stems - each driving Milkdrop presets to create your own unique visual masterpieces.
 
@@ -21,13 +21,13 @@ Cleave is in active development. It is very usable, but may not maintain backwar
 ## Getting Started
 
 1. **Open a song.** On Windows, drop a music file onto `cleave.exe`, or launch Cleave and pick a file in the window. On Linux, run `./cleave.py play ~/music/mysong.mp3`, or `./cleave.py play` to pick a file in the window. Cleave reads wav, mp3, flac, m4a, aac, ogg, aiff, and aif.
-2. **Grab the downloads.** On first launch, the Welcome to Cleave step offers the Milkdrop presets and the AI models Cleave needs, each with its own progress bar. Anything you skip downloads when it is first needed, or later from Settings > Download packages.
-3. **Let Cleave prepare the song.** It splits the song into stems (drums, bass, vocals, other) and finds the beats and bars. The window shows each step's progress. This happens once per song.
-4. **Press `H`.** The help column explains whatever you have highlighted, anywhere in the editor, including inside dialogs.
+2. **Grab the downloads.** On first launch, the Welcome to Cleave step offers the Milkdrop presets and the AI models Cleave needs, each with its own progress bar. Anything you skip is fetched when first needed, or later from Settings > Download packages.
+3. **Let Cleave prepare the song.** It separates the track into stems (drums, bass, vocals, other) and detects the beat and bar grid, showing progress in the window. This happens once per song.
+4. **Press `H`.** The help column describes whatever is highlighted, anywhere in the editor, dialogs included.
 
-The [User Guide](docs/user-guide/README.md) covers everything else: layers, presets, preset curation, the timeline, credits cards, post-processing, and rendering.
+The [User Guide](docs/user-guide/README.md) covers the rest: layers, presets, preset curation, the timeline, credits cards, post-processing, and rendering.
 
-If the editor runs slowly with several layers, lower Settings > Preview > preview quality. The final render is always full quality and full frame rate.
+If the preview struggles with several layers, lower Settings > Preview > preview quality. Renders always run at full quality and full frame rate.
 
 ## CLI
 

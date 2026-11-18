@@ -88,18 +88,16 @@ _EFFECT_HELP_TITLES: dict[str, str] = {
 
 _EFFECT_HELP_DESCRIPTIONS: dict[str, tuple[str, ...]] = {
     "pulse": (
-        "Layer opacity follows the audio driver.",
-        "The driver sets if it follows short hits or longer sounds.",
+        "Modulates the layer's opacity from the audio driver; the driver choice decides whether it follows transients or sustained sound.",
     ),
     "flash": (
-        "A short white flash when the driver goes above its threshold.",
+        "Fires a brief white flash whenever the driver crosses its threshold.",
     ),
     "hue": (
-        "Changes the layer colour with the vocal pitch.",
-        "Vocals stem and pitch driver only.",
+        "Rotates the layer's hue with the vocal pitch. Available only on the vocals stem with the pitch driver.",
     ),
     "grit": (
-        "Film grain and colour fringes that follow the audio level.",
+        "Film grain and chromatic fringing that intensify with the audio level.",
     ),
 }
 

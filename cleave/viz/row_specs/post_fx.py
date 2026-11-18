@@ -386,8 +386,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Post FX",
         help_description=(
-            "Post-processing effects on the final picture.",
-            "Each effect has its own on/off switch.",
+            "Finishing effects applied to the combined picture, each with its own switch: fades, highlight control, colour, and a limiter for busy passages.",
         ),
     ),
     RowKind.POST_FX_LOCKED: RowSpec(
@@ -398,7 +397,9 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_post_fx_locked,
         choice=bool_choice(lambda s, _d: s.post_fx.locked, lock_text),
         help_title="Post FX Lock",
-        help_description=("When locked, you cannot change the Post FX settings.",),
+        help_description=(
+            "Protects the Post FX settings from accidental edits.",
+        ),
         blocked_by_section_lock=False,
     ),
     RowKind.POST_FX_FADE_HEADER: RowSpec(
@@ -408,7 +409,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Fade",
         help_description=(
-            "Fades the picture in at the start of the song and out at the end.",
+            "Fades the picture up from black at the start of the song and down to black at the end.",
         ),
         help_entries=(("E", "enable/disable"),),
         toggle_enabled=_toggle_post_fx_fade_enabled,
@@ -422,7 +423,9 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_post_fx_fade_enabled,
         choice=bool_choice(lambda s, _d: s.post_fx.fade.enabled),
         help_title="Fade Enabled",
-        help_description=("Turns the fade in and fade out on or off.",),
+        help_description=(
+            "Switches both the fade-in and the fade-out.",
+        ),
         parent_group="post_fx_fade",
     ),
     RowKind.POST_FX_FADE_IN_HEADER: RowSpec(
@@ -432,8 +435,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Fade In",
         help_description=(
-            "Times count from the start of the song.",
-            "The picture fades in between Start and End.",
+            "The fade-in runs from Start to End, both measured in seconds from the start of the song.",
         ),
         parent_group="post_fx_fade",
     ),
@@ -445,7 +447,7 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_post_fx_fade_in_start,
         help_title="Start",
         help_description=(
-            "The fade-in starts this many seconds after the song starts.",
+            "When the fade-in begins, in seconds from the start of the song.",
         ),
         repeatable=True,
         parent_group="post_fx_fade_in",
@@ -458,8 +460,7 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_post_fx_fade_in_end,
         help_title="End",
         help_description=(
-            "The fade-in ends this many seconds after the song starts.",
-            "It cannot be before Start.",
+            "When the picture reaches full brightness, in seconds from the start of the song. It cannot come before Start.",
         ),
         repeatable=True,
         parent_group="post_fx_fade_in",
@@ -473,7 +474,9 @@ SPECS: dict[RowKind, RowSpec] = {
         choice=options_choice(FADE_CURVES, lambda s, _d: s.post_fx.fade.fade_in.type, jump=_jump_post_fx_fade_in_type),
         help_title="Type",
         help_entries=(("Left/Right", "choose type"),),
-        help_description=("The shape of the fade.",),
+        help_description=(
+            "The fade curve.",
+        ),
         help_mode_entries=FADE_CURVE_HELP_ENTRIES,
         repeatable=True,
         parent_group="post_fx_fade_in",
@@ -485,9 +488,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Fade Out",
         help_description=(
-            "Times count back from the end of the song.",
-            "The picture fades out between Start and End.",
-            "Start is a larger number than End.",
+            "The fade-out runs from Start to End, both measured in seconds back from the end of the song, so Start is the larger number.",
         ),
         parent_group="post_fx_fade",
     ),
@@ -499,8 +500,7 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_post_fx_fade_out_start,
         help_title="Start",
         help_description=(
-            "The fade-out starts this many seconds before the song ends.",
-            "Start is a larger number than End.",
+            "When the fade-out begins, in seconds before the song ends. It is always larger than End.",
         ),
         repeatable=True,
         parent_group="post_fx_fade_out",
@@ -513,7 +513,7 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_post_fx_fade_out_end,
         help_title="End",
         help_description=(
-            "The fade-out ends this many seconds before the song ends.",
+            "When the picture reaches black, in seconds before the song ends.",
         ),
         repeatable=True,
         parent_group="post_fx_fade_out",
@@ -528,7 +528,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Type",
         help_entries=(("Left/Right", "choose type"),),
         help_description=(
-            "The shape of the fade.",
+            "The fade curve.",
         ),
         help_mode_entries=FADE_CURVE_HELP_ENTRIES,
         repeatable=True,
@@ -541,11 +541,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Highlight Rolloff",
         help_description=(
-            "Makes very bright areas less bright when the layers are combined.",
-            "This stops stacked black-key layers from becoming flat white.",
-            "Colours keep their hue.",
-            "When HDR Compositing is on, a light rolloff always runs.",
-            "These settings add to it.",
+            "Compresses highlights so stacked layers, black-key layers especially, do not clip to flat white. Hue is preserved. With HDR Compositing on, a gentle rolloff always runs and these settings add to it.",
         ),
         help_entries=(("E", "enable/disable"),),
         toggle_enabled=_toggle_post_fx_highlight_rolloff_enabled,
@@ -559,7 +555,9 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_post_fx_highlight_rolloff_enabled,
         choice=bool_choice(lambda s, _d: s.post_fx.highlight_rolloff.enabled),
         help_title="Highlight Rolloff Enabled",
-        help_description=("Turns the highlight rolloff on or off.",),
+        help_description=(
+            "Switches the highlight rolloff on or off.",
+        ),
         parent_group="post_fx_highlight_rolloff",
     ),
     RowKind.POST_FX_HIGHLIGHT_ROLLOFF_MODE: RowSpec(
@@ -571,7 +569,9 @@ SPECS: dict[RowKind, RowSpec] = {
         choice=options_choice(HIGHLIGHT_ROLLOFF_APPLY_MODES, lambda s, _d: s.post_fx.highlight_rolloff.mode),
         help_title="Mode",
         help_entries=(("Left/Right", "choose mode"),),
-        help_description=("Where the rolloff applies.",),
+        help_description=(
+            "Where in the chain the rolloff runs.",
+        ),
         help_mode_entries=HIGHLIGHT_ROLLOFF_APPLY_MODE_HELP_ENTRIES,
         repeatable=True,
         parent_group="post_fx_highlight_rolloff",
@@ -585,7 +585,9 @@ SPECS: dict[RowKind, RowSpec] = {
         choice=options_choice(HIGHLIGHT_ROLLOFF_CURVES, lambda s, _d: s.post_fx.highlight_rolloff.curve),
         help_title="Curve",
         help_entries=(("Left/Right", "choose curve"),),
-        help_description=("The shape of the rolloff above the threshold.",),
+        help_description=(
+            "The tone curve applied above the threshold.",
+        ),
         help_mode_entries=HIGHLIGHT_ROLLOFF_CURVE_HELP_ENTRIES,
         repeatable=True,
         parent_group="post_fx_highlight_rolloff",
@@ -598,9 +600,7 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_post_fx_highlight_rolloff_threshold,
         help_title="Threshold",
         help_description=(
-            "The brightness where the rolloff starts.",
-            "A lower value changes more of the picture.",
-            "A higher value changes only the brightest areas.",
+            "The brightness where compression begins. Lower values touch more of the image; higher values affect only the hottest highlights.",
         ),
         repeatable=True,
         parent_group="post_fx_highlight_rolloff",
@@ -613,9 +613,7 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_post_fx_highlight_rolloff_ceiling,
         help_title="Ceiling",
         help_description=(
-            "The maximum brightness after the rolloff.",
-            "At 100% strength, the brightest areas go down to this level.",
-            "Set it at or below the threshold.",
+            "The brightness highlights are compressed towards; at 100% strength they land exactly on it. Keep it at or below the threshold.",
         ),
         repeatable=True,
         parent_group="post_fx_highlight_rolloff",
@@ -628,10 +626,7 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_post_fx_highlight_rolloff_strength,
         help_title="Strength",
         help_description=(
-            "How much the rolloff pulls bright areas down to the ceiling.",
-            "At 100%, bright areas go fully to the ceiling.",
-            "Above 100%, the pull is stronger.",
-            "A lower value keeps more brightness.",
+            "How far highlights are pulled towards the ceiling. 100% reaches it, values above push harder, and lower values keep more of the original brightness.",
         ),
         repeatable=True,
         parent_group="post_fx_highlight_rolloff",
@@ -644,9 +639,7 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_post_fx_highlight_rolloff_softness,
         help_title="Softness",
         help_description=(
-            "How gradually the rolloff starts above the threshold.",
-            "A higher value gives a smoother start.",
-            "A lower value gives a sharp start at the threshold.",
+            "Width of the knee at the threshold. Higher values ease into compression; lower values give a hard knee.",
         ),
         repeatable=True,
         parent_group="post_fx_highlight_rolloff",
@@ -659,8 +652,7 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_post_fx_highlight_rolloff_desaturation,
         help_title="Desaturation",
         help_description=(
-            "How much colour the bright areas lose.",
-            "A higher value moves the bright areas toward grey.",
+            "How much saturation the compressed highlights lose. Higher values push them towards white-grey, as film does.",
         ),
         repeatable=True,
         parent_group="post_fx_highlight_rolloff",
@@ -672,8 +664,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Chroma Boost",
         help_description=(
-            "Makes colours stronger.",
-            "Use it after Highlight Rolloff to bring back colour.",
+            "Increases colour intensity. Useful after Highlight Rolloff to win back saturation the compression took out.",
         ),
         help_entries=(("E", "enable/disable"),),
         toggle_enabled=_toggle_post_fx_chroma_boost_enabled,
@@ -687,7 +678,9 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_post_fx_chroma_boost_enabled,
         choice=bool_choice(lambda s, _d: s.post_fx.chroma_boost.enabled),
         help_title="Chroma Boost Enabled",
-        help_description=("Turns the chroma boost on or off.",),
+        help_description=(
+            "Switches the chroma boost on or off.",
+        ),
         parent_group="post_fx_chroma_boost",
     ),
     RowKind.POST_FX_CHROMA_BOOST_MODE: RowSpec(
@@ -699,7 +692,9 @@ SPECS: dict[RowKind, RowSpec] = {
         choice=options_choice(CHROMA_BOOST_APPLY_MODES, lambda s, _d: s.post_fx.chroma_boost.mode),
         help_title="Mode",
         help_entries=(("Left/Right", "choose mode"),),
-        help_description=("Where the boost applies.",),
+        help_description=(
+            "Where in the chain the boost runs.",
+        ),
         help_mode_entries=CHROMA_BOOST_APPLY_MODE_HELP_ENTRIES,
         repeatable=True,
         parent_group="post_fx_chroma_boost",
@@ -713,7 +708,9 @@ SPECS: dict[RowKind, RowSpec] = {
         choice=options_choice(CHROMA_BOOST_VARIANTS, lambda s, _d: s.post_fx.chroma_boost.variant),
         help_title="Variant",
         help_entries=(("Left/Right", "choose variant"),),
-        help_description=("How the boost changes different colours.",),
+        help_description=(
+            "How the boost treats different colours.",
+        ),
         help_mode_entries=CHROMA_BOOST_VARIANT_HELP_ENTRIES,
         repeatable=True,
         parent_group="post_fx_chroma_boost",
@@ -726,8 +723,7 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_post_fx_chroma_boost_amount,
         help_title="Amount",
         help_description=(
-            "The strength of the boost.",
-            "0% turns it off.",
+            "Boost intensity. 0% bypasses it.",
         ),
         repeatable=True,
         parent_group="post_fx_chroma_boost",
@@ -739,10 +735,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Visual Limiter",
         help_description=(
-            "Makes the layers dimmer when the combined picture is too busy.",
-            "It works with or without the timeline.",
-            "When the timeline is on, cue roles change how much each layer dims.",
-            "Post FX solo and the Post FX lock do not change it.",
+            "Works like an audio compressor for visual density: when the composite gets too busy, it pulls the layers down. With the timeline on, cue roles decide which layers give way most. Post FX solo and lock do not affect it.",
         ),
         help_entries=(("E", "enable/disable"),),
         toggle_enabled=_toggle_post_fx_limiter_enabled,
@@ -759,7 +752,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Visual Limiter Enabled",
         help_entries=(("Left/Right", "off / on"),),
         help_description=(
-            "Turns the visual limiter on or off.",
+            "Switches the visual limiter on or off.",
         ),
         parent_group="post_fx_limiter",
         blocked_by_section_lock=False,
@@ -775,7 +768,7 @@ SPECS: dict[RowKind, RowSpec] = {
             ("Left/Right", "decrease / increase"),
         ),
         help_description=(
-            "The busyness level where the limiter starts to dim the layers.",
+            "The level of visual activity where the limiter starts dimming layers.",
         ),
         repeatable=True,
         parent_group="post_fx_limiter",
@@ -792,8 +785,7 @@ SPECS: dict[RowKind, RowSpec] = {
             ("Left/Right", "decrease / increase"),
         ),
         help_description=(
-            "How much the limiter dims the layers above the threshold.",
-            "A higher ratio dims busy layers more.",
+            "How hard the limiter dims once activity passes the threshold. Higher ratios clamp busy passages harder.",
         ),
         repeatable=True,
         parent_group="post_fx_limiter",
@@ -810,7 +802,7 @@ SPECS: dict[RowKind, RowSpec] = {
             ("Left/Right", "decrease / increase"),
         ),
         help_description=(
-            "Seconds that the layers take to become bright again after the limiter dims them.",
+            "How long, in seconds, the layers take to recover after the limiter lets go.",
         ),
         repeatable=True,
         parent_group="post_fx_limiter",

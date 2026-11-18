@@ -497,7 +497,7 @@ SPECS: dict[RowKind, RowSpec] = {
         visibility_icon=_visibility_overlays,
         help_title="Credits Overlays",
         help_description=(
-            "Credits cards at the start and end of the song.",
+            "Opening and closing credits cards drawn over the visuals.",
         ),
         toggle_preview=_toggle_overlays_preview,
     ),
@@ -510,8 +510,7 @@ SPECS: dict[RowKind, RowSpec] = {
         choice=bool_choice(lambda s, _d: s.overlays.preview),
         help_title="Overlay Preview",
         help_description=(
-            "Holds the credits cards on screen at any time, so you can see edits.",
-            "Not saved.",
+            "Holds the cards on screen regardless of the playhead, so you can style them without seeking. Not saved with the project.",
         ),
         blocked_by_section_lock=False,
     ),
@@ -523,7 +522,9 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_overlays_locked,
         choice=bool_choice(lambda s, _d: s.overlays.locked, lock_text),
         help_title="Overlay Lock",
-        help_description=("When locked, you cannot change the overlay settings.",),
+        help_description=(
+            "Protects the overlay settings from accidental edits.",
+        ),
         blocked_by_section_lock=False,
     ),
     RowKind.OVERLAY_CARD_HEADER: RowSpec(
@@ -536,8 +537,7 @@ SPECS: dict[RowKind, RowSpec] = {
             ("E", "enable/disable"),
         ),
         help_description=(
-            "The opening card shows at the start of the song.",
-            "The closing card shows near the end.",
+            "The opening card appears at the start of the song, the closing card near the end.",
         ),
         toggle_enabled=_toggle_overlay_card_enabled,
         parent_group="overlay",
@@ -550,7 +550,9 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_overlay_card_enabled,
         choice=bool_choice(lambda s, d: _overlay_card_block(s, d).runtime.enabled),
         help_title="Card Enabled",
-        help_description=("Turns this credits card on or off.",),
+        help_description=(
+            "Shows or hides this card in playback and renders.",
+        ),
         parent_group="overlay",
         blocked_by_section_lock=True,
     ),
@@ -561,7 +563,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Card Animation",
         help_description=(
-            "How this card moves on and off the screen.",
+            "How the card enters and leaves the screen.",
         ),
         parent_group="overlay",
     ),
@@ -574,7 +576,9 @@ SPECS: dict[RowKind, RowSpec] = {
         choice=options_choice(RENDER_OVERLAY_ANIMATION_TYPES, lambda s, d: _overlay_card_block(s, d).runtime.animation.type, jump=_jump_overlay_card_animation_type),
         help_title="Animation Type",
         help_entries=(("Left/Right", "choose type"),),
-        help_description=("The motion that shows and hides this card.",),
+        help_description=(
+            "The transition used to bring the card on and take it off.",
+        ),
         help_mode_entries=RENDER_OVERLAY_ANIMATION_TYPE_HELP_ENTRIES,
         repeatable=True,
         parent_group="overlay_animation",
@@ -589,8 +593,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Slide Direction",
         help_entries=(("Left/Right", "choose direction"),),
         help_description=(
-            "The edge that the card enters from.",
-            "It leaves the same way.",
+            "The edge the card slides in from. It exits the same way.",
         ),
         help_mode_entries=RENDER_OVERLAY_SLIDE_DIRECTION_HELP_ENTRIES,
         repeatable=True,
@@ -605,7 +608,7 @@ SPECS: dict[RowKind, RowSpec] = {
         choice=options_choice(RENDER_OVERLAY_POSITIONS, lambda s, d: _overlay_card_block(s, d).runtime.position, jump=_jump_overlay_card_position),
         help_title="Position",
         help_description=(
-            "The corner of the screen where the card shows.",
+            "The corner of the frame the card sits in.",
         ),
         repeatable=True,
         parent_group="overlay",
@@ -616,7 +619,9 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         help_title="Card Title",
-        help_description=("Title line of this credits card.",),
+        help_description=(
+            "Typography and colour of the card's title line.",
+        ),
         parent_group="overlay",
     ),
     RowKind.OVERLAY_CARD_TITLE_FONT_SIZE: RowSpec(
@@ -626,7 +631,9 @@ SPECS: dict[RowKind, RowSpec] = {
         format_value=_format_overlay_card_title_font_size,
         apply_horizontal=_apply_overlay_card_title_font_size,
         help_title="Title Font Size",
-        help_description=("Size of the title text.",),
+        help_description=(
+            "Title text size.",
+        ),
         repeatable=True,
         parent_group="overlay_title",
     ),
@@ -639,7 +646,9 @@ SPECS: dict[RowKind, RowSpec] = {
         choice=options_choice(overlay_system_fonts, lambda s, d: _overlay_card_block(s, d).runtime.title_font, jump=_jump_overlay_card_title_font),
         fit_strategy=FitStrategy.NONE,
         help_title="Title Font",
-        help_description=("Font of the title text.",),
+        help_description=(
+            "Title typeface.",
+        ),
         repeatable=True,
         parent_group="overlay_title",
     ),
@@ -651,7 +660,7 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_overlay_card_title_margin_bottom,
         help_title="Title Margin Bottom",
         help_description=(
-            "Space between the title and the body.",
+            "Gap between the title and the body text.",
         ),
         repeatable=True,
         parent_group="overlay_title",
@@ -664,7 +673,9 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_action=_apply_overlay_card_title_text_action,
         help_title="Title Text",
         help_entries=(("Enter", "edit title"),),
-        help_description=("The title text of the card.",),
+        help_description=(
+            "The card's title.",
+        ),
         parent_group="overlay_title",
         blocked_by_section_lock=True,
     ),
@@ -677,7 +688,9 @@ SPECS: dict[RowKind, RowSpec] = {
         colour_target=_colour_target("title_colour"),
         help_title="Title Colour",
         help_entries=(("Enter", "edit hex value"),),
-        help_description=("Colour of the title text, as a hex value.",),
+        help_description=(
+            "Title text colour, as a hex value.",
+        ),
         parent_group="overlay_title",
         blocked_by_section_lock=True,
     ),
@@ -691,7 +704,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Title Background",
         help_entries=(("Enter", "edit hex value"),),
         help_description=(
-            "Optional background colour behind the title, as a hex value.",
+            "Optional fill behind the title, as a hex value.",
         ),
         parent_group="overlay_title",
         blocked_by_section_lock=True,
@@ -702,7 +715,9 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
         help_title="Card Body",
-        help_description=("The text under the title.",),
+        help_description=(
+            "Typography and colour of the text under the title.",
+        ),
         parent_group="overlay",
     ),
     RowKind.OVERLAY_CARD_BODY_FONT_SIZE: RowSpec(
@@ -712,7 +727,9 @@ SPECS: dict[RowKind, RowSpec] = {
         format_value=_format_overlay_card_body_font_size,
         apply_horizontal=_apply_overlay_card_body_font_size,
         help_title="Body Font Size",
-        help_description=("Size of the body text.",),
+        help_description=(
+            "Body text size.",
+        ),
         repeatable=True,
         parent_group="overlay_body",
     ),
@@ -725,7 +742,9 @@ SPECS: dict[RowKind, RowSpec] = {
         choice=options_choice(overlay_system_fonts, lambda s, d: _overlay_card_block(s, d).runtime.body_font, jump=_jump_overlay_card_body_font),
         fit_strategy=FitStrategy.NONE,
         help_title="Body Font",
-        help_description=("Font of the body text.",),
+        help_description=(
+            "Body typeface.",
+        ),
         repeatable=True,
         parent_group="overlay_body",
     ),
@@ -738,8 +757,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Body Text",
         help_entries=(("Enter", "edit body"),),
         help_description=(
-            "The body text of the card.",
-            "It can have more than one line.",
+            "The card's body text, which can span several lines, for example artist, track, and label.",
         ),
         parent_group="overlay_body",
         blocked_by_section_lock=True,
@@ -753,7 +771,9 @@ SPECS: dict[RowKind, RowSpec] = {
         colour_target=_colour_target("body_colour"),
         help_title="Body Colour",
         help_entries=(("Enter", "edit hex value"),),
-        help_description=("Colour of the body text, as a hex value.",),
+        help_description=(
+            "Body text colour, as a hex value.",
+        ),
         parent_group="overlay_body",
         blocked_by_section_lock=True,
     ),
@@ -767,7 +787,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Body Background",
         help_entries=(("Enter", "edit hex value"),),
         help_description=(
-            "Optional background colour behind the body, as a hex value.",
+            "Optional fill behind the body text, as a hex value.",
         ),
         parent_group="overlay_body",
         blocked_by_section_lock=True,
@@ -779,7 +799,9 @@ SPECS: dict[RowKind, RowSpec] = {
         format_value=_format_overlay_card_opacity,
         apply_horizontal=_apply_overlay_card_opacity,
         help_title="Background Opacity",
-        help_description=("Opacity of the card background.",),
+        help_description=(
+            "Opacity of the card's background panel.",
+        ),
         repeatable=True,
         parent_group="overlay",
     ),
@@ -792,7 +814,9 @@ SPECS: dict[RowKind, RowSpec] = {
         colour_target=_colour_target("background_colour"),
         help_title="Background Colour",
         help_entries=(("Enter", "edit hex value"),),
-        help_description=("Colour of the card background, as a hex value.",),
+        help_description=(
+            "Card background colour, as a hex value.",
+        ),
         parent_group="overlay",
         blocked_by_section_lock=True,
     ),
@@ -804,7 +828,7 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_overlay_card_background_margin,
         help_title="Background Margin",
         help_description=(
-            "Space between the card and the edge of the screen.",
+            "Distance between the card and the edge of the frame.",
         ),
         repeatable=True,
         parent_group="overlay",
@@ -817,7 +841,7 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_overlay_card_background_padding,
         help_title="Background Padding",
         help_description=(
-            "Space between the card border and its text.",
+            "Space between the card's border and its text.",
         ),
         repeatable=True,
         parent_group="overlay",
@@ -830,7 +854,7 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_overlay_card_border_width,
         help_title="Border Width",
         help_description=(
-            "Width of the card border.",
+            "Card border thickness.",
         ),
         repeatable=True,
         parent_group="overlay",
@@ -845,7 +869,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Border Colour",
         help_entries=(("Enter", "edit hex value"),),
         help_description=(
-            "Colour of the card border, as a hex value.",
+            "Card border colour, as a hex value.",
         ),
         parent_group="overlay",
         blocked_by_section_lock=True,
@@ -858,8 +882,7 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_overlay_card_time,
         help_title="Card Time",
         help_description=(
-            "Opening card: it shows this many seconds after the song starts.",
-            "Closing card: it goes this many seconds before the song ends.",
+            "When the card appears. The opening card counts in seconds from the start of the song; the closing card counts back from the end.",
         ),
         repeatable=True,
         parent_group="overlay_animation",
@@ -872,8 +895,7 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_overlay_card_display_time,
         help_title="Display Time",
         help_description=(
-            "Seconds that the card stays on screen, with its animation.",
-            "At 0, the card stays on screen.",
+            "How long the card stays up, in seconds, including its animation. 0 keeps it on screen for good once it appears.",
         ),
         repeatable=True,
         parent_group="overlay_animation",

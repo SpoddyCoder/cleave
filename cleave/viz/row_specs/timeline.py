@@ -557,8 +557,7 @@ SPECS: dict[RowKind, RowSpec] = {
         visibility_icon=_visibility_timeline,
         help_title="Timeline",
         help_description=(
-            "Shows and hides the layers at set times in the song.",
-            "When it is on, the layer on/off switches do not apply.",
+            "Sequences the layers across the song with cues, so each one comes in and drops out at set times. While it is on, the layers' own on/off switches are ignored.",
         ),
         toggle_enabled=_toggle_timeline_enabled,
     ),
@@ -571,7 +570,7 @@ SPECS: dict[RowKind, RowSpec] = {
         choice=bool_choice(lambda s, _d: s.timeline.enabled),
         help_title="Timeline Enabled",
         help_description=(
-            "When on, the timeline shows and hides the layers, and the timeline strip opens.",
+            "Hands layer visibility to the timeline's cues and opens the timeline strip.",
         ),
         blocked_by_section_lock=True,
     ),
@@ -583,7 +582,9 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_timeline_locked,
         choice=bool_choice(lambda s, _d: s.timeline.locked, lock_text),
         help_title="Timeline Lock",
-        help_description=("When locked, you cannot change the timeline settings.",),
+        help_description=(
+            "Protects the timeline from accidental edits.",
+        ),
         blocked_by_section_lock=False,
     ),
     RowKind.TIMELINE_GENERATE: RowSpec(
@@ -595,10 +596,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Generate Timeline",
         help_entries=(("Enter", "open generate dialog"),),
         help_description=(
-            "Makes a new timeline from the settings in a dialog.",
-            "This replaces the current cues.",
-            "Each crescendo song marker gets a crescendo.",
-            "The project keeps the dialog settings.",
+            "Builds a complete timeline from the arrangement style you pick in a dialog, replacing the current cues. Crescendo song markers each get a crescendo, and the project remembers your choices for next time.",
         ),
         help_mode_entries=TIMELINE_PRESET_HELP_ENTRIES,
         blocked_by_section_lock=True,
@@ -612,7 +610,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Set Cut Type On Cues",
         help_entries=(("Enter", "open set cut type dialog"),),
         help_description=(
-            "Sets the cut type of many cues at once.",
+            "Sets the cut type on many cues in one go.",
         ),
         blocked_by_section_lock=True,
     ),
@@ -625,8 +623,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Reset Timeline",
         help_entries=(("Enter", "open reset dialog"),),
         help_description=(
-            "Removes all cues.",
-            "Every layer then stays on, or stays off, for the whole song.",
+            "Clears every cue, leaving each layer either on or off for the whole song.",
         ),
         help_mode_entries=TIMELINE_RESET_HELP_ENTRIES,
         blocked_by_section_lock=True,
@@ -638,7 +635,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Beat / Bar Grid",
         help_description=(
-            "Beats and bars that Beat This! finds in the song.",
+            "The beat and bar grid detected by Beat This!, used to snap cues and song markers.",
         ),
     ),
     RowKind.TIMELINE_BAR_PHASE: RowSpec(
@@ -652,8 +649,7 @@ SPECS: dict[RowKind, RowSpec] = {
             ("Left/Right", "move grid and cues -1 / +1 beat"),
         ),
         help_description=(
-            "Moves the bar grid and all cues by one beat.",
-            "After you change it, snap the cues to the song markers again."
+            "Shifts the bar grid, and every cue with it, by one beat, to fix a downbeat detected in the wrong place. Re-snap cues to song markers afterwards.",
         ),
         repeatable=True,
         blocked_by_section_lock=True,
@@ -670,8 +666,7 @@ SPECS: dict[RowKind, RowSpec] = {
             ("Left/Right", "hide / show"),
         ),
         help_description=(
-            "Shows the detected bars on the timeline strip.",
-            "A gap means that no beat was found there, for example with no drums.",
+            "Draws the detected bars on the timeline strip. Gaps are stretches where no beat was found, such as a beatless intro.",
         ),
         blocked_by_section_lock=True,
     ),
@@ -685,8 +680,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Placement Snap",
         help_entries=(("Left/Right", "choose off / beat / bar"),),
         help_description=(
-            "Moves new song markers and cues to the nearest beat or bar.",
-            "Set it to off if the beat detection is wrong.",
+            "Snaps new song markers and cues to the nearest beat or bar. Turn it off if beat detection has gone wrong for this song.",
         ),
         blocked_by_section_lock=True,
     ),
@@ -699,7 +693,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Snap Cues",
         help_entries=(("Enter", "open snap dialog"),),
         help_description=(
-            "Moves cues to the nearest beat or bar, or onto nearby song markers.",
+            "Quantises existing cues to the beat or bar grid, or pulls them onto nearby song markers.",
         ),
         blocked_by_section_lock=True,
     ),
@@ -710,7 +704,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Cue Fades",
         help_description=(
-            "Fade times at the cues, for each cut type.",
+            "Fade lengths at cues, set separately for hard and soft cuts.",
         ),
     ),
     RowKind.TIMELINE_HARD_CUTS: RowSpec(
@@ -723,7 +717,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Hard Cuts",
         help_entries=(("Left/Right", "enabled / disabled"),),
         help_description=(
-            "When on, the layer fades at cues with a hard cut.",
+            "Applies a fade at hard-cut cues. Off makes them instant.",
         ),
         repeatable=True,
         blocked_by_section_lock=True,
@@ -739,7 +733,7 @@ SPECS: dict[RowKind, RowSpec] = {
             ("Left/Right", "decrease / increase"),
         ),
         help_description=(
-            "The fade-in starts this many seconds before a hard-cut cue.",
+            "How many seconds before a hard-cut cue the fade-in starts.",
         ),
         repeatable=True,
         blocked_by_section_lock=True,
@@ -755,7 +749,7 @@ SPECS: dict[RowKind, RowSpec] = {
             ("Left/Right", "decrease / increase"),
         ),
         help_description=(
-            "The fade-out starts this many seconds after a hard-cut cue.",
+            "How many seconds after a hard-cut cue the fade-out starts.",
         ),
         repeatable=True,
         blocked_by_section_lock=True,
@@ -770,8 +764,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Hard Cut Shift For Crossfade",
         help_entries=(("Left/Right", "off / on"),),
         help_description=(
-            "Puts the middle of each fade on the cue, not its start or end.",
-            "This gives a crossfade between the layers.",
+            "Centres each fade on the cue rather than starting or ending it there, so outgoing and incoming layers crossfade.",
         ),
         repeatable=True,
         blocked_by_section_lock=True,
@@ -786,7 +779,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Soft Cuts",
         help_entries=(("Left/Right", "enabled / disabled"),),
         help_description=(
-            "When on, the layer fades at cues with a soft cut.",
+            "Applies a fade at soft-cut cues. Off makes them instant.",
         ),
         repeatable=True,
         blocked_by_section_lock=True,
@@ -802,7 +795,7 @@ SPECS: dict[RowKind, RowSpec] = {
             ("Left/Right", "decrease / increase"),
         ),
         help_description=(
-            "The fade-in starts this many seconds before a soft-cut cue.",
+            "How many seconds before a soft-cut cue the fade-in starts.",
         ),
         repeatable=True,
         blocked_by_section_lock=True,
@@ -818,7 +811,7 @@ SPECS: dict[RowKind, RowSpec] = {
             ("Left/Right", "decrease / increase"),
         ),
         help_description=(
-            "The fade-out starts this many seconds after a soft-cut cue.",
+            "How many seconds after a soft-cut cue the fade-out starts.",
         ),
         repeatable=True,
         blocked_by_section_lock=True,
@@ -833,8 +826,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Soft Cut Shift For Crossfade",
         help_entries=(("Left/Right", "off / on"),),
         help_description=(
-            "Puts the middle of each fade on the cue, not its start or end.",
-            "This gives a crossfade between the layers.",
+            "Centres each fade on the cue rather than starting or ending it there, so outgoing and incoming layers crossfade.",
         ),
         repeatable=True,
         blocked_by_section_lock=True,
@@ -847,8 +839,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Song Markers",
         help_description=(
-            "Markers that you put at the main changes in the song.",
-            "Press Ctrl+Enter to add a marker at the playhead.",
+            "Markers for the song's structure, such as drops, breakdowns, and builds. Ctrl+Enter drops one at the playhead.",
         ),
     ),
     RowKind.SONG_MARKER_ITEM: RowSpec(
@@ -876,8 +867,7 @@ SPECS: dict[RowKind, RowSpec] = {
             ("Delete", "remove marker"),
         ),
         help_description=(
-            "The time and type of a song marker.",
-            "Generate Timeline makes a crescendo at each crescendo marker.",
+            "A marker's time and type. Generate Timeline builds a crescendo at each crescendo marker.",
         ),
         blocked_by_section_lock=True,
     ),
@@ -901,9 +891,7 @@ SPECS: dict[RowKind, RowSpec] = {
             ("PgUp/PgDn", "trim by one bar"),
         ),
         help_description=(
-            "Where the layer turns on.",
-            "It stops at the clip before, or rolls the boundary when the clips butt.",
-            "The step follows the placement snap.",
+            "Where the clip begins. It cannot pass the previous clip; where the two touch, moving it rolls the shared edit point. Steps follow Placement Snap.",
         ),
     ),
     RowKind.TIMELINE_CLIP_END: _clip_spec(
@@ -918,9 +906,7 @@ SPECS: dict[RowKind, RowSpec] = {
             ("PgUp/PgDn", "trim by one bar"),
         ),
         help_description=(
-            "Where the layer turns off, or the next clip takes over.",
-            "It stops at the next clip, or rolls the boundary when the clips butt.",
-            "The step follows the placement snap.",
+            "Where the clip ends. It cannot pass the next clip; where the two touch, moving it rolls the shared edit point. Steps follow Placement Snap.",
         ),
     ),
     RowKind.TIMELINE_CLIP_OPACITY: _clip_spec(
@@ -935,10 +921,7 @@ SPECS: dict[RowKind, RowSpec] = {
             ("PgUp/PgDn", "10% step"),
         ),
         help_description=(
-            "How visible the layer is for this clip.",
-            "It multiplies the opacity of the layer.",
-            "0% hides it.",
-            "Pattern Mask replaces this when it is on.",
+            "Opacity for this clip, multiplied with the layer's own opacity. Pattern Mask overrides this while it is on.",
         ),
     ),
     RowKind.TIMELINE_CLIP_BLEND: _clip_spec(
@@ -955,9 +938,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Clip Blend",
         help_entries=(("Left/Right", "choose blend mode"),),
         help_description=(
-            "How the layer mixes with the layers below it for this clip.",
-            "The Layer option uses the blend mode of the layer.",
-            "Pattern Mask replaces this when it is on.",
+            "Blend mode for this clip. Layer uses the layer's own blend mode. Pattern Mask overrides this while it is on.",
         ),
         help_mode_entries=(
             ("layer", "uses the blend mode of the layer."),
@@ -978,8 +959,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Clip Role",
         help_entries=(("Left/Right", "choose role"),),
         help_description=(
-            "The role of the layer for this clip.",
-            "The visual limiter uses the role.",
+            "The part this layer plays during the clip. The visual limiter uses it to decide which layers give way when the picture gets busy.",
         ),
         help_mode_entries=(
             ("none", "no role."),
@@ -999,8 +979,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Clip Cut In",
         help_entries=(("Left/Right", "choose none / hard / soft"),),
         help_description=(
-            "How the layer fades in at the start of this clip.",
-            "Set the fade times in Timeline > Cue Fades.",
+            "The transition into this clip. Fade lengths are set in Timeline > Cue Fades.",
         ),
     ),
     RowKind.TIMELINE_CLIP_CUT_OUT: _clip_spec(
@@ -1016,10 +995,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Clip Cut Out",
         help_entries=(("Left/Right", "choose none / hard / soft"),),
         help_description=(
-            "How the layer fades out at the end of this clip.",
-            "Unavailable when the clip butts the next one (set that clip's Cut in) "
-            "or runs to the song end.",
-            "Set the fade times in Timeline > Cue Fades.",
+            "The transition out of this clip. Not available when the clip runs straight into the next one (use that clip's Cut in) or to the end of the song. Fade lengths are set in Timeline > Cue Fades.",
         ),
     ),
 }

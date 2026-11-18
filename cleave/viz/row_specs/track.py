@@ -472,7 +472,7 @@ SPECS: dict[RowKind, RowSpec] = {
         visibility_icon=_visibility_track,
         help_title="Layer",
         help_description=(
-            "A projectM visualiser layer.",
+            "One projectM visualiser, driven by a single audio stem and stacked with the other layers to build the final picture.",
         ),
         toggle_enabled=_toggle_track_enabled,
         toggle_solo=_toggle_track_solo,
@@ -488,8 +488,7 @@ SPECS: dict[RowKind, RowSpec] = {
         inert=lambda state, _desc: state.timeline.enabled,
         help_title="Layer Enabled",
         help_description=(
-            "Shows or hides this layer.",
-            "When the timeline is on, the timeline shows and hides the layer instead.",
+            "Shows or hides the layer. While the timeline is on, its cues control visibility and this switch is ignored.",
         ),
         parent_group="track",
         blocked_by_section_lock=True,
@@ -502,7 +501,9 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_track_solo,
         choice=bool_choice(lambda s, d: s.solo_slot == d.slot),
         help_title="Layer Solo",
-        help_description=("Shows only this layer.",),
+        help_description=(
+            "Isolates this layer so you can judge it on its own, without touching the other layers' settings.",
+        ),
         parent_group="track",
         blocked_by_section_lock=False,
     ),
@@ -514,7 +515,9 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_track_locked,
         choice=bool_choice(lambda s, d: _track_block(s, d).runtime.locked, lock_text),
         help_title="Layer Lock",
-        help_description=("When locked, you cannot change the layer settings.",),
+        help_description=(
+            "Protects the layer's settings from accidental edits while you work elsewhere.",
+        ),
         parent_group="track",
         blocked_by_section_lock=False,
     ),
@@ -525,7 +528,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Milkdrop Preset",
         help_description=(
-            "The Milkdrop preset of this layer, and how strongly it reacts to the beat.",
+            "The Milkdrop preset this layer renders, and how hard it responds to the beat.",
         ),
         parent_group="track",
     ),
@@ -553,9 +556,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Preset Directory",
         help_description=(
-            "The directory that contains the presets for this layer.",
-            "Click the up arrow to open the parent directory.",
-            "Click the down arrow, or double-click, to open the first subdirectory.",
+            "The folder this layer browses for presets. The up arrow moves to the parent folder; the down arrow, or a double-click, opens the first subfolder.",
         ),
         repeatable=True,
         parent_group="track",
@@ -571,8 +572,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Milkdrop Preset File",
         help_description=(
-            "The Milkdrop preset that this layer shows.",
-            "Markers after the name (hover one to see it):",
+            "The Milkdrop preset this layer is rendering. Tags after the name mark its curation status and role; hover over one for a reminder:",
         ),
         help_mode_entries=_PRESET_MARKER_HELP_ENTRIES,
         repeatable=True,
@@ -585,7 +585,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Preset Switching",
         help_description=(
-            "Changes the preset of this layer automatically, from a list.",
+            "Moves the layer through a list of presets automatically, on a timer, on projectM's own schedule, or on timeline cues.",
         ),
         parent_group="track",
     ),
@@ -598,7 +598,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Resume Switching",
         help_description=(
-            "Stops manual browsing and starts automatic switching again.",
+            "Browsing presets by hand pauses automatic switching. This hands control back to the list.",
         ),
         parent_group="track",
         blocked_by_section_lock=True,
@@ -613,7 +613,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Trigger",
         help_entries=(("Left/Right", "choose trigger"),),
         help_description=(
-            "What moves the layer to the next preset in the list.",
+            "What advances the layer to the next preset in its list.",
         ),
         help_mode_entries=PRESET_SWITCHING_TRIGGER_HELP_ENTRIES,
         repeatable=True,
@@ -627,7 +627,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Preset List",
         help_description=(
-            "The presets that this layer switches through, in order.",
+            "The presets this layer cycles through, in playback order.",
         ),
         parent_group="track",
     ),
@@ -642,8 +642,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Preset List Entry",
         help_description=(
-            "A preset in the switching list of this layer.",
-            "Markers after the name (hover one to see it):",
+            "A preset in this layer's switching list. Tags after the name mark its curation status and role; hover over one for a reminder:",
         ),
         help_mode_entries=_PRESET_LIST_MARKER_HELP_ENTRIES,
         can_enter_move_mode=True,
@@ -659,10 +658,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Add To Preset List",
         help_description=(
-            "Adds the current preset to the end of the list.",
-            "When switching is paused, this is the preset that you browsed to.",
-            "Cleave copies the preset file into the project.",
-            "Press P on any row of the layer to do the same.",
+            "Appends the current preset to the list; if switching is paused, that is the one you browsed to. The preset file is copied into the project so it travels with it. P does the same from any row of the layer.",
         ),
         parent_group="track",
         blocked_by_section_lock=True,
@@ -677,7 +673,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Populate Presets",
         help_entries=(("Enter", "choose a directory"),),
         help_description=(
-            "Replaces the full list with the presets from a directory.",
+            "Replaces the whole list with presets from a folder, a quick way to audition a collection.",
         ),
         parent_group="track",
         blocked_by_section_lock=True,
@@ -691,7 +687,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Preset Duration",
         help_entries=(("Left/Right", "adjust value"),),
         help_description=(
-            "Seconds that each preset plays before the next one starts.",
+            "How long each preset plays, in seconds, before the next one takes over.",
         ),
         repeatable=True,
         parent_group="track",
@@ -705,7 +701,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Soft Cut",
         help_entries=(("Left/Right", "adjust value"),),
         help_description=(
-            "Seconds that projectM takes to blend from one preset to the next.",
+            "Length of projectM's blend between consecutive presets, in seconds. Longer values give slower, smoother morphs.",
         ),
         repeatable=True,
         parent_group="track",
@@ -722,7 +718,7 @@ SPECS: dict[RowKind, RowSpec] = {
             ("PgUp/PgDn", "large step"),
         ),
         help_description=(
-            "How much projectM changes each preset duration at random.",
+            "Randomises each preset's duration around the set value, so changes feel less mechanical.",
         ),
         repeatable=True,
         parent_group="track",
@@ -737,7 +733,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Start Clean",
         help_entries=(("Left/Right", "yes / no"),),
         help_description=(
-            "When on, each new preset starts from a blank frame, not from the last frame.",
+            "Starts each new preset from a black frame instead of letting it build on the previous preset's last image. Off gives more continuity between presets.",
         ),
         repeatable=True,
         parent_group="track",
@@ -752,7 +748,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Hard Cut",
         help_entries=(("Left/Right", "enabled / disabled"),),
         help_description=(
-            "When on, projectM can change the preset immediately on a strong beat, with no blend.",
+            "Lets projectM jump straight to the next preset on a strong beat, skipping the blend. Good for punchy, rhythmic material.",
         ),
         repeatable=True,
         parent_group="track",
@@ -766,7 +762,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Hard Cut Min",
         help_entries=(("Left/Right", "adjust value"),),
         help_description=(
-            "Minimum seconds between two hard cuts.",
+            "Minimum gap between hard cuts, in seconds, so busy passages do not trigger a cut on every hit.",
         ),
         repeatable=True,
         parent_group="track",
@@ -780,8 +776,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Hard Cut Sens",
         help_entries=(("Left/Right", "adjust value"),),
         help_description=(
-            "How strong a beat must be to cause a hard cut.",
-            "A higher value gives fewer hard cuts.",
+            "How strong a beat must be to trigger a hard cut. Raise it if cuts are too frequent.",
         ),
         repeatable=True,
         parent_group="track",
@@ -796,8 +791,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Stem",
         help_entries=(("Left/Right", "choose stem source"),),
         help_description=(
-            "The audio stem that this layer reacts to.",
-            "When you change the stem, the Cleave Effects of the layer reset.",
+            "The audio stem this layer reacts to. Changing it resets the layer's Cleave Effects, since their drivers depend on the stem.",
         ),
         repeatable=True,
         parent_group="track",
@@ -811,8 +805,7 @@ SPECS: dict[RowKind, RowSpec] = {
         choice=options_choice(BLEND_MODES, lambda s, d: _track_block(s, d).runtime.blend_mode, jump=_jump_track_blend),
         help_title="Blend Mode",
         help_description=(
-            "How this layer mixes with the layers below it.",
-            "Pattern Mask replaces this when it is on.",
+            "How this layer combines with everything beneath it. Pattern Mask overrides this while it is on.",
         ),
         help_mode_entries=BLEND_MODE_HELP_ENTRIES,
         repeatable=True,
@@ -826,9 +819,7 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_track_opacity,
         help_title="Opacity",
         help_description=(
-            "How visible this layer is.",
-            "0% hides it.",
-            "Pattern Mask replaces this when it is on.",
+            "The layer's overall opacity. Pattern Mask overrides this while it is on.",
         ),
         repeatable=True,
         parent_group="track",
@@ -841,8 +832,7 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_track_beat,
         help_title="Beat Sensitivity",
         help_description=(
-            "How strongly this layer reacts to the beat.",
-            "A higher value makes the visuals move more.",
+            "How hard the preset responds to the beat. Higher values give more movement; lower values suit calmer, ambient layers.",
         ),
         repeatable=True,
         parent_group="track",
@@ -854,8 +844,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Compositing",
         help_description=(
-            "How this layer mixes with the layers below it.",
-            "Pattern Mask replaces these settings when it is on.",
+            "Blend mode and opacity: how this layer combines with the layers beneath it. Pattern Mask overrides both while it is on.",
         ),
         parent_group="track",
     ),
@@ -866,7 +855,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Cleave Effects",
         help_description=(
-            "Effects on this layer that follow the audio.",
+            "Audio-reactive effects Cleave adds on top of the preset, each driven by this layer's stem.",
         ),
         parent_group="track",
     ),
@@ -878,8 +867,7 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_track_effect,
         help_title="Cleave Effects",
         help_description=(
-            "The strength of this effect.",
-            "0 turns it off.",
+            "Effect depth. 0 bypasses it.",
         ),
         repeatable=True,
         parent_group="track",
@@ -899,8 +887,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Add Layer",
         help_description=(
-            "Adds a new layer on top of the others.",
-            "You can have up to eight layers.",
+            "Adds a layer at the top of the stack. A project can hold up to eight.",
         ),
     ),
     RowKind.LAYER_MANAGEMENT_DELETE: RowSpec(
@@ -911,8 +898,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Delete Layer",
         help_description=(
-            "Removes this layer permanently.",
-            "You cannot delete the last layer.",
+            "Removes this layer and all its settings. A project needs at least one layer, so the last one cannot be deleted.",
         ),
         parent_group="track",
         blocked_by_section_lock=False,

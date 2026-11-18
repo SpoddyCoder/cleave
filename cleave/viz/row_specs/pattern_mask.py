@@ -176,8 +176,7 @@ SPECS: dict[RowKind, RowSpec] = {
         visibility_icon=_visibility_pattern_mask,
         help_title="Pattern Mask",
         help_description=(
-            "Splits the screen into areas, one for each visible layer.",
-            "This replaces the Compositing settings of each layer.",
+            "Divides the frame into regions, one per visible layer, so layers sit side by side instead of stacking. While on, it overrides each layer's Compositing settings.",
         ),
         toggle_enabled=_toggle_pattern_mask_enabled,
     ),
@@ -188,7 +187,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Pattern",
         help_description=(
-            "The shape that splits the screen between the layers.",
+            "The geometry used to divide the frame between layers.",
         ),
         parent_group="pattern_mask",
     ),
@@ -199,7 +198,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Edges & Motion",
         help_description=(
-            "How soft the edges are, and how the areas change when a layer turns on or off.",
+            "Edge softness, and how regions reshape when a layer comes or goes.",
         ),
         parent_group="pattern_mask",
     ),
@@ -212,7 +211,7 @@ SPECS: dict[RowKind, RowSpec] = {
         choice=bool_choice(lambda s, _d: s.pattern_mask.enabled),
         help_title="Pattern Mask Enabled",
         help_description=(
-            "When on, the mask replaces the Compositing settings of each layer.",
+            "Switches the mask on. While it is on, it overrides each layer's Compositing settings.",
         ),
         blocked_by_section_lock=True,
     ),
@@ -224,7 +223,9 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_pattern_mask_locked,
         choice=bool_choice(lambda s, _d: s.pattern_mask.locked, lock_text),
         help_title="Pattern Mask Lock",
-        help_description=("When locked, you cannot change the Pattern Mask settings.",),
+        help_description=(
+            "Protects the Pattern Mask settings from accidental edits.",
+        ),
         blocked_by_section_lock=False,
     ),
     RowKind.PATTERN_MASK_TYPE: RowSpec(
@@ -236,7 +237,9 @@ SPECS: dict[RowKind, RowSpec] = {
         choice=options_choice(PATTERN_MASK_TYPES, lambda s, _d: s.pattern_mask.type, jump=_jump_pattern_mask_type),
         help_title="Type",
         help_entries=(("Left/Right", "choose pattern type"),),
-        help_description=("The shape of the areas.",),
+        help_description=(
+            "The shape of the regions.",
+        ),
         repeatable=True,
         parent_group="pattern_mask",
     ),
@@ -248,9 +251,7 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_pattern_mask_density,
         help_title="Density",
         help_description=(
-            "How many areas each layer gets.",
-            "At 1.0x, each layer gets one area.",
-            "A higher value repeats the areas across the screen.",
+            "How many times the pattern repeats across the frame. At 1.0x each layer gets a single region.",
         ),
         repeatable=True,
         parent_group="pattern_mask",
@@ -267,9 +268,7 @@ SPECS: dict[RowKind, RowSpec] = {
             ("PgUp/PgDn", "+/- 10%"),
         ),
         help_description=(
-            "How soft the edges between the areas are.",
-            "0% gives hard edges.",
-            "100% gives the most overlap.",
+            "Softness of the edges between regions, from hard lines at 0% to maximum overlap at 100%.",
         ),
         repeatable=True,
         parent_group="pattern_mask",
@@ -283,7 +282,9 @@ SPECS: dict[RowKind, RowSpec] = {
         choice=bool_choice(lambda s, _d: s.pattern_mask.invert, pattern_mask_invert_display),
         help_title="Invert",
         help_entries=(("Left/Right", "off / on"),),
-        help_description=("Reverses the order of the layers across the pattern.",),
+        help_description=(
+            "Reverses the order in which layers are assigned to regions.",
+        ),
         repeatable=True,
         parent_group="pattern_mask",
     ),
@@ -295,8 +296,7 @@ SPECS: dict[RowKind, RowSpec] = {
         apply_horizontal=_apply_pattern_mask_transition,
         help_title="Transition",
         help_description=(
-            "Seconds that the areas take to change when a layer turns on or off.",
-            "At 0.0s, they change immediately.",
+            "How long, in seconds, regions take to reshape when a layer turns on or off. 0.0s snaps instantly.",
         ),
         repeatable=True,
         parent_group="pattern_mask",
@@ -310,8 +310,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Seed",
         help_entries=(("Left/Right", "new random seed"),),
         help_description=(
-            "The random seed for plasma patterns.",
-            "Change it to get a different plasma shape.",
+            "Random seed for the plasma patterns. Change it for a different plasma shape.",
         ),
         repeatable=True,
         parent_group="pattern_mask",

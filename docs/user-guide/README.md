@@ -1,8 +1,8 @@
 # Cleave User Guide
 
-Cleave turns a song into a music video. It splits the song into four parts, called **stems**: drums, bass, vocals, and everything else ("other"). Each stem drives its own layer of Milkdrop visuals, so the drums can pound away on one layer while the vocals swirl on another. You stack the layers, decide when each one shows, add effects and credits, then render the result to a video file.
+Cleave turns a song into a music video. It separates the track into four **stems** (drums, bass, vocals, and other) and gives each one its own layer of Milkdrop visuals, so the kick can drive one layer while the vocal line shapes another. You stack and blend the layers, sequence them across the song, add effects and credits, then render the result to video.
 
-This guide walks through everything Cleave can do. You do not need to read it all before you start: open a song, press **H**, and explore.
+You don't need to read this guide cover to cover before starting. Open a song, press **H**, and the help column will explain whatever you highlight. Come back here for the bigger picture and the workflows that span several pages.
 
 ![The Cleave editor](images/editor-overview.png)
 
@@ -30,177 +30,169 @@ This guide walks through everything Cleave can do. You do not need to read it al
 
 ## Help is always one key away
 
-Press **H** at any time to show or hide the help column. You can also tick **Help > Help** in the menu bar.
+Press **H**, or tick **Help > Help** in the menu bar, to toggle the help column.
 
-The help column follows whatever you are working on. Move to a different row, page, or panel and the help changes to match. It tells you:
-
-- what the highlighted thing is and what it does
-- what each of its choices means
-- which keys and mouse actions work there
+The help column tracks your focus: move to another row, page, or panel and it updates to describe what is highlighted, what each of its options does, and which keys and mouse actions apply there.
 
 ![Help follows the highlighted row](images/help-follows-focus.png)
 
-Here the **preset directory** row is highlighted, so the help column explains what a preset directory is and lists the keys for moving between directories.
+In this example the **preset directory** row is highlighted, so help explains what the row controls and lists the keys for moving between folders.
 
-Help works everywhere in the editor: the navigator, the inspector, the preview, the timeline strip, the menu bar, and dialogs. With the menu bar selected (press Alt or F10), help lists the shortcuts that work anywhere. When a dialog is open, the help column describes the setting you have highlighted inside the dialog, including every option it offers. You can scroll the help with the mouse wheel without closing the dialog.
+Help covers the whole editor: the navigator, inspector, preview, timeline strip, menu bar, and dialogs. With the menu bar focused (Alt or F10), it lists the shortcuts that work anywhere. Inside a dialog it describes the highlighted field and every option it offers, and you can scroll it with the mouse wheel without leaving the dialog.
 
 ![Help inside a dialog](images/help-in-dialog.png)
 
-A few more places to look for help:
+There are a few other sources of help:
 
-- **Hover** over an icon, a marker such as `[F]`, or a button on the timeline strip to see a short tooltip.
-- **Greyed-out menu items** explain why they are unavailable when you hover over them.
-- **Right-click** almost anything to see what you can do with it. Each menu item shows its keyboard shortcut, so menus are a good way to learn the keys.
+- **Tooltips** appear when you hover over an icon, a marker such as `[F]`, or a button on the timeline strip.
+- **Greyed-out menu items** tell you why they are unavailable when you hover over them.
+- **Right-click menus** are available almost everywhere and show each item's keyboard shortcut, which makes them a good way to pick up the keys.
 
-If help gets in the way of a bigger preview, press **H** to hide it. Your place in the editor stays the same.
+When you want the screen space back for the preview, press **H** again. Your place in the editor is unaffected.
 
 ---
 
 ## First launch
 
-The first time Cleave starts, the **Welcome to Cleave** step lists the downloads it needs. Each one says what it is for:
+On first start, the **Welcome to Cleave** step lists the downloads Cleave needs and what each one is for:
 
 | Download | What it is for | Ticked by default |
 | --- | --- | --- |
-| Milkdrop Presets | The visuals themselves. A starter set of preset and texture packs (about 60 MB). | Yes |
-| Demucs | The AI model that splits a song into stems. | Yes |
-| BeatThis! | The AI model that finds the beats and bars in a song. | Yes |
-| Demucs HQ | A slower, higher quality splitting model. | No |
-| CUDA Toolkit | Windows with an NVIDIA graphics card only. Makes stem splitting much faster (about 2 GB). | No |
+| Milkdrop Presets | A starter set of preset and texture packs (about 60 MB). | Yes |
+| Demucs | The model that separates a song into stems. | Yes |
+| BeatThis! | The model that detects beats and downbeats. | Yes |
+| Demucs HQ | A slower, higher-quality separation model. | No |
+| CUDA Toolkit | Windows with an NVIDIA GPU only. Speeds up stem separation considerably (about 2 GB). | No |
 
-Each download shows its own progress. You can cancel partway, and anything that fails is listed with a Retry button. Anything you skip downloads later, when it is first needed.
-
-To get something you skipped, choose **Settings > Download packages** at any time.
+Each download reports its own progress. You can cancel at any point, and anything that fails is listed with a Retry button. Anything you skip is fetched automatically when it is first needed, or you can get it at any time from **Settings > Download packages**.
 
 ---
 
 ## Opening a song
 
-There are a few ways to start:
+- **Windows:** drop an audio file onto `cleave.exe`, or launch Cleave and pick a file in the window.
+- **From the editor:** **File > New project** (Ctrl+N) starts a project from an audio file, and **File > Open project** (Ctrl+O) reopens an existing one.
 
-- **Windows:** drop a music file onto `cleave.exe`, or launch Cleave and pick a file in the window.
-- **From the editor:** **File > New project** (Ctrl+N) asks for a music file. **File > Open project** (Ctrl+O) opens a song you have worked on before.
+Supported formats are wav, mp3, flac, m4a, aac, ogg, aiff, and aif.
 
-Cleave reads wav, mp3, flac, m4a, aac, ogg, aiff, and aif files.
+The first time you open a song, Cleave analyses it, with progress shown in a **Creating project** dialog:
 
-The first time you open a song, Cleave prepares it. A **Creating project** dialog shows each step and its progress:
+1. **Stem separation** into drums, bass, vocals, and other. This is the slow step; on CPU, a few minutes per song is normal.
+2. **Audio analysis**, which finds the beats, bars, loudness, and pitch that drive the visuals.
 
-1. **Splitting the song** into drums, bass, vocals, and other. This is the slow part. A few minutes is normal without an NVIDIA graphics card.
-2. **Listening to the song** to find the beats, bars, and changes in loudness and pitch that drive the visuals.
+This happens once per song; after that, the project opens immediately.
 
-This only happens once per song. Next time, the song opens straight away.
-
-Each song gets its own **project**: a folder that holds the stems, your settings, and your renders. See [Where your files live](#where-your-files-live).
+Each song becomes a **project**: a folder holding the stems, your settings, and your renders. See [Where your files live](#where-your-files-live).
 
 ### Saving
 
-Choose **File > Save** (Ctrl+S) to save your project. A `*` after the project name, at the right end of the menu bar and in the window title, means you have unsaved changes. If you open another project or quit with unsaved changes, Cleave asks first.
+**File > Save** (Ctrl+S) saves the project. A `*` after the project name, in the menu bar and the window title, marks unsaved changes, and Cleave asks before discarding them when you open another project or quit.
 
 ---
 
 ## Finding your way around
 
-The numbers below match the picture at the top of this guide.
+The numbers below refer to the screenshot at the top of this guide.
 
-1. **Menu bar.** File, Edit, View, Project, Settings, and Help. The open project's name is at the right.
-2. **Transport bar.** Play or pause, the current time, and the current bar. Click PLAYING / PAUSED to play or pause. Drag the time or bar sideways to scrub, or double-click either one to type a time or bar number.
-3. **Navigator.** Every part of your picture: Overlay, Post-FX, Pattern Mask, Timeline, and Layers. Click a row to open its page.
-4. **Inspector.** The settings for the page you picked in the navigator.
-5. **Preview.** Your show, live, at the shape of your final video.
-6. **Help column.** See [Help is always one key away](#help-is-always-one-key-away).
-7. **Timeline strip.** Shown while the timeline is on. See [The timeline](#the-timeline).
+1. **Menu bar:** File, Edit, View, Project, Settings, and Help, with the open project's name on the right.
+2. **Transport bar:** play state, current time, and current bar. Click PLAYING / PAUSED to toggle playback. Drag the time or bar sideways to scrub, or double-click either to type a position.
+3. **Navigator:** the structure of your show: Overlay, Post-FX, Pattern Mask, Timeline, and Layers. Click a row to open its page.
+4. **Inspector:** the settings for the page selected in the navigator.
+5. **Preview:** the live output, at your video's aspect ratio.
+6. **Help column:** see [Help is always one key away](#help-is-always-one-key-away).
+7. **Timeline strip:** visible while the timeline is on. See [The timeline](#the-timeline).
 
 ![The menu bar](images/menu-bar.png)
 
 ### Mouse
 
-Everything works with the mouse:
+The whole editor works with the mouse:
 
-- **Click** a row to select it, and click a setting's choices or arrows to change it.
-- **Drag** a number sideways to change it quickly.
-- **Right-click** a navigator row, a preset, the preview, or anything on the timeline strip for a menu of what you can do there.
-- **Drag** the borders between panels to resize them. Drag the line between the navigator and the inspector to share the space between them. **Double-click** a border to put it back where it started. **View > Reset panel layout** puts every border back at once.
-- **Mouse wheel** scrolls long lists.
+- **Click** a row to select it, and click a setting's options or arrows to change it.
+- **Drag** a number sideways for quick, coarse changes.
+- **Right-click** a navigator row, a preset, the preview, or anything on the timeline strip for a context menu.
+- **Drag** the borders between panels to resize them, including the divider between the navigator and the inspector. **Double-click** a border to reset it, or use **View > Reset panel layout** to reset them all.
+- **Scroll** long lists with the mouse wheel.
 
 ### Keyboard
 
-The editor can also be driven entirely from the keyboard:
+Everything can also be driven from the keyboard:
 
 | Key | What it does |
 | --- | --- |
-| Tab / Shift+Tab | Move between the menu bar, navigator, inspector, preview, and timeline strip. The current area has a blue outline. |
+| Tab / Shift+Tab | Cycle focus between the menu bar, navigator, inspector, preview, and timeline strip. The focused area has a blue outline. |
 | Up / Down | Move between rows. |
-| Left / Right | Open or close a navigator row, or change a setting. |
-| PgUp / PgDn | Change a setting in bigger steps. |
+| Left / Right | Expand or collapse a navigator row, or change a setting. |
+| PgUp / PgDn | Change a setting in larger steps. |
 | Enter | Press a button, or open a list. |
 | Esc | Close a menu or dialog, or step back. |
-| Alt or F10 | Go to the menu bar. Alt plus an underlined letter opens that menu. |
-| Shift+F10 or the Menu key | Open the right-click menu for the highlighted item. |
+| Alt or F10 | Focus the menu bar. Alt plus an underlined letter opens that menu. |
+| Shift+F10 or the Menu key | Open the context menu for the highlighted item. |
 
 ### Back and Forward
 
-The arrows at the right of the inspector's title step back and forward through the pages you have visited, like a web browser. Alt+Left and Alt+Right, your mouse's back and forward buttons, and **View > Back** / **View > Forward** do the same.
+The arrows at the right of the inspector title step through your page history, as in a web browser. Alt+Left / Alt+Right, the mouse's back and forward buttons, and **View > Back** / **View > Forward** do the same.
 
 ### On, solo, and lock icons
 
-Many navigator rows have small icons on the right:
+Many navigator rows carry icons on the right:
 
-- **On/off** (power icon): turns that part on or off. Green means on.
-- **Solo**: shows only that layer, so you can see it on its own.
-- **Lock**: protects that part from accidental changes. Locked settings turn red and cannot be changed until you unlock them.
-- **Preview** (on Overlay only): keeps the credits cards on screen at any time so you can see your edits.
+- **On/off** (power icon) enables or bypasses that part of the show. Green means on.
+- **Solo** isolates a layer so you can judge it on its own.
+- **Lock** protects settings from accidental edits. Locked settings turn red and stay fixed until you unlock them.
+- **Preview** (Overlay only) holds the credits cards on screen so you can style them without seeking.
 
-The same icons, in the same order, sit at the right of the inspector's title, so a layer's pages can solo the layer and the Overlay pages can preview the cards. When a page or the part it belongs to is off or locked, its settings dim, and hovering the icon tells you which switch to change.
+The same icons, in the same order, also sit at the right of the inspector title, so you can solo a layer from any of its pages or preview the cards from any Overlay page. When a page, or the part it belongs to, is off or locked, its settings dim, and hovering over the icon tells you which switch is responsible.
 
 ### Undo
 
-**Edit > Undo** (Ctrl+Z) and **Edit > Redo** (Ctrl+Y) cover changes to the timeline: adding, moving, trimming, splitting, and deleting clips, recording takes, and the timeline commands such as Generate timeline. The menu names what it would undo. Other settings take effect as you change them; use Save when you are happy, or close without saving to throw changes away.
+**Edit > Undo** (Ctrl+Z) and **Edit > Redo** (Ctrl+Y) cover timeline edits: adding, moving, trimming, splitting, and deleting clips, recorded takes, and timeline commands such as Generate timeline. The menu item names the step it would undo. Other settings apply as you change them, so save when you are happy, or close without saving to discard your changes.
 
 ---
 
 ## Layers
 
-A **layer** is one Milkdrop visual, driven by one stem. A new project has four layers, one for each stem: drums, bass, vocals, and other. You can have up to eight.
+A **layer** is one Milkdrop visual driven by one stem. New projects start with four layers, one per stem, and a project can hold up to eight.
 
-Layers stack like sheets of glass. The layer at the top of the Layers list sits in front. Milkdrop visuals are drawn on black, and Cleave treats black as see-through, so the bright parts of each layer show through to the ones below.
+Layers stack from the top of the Layers list down, so the first layer sits in front. Milkdrop renders on black, and the default blend mode keys black out, so the bright parts of each layer show through over the ones below.
 
-Each layer in the navigator has these pages:
+Each layer has these pages in the navigator:
 
 | Page | What it holds |
 | --- | --- |
-| (the layer itself) | On/off, solo, lock, and which stem drives the layer. |
-| Milkdrop Preset | Which preset the layer shows, and how strongly it reacts to the beat. |
-| Preset Switching | Whether and how the layer changes presets by itself. |
-| Preset List | The presets the layer switches through. |
-| Compositing | How the layer mixes with the layers below: blend mode and opacity. |
-| Cleave Effects | Extra effects that follow the music. |
+| (the layer itself) | On/off, solo, lock, and the stem that drives the layer. |
+| Milkdrop Preset | The preset the layer renders, and its beat sensitivity. |
+| Preset Switching | Whether and how the layer changes presets automatically. |
+| Preset List | The presets the layer cycles through. |
+| Compositing | Blend mode and opacity: how the layer combines with the ones below. |
+| Cleave Effects | Audio-reactive effects Cleave adds on top of the preset. |
 
-Managing layers:
+To manage layers:
 
-- **Add a layer:** click the **+** on the Layers row, or press Ctrl+L.
-- **Delete a layer:** **Delete layer** on the layer's page, or right-click the layer.
-- **Reorder:** drag a layer by the dotted handle in front of its name, or press M and use Up/Down.
-- **Jump to a layer:** press its number key, 1 to 8.
-- **Change the stem:** the **driving stem** setting on the layer's page. A layer can also follow the full mix.
+- **Add** a layer with the **+** on the Layers row, or Ctrl+L.
+- **Delete** a layer with **Delete layer** on its page, or from its context menu.
+- **Reorder** by dragging the dotted handle in front of a layer's name, or by pressing M and moving it with Up/Down.
+- **Jump** to a layer with its number key, 1 to 8.
+- **Change the stem** with the **driving stem** setting on the layer's page. A layer can also follow the full mix.
 
 ### Compositing
 
-**Blend mode** decides how a layer mixes with the layers below it. The default, **black-key**, makes black see-through. Others include add (good for drums), screen (lightens), multiply (darkens), and difference. Highlight the blend mode and the help column describes every option.
+**Blend mode** controls how a layer combines with everything beneath it. The default, **black-key**, treats black as transparent. The others include add (good for drums), screen, multiply, and difference; highlight the setting to see every mode described in the help column.
 
-**Opacity** sets how visible the layer is. 0% hides it.
+**Opacity** scales the layer's overall visibility, down to 0% for hidden.
 
 ### Cleave Effects
 
-These effects follow the music, on top of whatever the preset is doing. Each one has a strength from 0% (off) upwards.
+These effects react to the audio on top of whatever the preset is already doing. Each has a depth from 0% (bypassed) upwards.
 
 | Effect | What it does |
 | --- | --- |
-| Pulse | The layer gets brighter and dimmer with the music. |
-| Flash | A short white flash on strong hits. |
-| Hue | Shifts the layer's colour with the singer's pitch. Vocals layers only. |
-| Grit | Film grain and colour fringes that grow with the music's loudness. |
+| Pulse | Modulates the layer's opacity with the music. |
+| Flash | Fires a brief white flash on strong hits. |
+| Hue | Rotates the layer's hue with the vocal pitch. Vocals layers only. |
+| Grit | Adds film grain and chromatic fringing that intensify with loudness. |
 
-Each effect lists what part of the sound it follows, for example `pulse (rms)` follows loudness and `pulse (sub_bass)` follows the deepest bass.
+Each effect is labelled with the feature of the audio that drives it: `pulse (rms)` follows overall loudness, for example, and `pulse (sub_bass)` follows the lowest frequencies.
 
 ![Cleave Effects on a vocals layer](images/cleave-effects.png)
 
@@ -208,189 +200,189 @@ Each effect lists what part of the sound it follows, for example `pulse (rms)` f
 
 ## Choosing presets
 
-A **preset** is one Milkdrop visual. Cleave can use thousands of them, organised in folders.
+A **preset** is a single Milkdrop visual. Cleave can draw on thousands of them, organised in folders.
 
 On a layer's **Milkdrop Preset** page:
 
-- **preset directory** is the folder the layer picks from. Left/Right steps to the next or previous folder. Enter (or the down arrow) opens the first folder inside it, and Backspace (or the up arrow) goes back up a level.
-- **preset** is the preset the layer is showing. Left/Right steps through the presets in the folder. PgUp/PgDn jumps further.
-- **beat sensitivity** sets how strongly the preset reacts to the beat.
+- **preset directory** is the folder the layer browses. Left/Right steps to the neighbouring folder, Enter (or the down arrow) opens the first subfolder, and Backspace (or the up arrow) goes up a level.
+- **preset** is the preset currently rendering. Left/Right steps through the folder, and PgUp/PgDn jumps further.
+- **beat sensitivity** sets how hard the preset responds to the beat.
 
-At the top level of the preset folders, Left/Right also steps through your collections: **Favourites**, each **Role**, and **Blacklisted**. Right-click the preset directory row and choose **Jump to directory** to go straight to one. See [Curating your presets](#curating-your-presets).
+At the top level of the preset folders, Left/Right also reaches your collections: **Favourites**, one per **Role**, and **Blacklisted**. To go straight to one, right-click the preset directory row and choose **Jump to directory**. See [Curating your presets](#curating-your-presets).
 
 ### Preset switching
 
-A layer can change presets by itself. On the **Preset Switching** page, the **trigger** decides what moves it to the next preset:
+A layer can move through presets on its own. On the **Preset Switching** page, the **trigger** decides what advances it:
 
 | Trigger | What happens |
 | --- | --- |
-| off | No switching. The current preset stays. |
-| timer | The next preset starts after a set number of seconds. |
-| projectm | The Milkdrop engine plays the list with its own timing, including sudden "hard cuts" on strong beats. |
-| timeline | The next preset starts each time the timeline turns the layer on. |
+| off | No switching; the current preset stays. |
+| timer | The next preset starts after a fixed number of seconds. |
+| projectm | projectM plays the list on its own schedule, including hard cuts on strong beats. |
+| timeline | The next preset starts each time the timeline brings the layer in. |
 
-The other settings on the page tune how long each preset plays and how it blends into the next. Highlight one to see what it does.
+The rest of the page controls how long each preset plays and how it transitions into the next; the help column describes each setting.
 
 ### The preset list
 
-The **Preset List** page holds the presets the layer switches through, in order. It appears while switching is not off.
+The **Preset List** page holds the presets the layer cycles through, in order. It appears whenever switching is not off.
 
-- **Add to preset list** (or press P on any of the layer's rows) adds the preset you are looking at.
-- **Populate** fills the whole list from the current folder, shuffled or in order.
-- **Enter** on an entry plays it straight away and pauses switching. **Resume** starts switching again.
-- **Drag** the handle in front of an entry, or press M, to move it. **Delete** removes it.
+- **Add to preset list** (or P from any of the layer's rows) appends the preset you are looking at.
+- **Populate** fills the list from the current folder, shuffled or in order.
+- **Enter** on an entry plays it immediately and pauses switching; **Resume** hands control back to the list.
+- **Drag** an entry's handle, or press M, to reorder it, and press **Delete** to remove it.
 
-Right-click an entry for all of these in one menu.
+All of these are also in the entry's context menu.
 
 ![Right-click menu on a preset list entry](images/preset-list-menu.png)
 
 ### Preset markers
 
-Markers after a preset's name tell you more about it. Hover one to see what it means.
+Tags after a preset's name show its curation status and role. Hover over one for a reminder.
 
 | Marker | Meaning |
 | --- | --- |
-| `[F]` | A favourite. |
+| `[F]` | Favourite. |
 | `[B]` | Blacklisted. |
 | `[L]` | In this layer's preset list. |
-| `[R:B]` `[R:P]` `[R:L]` `[R:A]` | Its role: bed, pulse, lead, or accent. |
+| `[R:B]` `[R:P]` `[R:L]` `[R:A]` | Role: bed, pulse, lead, or accent. |
 
 ---
 
 ## Curating your presets
 
-Preset packs hold thousands of presets of mixed quality. **Preset curation mode** is a quick way to sort through them and mark the ones you like. Choose **View > Preset curation mode**.
+Preset packs run to thousands of presets of very mixed quality. **Preset curation mode** is built for working through them quickly and marking the keepers. Choose **View > Preset curation mode** to enter it.
 
 ![Preset curation mode](images/preset-curation.png)
 
-In curation mode the editor shows a single layer playing the full song, so you can judge each preset on its own. Step through presets with Left/Right and mark them as you go:
+Curation mode reduces the editor to a single layer playing the full song, so each preset is judged on its own. Step through with Left/Right and mark presets as you go:
 
 | Key | What it does |
 | --- | --- |
-| F | Favourite or unfavourite the preset. |
-| B | Blacklist the preset, or take it off the blacklist. Blacklisted presets are hidden from browsing, Populate, and random picks. |
-| C | Give the preset a role, or None to clear it. |
+| F | Toggle favourite. |
+| B | Toggle blacklist. Blacklisted presets are excluded from browsing, Populate, and random picks. |
+| C | Assign a role, or None to clear it. |
 
-You can also right-click a preset for the same choices.
+The same actions are in the preset's context menu.
 
-**Roles** describe the job a preset does well. Timeline generation uses them to pick the right preset for each moment:
+**Roles** describe the job a preset does well, and timeline generation uses them to cast the right preset for each part of the song:
 
 | Role | Best for |
 | --- | --- |
 | bed | Calm, dark backgrounds. |
-| pulse | Visuals that react to the beat, in the middle of the stack. |
+| pulse | Beat-reactive visuals in the middle of the stack. |
 | lead | Busy, bright main visuals. |
 | accent | Short, bright hits. |
 
-Curation never moves, copies, or deletes your preset files. Cleave remembers your marks even if you rename or move a preset. Choose **View > Preset curation mode** again to go back to your project.
+Curation never moves, copies, or deletes preset files, and your marks survive renaming or moving a preset. Choose **View > Preset curation mode** again to return to your project.
 
 ---
 
 ## The timeline
 
-The timeline decides when each layer shows during the song. Without it, every layer that is on shows all the time. With it, layers come and go: the drums might take over for the chorus, then hand back to the vocals.
+The timeline sequences your layers across the song. Without it, every enabled layer plays throughout. With it, layers come in and drop out on cue: the drums might carry the chorus, then hand back to the vocals for the verse.
 
-Turn the timeline on with the on/off icon on the **Timeline** row in the navigator. The **timeline strip** opens along the bottom of the window. While the timeline is on, it controls the layers, so the layers' own on/off switches stop applying.
+Enable it with the on/off icon on the **Timeline** row in the navigator, and the **timeline strip** opens along the bottom of the window. While the timeline is on, it owns layer visibility and the layers' own on/off switches are ignored.
 
-The picture at the top of this guide shows the strip (number 7), with a clip on layer 1 selected and its details in the inspector.
+In the screenshot at the top of this guide, the strip (number 7) has a clip on layer 1 selected, with its details in the inspector.
 
 ### Generate a whole timeline
 
-The quickest start is to let Cleave build a timeline for you. Choose **Generate timeline** on the Timeline page. The dialog lets you pick:
+The fastest way to get started is to let Cleave build an arrangement. Choose **Generate timeline** on the Timeline page, and the dialog offers:
 
-- **mode:** layers switch whole layers on and off. Pattern mask swaps layers through the [Pattern Mask](#pattern-mask).
-- **character:** the feel of the arrangement. Breathing (mostly one layer, sometimes two), Dialogue (the layers answer each other), Arc (builds to one climax, then calms), or Pulse (one layer at a time, with short pairs).
-- **density:** how busy it is.
-- **snap** and **cut type:** how cues line up with the beat and how layers fade.
-- **refill preset lists:** optionally refills each layer's preset list to match.
+- **mode:** either switch whole layers in and out, or swap them through the [Pattern Mask](#pattern-mask).
+- **character:** the shape of the arrangement. Breathing is mostly one layer, sometimes two; Dialogue has the layers answer each other; Arc builds to a single climax and then settles; Pulse runs one layer at a time with short pairs.
+- **density:** how busy the arrangement is.
+- **snap** and **cut type:** how cues align to the beat grid and how layers transition.
+- **refill preset lists:** optionally rebuilds each layer's preset list to suit.
 
-Press H while the dialog is open for a full description of every option. For the best results, [mark the big moments of the song](#song-markers) and [give your presets roles](#curating-your-presets) first.
+Press H in the dialog for a full description of each option. You will get much better results if you [mark the song's structure](#song-markers) and [assign roles to your presets](#curating-your-presets) first.
 
-Generate replaces the current timeline, but you can undo it with Ctrl+Z.
+Generate replaces the current timeline, but Ctrl+Z undoes it.
 
 ### Reading the strip
 
-Each row on the strip is a layer. Coloured blocks, called **clips**, show when the layer is on. Gaps show when it is off. Red lines are song markers, and the white line is the playhead.
+Each row of the strip is a layer. Coloured blocks, called **clips**, show when the layer is in, and gaps show when it is out. Red lines are song markers, and the white line is the playhead.
 
-At the left of each row:
+Each row's header holds:
 
 - the layer **number** and stem
-- **arm**, for recording (see below)
-- **solo**, to see only that layer
-- the **eye**, which shows whether the layer is showing right now
+- **arm**, for recording takes (see below)
+- **solo**, to isolate the layer
+- the **eye**, which shows whether the layer is visible right now
 
 Play and REC buttons sit in the top-left corner.
 
-Moving around the strip:
+To move around the strip:
 
-- **Click or drag the time scale** along the top to move the playhead.
-- **Mouse wheel** zooms in and out. When zoomed, drag a row sideways, or use Shift+wheel or the scrollbar, to move along the song.
-- **Drag the top edge** of the strip to make it taller. Double-click the edge to fit the strip to its rows again.
-- **Esc** returns you to the navigator and leaves the strip open.
+- **Click or drag the time ruler** to move the playhead.
+- **Scroll** to zoom. When zoomed in, drag a row sideways, use Shift+wheel, or drag the scrollbar to pan.
+- **Drag the strip's top edge** to make it taller, and double-click the edge to fit it to its rows again.
+- **Esc** returns focus to the navigator and leaves the strip open.
 
 ### Editing clips
 
-Click a clip to select it. Its details show in the inspector, where you can change them.
+Click a clip to select it and edit its details in the inspector.
 
 | To do this | Do this |
 | --- | --- |
 | Add a clip | Double-click a gap, or right-click it and choose Add clip here. |
 | Move a clip | Drag it. |
-| Make it longer or shorter | Drag either end. |
-| Move the join between two touching clips | Drag the middle of the join. One clip grows as the other shrinks. |
-| Shorten one of two touching clips | Grab just inside that clip, next to the join, and drag. This leaves a gap. |
-| Split it in two | Ctrl+K splits at the playhead. Right-click for Split here. |
-| Delete it | Press Delete. |
-| Change its opacity | `,` and `.` nudge it down and up. |
-| Change how it fades in and out | C cycles the cut in, Shift+C the cut out. |
+| Trim a clip | Drag either end. |
+| Roll the edit point between two touching clips | Drag the centre of the join; one clip grows as the other shrinks. |
+| Trim one of two touching clips | Grab just inside that clip, next to the join, and drag. This opens a gap. |
+| Split a clip | Ctrl+K splits at the playhead; the context menu has Split here. |
+| Delete a clip | Press Delete. |
+| Nudge its opacity | `,` and `.` nudge it down and up. |
+| Change its transitions | C cycles the cut in, and Shift+C the cut out. |
 
-The pointer shows what a drag will do: a four-way arrow moves a clip, a bracket with an arrow trims one end, and a left-right arrow moves a join.
+The pointer shows what a drag will do: a four-way arrow moves a clip, a bracket with an arrow trims one end, and a left-right arrow rolls a join.
 
-Each clip also has a **blend** mode and a **role**, which you can set in the inspector or from the right-click menu.
+Each clip also has its own **blend** mode and **role**, set in the inspector or from the context menu.
 
-Clips snap to beats or bars when **placement snap** is on (Timeline > Beat / Bar Grid).
+With **placement snap** on (Timeline > Beat / Bar Grid), clips snap to beats or bars.
 
 ![Right-click menu on a clip](images/timeline-clip-menu.png)
 
 ### Cuts and fades
 
-Each clip starts and ends with a **cut**:
+Each clip begins and ends with a **cut**:
 
-- **hard:** the layer appears or disappears quickly.
-- **soft:** the layer fades in or out more gently.
-- **none:** no fade at all.
+- **hard:** a fast transition.
+- **soft:** a longer, gentler fade.
+- **none:** instant, with no fade.
 
-Set how long hard and soft fades take on **Timeline > Cue Fades**.
+Fade lengths for hard and soft cuts are set on **Timeline > Cue Fades**.
 
 ### Recording a take
 
-You can also "play" the timeline live, like playing an instrument:
+You can also perform the timeline live, cueing layers in and out by hand as the song plays:
 
-1. **Arm** the rows you want to record: click their arm buttons, or press A on a row.
-2. Press **R** (or click **REC**) to start recording. Playback starts.
-3. Press a layer's **number key**, or click its eye, to show or hide it in time with the music.
+1. **Arm** the rows you want to record, with their arm buttons or A on a row.
+2. Press **R** (or click **REC**) to start recording; playback starts with it.
+3. Press a layer's **number key**, or click its eye, to bring it in or drop it out in time with the music.
 4. Press **R** again to stop.
 
-Only armed rows are recorded. Each take can be undone with Ctrl+Z.
+Only armed rows are recorded, and each take is a single undo step.
 
 ### Taking a row over for a moment
 
-Sometimes you want to see a layer that the timeline has switched off. Click the row's eye or press its number key: the row is **taken over**, and its eye turns yellow. A yellow back-to-timeline button appears next to the eye; click it to hand the row back to the timeline. Taking a row over does not change the timeline itself.
+Sometimes you want to see a layer the timeline has switched off. Click the row's eye or press its number key and the row is **taken over**: its eye turns yellow, and a yellow back-to-timeline button appears beside it. Click that button to hand the row back. Taking a row over never changes the timeline itself.
 
 ### Song markers
 
-**Song markers** mark the big moments in a song: the drop, the chorus, the quiet bridge. Press **Ctrl+Enter** to drop one at the playhead, or right-click the time scale and choose to drop one there.
+**Song markers** map the structure of the song: the drop, the chorus, the breakdown. Press **Ctrl+Enter** to drop one at the playhead, or right-click the time ruler and drop one there.
 
-Markers help in three ways: clips snap to them, you can jump between them, and Generate timeline builds the arrangement around them.
+Markers pay off in three ways: clips snap to them, you can jump between them, and Generate timeline builds its arrangement around them.
 
 Each marker has a **type**, set on **Timeline > Song Markers**:
 
 | Type | What it means |
 | --- | --- |
 | `-` | A plain marker. |
-| crescendo | The visuals build up to this point, then crash back down. |
+| crescendo | The visuals build up to this point, then drop back. |
 | diminuendo | The visuals thin out to this point, then return to normal. |
-| begin | Where a crescendo or diminuendo starts to build. |
+| begin | Where a crescendo or diminuendo starts. |
 | sustain | Where a crescendo or diminuendo reaches its peak or its lowest point. |
 
 ```
@@ -405,58 +397,58 @@ DIMINUENDO:  FULL >>>  thin ---- thin ---- > restore
 
 ### Beats and bars
 
-When Cleave first prepares a song it finds the beats and bars. On **Timeline > Beat / Bar Grid**:
+Cleave detects the beat and bar grid when it first prepares a song. On **Timeline > Beat / Bar Grid**:
 
-- **bar grid** shows the bars on the strip.
-- **placement snap** makes new clips and markers land on the nearest beat or bar. Turn it off if the beat detection got the song wrong.
-- **bar phase** shifts the bar lines by one beat, if the first beat of each bar is off.
+- **bar grid** draws the bars on the strip.
+- **placement snap** quantises new clips and markers to the nearest beat or bar. Turn it off if detection got the song wrong.
+- **bar phase** shifts the grid by one beat, for when the downbeat has been detected in the wrong place.
 
-To tidy up many clips at once, use **Snap cues** on this page, **Snap cues to markers** on the Song Markers page, and **Set cut type on cues** on the Cue Fades page.
+For bulk clean-up, use **Snap cues** on this page, **Snap cues to markers** on the Song Markers page, and **Set cut type on cues** on the Cue Fades page.
 
 ---
 
 ## Pattern Mask
 
-Normally layers stack on top of each other. **Pattern Mask** instead splits the screen into areas, one for each visible layer, using a shape such as strips, bars, radial slices, or a flowing plasma. As the timeline turns layers on and off, the areas grow and shrink to make room.
+Layers normally stack on top of one another. **Pattern Mask** instead divides the frame into regions, one per visible layer, using a pattern such as strips, bars, radial slices, or a flowing plasma. As the timeline brings layers in and out, the regions resize to make room.
 
-Turn it on with the on/off icon on the **Pattern Mask** row. Its pages set the shape, how many areas each layer gets, how soft the edges are, and how quickly the areas change.
+Enable it with the on/off icon on the **Pattern Mask** row. Its pages control the pattern, how often it repeats, edge softness, and how quickly regions reshape.
 
-While Pattern Mask is on, it replaces each layer's blend mode and opacity.
+While Pattern Mask is on, it overrides each layer's blend mode and opacity.
 
 ---
 
 ## Credits cards (Overlay)
 
-The **Overlay** adds a credits card at the start of the song and another near the end: a good place for the track title, the artist, and the year.
+The **Overlay** adds a credits card at the start of the song and another near the end, typically for the track title, artist, and year.
 
 ![An opening card held on screen with preview](images/overlay-card.png)
 
 Open **Overlay > Opening Card** or **Closing Card** in the navigator. Each card has its own on/off switch and settings for:
 
-- **when** it appears and how long it stays
-- **how** it animates on and off: fade, slide, wipe, and more
-- **where** it sits: one of the four corners or the centre
-- the **title and body text**, fonts, sizes, and colours
-- the **background**, margin, padding, and border
+- **timing:** when it appears and how long it stays
+- **animation:** fade, slide, wipe, and more
+- **position:** any of the four corners or the centre
+- **text:** title and body copy, fonts, sizes, and colours
+- **panel:** background, margin, padding, and border
 
-Click a text row to type into it. Click a colour swatch to pick a colour, with a live preview. The body text can have several lines.
+Click a text row to edit it in place, or a colour swatch to pick a colour with a live preview. The body text can run over several lines.
 
-Cards normally show only at their set times. Turn on **preview** (the icon on the Overlay row or at the right of an Overlay page's title, or press V on the Overlay page) to keep them on screen while you edit.
+Cards normally appear only at their set times. Turn on **preview** (the icon on the Overlay row or in an Overlay page's title, or V on the Overlay page) to hold them on screen while you work.
 
 ---
 
 ## Finishing touches (Post-FX)
 
-**Post-FX** are effects on the whole finished picture. Each has its own on/off switch.
+**Post-FX** are finishing effects applied to the combined picture, each with its own on/off switch.
 
 | Effect | What it does |
 | --- | --- |
-| Fade | Fades the picture in at the start of the song and out at the end. |
-| Highlight Rolloff | Tames very bright areas, so stacked layers do not turn flat white. |
-| Chroma Boost | Makes colours stronger. Useful after Highlight Rolloff. |
-| Visual Limiter | Dims the layers when the picture gets too busy, then lets them recover. |
+| Fade | Fades up from black at the start of the song and down to black at the end. |
+| Highlight Rolloff | Compresses highlights so stacked layers don't clip to flat white. |
+| Chroma Boost | Increases colour intensity; useful for winning back saturation after Highlight Rolloff. |
+| Visual Limiter | Works like an audio compressor for visual density, dimming the layers when the picture gets too busy and letting them recover afterwards. |
 
-Highlight a setting on any of these pages and the help column explains it.
+Every setting on these pages is described in the help column.
 
 ---
 
@@ -464,15 +456,15 @@ Highlight a setting on any of these pages and the help column explains it.
 
 ### The preview
 
-The preview shows your show live, at the shape of your final video. Right-click it for quick options:
+The preview shows the live output at your video's aspect ratio. Right-click it for quick options:
 
 ![Right-click menu on the preview](images/preview-menu.png)
 
 - **Play** or pause.
-- **Solo layer** to look at one layer on its own.
+- **Solo layer** to isolate one layer.
 - **Pattern Mask** on or off.
 - **Preview quality** (see below).
-- **Grab still** saves the current frame as a picture in the project's `captures` folder.
+- **Grab still** saves the current frame as an image in the project's `captures` folder.
 - **Play full screen** and **Full screen editor**.
 
 ### Playing and moving through the song
@@ -483,36 +475,36 @@ The preview shows your show live, at the shape of your final video. Right-click 
 | Shift+Left / Shift+Right | Skip 2 seconds. |
 | Ctrl+Left / Ctrl+Right | Skip 30 seconds. |
 
-You can also drag the time in the transport bar, or click the timeline strip's time scale.
+You can also drag the time in the transport bar, or click the timeline strip's ruler.
 
 ### Full screen
 
-- **View > Play full screen** (Ctrl+F) shows only your show, across the whole screen, with no menus or panels. Space still plays and pauses. Press Esc to return to the editor.
+- **View > Play full screen** (Ctrl+F) shows only the output, across the whole screen, with no editor chrome. Space still plays and pauses, and Esc returns to the editor.
 - **View > Full screen editor** (F11) fills the screen with the editor.
 
 ### If the preview is slow
 
-Several Milkdrop layers are a lot of work for a computer. If the preview stutters, lower **Settings > Preview > preview quality**:
+Running several Milkdrop layers at once is demanding. If the preview stutters, lower **Settings > Preview > preview quality**:
 
 | Quality | What it does |
 | --- | --- |
 | ultra-performance | Smallest layers, lightest load. |
 | performance | Smaller layers. |
 | balanced | Top layer at full size, lower layers smaller. |
-| full-quality | Every layer at the size shown. The default. |
-| output | Every layer at the final video size, to check exactly how the render will look. |
+| full-quality | Every layer at its displayed size. The default. |
+| output | Every layer at the final video size, for judging exactly how the render will look. |
 
-Preview quality never changes your rendered video, which is always made at full quality and a smooth frame rate.
+Preview quality never affects the render, which always runs at full quality and full frame rate.
 
 ---
 
 ## Rendering a video
 
-When you are happy with your show, turn it into a video file.
+When the show is ready, render it to a video file:
 
-1. Set the video size on **Project > Resolution**. The default is 1920 x 1080. The preview takes this shape too.
+1. Set the frame size on **Project > Resolution**. The default is 1920 x 1080, and the preview follows its aspect ratio.
 2. Choose **Project > Render** (Ctrl+R).
-3. Pick the frame rate, the quality, and the start and end times. The dialog shows the file name it will use.
+3. Pick the frame rate, quality, and start and end times. The dialog shows the output file name.
 4. Press **Render**.
 
 ![The Render dialog](images/render-dialog.png)
@@ -521,9 +513,9 @@ When you are happy with your show, turn it into a video file.
 | --- | --- |
 | normal | Full size, standard quality. |
 | high | Full size, best quality, slower. |
-| viz | Uses the preview's layer sizes. Faster, and looks just like the preview. |
+| viz | Uses the preview's layer sizes: faster, and a close match to what you saw while editing. |
 
-A **Render project** dialog shows the render's progress and tells you when it is done. The finished video (an MP4 file) is saved in the project's `renders` folder.
+A **Render project** dialog tracks progress and tells you when the render is done. The finished MP4 lands in the project's `renders` folder.
 
 ---
 
@@ -531,24 +523,24 @@ A **Render project** dialog shows the render's progress and tells you when it is
 
 The **Settings** menu holds preferences that apply to every project:
 
-- **Preview:** preview quality, and the audio delay correction.
-- **UI:** the editor's colour theme (Ultraviolet, Chocolate, Mint, or the light Daylight) and [custom themes](custom-themes.md), the size of the editor text (UI scale), which side the panels sit on, tooltips, how long notifications stay on screen, and more.
+- **Preview:** preview quality and audio latency correction.
+- **UI:** the editor theme (Ultraviolet, Chocolate, Mint, or the light Daylight) and [custom themes](custom-themes.md), UI scale, panel sides, tooltips, notification timing, and more.
 - **Measure audio latency:** see [The visuals are out of time with the music](#the-visuals-are-out-of-time-with-the-music).
-- **Rescan presets:** re-read the presets folder after adding presets to a pack that was already there, or while Cleave is open.
-- **Download packages:** get downloads you skipped on first launch. Presets downloaded here are rescanned straight away, so they are ready to curate.
-- **Dev Tools:** a crash log, for reporting problems.
+- **Rescan presets:** re-reads the presets folder after you add presets to an existing pack, or while Cleave is open.
+- **Download packages:** fetches anything you skipped on first launch. Presets downloaded here are indexed immediately, ready to curate.
+- **Dev Tools:** a crash log for bug reports.
 
 The **Project** menu holds settings saved with the current song:
 
-- **Resolution:** the video size.
-- **Compositor:** HDR compositing, which mixes layers with extra colour precision for smoother results.
-- **ProjectM:** the default beat sensitivity for new layers.
+- **Resolution:** the output frame size.
+- **Compositor:** HDR compositing, which combines layers at higher bit depth to avoid banding and clipping when bright layers stack.
+- **ProjectM:** the default beat sensitivity for layers.
 
 ---
 
 ## Keyboard shortcuts
 
-These work anywhere in the editor. Press H to see the keys for whatever you are doing right now.
+These work anywhere in the editor. Press H to see the keys for whatever you are working on.
 
 | Key | What it does |
 | --- | --- |
@@ -568,10 +560,10 @@ These work anywhere in the editor. Press H to see the keys for whatever you are 
 | Ctrl+F | Play full screen. Esc returns. |
 | F11 | Full screen editor. |
 | Alt+Left / Alt+Right | Back / forward through pages. |
-| Tab / Shift+Tab | Move between areas. |
-| Ctrl+Up / Ctrl+Down | Jump to the previous or next top-level row in the navigator. |
-| Shift+F10 or Menu key | Right-click menu for the highlighted item. |
-| F10 or Alt | Go to the menu bar. |
+| Tab / Shift+Tab | Cycle focus between areas. |
+| Ctrl+Up / Ctrl+Down | Jump to the previous or next top-level navigator row. |
+| Shift+F10 or Menu key | Context menu for the highlighted item. |
+| F10 or Alt | Focus the menu bar. |
 | F3 | Show or hide the frame timer. |
 | Ctrl+Q | Quit. |
 
@@ -582,23 +574,23 @@ These work anywhere in the editor. Press H to see the keys for whatever you are 
 ### A good first project
 
 1. Open a song and let Cleave prepare it.
-2. Press H, then browse presets on each layer's **Milkdrop Preset** page until you like the mix.
-3. Drop song markers (Ctrl+Enter) at the big moments as the song plays.
+2. Press H, then browse presets on each layer's **Milkdrop Preset** page until the mix works.
+3. Drop song markers (Ctrl+Enter) at the main structural moments as the song plays.
 4. Turn the timeline on and choose **Generate timeline**.
-5. Tweak clips on the strip, add credits cards, and set a fade in and out.
+5. Refine clips on the strip, add credits cards, and set a fade in and out.
 6. Save, then **Project > Render**.
 
 ### No visuals appear
 
-Cleave needs Milkdrop presets. Choose **Settings > Download packages** to get the starter set, or add your own preset folders (see below).
+Cleave needs Milkdrop presets to draw anything. Get the starter set from **Settings > Download packages**, or add your own preset folders (see below).
 
 ### The visuals are out of time with the music
 
-Some speakers and headphones, especially wireless ones, add a delay. Choose **Settings > Measure audio latency** and press Enter on each long, low tone it plays. Cleave works out the delay and offers to correct it. You can also set it by hand with **Settings > Preview > audio latency**. The correction affects the live preview and where new markers and clips land. It never changes your render.
+Some audio outputs, wireless headphones in particular, add latency. Choose **Settings > Measure audio latency** and press Enter on each long, low tone it plays; Cleave calculates the delay and offers to correct it. You can also set it by hand with **Settings > Preview > audio latency**. The correction shifts the live preview and the placement of new markers and clips, and never affects the render.
 
 ### Stem splitting is very slow
 
-Splitting is much faster with an NVIDIA graphics card. On Windows, tick the CUDA Toolkit in **Settings > Download packages**.
+Separation is far faster on an NVIDIA GPU. On Windows, tick the CUDA Toolkit in **Settings > Download packages**.
 
 ### Where your files live
 
@@ -607,22 +599,22 @@ Splitting is much faster with an NVIDIA graphics card. On Windows, tick the CUDA
 | Projects, presets, textures, themes | `Documents\Cleave\` | `~/.local/share/cleave/` |
 | Settings | `%APPDATA%\Cleave\config.yaml` | `~/.config/cleave/config.yaml` |
 
-Each song has its own folder under `projects`, holding:
+Each song has its own folder under `projects`, containing:
 
-- the original song and its `stems`
-- your settings for the song (`project.yaml` and `cleave-viz.yaml`)
+- the original audio and its `stems`
+- the song's settings (`project.yaml` and `cleave-viz.yaml`)
 - `renders`, your finished videos
 - `captures`, stills saved with Grab still
 - `presets`, copies of the presets in the layers' preset lists
 
 ### Adding more presets
 
-There are many thousands of Milkdrop presets online. Copy preset folders into the `presets` folder (see above), and texture packs into `textures`. They appear the next time you browse.
+Many thousands of Milkdrop presets are available online. Copy preset folders into `presets` (see above) and texture packs into `textures`, and they appear the next time you browse.
 
-When you add a new pack folder, Cleave notices the next time you open a project and shows "New Milkdrop presets found, re-indexing" while it reads the folder. With a very large collection this can take a little while, but only the first time.
+When you add a new pack folder, Cleave picks it up the next time you open a project, showing "New Milkdrop presets found, re-indexing" while it reads the folder. A very large collection can take a while, but only the first time.
 
-Cleave does not notice presets added to a pack folder that was already there, or presets added while Cleave is open. Choose **Settings > Rescan presets** for those. Your favourites, roles, and blacklist then recognise the new presets, and Favourites and the role collections include them. A dialog shows the progress, and Cancel leaves everything as it was.
+Presets added to an existing pack folder, or added while Cleave is open, are not picked up automatically. Choose **Settings > Rescan presets** for those, and your favourites, roles, blacklist, and collections will include them. A dialog shows progress, and Cancel leaves everything as it was.
 
 ### Reporting a crash
 
-Turn on **Settings > Dev Tools > crash log**. It takes effect the next time Cleave starts. After a crash, **Open crash log folder** on the same page shows you the file to attach to your report.
+Turn on **Settings > Dev Tools > crash log**; it takes effect the next time Cleave starts. After a crash, **Open crash log folder** on the same page takes you to the file to attach to your report.
