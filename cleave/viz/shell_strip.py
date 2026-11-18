@@ -154,10 +154,15 @@ class StripPointerRouter:
             return PointerShape.MOVE
         if pointer.scrubbing or pointer.over_ruler or pointer.scrollbar_active:
             return PointerShape.RESIZE_EW
-        # A clip body moves and a clip edge trims, where clips can be edited.
+        # A clip body moves, a clip edge trims, and the middle of a boundary
+        # two clips share rolls it, where clips can be edited.
         clip_gesture = pointer.clip_gesture
-        if clip_gesture == "trim":
+        if clip_gesture == "roll":
             return PointerShape.RESIZE_EW
+        if clip_gesture == "trim_start":
+            return PointerShape.TRIM_START
+        if clip_gesture == "trim_end":
+            return PointerShape.TRIM_END
         if clip_gesture == "move":
             return PointerShape.MOVE
         if pointer.hover_pressable:

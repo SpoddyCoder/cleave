@@ -610,6 +610,11 @@ def lane_last_on_level(lane: TimelineLane, t_sec: float) -> float:
 
 MIN_CLIP_SEC = 0.1
 ClipEdge = Literal["start", "end"]
+# What a pointer press on a clip edge grabs. ``"start"`` and ``"end"`` trim
+# that edge of the named clip, leaving a gap at a boundary it shared with a
+# butted neighbour. ``"roll"`` moves a shared boundary (named by the earlier
+# clip), so both clips change.
+ClipGrip = Literal["start", "end", "roll"]
 
 
 @dataclass(frozen=True)
@@ -726,12 +731,16 @@ def clip_trim_bounds(
     edge: ClipEdge,
     min_len: float,
     duration_sec: float,
+    *,
+    roll: bool = True,
 ) -> tuple[float, float]:
     """Range one edge of ``clip`` may move in, leaving each clip ``min_len``.
 
     An edge shared with a butted neighbour rolls, so the neighbour keeps
-    ``min_len`` too. A free edge stops at the neighbour or the song bounds.
-    A clip already shorter than ``min_len`` keeps its edge where it is.
+    ``min_len`` too; with ``roll`` False it trims away from the neighbour
+    and may only move into ``clip``. A free edge stops at the neighbour or
+    the song bounds. A clip already shorter than ``min_len`` keeps its edge
+    where it is.
     """
     previous, following = _clip_neighbours(clips, clip)
     if edge == "start":
@@ -739,7 +748,7 @@ def clip_trim_bounds(
         if previous is None:
             low = 0.0
         elif previous.end == clip.start:
-            low = previous.start + min_len
+            low = previous.start + min_len if roll else clip.start
         else:
             low = previous.end
         high = clip.end - min_len
@@ -749,7 +758,7 @@ def clip_trim_bounds(
         if following is None:
             high = duration_sec
         elif clip.butts_next:
-            high = following.end - min_len
+            high = following.end - min_len if roll else clip.end
         else:
             high = following.start
     low = min(low, current)
@@ -922,21 +931,39 @@ def trim_clip(
     inherit: float,
     duration_sec: float,
     min_len: float = MIN_CLIP_SEC,
+    roll: bool = True,
 ) -> TimelineLane:
     """Move one edge of the clip to ``t_sec``, clamped by ``clip_trim_bounds``.
 
     An edge shared with a butted neighbour moves the shared cue, so both
-    clips change (a roll). An end trimmed out to the song end drops its off
-    cue; a clip that ran to the song end gains one when trimmed back.
+    clips change (a roll). With ``roll`` False that edge trims only this
+    clip and opens a gap: the neighbour keeps its edge, through a new off
+    cue. An end trimmed out to the song end drops its off cue; a clip that
+    ran to the song end gains one when trimmed back.
     """
     clips = lane_clips(lane, inherit=inherit, duration_sec=duration_sec)
     stored = clip_starting_at(clips, clip.start)
     if stored is None:
         return copy_lane(lane)
-    low, high = clip_trim_bounds(clips, stored, edge, min_len, duration_sec)
+    low, high = clip_trim_bounds(
+        clips, stored, edge, min_len, duration_sec, roll=roll
+    )
     target = max(low, min(high, t_sec))
     cues = _explicit_cues(lane, inherit)
     old_t = stored.start if edge == "start" else stored.end
+    if not roll and target != old_t:
+        previous, _ = _clip_neighbours(clips, stored)
+        if edge == "end" and stored.butts_next:
+            # The next clip keeps its start cue; this clip ends early.
+            return _lane_from_cues(
+                [*cues, SlotCue(t=target, level=0.0)], duration_sec
+            )
+        if edge == "start" and previous is not None and previous.end == old_t:
+            # The earlier clip keeps its end through an off cue at the old start.
+            moving = next(cue for cue in cues if cue.t == old_t)
+            kept = _without(cues, old_t)
+            kept += [SlotCue(t=old_t, level=0.0), replace(moving, t=target)]
+            return _lane_from_cues(kept, duration_sec)
     moving = next((cue for cue in cues if cue.t == old_t), None)
     if moving is None:
         # The clip ran to the song end, so its end has no cue yet.

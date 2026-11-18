@@ -834,13 +834,13 @@ def test_a_dragged_clip_snaps_to_the_grid() -> None:
 
 def test_dragging_a_clip_edge_trims_it() -> None:
     pointer, controls, _, geometry = _drag_setup(
-        _ONE_CLIP, StripHit(0, 30.2, 0.2, clip_start=20.0, clip_edge="end")
+        _ONE_CLIP, StripHit(0, 30.2, 0.2, clip_start=20.0, clip_grip="end")
     )
     # The end edge can be pressed from just outside the clip.
     pointer.press(302, 0)
     pointer.motion(350, 0)
     assert _spans(controls) == [(20.0, 35.0)]
-    assert pointer.clip_gesture == "trim"
+    assert pointer.clip_gesture == "trim_end"
     # It keeps a minimum length.
     pointer.motion(0, 0)
     assert _spans(controls) == [(20.0, pytest.approx(20.1))]
@@ -849,7 +849,7 @@ def test_dragging_a_clip_edge_trims_it() -> None:
     assert _spans(controls) == [(20.0, 26.0)]
     assert controls.clip_editor.history.undo_label == "Trim clip"
 
-    geometry.hit = StripHit(0, 20.0, 0.2, clip_start=20.0, clip_edge="start")
+    geometry.hit = StripHit(0, 20.0, 0.2, clip_start=20.0, clip_grip="start")
     pointer.press(200, 0)
     pointer.motion(150, 0)
     pointer.release()
@@ -857,18 +857,45 @@ def test_dragging_a_clip_edge_trims_it() -> None:
     assert controls.session.timeline.selected_clip_t["layer_1"] == 15.0
 
 
-def test_dragging_a_butted_edge_rolls_the_boundary() -> None:
+def test_dragging_a_butted_boundary_rolls_it() -> None:
     pointer, controls, _, _ = _drag_setup(
         [(10.0, 1.0), (20.0, 0.5), (30.0, 0.0)],
-        StripHit(0, 20.0, 0.2, clip_start=10.0, clip_edge="end"),
+        StripHit(0, 20.0, 0.2, clip_start=10.0, clip_grip="roll"),
     )
     pointer.press(200, 0)
     pointer.motion(250, 0)
     assert _spans(controls) == [(10.0, 25.0), (25.0, 30.0)]
+    assert pointer.clip_gesture == "roll"
     # Neither clip can be rolled away.
     pointer.motion(900, 0)
     assert _spans(controls) == [(10.0, pytest.approx(29.9)), (pytest.approx(29.9), 30.0)]
     pointer.release()
+    assert controls.clip_editor.history.undo_label == "Roll clips"
+
+
+def test_dragging_inside_a_butted_boundary_trims_one_clip_and_opens_a_gap() -> None:
+    pointer, controls, _, geometry = _drag_setup(
+        [(10.0, 1.0), (20.0, 0.5), (30.0, 0.0)],
+        StripHit(0, 19.6, 0.2, clip_start=10.0, clip_grip="end"),
+    )
+    pointer.press(196, 0)
+    pointer.motion(150, 0)
+    assert _spans(controls) == [(10.0, 15.0), (20.0, 30.0)]
+    # It cannot push into the next clip; back at the boundary they butt again.
+    pointer.motion(250, 0)
+    assert _spans(controls) == [(10.0, 20.0), (20.0, 30.0)]
+    pointer.motion(150, 0)
+    pointer.release()
+    assert controls.clip_editor.history.undo_label == "Trim clip"
+
+    controls.clip_editor.history.undo()
+    geometry.hit = StripHit(0, 20.4, 0.2, clip_start=20.0, clip_grip="start")
+    pointer.press(204, 0)
+    pointer.motion(250, 0)
+    assert pointer.clip_gesture == "trim_start"
+    pointer.release()
+    assert _spans(controls) == [(10.0, 20.0), (25.0, 30.0)]
+    assert controls.session.timeline.selected_clip_t["layer_1"] == 25.0
 
 
 def test_esc_during_a_drag_restores_the_clip() -> None:
@@ -949,10 +976,16 @@ def test_hover_reports_the_clip_gesture() -> None:
     pointer.motion(240, 0)
     assert session.timeline.strip_hover_clip == (0, 20.0, None)
     assert pointer.clip_gesture == "move"
-    geometry.hit = StripHit(0, 30.0, 0.2, clip_start=20.0, clip_edge="end")
+    geometry.hit = StripHit(0, 30.0, 0.2, clip_start=20.0, clip_grip="end")
     pointer.motion(300, 0)
     assert session.timeline.strip_hover_clip == (0, 20.0, "end")
-    assert pointer.clip_gesture == "trim"
+    assert pointer.clip_gesture == "trim_end"
+    geometry.hit = StripHit(0, 20.0, 0.2, clip_start=20.0, clip_grip="start")
+    pointer.motion(200, 0)
+    assert pointer.clip_gesture == "trim_start"
+    geometry.hit = StripHit(0, 30.0, 0.2, clip_start=20.0, clip_grip="roll")
+    pointer.motion(300, 0)
+    assert pointer.clip_gesture == "roll"
     session.timeline.locked = True
     assert pointer.clip_gesture is None
     session.timeline.locked = False

@@ -30,6 +30,7 @@ from cleave.timeline import (
     LEVEL_STEP_SMALL,
     MIN_CLIP_SEC,
     ClipEdge,
+    ClipGrip,
     TimelineClip,
     TimelineLane,
     add_clip,
@@ -176,8 +177,9 @@ def step_clip_selection(
 @dataclass
 class _ClipDrag:
     slot: str
-    # None moves the whole clip; an edge trims it.
-    edge: ClipEdge | None
+    # None moves the whole clip; an edge trims it, and "roll" moves the
+    # boundary it shares with the next clip.
+    grip: ClipGrip | None
     clip: TimelineClip
     # The lane as it was, or None when the slot had no stored lane.
     lane: TimelineLane | None
@@ -384,12 +386,17 @@ class ClipEditor:
         return self._drag is not None
 
     @property
-    def drag_edge(self) -> ClipEdge | None:
-        """The edge being trimmed, or None for a move or no drag."""
-        return None if self._drag is None else self._drag.edge
+    def drag_grip(self) -> ClipGrip | None:
+        """The edge grip being dragged, or None for a move or no drag."""
+        return None if self._drag is None else self._drag.grip
 
-    def begin_drag(self, slot: str, edge: ClipEdge | None, grab_t: float) -> bool:
-        """Start moving (*edge* None) or trimming *slot*'s selected clip."""
+    def begin_drag(self, slot: str, grip: ClipGrip | None, grab_t: float) -> bool:
+        """Start moving (*grip* None), trimming, or rolling *slot*'s selected clip.
+
+        A ``"start"`` or ``"end"`` grip trims only this clip, opening a gap at
+        a boundary it shares with a neighbour; ``"roll"`` moves the clip's end
+        and the next clip's start together.
+        """
         if self._drag is not None:
             self.cancel_drag()
         session = self.session
@@ -399,10 +406,11 @@ class ClipEditor:
         if clip is None:
             return False
         stored = session.timeline.lanes.get(slot)
-        self.history.begin("Move clip" if edge is None else "Trim clip")
+        label = {None: "Move clip", "roll": "Roll clips"}.get(grip, "Trim clip")
+        self.history.begin(label)
         self._drag = _ClipDrag(
             slot=slot,
-            edge=edge,
+            grip=grip,
             clip=clip,
             lane=None if stored is None else copy_lane(stored),
             selected_t=session.timeline.selected_clip_t.get(slot),
@@ -420,10 +428,14 @@ class ClipEditor:
         if drag is None:
             return
         self._restore_drag_lane(drag)
-        if drag.edge is None:
+        if drag.grip is None:
             self._move(drag.slot, drag.clip, self.snap(t_sec - drag.grab_offset))
+        elif drag.grip == "roll":
+            self._trim(drag.slot, drag.clip, "end", self.snap(t_sec))
         else:
-            self._trim(drag.slot, drag.clip, drag.edge, self.snap(t_sec))
+            self._trim(
+                drag.slot, drag.clip, drag.grip, self.snap(t_sec), roll=False
+            )
 
     def end_drag(self) -> None:
         """Keep the drag's result as one undo step."""
@@ -505,12 +517,19 @@ class ClipEditor:
         session.timeline.selected_clip_t[slot] = start
 
     def _trim(
-        self, slot: str, clip: TimelineClip, edge: ClipEdge, t_sec: float
+        self,
+        slot: str,
+        clip: TimelineClip,
+        edge: ClipEdge,
+        t_sec: float,
+        *,
+        roll: bool = True,
     ) -> None:
+        """Trim *edge*; a shared edge rolls unless *roll* is False."""
         session = self.session
         lane = _lane(session, slot)
         low, high = clip_trim_bounds(
-            self.clips(slot), clip, edge, MIN_CLIP_SEC, self.duration_sec
+            self.clips(slot), clip, edge, MIN_CLIP_SEC, self.duration_sec, roll=roll
         )
         target = max(low, min(high, t_sec))
         session.timeline.lanes[slot] = trim_clip(
@@ -520,6 +539,7 @@ class ClipEditor:
             target,
             inherit=_inherit(session, slot),
             duration_sec=self.duration_sec,
+            roll=roll,
         )
         if edge == "start":
             session.timeline.selected_clip_t[slot] = target

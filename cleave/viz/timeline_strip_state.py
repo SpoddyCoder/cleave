@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 
 from cleave.stems import StemSource
 from cleave.timeline import (
-    ClipEdge,
+    ClipGrip,
     SlotCue,
     TimelineClip,
     TimelineFadeGroup,
@@ -60,7 +60,7 @@ class TimelineViewState:
     selected_clip_t: dict[str, float] = field(default_factory=dict)
     selected_clip_flash_start_ms: int | None = None
     # Clip under the pointer: (row, clip start, edge or None for the body).
-    hover_clip: tuple[int, float, ClipEdge | None] | None = None
+    hover_clip: tuple[int, float, ClipGrip | None] | None = None
     # Visible time window mapped onto the bar. An end of None is the song end.
     view_start_sec: float = 0.0
     view_end_sec: float | None = None

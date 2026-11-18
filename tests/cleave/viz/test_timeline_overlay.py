@@ -1866,12 +1866,22 @@ def test_clip_hit_edge_wins_over_body_at_the_threshold() -> None:
     assert _clip_hit(end_x + CLIP_EDGE_HIT_PX) == (40.0, "end")
 
 
-def test_clip_hit_butted_boundary_is_the_earlier_clips_end() -> None:
+def test_clip_hit_butted_boundary_rolls_in_the_middle_and_trims_each_side() -> None:
+    from cleave.viz.timeline_strip_hit import CLIP_EDGE_HIT_PX, CLIP_ROLL_HIT_PX
+
     boundary_x = 100 + 400
-    assert _clip_hit(boundary_x) == (20.0, "end")
-    assert _clip_hit(boundary_x - 3) == (20.0, "end")
-    assert _clip_hit(boundary_x + 3) == (20.0, "end")
-    assert _clip_hit(boundary_x + 30) == (40.0, None)
+    reach = CLIP_ROLL_HIT_PX + CLIP_EDGE_HIT_PX
+    assert _clip_hit(boundary_x) == (20.0, "roll")
+    assert _clip_hit(boundary_x - CLIP_ROLL_HIT_PX) == (20.0, "roll")
+    assert _clip_hit(boundary_x + CLIP_ROLL_HIT_PX) == (20.0, "roll")
+    # Just inside the earlier clip trims its end; just inside the later clip
+    # trims its start.
+    assert _clip_hit(boundary_x - CLIP_ROLL_HIT_PX - 1) == (20.0, "end")
+    assert _clip_hit(boundary_x - reach) == (20.0, "end")
+    assert _clip_hit(boundary_x - reach - 1) == (20.0, None)
+    assert _clip_hit(boundary_x + CLIP_ROLL_HIT_PX + 1) == (40.0, "start")
+    assert _clip_hit(boundary_x + reach) == (40.0, "start")
+    assert _clip_hit(boundary_x + reach + 1) == (40.0, None)
 
 
 def test_clip_hit_keeps_the_body_of_a_narrow_clip_grabbable() -> None:
@@ -1908,13 +1918,13 @@ def test_hit_at_reports_the_clip_and_edge_under_a_row_point() -> None:
         return overlay.hit_at(x, py + rows[row][2] + rows[row][4] // 2)
 
     body = hit(40.0)
-    assert (body.clip_start, body.clip_edge) == (20.0, None)
-    assert (hit(20.0).clip_start, hit(20.0).clip_edge) == (20.0, "start")
-    assert (hit(60.0, dx=-2).clip_start, hit(60.0, dx=-2).clip_edge) == (20.0, "end")
+    assert (body.clip_start, body.clip_grip) == (20.0, None)
+    assert (hit(20.0).clip_start, hit(20.0).clip_grip) == (20.0, "start")
+    assert (hit(60.0, dx=-2).clip_start, hit(60.0, dx=-2).clip_grip) == (20.0, "end")
     gap = hit(80.0)
-    assert (gap.clip_start, gap.clip_edge) == (None, None)
+    assert (gap.clip_start, gap.clip_grip) == (None, None)
     other_row = hit(40.0, row=1)
-    assert (other_row.clip_start, other_row.clip_edge) == (None, None)
+    assert (other_row.clip_start, other_row.clip_grip) == (None, None)
     # The ruler and the row label name no clip.
     assert overlay.hit_at(px + 10, py + rows[0][2] + 1).clip_start is None
 

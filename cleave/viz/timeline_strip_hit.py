@@ -8,7 +8,7 @@ from dataclasses import dataclass
 import pygame
 
 from cleave.song_markers import marker_index_near
-from cleave.timeline import ClipEdge, TimelineClip
+from cleave.timeline import ClipGrip, TimelineClip
 from cleave.viz.theme import timeline_ui_metrics
 from cleave.viz.timeline_ruler import ruler_tick_top
 from cleave.viz.timeline_strip_layout import (
@@ -25,6 +25,9 @@ from cleave.viz.timeline_strip_layout import (
 STRIP_HIT_PX: int = 4
 # A clip edge takes the pointer within this many pixels, ahead of the body.
 CLIP_EDGE_HIT_PX: int = 5
+# Where two clips butt, the pointer within this many pixels of the boundary
+# rolls it; the edge zones lie beyond it, one inside each clip.
+CLIP_ROLL_HIT_PX: int = 2
 
 
 @dataclass(frozen=True)
@@ -41,9 +44,8 @@ class StripHit:
     scrollbar ``t_sec`` is the song time at that point along the track.
     ``marker_index`` is the song marker within ``STRIP_HIT_PX`` of the point on
     the ruler or in a row's bar, or None. ``clip_start`` is the start of the
-    row's clip under the point, and ``clip_edge`` names the edge within
-    ``CLIP_EDGE_HIT_PX`` of it (an edge wins over the body, and a boundary
-    two clips share is the earlier clip's end).
+    row's clip under the point, and ``clip_grip`` what an edge press grabs
+    (``clip_hit_at_x``), or None on the body.
     """
 
     row: int | None
@@ -52,7 +54,7 @@ class StripHit:
     target: StripTarget | None = None
     marker_index: int | None = None
     clip_start: float | None = None
-    clip_edge: ClipEdge | None = None
+    clip_grip: ClipGrip | None = None
 
 
 def clip_hit_at_x(
@@ -63,35 +65,55 @@ def clip_hit_at_x(
     bar_width: int,
     view_start_sec: float,
     view_end_sec: float,
-) -> tuple[float, ClipEdge | None] | None:
-    """The clip under bar pixel *x* as ``(clip start, edge)``, or None in a gap.
+) -> tuple[float, ClipGrip | None] | None:
+    """The clip under bar pixel *x* as ``(clip start, grip)``, or None in a gap.
 
-    The nearest edge within ``CLIP_EDGE_HIT_PX`` wins over a body; the edge
-    zone never takes more than a third of a narrow clip, so its body stays
-    grabbable. Where two clips butt, the shared boundary is the earlier
-    clip's end.
+    A free edge grabs within ``CLIP_EDGE_HIT_PX``. Where two clips butt, the
+    boundary rolls within ``CLIP_ROLL_HIT_PX`` (named by the earlier clip),
+    and past that each side trims its own clip's edge out to
+    ``CLIP_EDGE_HIT_PX`` more. The nearest edge wins over a body; an edge zone
+    never takes more than a third of a narrow clip, so its body stays
+    grabbable.
     """
-    best: tuple[float, int, float, ClipEdge] | None = None
-    body: float | None = None
-    for order, clip in enumerate(clips):
+    spans: list[tuple[TimelineClip, float, float, float]] = []
+    for clip in clips:
         if clip.end < view_start_sec or clip.start > view_end_sec:
             continue
         start_x = time_to_x(clip.start, bar_left, bar_width, view_start_sec, view_end_sec)
         end_x = time_to_x(clip.end, bar_left, bar_width, view_start_sec, view_end_sec)
         zone = min(float(CLIP_EDGE_HIT_PX), max(1.0, (end_x - start_x) / 3.0))
-        for edge, edge_x, edge_t in (
-            ("end", end_x, clip.end),
-            ("start", start_x, clip.start),
-        ):
-            if not time_in_view(edge_t, view_start_sec, view_end_sec):
-                continue
-            distance = abs(x - edge_x)
-            # Earlier clips sort first, and an end before a start, on a tie.
-            rank = (distance, order * 2 + (0 if edge == "end" else 1))
-            if distance <= zone and (best is None or rank < (best[0], best[1])):
-                best = (distance, rank[1], clip.start, edge)
+        spans.append((clip, start_x, end_x, zone))
+    # (distance, order, clip start, grip); earlier edges win a tie.
+    best: tuple[float, int, float, ClipGrip] | None = None
+    body: float | None = None
+
+    def offer(distance: float, order: int, start: float, grip: ClipGrip) -> None:
+        nonlocal best
+        if best is None or (distance, order) < (best[0], best[1]):
+            best = (distance, order, start, grip)
+
+    for index, (clip, start_x, end_x, zone) in enumerate(spans):
+        previous = spans[index - 1] if index > 0 else None
+        following = spans[index + 1] if index + 1 < len(spans) else None
         if start_x <= x < end_x:
             body = clip.start
+        butts_previous = previous is not None and previous[0].end == clip.start
+        if not butts_previous and time_in_view(clip.start, view_start_sec, view_end_sec):
+            distance = abs(x - start_x)
+            if distance <= zone:
+                offer(distance, index * 2 + 1, clip.start, "start")
+        if not time_in_view(clip.end, view_start_sec, view_end_sec):
+            continue
+        offset = x - end_x
+        if following is not None and following[0].start == clip.end:
+            if abs(offset) <= CLIP_ROLL_HIT_PX:
+                offer(abs(offset), index * 2, clip.start, "roll")
+            elif offset < 0 and -offset <= CLIP_ROLL_HIT_PX + zone:
+                offer(-offset, index * 2, clip.start, "end")
+            elif offset > 0 and offset <= CLIP_ROLL_HIT_PX + following[3]:
+                offer(offset, index * 2 + 2, following[0].start, "start")
+        elif abs(offset) <= zone:
+            offer(abs(offset), index * 2, clip.start, "end")
     if best is not None:
         return (best[2], best[3])
     return None if body is None else (body, None)
@@ -190,7 +212,7 @@ class StripHitMap:
                     target=header_target,
                     marker_index=marker_index,
                     clip_start=None if clip_hit is None else clip_hit[0],
-                    clip_edge=None if clip_hit is None else clip_hit[1],
+                    clip_grip=None if clip_hit is None else clip_hit[1],
                 )
         return None
 

@@ -337,10 +337,14 @@ Click a clip to select it. Its details show in the inspector, where you can chan
 | Add a clip | Double-click a gap, or right-click it and choose Add clip here. |
 | Move a clip | Drag it. |
 | Make it longer or shorter | Drag either end. |
+| Move the join between two touching clips | Drag the middle of the join. One clip grows as the other shrinks. |
+| Shorten one of two touching clips | Grab just inside that clip, next to the join, and drag. This leaves a gap. |
 | Split it in two | Ctrl+K splits at the playhead. Right-click for Split here. |
 | Delete it | Press Delete. |
 | Change its opacity | `,` and `.` nudge it down and up. |
 | Change how it fades in and out | C cycles the cut in, Shift+C the cut out. |
+
+The pointer shows what a drag will do: a four-way arrow moves a clip, a bracket with an arrow trims one end, and a left-right arrow moves a join.
 
 Each clip also has a **blend** mode and a **role**, which you can set in the inspector or from the right-click menu.
 

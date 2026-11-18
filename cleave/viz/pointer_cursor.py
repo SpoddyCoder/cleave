@@ -43,6 +43,9 @@ class PointerShape(Enum):
     TEXT = "text"
     RESIZE_EW = "resize_ew"
     RESIZE_NS = "resize_ns"
+    # A bracket with an arrow into the clip: drag a clip's start or end alone.
+    TRIM_START = "trim_start"
+    TRIM_END = "trim_end"
     MOVE = "move"
     NOT_ALLOWED = "not_allowed"
 
@@ -116,6 +119,45 @@ _MOVE_EW_POINTS: tuple[_Point, ...] = (
 )
 _CENTER: _Point = (16.0, 16.0)
 
+
+def _mirror(parts: tuple[_Part, ...]) -> tuple[_Part, ...]:
+    """*parts* flipped left to right across the grid."""
+
+    def flip(point: _Point) -> _Point:
+        return (POINTER_GRID - point[0], point[1])
+
+    mirrored: list[_Part] = []
+    for part in parts:
+        if isinstance(part, _Poly):
+            mirrored.append(_Poly(tuple(flip(point) for point in part.points)))
+        elif isinstance(part, _Line):
+            mirrored.append(_Line(flip(part.start), flip(part.end), part.width))
+        else:
+            mirrored.append(_Ring(flip(part.center), part.radius, part.width))
+    return tuple(mirrored)
+
+
+# "]" at the clip's end with a two-way arrow over the clip to its left.
+_TRIM_END_PARTS: tuple[_Part, ...] = (
+    _Line((21.0, 5.0), (21.0, 27.0), 3.0),
+    _Line((17.0, 5.0), (21.0, 5.0), 3.0),
+    _Line((17.0, 27.0), (21.0, 27.0), 3.0),
+    _Poly(
+        (
+            (2.5, 16.0),
+            (8.0, 10.5),
+            (8.0, 14.5),
+            (12.0, 14.5),
+            (12.0, 10.5),
+            (17.5, 16.0),
+            (12.0, 21.5),
+            (12.0, 17.5),
+            (8.0, 17.5),
+            (8.0, 21.5),
+        )
+    ),
+)
+
 _SHAPES: dict[PointerShape, _ShapeSpec] = {
     PointerShape.ARROW: _ShapeSpec((_Poly(_ARROW_POINTS),), (2.0, 2.0)),
     PointerShape.HAND: _ShapeSpec(
@@ -148,6 +190,10 @@ _SHAPES: dict[PointerShape, _ShapeSpec] = {
     ),
     PointerShape.RESIZE_EW: _ShapeSpec((_Poly(_EW_POINTS),), _CENTER),
     PointerShape.RESIZE_NS: _ShapeSpec((_Poly(_transpose(_EW_POINTS)),), _CENTER),
+    PointerShape.TRIM_START: _ShapeSpec(
+        _mirror(_TRIM_END_PARTS), (POINTER_GRID - 21.0, 16.0)
+    ),
+    PointerShape.TRIM_END: _ShapeSpec(_TRIM_END_PARTS, (21.0, 16.0)),
     PointerShape.MOVE: _ShapeSpec(
         (_Poly(_MOVE_EW_POINTS), _Poly(_transpose(_MOVE_EW_POINTS))), _CENTER
     ),
@@ -166,6 +212,8 @@ _SYSTEM_CURSORS: dict[PointerShape, int] = {
     PointerShape.TEXT: pygame.SYSTEM_CURSOR_IBEAM,
     PointerShape.RESIZE_EW: pygame.SYSTEM_CURSOR_SIZEWE,
     PointerShape.RESIZE_NS: pygame.SYSTEM_CURSOR_SIZENS,
+    PointerShape.TRIM_START: pygame.SYSTEM_CURSOR_SIZEWE,
+    PointerShape.TRIM_END: pygame.SYSTEM_CURSOR_SIZEWE,
     PointerShape.MOVE: pygame.SYSTEM_CURSOR_SIZEALL,
     PointerShape.NOT_ALLOWED: pygame.SYSTEM_CURSOR_NO,
 }
@@ -176,6 +224,10 @@ _IMGUI_CURSORS: dict[PointerShape, int] = {
     PointerShape.TEXT: int(imgui.MouseCursor_.text_input),
     PointerShape.RESIZE_EW: int(imgui.MouseCursor_.resize_ew),
     PointerShape.RESIZE_NS: int(imgui.MouseCursor_.resize_ns),
+    # Cleave windows never resize, so ImGui's diagonal resize ids are free
+    # to carry the trim shapes from request to end of frame.
+    PointerShape.TRIM_START: int(imgui.MouseCursor_.resize_nesw),
+    PointerShape.TRIM_END: int(imgui.MouseCursor_.resize_nwse),
     PointerShape.MOVE: int(imgui.MouseCursor_.resize_all),
     PointerShape.NOT_ALLOWED: int(imgui.MouseCursor_.not_allowed),
 }

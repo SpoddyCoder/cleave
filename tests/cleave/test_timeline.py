@@ -1249,6 +1249,42 @@ def test_trim_clip_rolls_a_butted_edge() -> None:
     assert clip_trim_bounds(_clips(lane), second, "start", 1.0, _DUR) == (11.0, 29.0)
 
 
+def test_trim_clip_without_roll_opens_a_gap_at_a_butted_edge() -> None:
+    lane = _clip_lane(
+        SlotCue(t=10.0, level=1.0),
+        SlotCue(t=20.0, level=0.5, role="lead", cut="soft"),
+        SlotCue(t=30.0, level=0.0),
+    )
+    first, second = _clips(lane)
+    end = trim_clip(
+        lane, first, "end", 16.0, inherit=0.0, duration_sec=_DUR, roll=False
+    )
+    assert _spans(end) == [(10.0, 16.0), (20.0, 30.0)]
+    assert _clips(end)[1].role == "lead"
+    assert _clips(end)[1].cut_in == "soft"
+    start = trim_clip(
+        lane, second, "start", 24.0, inherit=0.0, duration_sec=_DUR, roll=False
+    )
+    assert _spans(start) == [(10.0, 20.0), (24.0, 30.0)]
+    assert _clips(start)[1].role == "lead"
+    # Without a roll the edge only moves into its own clip.
+    assert clip_trim_bounds(_clips(lane), first, "end", 1.0, _DUR, roll=False) == (
+        11.0,
+        20.0,
+    )
+    assert clip_trim_bounds(
+        _clips(lane), second, "start", 1.0, _DUR, roll=False
+    ) == (20.0, 29.0)
+    outward = trim_clip(
+        lane, first, "end", 25.0, inherit=0.0, duration_sec=_DUR, roll=False
+    )
+    assert outward == lane
+    outward = trim_clip(
+        lane, second, "start", 15.0, inherit=0.0, duration_sec=_DUR, roll=False
+    )
+    assert outward == lane
+
+
 def test_trim_clip_end_onto_the_next_clip_butts_it() -> None:
     lane = _clip_lane(
         SlotCue(t=10.0, level=1.0),

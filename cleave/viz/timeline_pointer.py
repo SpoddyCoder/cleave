@@ -4,8 +4,10 @@ The corner buttons above the row labels play/pause and record. A press on
 the ruler seeks and a held drag scrubs. A press on a layer row focuses it
 and selects the clip under the pointer without moving the playhead. A held
 press on a clip that moves past ``PAN_DRAG_PX`` drags it: the body moves the
-clip at its length, an edge trims it, and an edge two clips share rolls the
-boundary (``ClipEditor.begin_drag`` / ``update_drag``). Release keeps the
+clip at its length and an edge trims it. Where two clips butt, the middle of
+the boundary rolls it (both clips change) and just inside either clip trims
+only that clip, opening a gap (``ClipGrip``, ``ClipEditor.begin_drag`` /
+``update_drag``). Release keeps the
 result as one undo step; Esc puts the clip back. A
 double-click in a gap adds a clip there (``TimelineControls.add_clip_at``);
 on a clip, or while clips cannot be edited, it seeks, and holding the second
@@ -38,7 +40,7 @@ from __future__ import annotations
 import time
 from typing import Callable, Literal, Protocol
 
-from cleave.timeline import ClipEdge
+from cleave.timeline import ClipGrip
 
 from cleave.viz.context_menu import ContextMenuEntry, ContextMenuProvider
 from cleave.viz.session import TuningSession
@@ -64,6 +66,18 @@ RIGHT_BUTTON: int = 1
 MIDDLE_BUTTON: int = 2
 _SCROLLBAR_TARGETS = ("scroll_thumb", "scroll_track")
 _ROW_BUTTON_TARGETS = frozenset(ROW_HEADER_BUTTONS)
+
+# What a clip drag does: move the body, trim one clip's start or end, or roll
+# the boundary two butted clips share.
+ClipGesture = Literal["move", "trim_start", "trim_end", "roll"]
+
+
+def _clip_gesture(grip: ClipGrip | None) -> ClipGesture:
+    if grip is None:
+        return "move"
+    if grip == "roll":
+        return "roll"
+    return "trim_start" if grip == "start" else "trim_end"
 
 
 class StripGeometry(Protocol):
@@ -145,8 +159,8 @@ class TimelinePointer:
         # X of a held row press that has not yet moved far enough to pan.
         self._pan_pending_x: float | None = None
         # Held press on a clip that has not yet moved far enough to drag:
-        # (x, slot, edge or None for the body).
-        self._clip_pending: tuple[float, str, ClipEdge | None] | None = None
+        # (x, slot, grip or None for the body).
+        self._clip_pending: tuple[float, str, ClipGrip | None] | None = None
         # Last row press: (time, x, y, row, target), for double-click detection.
         self._last_row_press: (
             tuple[float, float, float, int, StripTarget | None] | None
@@ -162,7 +176,7 @@ class TimelinePointer:
         return self._drag == "pan"
 
     @property
-    def clip_gesture(self) -> Literal["move", "trim"] | None:
+    def clip_gesture(self) -> ClipGesture | None:
         """What a drag is doing to a clip, or what a press here would start.
 
         None away from clips and wherever clips cannot be edited.
@@ -171,13 +185,13 @@ class TimelinePointer:
             editor = self._actions.clip_editor
             if not editor.dragging:
                 return None
-            return "move" if editor.drag_edge is None else "trim"
+            return _clip_gesture(editor.drag_grip)
         if self._drag is not None or self._scrubbing:
             return None
         hover = self._session.timeline.strip_hover_clip
         if hover is None or not clip_edits_allowed(self._session):
             return None
-        return "move" if hover[2] is None else "trim"
+        return _clip_gesture(hover[2])
 
     @property
     def scrollbar_active(self) -> bool:
@@ -345,7 +359,7 @@ class TimelinePointer:
         if not on_clip and hit.marker_index is not None:
             self._actions.select_song_marker(hit.marker_index)
         if on_clip and slot is not None and clip_edits_allowed(self._session):
-            self._clip_pending = (x, slot, hit.clip_edge)
+            self._clip_pending = (x, slot, hit.clip_grip)
         elif self._view.zoomed:
             self._pan_pending_x = x
         return True
@@ -446,10 +460,10 @@ class TimelinePointer:
         if clip_pending is not None and abs(x - clip_pending[0]) >= PAN_DRAG_PX:
             self._last_row_press = None
             self._clip_pending = None
-            press_x, slot, edge = clip_pending
+            press_x, slot, grip = clip_pending
             grab_t = self._geometry.time_at_x(press_x)
             if grab_t is not None and self._actions.clip_editor.begin_drag(
-                slot, edge, grab_t
+                slot, grip, grab_t
             ):
                 self._drag = "clip"
                 self._view.held = True
@@ -482,7 +496,7 @@ class TimelinePointer:
         timeline = self._session.timeline
         timeline.strip_hover = hover
         timeline.strip_hover_clip = (
-            (hit.row, hit.clip_start, hit.clip_edge)
+            (hit.row, hit.clip_start, hit.clip_grip)
             if hit is not None
             and hit.row is not None
             and hit.target is None

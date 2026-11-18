@@ -988,12 +988,16 @@ def test_strip_buttons_ask_for_the_hand_and_the_ruler_for_left_right() -> None:
         assert _gesture_pointer(host) is PointerShape.ARROW
 
 
-def test_strip_clips_ask_for_move_on_a_body_and_left_right_on_an_edge() -> None:
+def test_strip_clips_ask_for_move_trim_and_roll_pointers() -> None:
     with _host() as host:
         host.imgui.process_mouse_event(_motion((640, 400)))
         _strip_host(host, clip_gesture="move")
         assert _gesture_pointer(host) is PointerShape.MOVE
-        _strip_host(host, clip_gesture="trim")
+        _strip_host(host, clip_gesture="trim_start")
+        assert _gesture_pointer(host) is PointerShape.TRIM_START
+        _strip_host(host, clip_gesture="trim_end")
+        assert _gesture_pointer(host) is PointerShape.TRIM_END
+        _strip_host(host, clip_gesture="roll")
         assert _gesture_pointer(host) is PointerShape.RESIZE_EW
 
 
