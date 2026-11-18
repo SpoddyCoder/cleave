@@ -449,13 +449,13 @@ SPECS: dict[RowKind, RowSpec] = {
     ),
     RowKind.SETTINGS_RESIDUAL_LATENCY_MS: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
-        panel_label="residual latency",
+        panel_label="audio latency",
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_settings_residual_latency_ms,
         apply_horizontal=_apply_settings_residual_latency_ms,
-        help_title="Residual Latency",
+        help_title="Audio Latency",
         help_entries=(
-            ("Left/Right", "adjust latency (10 ms)"),
+            ("Left/Right", "adjust audio latency (10 ms)"),
             ("PgUp/PgDn", "large step (50 ms)"),
         ),
         help_description=(

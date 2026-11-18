@@ -194,7 +194,7 @@ def test_consistent_taps_open_apply_modal_with_mean_latency() -> None:
 
     view = modal.view_state()
     assert view is not None
-    assert view.message == "Detected latency"
+    assert view.message == "Detected audio latency"
     assert view.form_rows[0].options[view.form_rows[0].value] == "200 ms"
     assert controls.active
     assert controls.awaiting_apply
@@ -239,7 +239,7 @@ def test_double_tap_same_accent_is_ignored() -> None:
     assert len(controls._taps) == 4
     view = modal.view_state()
     assert view is not None
-    assert view.message == "Detected latency"
+    assert view.message == "Detected audio latency"
     assert view.form_rows[0].options[view.form_rows[0].value] == "200 ms"
     assert ui_log == ["hide", "restore"]
 
@@ -281,7 +281,7 @@ def test_apply_modal_yes_sets_residual_latency_and_leaves_transport_paused() -> 
     assert playback.player._clock.paused
     assert playback.player._click_only is False
     assert controls.cfg.editor.residual_latency_ms == pytest.approx(200, abs=1)
-    assert any("Latency compensation set" in msg for msg in notifications)
+    assert any("Audio latency set" in msg for msg in notifications)
 
 
 def test_apply_modal_cancel_exits_without_applying() -> None:
@@ -304,7 +304,7 @@ def test_apply_modal_cancel_exits_without_applying() -> None:
     assert playback.player._clock.paused
     assert playback.player._click_only is False
     assert controls.cfg.editor.residual_latency_ms == original_latency
-    assert not any("Latency compensation set" in msg for msg in notifications)
+    assert not any("Audio latency set" in msg for msg in notifications)
 
 
 def test_progress_view_updates_with_streak() -> None:

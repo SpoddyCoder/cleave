@@ -621,7 +621,7 @@ _REDO = Command(
 
 _MEASURE_LATENCY = Command(
     id="settings.measure_latency",
-    label="Measure latency…",
+    label="Measure audio latency…",
     kind="command",
     enabled=_enabled,
     run=_run_measure_latency,

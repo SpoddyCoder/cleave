@@ -529,7 +529,7 @@ The **Settings** menu holds preferences that apply to every project:
 
 - **Preview:** preview quality, and the audio delay correction.
 - **UI:** the editor's colour theme (Ultraviolet, Chocolate, Mint, or the light Daylight) and [custom themes](custom-themes.md), the size of the editor text (UI scale), which side the panels sit on, tooltips, how long notifications stay on screen, and more.
-- **Measure latency:** see [The visuals are out of time with the music](#the-visuals-are-out-of-time-with-the-music).
+- **Measure audio latency:** see [The visuals are out of time with the music](#the-visuals-are-out-of-time-with-the-music).
 - **Rescan presets:** re-read the presets folder after adding presets to a pack that was already there, or while Cleave is open.
 - **Download packages:** get downloads you skipped on first launch. Presets downloaded here are rescanned straight away, so they are ready to curate.
 - **Dev Tools:** a crash log, for reporting problems.
@@ -590,7 +590,7 @@ Cleave needs Milkdrop presets. Choose **Settings > Download packages** to get th
 
 ### The visuals are out of time with the music
 
-Some speakers and headphones, especially wireless ones, add a delay. Choose **Settings > Measure latency** and press Enter on each long, low tone it plays. Cleave works out the delay and offers to correct it. You can also set it by hand with **Settings > Preview > residual latency**. The correction affects the live preview and where new markers and clips land. It never changes your render.
+Some speakers and headphones, especially wireless ones, add a delay. Choose **Settings > Measure audio latency** and press Enter on each long, low tone it plays. Cleave works out the delay and offers to correct it. You can also set it by hand with **Settings > Preview > audio latency**. The correction affects the live preview and where new markers and clips land. It never changes your render.
 
 ### Stem splitting is very slow
 

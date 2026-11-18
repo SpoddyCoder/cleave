@@ -29,13 +29,13 @@ from cleave.viz.tap_sync import (
 from cleave.viz.transport_clock import MAX_RESIDUAL_LATENCY_SEC
 
 _TAP_SYNC_CONFIRM_MESSAGE = (
-    "Measure Latency: "
+    "Measure Audio Latency: "
     "A 140 BPM click track will play: a long low tone, then three short clicks. "
     "Tap Enter on each long low tone until the latency is detected."
 )
 
-_APPLY_TITLE = "Detected latency"
-# Matches the Settings > Preview residual latency row: 10 ms, 50 ms large.
+_APPLY_TITLE = "Detected audio latency"
+# Matches the Settings > Preview audio latency row: 10 ms, 50 ms large.
 _LATENCY_STEP_MS = 10
 _LATENCY_LARGE_STEPS = 5
 _LATENCY_HELP = (
@@ -250,7 +250,7 @@ class TapSyncControls:
                 fields=(
                     FormField(
                         "latency",
-                        "residual latency",
+                        "audio latency",
                         tuple(f"{ms} ms" for ms in options),
                         options.index(latency_ms),
                         help=_LATENCY_HELP,
@@ -270,7 +270,7 @@ class TapSyncControls:
         self._on_apply_residual_latency()
         persist_editor_settings(self.cfg)
         self._finish_calibration()
-        self._on_notification(f"Latency compensation set to {latency_ms} ms")
+        self._on_notification(f"Audio latency set to {latency_ms} ms")
 
     def _dismiss_without_apply(self) -> None:
         self._finish_calibration()
