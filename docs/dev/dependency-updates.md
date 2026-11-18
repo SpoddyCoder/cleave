@@ -107,11 +107,11 @@ Bump `actions/checkout`, `actions/setup-python`, and `actions/upload-artifact` i
 
 ## 6. Windows libprojectM DLLs
 
-CI does not build libprojectM. The committed DLLs in [packaging/windows/](../../packaging/windows/) are what ships. Build on native Windows, not WSL.
+CI does not build libprojectM. The committed DLLs in [packaging/windows/](../../packaging/windows/) are what ships. Build on native Windows, not WSL. First time on a machine, do [Windows host setup](#windows-host-setup-one-time) first.
 
-1. Update vcpkg (`git pull`, then `bootstrap-vcpkg.bat`) with Visual Studio 2022 installed.
-2. Build the shared x64 triplet with the playlist component: `vcpkg install projectm:x64-windows`. If the vcpkg port is older than the latest projectM release, use an overlay port pointing at the release tag.
-3. Copy `projectM-4.dll` and `projectM-4-playlist.dll` from the vcpkg `bin/` tree into `packaging/windows/`.
+1. Update vcpkg from a Developer PowerShell for VS 2022: `git pull`, then `.\bootstrap-vcpkg.bat`, in the vcpkg folder.
+2. Build the shared x64 triplet with the playlist library (see [Playlist library](#playlist-library) for the exact port spec): `vcpkg install projectm:x64-windows`. If the vcpkg port is older than the latest projectM release, use an overlay port pointing at the release tag.
+3. Check the version you built (see [Check the built version](#check-the-built-version)), then copy `projectM-4.dll` and `projectM-4-playlist.dll` from `installed\x64-windows\bin\` in the vcpkg folder into `packaging/windows/` (see [Getting the DLLs into the repo](#getting-the-dlls-into-the-repo)).
 4. Run `dumpbin /dependents` on both DLLs. Commit any non-system DLL it lists (zlib is the usual one) into the same directory; the staging script copies every DLL there.
 5. Update the version in [packaging/windows/licenses/libprojectM/NOTICE.txt](../../packaging/windows/licenses/libprojectM/NOTICE.txt), and the version table and dependents list in [packaging/windows/README.md](../../packaging/windows/README.md). Replace `LICENSE.txt` if upstream changed it.
 6. Optional local freeze, following [packaging/windows/README.md](../../packaging/windows/README.md), then `cleave.exe play` on a real project.
@@ -134,3 +134,68 @@ Cleave requires libprojectM 4.2+. A newer projectM does not have to raise that. 
 ## 9. Changelog
 
 Add one bullet under `## [Unreleased]` > `### Changed` in [CHANGELOG.md](../../CHANGELOG.md) naming the user-visible upgrades, for example: "Updated libprojectM to X.Y.Z, FFmpeg to X.Y, and PyTorch to X.Y.Z." Pin-only Python bumps with no user-visible effect need no bullet.
+
+## Windows host setup (one time)
+
+Only needed on a Windows machine that has not built the DLLs before, or after a reinstall. CI sets up its own runner; none of this is needed for the CI freeze.
+
+### Build tools
+
+1. Install [Git for Windows](https://git-scm.com/download/win).
+2. Install Visual Studio 2022 (Community is fine) with the **Desktop development with C++** workload. That brings MSVC, the Windows SDK, and the Developer PowerShell for VS 2022 shortcut. vcpkg downloads its own CMake and Ninja.
+3. Clone and bootstrap vcpkg in a short path without spaces:
+
+   ```
+   git clone https://github.com/microsoft/vcpkg C:\dev\vcpkg
+   cd C:\dev\vcpkg
+   .\bootstrap-vcpkg.bat -disableMetrics
+   ```
+
+4. Optional: set `VCPKG_ROOT` to `C:\dev\vcpkg` and add it to PATH, so `vcpkg` works from any folder.
+
+Run every vcpkg build from **Developer PowerShell for VS 2022** so `dumpbin` is on PATH too.
+
+### Playlist library
+
+Cleave needs both the core DLL and `projectM-4-playlist.dll`. Before the first build, check how the current `projectm` port ships the playlist library:
+
+```
+vcpkg search projectm
+```
+
+Also read `ports\projectm\vcpkg.json` in the vcpkg folder. If it lists a playlist feature, install with it enabled (`vcpkg install "projectm[<feature>]:x64-windows"`). If the playlist library is built by default, the plain `vcpkg install projectm:x64-windows` is enough. After the build, confirm both DLLs are in `installed\x64-windows\bin\`.
+
+Record the exact install command you used in [packaging/windows/licenses/libprojectM/NOTICE.txt](../../packaging/windows/licenses/libprojectM/NOTICE.txt) (Build recipe), so the next update does not have to work it out again.
+
+### Check the built version
+
+```
+vcpkg list projectm
+```
+
+That prints the port version. The version the DLL itself reports is what Cleave sees; check it with any Windows Python (no packages needed):
+
+```
+python -c "import ctypes; l=ctypes.CDLL(r'C:\dev\vcpkg\installed\x64-windows\bin\projectM-4.dll'); l.projectm_get_version_string.restype=ctypes.c_char_p; print(l.projectm_get_version_string().decode())"
+```
+
+Write that version into `NOTICE.txt` and [packaging/windows/README.md](../../packaging/windows/README.md).
+
+### Getting the DLLs into the repo
+
+The repo is checked out in WSL. Copy straight into it from Windows through the WSL share (replace `<distro>` with the name `wsl -l` shows, or `echo $WSL_DISTRO_NAME` in WSL):
+
+```
+copy C:\dev\vcpkg\installed\x64-windows\bin\projectM-4*.dll \\wsl.localhost\<distro>\home\fernpa\cleave\packaging\windows\
+```
+
+Then commit from WSL as usual. Do not commit from a separate Windows checkout; it would need its own hooks setup and can disagree with the WSL tree on line endings.
+
+### Local freeze (optional)
+
+Only needed to test a freeze before pushing; CI builds the release.
+
+1. Install 64-bit Python 3.10 from python.org (the freeze targets `cp310`).
+2. Install Inno Setup 6, for example `winget install JRSoftware.InnoSetup`.
+3. Install the [Visual C++ Redistributable for VS 2022 (x64)](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist) if the machine does not already have it. Visual Studio usually installs it.
+4. Follow the manual freeze steps in [packaging/windows/README.md](../../packaging/windows/README.md) from a native Windows checkout (not the WSL share). Use that checkout for building only; commit from WSL.

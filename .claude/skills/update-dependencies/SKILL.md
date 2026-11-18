@@ -91,10 +91,11 @@ Wait for them to report back, then:
 
 ## 6. Windows libprojectM DLLs (user, then agent)
 
-1. Tell the user the latest projectM release tag, and whether the vcpkg `projectm` port already has it (check the vcpkg repo's port version). If not, explain the overlay port option.
-2. Give the Windows steps from the doc's section 6 as a numbered list, with commands for a Developer PowerShell for VS 2022. Ask them to paste the `dumpbin /dependents` output for both DLLs and tell you the projectM version, then wait.
-3. When they have copied the DLLs into `packaging/windows/`, confirm with `git status` that both changed. Optionally check dependents with `objdump -p` from WSL to confirm what they pasted.
-4. Edit `NOTICE.txt` and the version table and dependents list in [packaging/windows/README.md](../../../packaging/windows/README.md). If `dumpbin` listed a new non-system DLL, make sure it is in `packaging/windows/` and named in the README.
+1. Ask whether their Windows machine has built the DLLs before. If not, or they are unsure, walk them through the doc's "Windows host setup (one time)" section first (build tools, vcpkg), one block at a time, and wait for each to finish. Skip the "Local freeze" part unless they want to freeze locally.
+2. Tell the user the latest projectM release tag, and whether the vcpkg `projectm` port already has it (check the vcpkg repo's port version). If not, explain the overlay port option. Check `ports/projectm/vcpkg.json` upstream for how the playlist library is built and give the exact install command (doc: "Playlist library"). Compare with the recipe recorded in `NOTICE.txt`.
+3. Give the Windows steps from the doc's section 6 as a numbered list, with commands for a Developer PowerShell for VS 2022, including the version check and the copy over `\\wsl.localhost\` (the distro name is `$WSL_DISTRO_NAME` in the agent shell). Ask them to paste the version the DLL reports, the `dumpbin /dependents` output for both DLLs, and the exact vcpkg install command they ran, then wait.
+4. When they have copied the DLLs into `packaging/windows/`, confirm with `git status` that both changed. Optionally check dependents with `objdump -p` from WSL to confirm what they pasted.
+5. Edit `NOTICE.txt` (version, and the exact install command in Build recipe) and the version table and dependents list in [packaging/windows/README.md](../../../packaging/windows/README.md). If `dumpbin` listed a new non-system DLL, make sure it is in `packaging/windows/` and named in the README.
 
 ## 7. projectM minimum version (agent, only if needed)
 
