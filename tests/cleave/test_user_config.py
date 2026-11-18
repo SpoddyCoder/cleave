@@ -44,7 +44,7 @@ def test_load_user_config_missing_file_returns_defaults(tmp_path: Path) -> None:
     assert cfg.editor.notification_display_sec == DEFAULT_NOTIFICATION_DISPLAY_SEC
     assert cfg.editor.residual_latency_ms == DEFAULT_RESIDUAL_LATENCY_MS
     assert cfg.editor.inspector_width == DEFAULT_INSPECTOR_WIDTH == 495
-    assert cfg.editor.help_width == DEFAULT_HELP_WIDTH == 320
+    assert cfg.editor.help_width == DEFAULT_HELP_WIDTH == 480
     assert cfg.editor.navigator_side == DEFAULT_NAVIGATOR_SIDE == "left"
     assert cfg.editor.help_side == DEFAULT_HELP_SIDE == "right"
 
@@ -55,7 +55,7 @@ def test_default_editor_settings_matches_schema_defaults() -> None:
     assert editor.notification_display_sec == DEFAULT_NOTIFICATION_DISPLAY_SEC
     assert editor.residual_latency_ms == DEFAULT_RESIDUAL_LATENCY_MS
     assert editor.inspector_width == DEFAULT_INSPECTOR_WIDTH == 495
-    assert editor.help_width == DEFAULT_HELP_WIDTH == 320
+    assert editor.help_width == DEFAULT_HELP_WIDTH == 480
     assert editor.navigator_side == DEFAULT_NAVIGATOR_SIDE == "left"
     assert editor.help_side == DEFAULT_HELP_SIDE == "right"
 
@@ -230,7 +230,7 @@ def test_shell_column_settings_absent_keys_use_defaults(tmp_path: Path) -> None:
 
     cfg = load_user_config(config_path)
     assert cfg.editor.inspector_width == DEFAULT_INSPECTOR_WIDTH == 495
-    assert cfg.editor.help_width == DEFAULT_HELP_WIDTH == 320
+    assert cfg.editor.help_width == DEFAULT_HELP_WIDTH == 480
     assert cfg.editor.navigator_side == DEFAULT_NAVIGATOR_SIDE == "left"
     assert cfg.editor.help_side == DEFAULT_HELP_SIDE == "right"
 
