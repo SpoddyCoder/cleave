@@ -29,6 +29,7 @@ from cleave.config_schema.layers import (
 from cleave.config_snapshot import write_session_snapshot
 from cleave.preset_playlist import PresetPlaylist
 from cleave.viz.session import LayerRuntime, TuningSession
+from cleave.user_config import user_config_path
 from tests.support.config import TEST_LAYER_STEMS
 
 
@@ -181,7 +182,7 @@ def test_persist_omits_defaults() -> None:
         editor=EditorConfig(),
         layer_z_order=["layer_1"],
         config_path=Path("/tmp/cleave.config.yaml"),
-        user_config_path=Path("/tmp/user-config.yaml"),
+        user_config_path=user_config_path(),
     )
     session = TuningSession(
         layer_z_order=["layer_1"],
@@ -264,7 +265,7 @@ def test_persist_list_outside_cfg_dir_keeps_absolute() -> None:
         editor=EditorConfig(),
         layer_z_order=["layer_1"],
         config_path=Path("/tmp/test/cleave.config.yaml"),
-        user_config_path=Path("/tmp/user-config.yaml"),
+        user_config_path=user_config_path(),
     )
     session = TuningSession(
         layer_z_order=["layer_1"],

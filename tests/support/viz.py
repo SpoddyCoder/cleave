@@ -41,6 +41,7 @@ from cleave.viz.playback import PlaybackState
 from cleave.viz.overlay_primitives import overlay_font as production_overlay_font
 from cleave.viz.theme import TuningUiMetrics, tuning_ui_metrics
 from cleave.viz.tuning_view_state import OverlayCardBlock, TrackBlock, TuningViewState
+from cleave.user_config import user_config_path
 
 
 def baseline_tuning_ui_metrics() -> TuningUiMetrics:
@@ -203,7 +204,7 @@ def make_test_cfg(
         layer_z_order=list(slots),
         editor=EditorConfig(),
         config_path=config_path or Path("/tmp/test/cleave.config.yaml"),
-        user_config_path=Path("/tmp/user-config.yaml"),
+        user_config_path=user_config_path(),
     )
 
 

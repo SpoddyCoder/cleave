@@ -20,6 +20,7 @@ from cleave.viz.layer_preview_resolution import (
     render_layer_size,
 )
 from cleave.viz.session import LayerRuntime, TuningSession
+from cleave.user_config import user_config_path
 from tests.support.config import TEST_LAYER_STEMS
 from tests.support.viz import make_playlist
 
@@ -77,7 +78,7 @@ def _cfg(
         resolution_width=BASE[0],
         resolution_height=BASE[1],
         config_path=Path("/tmp/test/cleave.config.yaml"),
-        user_config_path=Path("/tmp/user-config.yaml"),
+        user_config_path=user_config_path(),
     )
 
 

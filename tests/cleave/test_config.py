@@ -87,7 +87,7 @@ from cleave.config_schema.render import (
     persist_render,
 )
 from cleave.config_schema.timeline import parse_timeline_section, persist_timeline
-from cleave.user_config import EditorSettings
+from cleave.user_config import EditorSettings, user_config_path
 from cleave.viz.session import (
     TuningSession,
     post_fx_runtime_from_cfg,
@@ -264,7 +264,7 @@ def test_persisted_session_payload_omits_editor() -> None:
             preview_quality="performance",
         ),
         config_path=Path("/tmp/cleave-viz.yaml"),
-        user_config_path=Path("/tmp/user-config.yaml"),
+        user_config_path=user_config_path(),
         layer_z_order=[],
         render=RenderConfig(),
         timeline=None,
@@ -319,7 +319,7 @@ def test_layers_in_z_order_matches_reversed_layer_z_order() -> None:
         },
         editor=EditorConfig(),
         config_path=Path("/tmp/cleave.config.yaml"),
-        user_config_path=Path("/tmp/user-config.yaml"),
+        user_config_path=user_config_path(),
         layer_z_order=layer_z_order,
     )
     names = [name for name, _ in cfg.layers_in_z_order()]
@@ -1921,7 +1921,7 @@ def test_cleave_config_layer_z_order_defaults_to_list() -> None:
         layers={},
         editor=EditorConfig(),
         config_path=Path("/tmp/cleave.config.yaml"),
-        user_config_path=Path("/tmp/user-config.yaml"),
+        user_config_path=user_config_path(),
     )
     assert isinstance(cfg.layer_z_order, list)
     cfg.layer_z_order.append("layer_5")

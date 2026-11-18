@@ -55,6 +55,7 @@ from cleave.viz.session import (
     default_pattern_mask_runtime,
     pattern_mask_runtime_from_cfg,
 )
+from cleave.user_config import user_config_path
 
 
 def _assert_valid_hard_mask(
@@ -657,7 +658,7 @@ def test_persist_pattern_mask_round_trip() -> None:
         layers={},
         editor=EditorConfig(),
         config_path=Path("/tmp/cleave-viz.yaml"),
-        user_config_path=Path("/tmp/user-config.yaml"),
+        user_config_path=user_config_path(),
         render=render,
     )
     session = TuningSession(layer_z_order=[])
@@ -693,7 +694,7 @@ def test_pattern_mask_runtime_from_cfg_defaults() -> None:
         layers={},
         editor=EditorConfig(),
         config_path=Path("/tmp/cleave-viz.yaml"),
-        user_config_path=Path("/tmp/user-config.yaml"),
+        user_config_path=user_config_path(),
         render=RenderConfig(),
     )
     runtime = pattern_mask_runtime_from_cfg(cfg)
