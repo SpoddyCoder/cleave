@@ -171,7 +171,7 @@ def test_parse_colour_accepts_hex_without_hash() -> None:
 def test_installed_themes_follow_the_built_ins(tmp_path: Path) -> None:
     _write(tmp_path, "zed.yaml", "name: Zed\n")
     assert install_user_themes(tmp_path) == ()
-    assert theme_ids() == ("ultraviolet", "daylight", "zed")
+    assert theme_ids() == ("ultraviolet", "chocolate", "mint", "daylight", "zed")
     assert theme_label("zed") == "Zed"
     assert palette_for_theme("zed").id == "zed"
     set_user_palettes(())

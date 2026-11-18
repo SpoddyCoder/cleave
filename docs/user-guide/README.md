@@ -528,7 +528,7 @@ Cleave shows the render's progress in the window and tells you when it is done. 
 The **Settings** menu holds preferences that apply to every project:
 
 - **Preview:** preview quality, and the audio delay correction.
-- **UI:** the editor's colour theme, Ultraviolet (dark) or Daylight (light), and [your own themes](user-themes.md), the size of the editor text (UI scale), which side the panels sit on, navigator height, tooltips, how long notifications stay on screen, and more.
+- **UI:** the editor's colour theme (Ultraviolet, Chocolate, Mint, or the light Daylight) and [your own themes](user-themes.md), the size of the editor text (UI scale), which side the panels sit on, navigator height, tooltips, how long notifications stay on screen, and more.
 - **Measure latency:** see [The visuals are out of time with the music](#the-visuals-are-out-of-time-with-the-music).
 - **Rescan presets:** re-read the presets folder after adding presets to a pack that was already there, or while Cleave is open.
 - **Download packages:** get downloads you skipped on first launch. Presets downloaded here are rescanned straight away, so they are ready to curate.

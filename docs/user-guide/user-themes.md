@@ -1,6 +1,6 @@
 # Your own colour themes
 
-Cleave comes with two themes: Ultraviolet (dark, the default) and Daylight (light). You can also make your own. Each theme is a small text file in the `themes` folder (see [Where your files live](README.md#where-your-files-live)). Choose **Settings > UI > Open themes folder** to open it.
+Cleave comes with four themes: Ultraviolet (the default), Chocolate, and Mint are dark, and Daylight is light. You can also make your own. Each theme is a small text file in the `themes` folder (see [Where your files live](README.md#where-your-files-live)). Choose **Settings > UI > Open themes folder** to open it.
 
 ## Making a theme
 
@@ -15,7 +15,7 @@ button_bg: "#202040"
 ```
 
 - **name** is what the Theme setting shows. Leave it out to use the file name.
-- **base** is the built-in theme to start from: `ultraviolet` for a dark theme, `daylight` for a light one. Leave it out to start from Ultraviolet.
+- **base** is the built-in theme to start from: `ultraviolet`, `chocolate`, or `mint` for a dark theme, `daylight` for a light one. Leave it out to start from Ultraviolet.
 - Every other line sets one colour. Write a colour as `"#rrggbb"` in quotes, or as red, green, and blue from 0 to 255 in square brackets.
 - A few settings are numbers, not colours:
   - Those ending in `_alpha` are 0 to 255, or two numbers from 0 to 1 for the row bands.

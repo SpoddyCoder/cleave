@@ -14,7 +14,9 @@ from cleave.viz.button_paint import ButtonState, ButtonTone, button_look
 from cleave.viz.imgui_theme import imgui_color_roles, lighten
 from cleave.viz.theme import (
     BUILTIN_PALETTES,
+    CHOCOLATE,
     DAYLIGHT,
+    MINT,
     ULTRAVIOLET,
     Palette,
     palette,
@@ -49,11 +51,15 @@ def _variant() -> Palette:
     )
 
 
-def test_ultraviolet_is_the_default_then_daylight() -> None:
+def test_builtin_themes_in_setting_order() -> None:
     assert palette() is ULTRAVIOLET
-    assert BUILTIN_PALETTES == (ULTRAVIOLET, DAYLIGHT)
-    assert (ULTRAVIOLET.id, ULTRAVIOLET.name) == ("ultraviolet", "Ultraviolet")
-    assert (DAYLIGHT.id, DAYLIGHT.name) == ("daylight", "Daylight")
+    assert BUILTIN_PALETTES == (ULTRAVIOLET, CHOCOLATE, MINT, DAYLIGHT)
+    assert [(p.id, p.name) for p in BUILTIN_PALETTES] == [
+        ("ultraviolet", "Ultraviolet"),
+        ("chocolate", "Chocolate"),
+        ("mint", "Mint"),
+        ("daylight", "Daylight"),
+    ]
 
 
 def test_set_palette_bumps_generation_only_on_change() -> None:
@@ -126,7 +132,7 @@ def test_default_theme_is_ultraviolet_and_unknown_ids_fall_back() -> None:
     from cleave.viz.theme import palette_for_theme, theme_ids, theme_label
 
     assert DEFAULT_THEME == ULTRAVIOLET.id
-    assert theme_ids() == ("ultraviolet", "daylight")
+    assert theme_ids() == ("ultraviolet", "chocolate", "mint", "daylight")
     assert palette_for_theme("ultraviolet") is ULTRAVIOLET
     assert palette_for_theme("deleted-user-theme") is ULTRAVIOLET
     assert theme_label("ultraviolet") == "Ultraviolet"

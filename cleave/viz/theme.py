@@ -1,12 +1,13 @@
 """Colour palettes and layout constants for the editor chrome.
 
 A theme is a named ``Palette``: one frozen dataclass holding every colour role
-below plus its alphas and shading amounts. ``ULTRAVIOLET`` is the built-in
-theme and ``DAYLIGHT`` its light counterpart. Draw code reads the live one
-with ``palette()`` at draw time, never at import; ``set_palette()`` switches it and bumps ``palette_generation()`` so
-caches that hold drawn pixels rebuild. Roles are named for what they do, not
-their colour; the colours named here are Ultraviolet's. No role assumes a
-dark or light theme. User theme files
+below plus its alphas and shading amounts. ``ULTRAVIOLET`` is the default
+built-in theme; ``CHOCOLATE`` and ``MINT`` are dark alternatives and
+``DAYLIGHT`` is light. Draw code reads the live one with ``palette()`` at
+draw time, never at import; ``set_palette()`` switches it and bumps
+``palette_generation()`` so caches that hold drawn pixels rebuild. Roles are
+named for what they do, not their colour; the colours named here are
+Ultraviolet's. No role assumes a dark or light theme. User theme files
 (``user_themes.py``) add palettes after the built-ins through
 ``set_user_palettes()``.
 
@@ -533,6 +534,230 @@ def _ultraviolet() -> Palette:
     )
 
 
+def _chocolate() -> Palette:
+    """Dark chocolate panels, cream text, caramel accents."""
+    return Palette(
+        id="chocolate",
+        name="Chocolate",
+        background=(14, 8, 5),
+        background_alpha=255,
+        modal_scrim=(0, 0, 0),
+        modal_scrim_alpha=150,
+        transport_rule=(74, 52, 38),
+        panel_edge=(74, 52, 38),
+        panel_focus_edge=(200, 129, 62),
+        navigator_tree_line=(106, 76, 56),
+        inspector_divider=(56, 39, 28),
+        label=(236, 197, 150),
+        value=(255, 247, 234),
+        disabled=(140, 120, 104),
+        off_control_text=(196, 176, 156),
+        off_control_muted=(140, 120, 104),
+        muted=(171, 146, 124),
+        highlight=(255, 220, 138),
+        error_notification=(255, 143, 134),
+        notification_on_fill=(0, 0, 0),
+        on_hover=(255, 247, 234),
+        on_hover_muted=(240, 226, 208),
+        on_primary=(255, 247, 234),
+        on_danger=(255, 247, 234),
+        on_accent=(14, 8, 5),
+        on_lit_icon=(255, 247, 234),
+        preset_icon=(255, 190, 98),
+        preset_file_icon=(255, 246, 230),
+        move_mode=(70, 196, 162),
+        lock_icon=(232, 90, 80),
+        locked=(236, 154, 144),
+        locked_muted=(173, 114, 104),
+        solo_bg=(196, 42, 40),
+        override_bg=(255, 200, 68),
+        nav_on_bg=(47, 140, 78),
+        nav_lock_bg=(226, 134, 42),
+        nav_lock_glyph=(0, 0, 0),
+        config_dirty=(255, 238, 48),
+        armed_bg=(196, 42, 40),
+        override_glyph=(0, 0, 0),
+        override_glyph_off=(140, 120, 104),
+        rec_bg=(216, 16, 16),
+        button_bg=(58, 39, 28),
+        button_border=(108, 80, 64),
+        button_hover_bg=(110, 66, 36),
+        button_hover_border=(230, 172, 108),
+        button_active_bg=(74, 42, 20),
+        button_primary_bg=(138, 80, 34),
+        button_primary_border=(159, 112, 74),
+        button_primary_hover_bg=(158, 94, 40),
+        button_primary_hover_border=(255, 210, 154),
+        button_primary_active_bg=(100, 58, 22),
+        button_off_bg=(32, 22, 15),
+        button_off_border=(74, 54, 40),
+        button_off_chosen_bg=(62, 42, 26),
+        button_off_chosen_border=(97, 80, 67),
+        button_danger_bg=(196, 42, 40),
+        button_danger_border=(207, 80, 79),
+        button_danger_hover_bg=(232, 60, 52),
+        button_danger_hover_border=(255, 176, 158),
+        button_danger_active_bg=(146, 26, 26),
+        button_sheen=0.14,
+        button_shade=0.24,
+        button_glow_alpha=0.3,
+        surface_bg=(28, 18, 12),
+        surface_edge=(168, 104, 58),
+        surface_text=(240, 226, 208),
+        accent_from=(168, 92, 42),
+        accent_to=(240, 176, 100),
+        hover=(208, 138, 68),
+        hover_bg_alpha=44,
+        row_select_tint=(200, 129, 62),
+        row_selected_alpha=(0.3, 0.06),
+        row_selected_bar=(208, 138, 68),
+        row_focused_alpha=(0.5, 0.14),
+        row_focused_bar=(255, 201, 138),
+        row_focus_edge=(156, 96, 48),
+        icon_hover_fg=(255, 226, 168),
+        icon_hover_bg=(168, 100, 46),
+        icon_hover_bg_alpha=130,
+        icon_hover_edge=(208, 138, 68),
+        icon_lit_hover_lift=0.25,
+        icon_lit_hover_edge_lift=0.45,
+        timeline_track_colors=(
+            # An assorted box: caramel, strawberry, mint, pistachio, orange cream,
+            # violet cream, vanilla, blueberry.
+            (255, 194, 122),
+            (245, 154, 178),
+            (157, 226, 192),
+            (214, 227, 140),
+            (255, 160, 114),
+            (200, 168, 255),
+            (242, 220, 182),
+            (136, 208, 234),
+        ),
+        timeline_off_segment=(40, 40, 40),
+        bar_grid=(106, 76, 54),
+        song_bound=(74, 52, 38),
+        playhead=(122, 66, 32),
+        playhead_flash=(255, 210, 160),
+        song_marker=(220, 42, 40),
+        song_marker_selected=(255, 176, 42),
+        timeline_scroll_rail=(74, 52, 38),
+        timeline_scroll_thumb=(171, 146, 124),
+        scrollbar_track=(30, 20, 14),
+        scrollbar_thumb=(108, 80, 64),
+        scrollbar_thumb_hover=(230, 172, 108),
+    )
+
+
+def _mint() -> Palette:
+    """Deep green-black panels, pale mint text, fresh mint accents."""
+    return Palette(
+        id="mint",
+        name="Mint",
+        background=(4, 11, 9),
+        background_alpha=255,
+        modal_scrim=(0, 0, 0),
+        modal_scrim_alpha=150,
+        transport_rule=(36, 68, 60),
+        panel_edge=(36, 68, 60),
+        panel_focus_edge=(60, 207, 160),
+        navigator_tree_line=(53, 96, 86),
+        inspector_divider=(26, 49, 43),
+        label=(158, 236, 204),
+        value=(242, 255, 249),
+        disabled=(108, 138, 130),
+        off_control_text=(168, 196, 188),
+        off_control_muted=(108, 138, 130),
+        muted=(134, 168, 158),
+        highlight=(255, 240, 138),
+        error_notification=(255, 143, 140),
+        notification_on_fill=(0, 0, 0),
+        on_hover=(242, 255, 249),
+        on_hover_muted=(214, 242, 232),
+        on_primary=(242, 255, 249),
+        on_danger=(242, 255, 249),
+        on_accent=(4, 11, 9),
+        on_lit_icon=(242, 255, 249),
+        preset_icon=(255, 195, 90),
+        preset_file_icon=(242, 255, 249),
+        move_mode=(76, 140, 255),
+        lock_icon=(235, 90, 90),
+        locked=(235, 150, 150),
+        locked_muted=(170, 110, 110),
+        solo_bg=(200, 40, 40),
+        override_bg=(255, 200, 60),
+        nav_on_bg=(74, 132, 20),
+        nav_lock_bg=(225, 140, 40),
+        nav_lock_glyph=(0, 0, 0),
+        config_dirty=(255, 255, 0),
+        armed_bg=(200, 40, 40),
+        override_glyph=(0, 0, 0),
+        override_glyph_off=(108, 138, 130),
+        rec_bg=(220, 0, 0),
+        button_bg=(28, 51, 45),
+        button_border=(62, 100, 89),
+        button_hover_bg=(31, 107, 86),
+        button_hover_border=(142, 240, 204),
+        button_active_bg=(19, 74, 59),
+        button_primary_bg=(22, 122, 94),
+        button_primary_border=(64, 146, 123),
+        button_primary_hover_bg=(25, 129, 95),
+        button_primary_hover_border=(180, 255, 226),
+        button_primary_active_bg=(15, 90, 69),
+        button_off_bg=(15, 28, 24),
+        button_off_border=(44, 72, 64),
+        button_off_chosen_bg=(26, 58, 50),
+        button_off_chosen_border=(67, 93, 87),
+        button_danger_bg=(200, 40, 40),
+        button_danger_border=(210, 79, 79),
+        button_danger_hover_bg=(238, 58, 52),
+        button_danger_hover_border=(255, 175, 155),
+        button_danger_active_bg=(150, 26, 26),
+        button_sheen=0.14,
+        button_shade=0.22,
+        button_glow_alpha=0.3,
+        surface_bg=(12, 25, 21),
+        surface_edge=(47, 166, 130),
+        surface_text=(214, 242, 232),
+        accent_from=(30, 156, 120),
+        accent_to=(124, 240, 196),
+        hover=(60, 207, 160),
+        hover_bg_alpha=40,
+        row_select_tint=(47, 184, 142),
+        row_selected_alpha=(0.3, 0.06),
+        row_selected_bar=(60, 207, 160),
+        row_focused_alpha=(0.5, 0.14),
+        row_focused_bar=(168, 255, 224),
+        row_focus_edge=(35, 134, 106),
+        icon_hover_fg=(255, 240, 138),
+        icon_hover_bg=(36, 160, 124),
+        icon_hover_bg_alpha=120,
+        icon_hover_edge=(60, 207, 160),
+        icon_lit_hover_lift=0.25,
+        icon_lit_hover_edge_lift=0.45,
+        timeline_track_colors=(
+            (127, 240, 200),
+            (140, 207, 255),
+            (255, 210, 127),
+            (246, 166, 200),
+            (200, 180, 255),
+            (214, 240, 138),
+            (255, 163, 143),
+            (230, 255, 244),
+        ),
+        timeline_off_segment=(40, 40, 40),
+        bar_grid=(46, 90, 78),
+        song_bound=(36, 68, 60),
+        playhead=(26, 106, 84),
+        playhead_flash=(180, 255, 226),
+        song_marker=(220, 40, 40),
+        song_marker_selected=(255, 170, 40),
+        timeline_scroll_rail=(36, 68, 60),
+        timeline_scroll_thumb=(134, 168, 158),
+        scrollbar_track=(14, 26, 23),
+        scrollbar_thumb=(62, 100, 89),
+        scrollbar_thumb_hover=(142, 240, 204),
+    )
+
+
 def _daylight() -> Palette:
     """Near-white chrome, ink text, pale violet pointer, blue selection, amber signals."""
     white: RGB = (255, 255, 255)
@@ -656,9 +881,11 @@ def _daylight() -> Palette:
 
 
 ULTRAVIOLET: Palette = _ultraviolet()
+CHOCOLATE: Palette = _chocolate()
+MINT: Palette = _mint()
 DAYLIGHT: Palette = _daylight()
 # Built-in themes, in the order the Theme setting lists them.
-BUILTIN_PALETTES: tuple[Palette, ...] = (ULTRAVIOLET, DAYLIGHT)
+BUILTIN_PALETTES: tuple[Palette, ...] = (ULTRAVIOLET, CHOCOLATE, MINT, DAYLIGHT)
 
 _palette: Palette = ULTRAVIOLET
 _palette_generation: int = 0
