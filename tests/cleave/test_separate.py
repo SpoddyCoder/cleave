@@ -35,6 +35,16 @@ from cleave.separate import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _ffmpeg_on_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Checkout ffmpeg lookup finds a binary whether or not the host has one.
+
+    Demucs runs check ffmpeg before the weight download. Tests that need a
+    specific path patch ``ffmpeg_executable`` or go frozen, which skips PATH.
+    """
+    monkeypatch.setattr("cleave.ffmpeg.shutil.which", lambda _name: "/usr/bin/ffmpeg")
+
+
 def _write_stub_stems(project: Path) -> None:
     base = stems_dir(project)
     base.mkdir(parents=True, exist_ok=True)
