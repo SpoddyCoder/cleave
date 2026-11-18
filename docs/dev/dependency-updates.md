@@ -1,6 +1,6 @@
 # Dependency updates
 
-How to move Cleave's Python packages, libprojectM, and FFmpeg to newer versions on Linux and Windows. Do this on the pre-release branch before cutting a release, as its own change. The [cut-release skill](../../.claude/skills/cut-release/SKILL.md) does not refresh pins; it only flags stale ones.
+How to move Cleave's Python packages, libprojectM, and FFmpeg to newer versions on Linux and Windows. Do this on the pre-release branch before cutting a release, as its own change. The [update-dependencies skill](../../.claude/skills/update-dependencies/SKILL.md) walks through this page step by step. The [cut-release skill](../../.claude/skills/cut-release/SKILL.md) does not refresh pins; it only flags stale ones.
 
 Related: [windows-freeze.md](windows-freeze.md) (freeze design), [packaging/windows/README.md](../../packaging/windows/README.md) (committed DLLs), [structured-releases.md](structured-releases.md) (release process), [projectm-api-coverage.md](projectm-api-coverage.md) (projectM API in use).
 
