@@ -1,10 +1,15 @@
-# `Cleave`
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/cleave-logo-full-dark.png">
+    <img src="assets/cleave-logo-full.png" alt="Cleave" width="315">
+  </picture>
+</p>
 
-<p align="center"><img src="assets/cleave-logo-full.png" alt="Cleave" width="420"></p>
+# Cleave - stem separated music visualizer
 
-[![Version](https://img.shields.io/badge/version-v0.4.0--7%20%28dev%20build%29-orange)](https://github.com/SpoddyCoder/cleave/compare/v0.4.0...0.5.0) [![Tests](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml/badge.svg)](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml)
+[![Version](https://img.shields.io/badge/version-v0.4.0--8%20%28dev%20build%29-orange)](https://github.com/SpoddyCoder/cleave/compare/v0.4.0...0.5.0) [![Tests](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml/badge.svg)](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml)
 
-Stem-separated music visualizer. Layer together drums, bass, vocals and other stems - each driving Milkdrop presets to create your own unique visual masterpieces.
+Layer together drums, bass, vocals and other stems - each driving Milkdrop presets to create your own unique visual masterpieces.
 
 The visual editor lets you browse and tune presets in real time - automate preset switching, layer in effects, post processing and more. Render the final output in high definition and high frame rates using FFmpeg.
 
