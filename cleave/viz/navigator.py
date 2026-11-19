@@ -241,6 +241,24 @@ def build_navigator(
     return tuple(nodes)
 
 
+def initial_expanded_ids(session: TuningSession) -> frozenset[str]:
+    """Navigator ids open when a project opens.
+
+    Layers is always open. Another root starts open when its own on/off
+    switch is on or any of its child rows' switches is on. Layer rows start
+    closed.
+    """
+    expanded = set(DEFAULT_EXPANDED_IDS)
+    for node in build_navigator(session, TOP_LEVEL_IDS):
+        if node.id == "layers" or node.parent_id == "layers":
+            continue
+        if any(
+            toggle.id == TOGGLE_ENABLED and toggle.active for toggle in node.toggles
+        ):
+            expanded.add(node.id if node.parent_id is None else node.parent_id)
+    return frozenset(expanded)
+
+
 class _EveryId(Collection[str]):
     """An expanded set that holds every id, so one build opens every node."""
 

@@ -20,6 +20,7 @@ from cleave.viz.navigator import (
     TOP_LEVEL_IDS,
     build_navigator,
     ancestor_ids,
+    initial_expanded_ids,
     layer_node_id,
     layer_page_node_id,
     layer_page_of,
@@ -176,6 +177,44 @@ def test_default_tree_opens_only_layers() -> None:
         *TOP_LEVEL_IDS,
         layer_node_id("layer_2"),
         layer_node_id("layer_1"),
+    )
+
+
+def _all_switches_off(session: TuningSession) -> TuningSession:
+    session.overlays.opening_card.enabled = False
+    session.overlays.closing_card.enabled = False
+    session.post_fx.fade.enabled = False
+    session.post_fx.highlight_rolloff.enabled = False
+    session.post_fx.chroma_boost.enabled = False
+    session.post_fx.limiter.enabled = False
+    session.pattern_mask.enabled = False
+    session.timeline.enabled = False
+    return session
+
+
+def test_initial_tree_opens_only_layers_when_everything_is_off() -> None:
+    session = _all_switches_off(_two_layers())
+    assert initial_expanded_ids(session) == {"layers"}
+
+
+def test_initial_tree_opens_roots_that_are_on() -> None:
+    session = _all_switches_off(_two_layers())
+    session.pattern_mask.enabled = True
+    session.timeline.enabled = True
+    assert initial_expanded_ids(session) == {"layers", "pattern_mask", "timeline"}
+
+
+def test_initial_tree_opens_roots_with_a_child_that_is_on() -> None:
+    session = _all_switches_off(_two_layers())
+    session.overlays.closing_card.enabled = True
+    session.post_fx.limiter.enabled = True
+    assert initial_expanded_ids(session) == {"layers", "overlay", "post_fx"}
+
+
+def test_controls_start_with_the_initial_tree() -> None:
+    controls = make_controls()
+    assert controls.shell_focus.nav_expanded == set(
+        initial_expanded_ids(controls.session)
     )
 
 

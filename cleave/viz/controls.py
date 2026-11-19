@@ -63,6 +63,7 @@ from cleave.viz.focus_nav import (
 from cleave.viz.inspector_controls import InspectorControls
 from cleave.viz.navigator import (
     build_navigator,
+    initial_expanded_ids,
     layer_node_id,
     timeline_row_node_id,
     timeline_row_slot_of,
@@ -142,7 +143,9 @@ class TuningControls:
         )
 
         self.context_menu = ContextMenuState()
-        self.shell_focus = ShellFocusState()
+        self.shell_focus = ShellFocusState(
+            nav_expanded=set(initial_expanded_ids(session))
+        )
         self.page_history = PageHistory()
         self._focus_cursor: FocusCursor = MainFocus(
             RowDescriptor(RowKind.TIMELINE_HEADER)
