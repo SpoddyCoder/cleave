@@ -525,7 +525,7 @@ A **Render project** dialog tracks progress and tells you when the render is don
 The **Settings** menu holds preferences that apply to every project:
 
 - **Preview:** preview quality and audio latency correction.
-- **UI:** the editor theme (Ultraviolet, Chocolate, Mint, or the light Daylight) and [custom themes](custom-themes.md), UI scale, panel sides, tooltips, notification timing, and more.
+- **UI:** the editor theme (Ultraviolet, Chocolate, Mint, or the light Daylight) and [custom themes](custom-themes.md), UI scale, panel sides, tooltips, notification timing, what a click on a navigator row with pages under it does (navigator expand), whether the inspector title flashes when a new page opens (highlight new page), and more.
 - **Measure audio latency:** see [The visuals are out of time with the music](#the-visuals-are-out-of-time-with-the-music).
 - **Rescan presets:** re-reads the presets folder after you add presets to an existing pack, or while Cleave is open.
 - **Download packages:** fetches anything you skipped on first launch. Presets downloaded here are indexed immediately, ready to curate.
@@ -618,4 +618,4 @@ Presets added to an existing pack folder, or added while Cleave is open, are not
 
 ### Reporting a crash
 
-Turn on **Settings > Dev Tools > crash log**; it takes effect the next time Cleave starts. After a crash, **Open crash log folder** on the same page takes you to the file to attach to your report.
+Turn on **Settings > Dev Tools > crash log**; it takes effect the next time Cleave starts. After a crash, **Open crash log folder** on the same page takes you to the file to attach to your report. Include the version from **Help > About Cleave** too.

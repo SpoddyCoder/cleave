@@ -9,6 +9,14 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.4.0] - 2026-11-19
+
+### Added
+
 - The editor takes the mouse everywhere: hover highlights, click to select, double-click to open or edit, mouse wheel scrolling, sideways drag on numbers, and side arrows that step on click and repeat while held. Hover tooltips say what a control does; Settings > UI > tooltips turns them off. The mouse pointer is larger, black with a white outline, follows the UI scale, and changes shape over buttons, text fields, borders, and drag handles.
 - Right-click menus on the preview, navigator rows, preset list entries, the current preset, the preset directory (Jump to directory), timeline strip rows, clips, the time scale, and song markers. Shift+F10 or the Menu key opens the same menu for the focused row. Menus can hold submenus, list each option's keyboard shortcut, and grey out options that can't be used, with a tooltip saying why.
 - The timeline strip edits clips, the way video editors show a track's visible spans. A clip is a span where the layer is on, and the gaps between clips are off. Double-click a gap (or right-click > Add clip here) to add one, Delete to remove it, drag it to move it, drag an edge to trim it, and drag the join between two touching clips to move the boundary. Ctrl+K splits a clip at the playhead. C and Shift+C cycle a clip's cut in and cut out. Moves and trims follow placement snap, and Esc during a drag puts the clip back.
@@ -216,7 +224,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Project backup and restore (`.cleave-tar.gz`).
 - XDG user-data and config directories (`~/.local/share/cleave/`, `~/.config/cleave/`), with `CLEAVE_DATA` override.
 
-[unreleased]: https://github.com/SpoddyCoder/cleave/compare/v0.3.0...HEAD
+[unreleased]: https://github.com/SpoddyCoder/cleave/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/SpoddyCoder/cleave/releases/tag/v0.4.0
 [0.3.0]: https://github.com/SpoddyCoder/cleave/releases/tag/v0.3.0
 [0.2.0]: https://github.com/SpoddyCoder/cleave/releases/tag/v0.2.0
 [0.1.0]: https://github.com/SpoddyCoder/cleave/releases/tag/v0.1.0
