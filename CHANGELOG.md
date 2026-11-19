@@ -17,6 +17,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Audio latency and tap latency have their own page, Settings > Latency, with buttons for both tests. Applying a measurement opens the page on the value it set.
 - Settings > Measure audio latency is now a flash-and-beep test: the preview flashes on a beep each bar, and you step the audio latency until the two land together. Audio latency only delays the live preview; tapped markers and recordings use tap latency instead. The setting is stored under a new name, so measure it again after updating.
 - The Welcome to Cleave step lists the presets as separate projectM curated preset packs, one line each: Milkdrop Original and Milkdrop Textures (ticked by default), plus Cream of the Crop, projectM Classic, and En D (not ticked). projectM Classic and En D are new.
+- Browsing to a preset folder that only holds subfolders no longer shows NO PRESETS FOUND. The preset row says how many subfolders lie below and how many presets they hold, so you know to go deeper; a folder whose presets are all blacklisted says so.
 - Calibrate tap timing no longer needs an unbroken streak of matching taps. It averages your recent taps, ignores a stray one instead of starting over, and reports a value once at least six taps agree to within a few milliseconds, or after 16 taps however loose they are. The progress box shows how many taps it has kept and how settled the estimate is.
 
 ### Fixed

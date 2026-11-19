@@ -484,8 +484,62 @@ def test_container_directory_anchor_no_direct_presets() -> None:
         assert playlist.paths == ()
         assert playlist.index == 0
         assert playlist.current is None
-        assert preset_filename_display(playlist) == "NO PRESETS FOUND"
+        assert (
+            preset_filename_display(playlist)
+            == "1 subfolder below (1 preset)"
+        )
         assert playlist.config_preset_path(root) == "container/"
+
+
+def test_empty_folder_label_counts_subfolders_and_nested_presets() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        container = root / "container"
+        for name in ("a", "b"):
+            (container / name / "deep").mkdir(parents=True)
+            _write_milk(container / name / "one.milk")
+            _write_milk(container / name / "deep" / "two.milk")
+        (container / "no_presets").mkdir()
+
+        playlist = scan_preset_playlist(container)
+        assert (
+            preset_filename_display(playlist)
+            == "2 subfolders below (4 presets)"
+        )
+
+
+def test_empty_folder_label_when_own_presets_all_blacklisted() -> None:
+    class _HideAll:
+        def collections(self):
+            return ()
+
+        def visible(self, paths):
+            list(paths)
+            return ()
+
+        def collection_paths(self, collection):
+            return ()
+
+    with tempfile.TemporaryDirectory() as tmp:
+        folder = Path(tmp) / "pack"
+        folder.mkdir()
+        _write_milk(folder / "hidden.milk")
+
+        playlist = playlist_at_dir(folder, catalog=_HideAll())
+        assert preset_filename_display(playlist) == "All presets blacklisted"
+
+
+def test_empty_folder_label_follows_folder_change() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        container = root / "container"
+        (container / "child").mkdir(parents=True)
+        _write_milk(container / "child" / "nested.milk")
+
+        playlist = scan_preset_playlist(container)
+        assert preset_filename_display(playlist).endswith("(1 preset)")
+        assert playlist.enter_child(root)
+        assert preset_filename_display(playlist) == "nested.milk"
 
 
 def test_scan_all_layers_uses_slot_keys(minimal_project: Path) -> None:

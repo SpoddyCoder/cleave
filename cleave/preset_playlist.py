@@ -42,6 +42,32 @@ def milk_files_in_dir(dir: Path) -> tuple[Path, ...]:
     return tuple(sorted(dir.glob("*.milk")))
 
 
+NO_PRESETS_LABEL = "NO PRESETS FOUND"
+
+
+def _plural(count: int, noun: str) -> str:
+    return f"{count:,} {noun}" if count == 1 else f"{count:,} {noun}s"
+
+
+def empty_folder_label(dir: Path, catalog: PresetCatalog = UNFILTERED_CATALOG) -> str:
+    """Preset row text for a folder with no visible presets of its own.
+
+    Points the user at the subfolders below when they hold presets, or says the
+    folder's own presets are all blacklisted, instead of a bare dead end.
+    """
+    children = list_navigable_dirs(dir)
+    if children:
+        below = len(catalog.visible(p.resolve() for p in dir.rglob("*.milk")))
+        if below:
+            return (
+                f"{_plural(len(children), 'subfolder')} below "
+                f"({_plural(below, 'preset')})"
+            )
+    if dir.is_dir() and milk_files_in_dir(dir):
+        return "All presets blacklisted"
+    return NO_PRESETS_LABEL
+
+
 def playlist_at_dir(
     dir: Path,
     *,
@@ -221,6 +247,7 @@ class PresetPlaylist:
     _dir_display_root: Path | None = field(default=None, repr=False)
     _dir_display_floor: Path | None = field(default=None, repr=False)
     _dir_display: DirectoryDisplay | None = field(default=None, repr=False)
+    _empty_label: str | None = field(default=None, repr=False)
 
     @property
     def current(self) -> Path | None:
@@ -232,6 +259,17 @@ class PresetPlaylist:
         self._dir_display_root = None
         self._dir_display_floor = None
         self._dir_display = None
+        self._empty_label = None
+
+    def empty_label(self) -> str:
+        """Preset row text when nothing is selected; cached until the folder changes."""
+        if self._empty_label is None:
+            self._empty_label = (
+                NO_PRESETS_LABEL
+                if self.collection is not None
+                else empty_folder_label(self.current_dir, self.catalog)
+            )
+        return self._empty_label
 
     def _at_top_level(self, preset_root: Path) -> bool:
         """True when Left/Right steps through collections and top-level folders."""
@@ -507,7 +545,7 @@ def scan_preset_playlist(
 def preset_filename_display(playlist: PresetPlaylist) -> str:
     """Current preset filename, or empty-state label."""
     if playlist.current is None:
-        return "NO PRESETS FOUND"
+        return playlist.empty_label()
     return playlist.current.name
 
 

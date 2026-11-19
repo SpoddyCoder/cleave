@@ -212,6 +212,8 @@ On a layer's **Milkdrop Preset** page:
 - **preset** is the preset currently rendering. Left/Right steps through the folder, and PgUp/PgDn jumps further.
 - **beat sensitivity** sets how hard the preset responds to the beat.
 
+Many preset packs keep their presets in subfolders. When the folder you are in has none of its own, the **preset** row says how many subfolders are below and how many presets they hold: press Enter (or the down arrow) on **preset directory** to open the first one.
+
 At the top level of the preset folders, Left/Right also reaches your collections: **Favourites**, one per **Role**, and **Blacklisted**. To go straight to one, right-click the preset directory row and choose **Jump to directory**. See [Curating your presets](#curating-your-presets).
 
 ### Preset switching

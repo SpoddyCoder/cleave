@@ -3152,14 +3152,15 @@ def test_parent_directory_clears_preset_from_previous_directory() -> None:
     press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1"), keydown(pygame.K_BACKSPACE))
     assert layer.playlist.current is None
     assert layer.auto_preset_path is None
+    expected = "1 subfolder below (1 preset)"
     view = controls.build_view_state(paused=False)
-    assert view.tracks["layer_1"].preset_label == "NO PRESETS FOUND"
+    assert view.tracks["layer_1"].preset_label == expected
 
     controls.focus_descriptor = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
     press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1"), keydown(pygame.K_RIGHT))
     assert controls.build_view_state(paused=False).tracks[
         "layer_1"
-    ].preset_label == "NO PRESETS FOUND"
+    ].preset_label == expected
 
 
 def test_ctrl_left_at_browse_floor_is_noop() -> None:
