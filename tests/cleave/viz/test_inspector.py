@@ -178,22 +178,18 @@ def test_child_pages_omit_the_root_switches(node_id: str) -> None:
 def test_settings_pages() -> None:
     state = _view_state()
     preview = build_inspector_rows(state, "settings.preview")
-    assert _kinds(preview) == [
-        RowKind.SETTINGS_PREVIEW_QUALITY,
+    assert _kinds(preview) == [RowKind.SETTINGS_PREVIEW_QUALITY]
+    latency = build_inspector_rows(state, "settings.latency")
+    assert _kinds(latency) == [
         RowKind.SETTINGS_AUDIO_LATENCY_MS,
         RowKind.SETTINGS_TAP_LATENCY_MS,
     ]
-    assert preview[-1].command_ids == (
+    assert latency[-1].command_ids == (
         "settings.measure_latency",
         "settings.calibrate_tap_timing",
     )
-    assert preview[-1].depth == 0
-    # Both latencies sit under the divider with their measuring commands.
-    assert preview[-4].divider
-    assert preview[-3].descriptor is not None
-    assert preview[-3].descriptor.kind == RowKind.SETTINGS_AUDIO_LATENCY_MS
-    assert preview[-2].descriptor is not None
-    assert preview[-2].descriptor.kind == RowKind.SETTINGS_TAP_LATENCY_MS
+    assert latency[-1].depth == 0
+    assert latency[-2].divider
     ui = build_inspector_rows(state, "settings.ui")
     assert _kinds(ui) == [
         RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY,
@@ -513,7 +509,7 @@ def test_layer_missing_from_view_state_has_no_rows(page: str | None) -> None:
 @pytest.mark.parametrize(
     "node_id",
     (
-        "settings.preview",
+        "settings.latency",
         "timeline",
         "timeline.grid",
         "timeline.cue_fades",

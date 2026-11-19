@@ -5230,3 +5230,32 @@ def test_select_song_marker_opens_its_row_on_the_song_markers_page() -> None:
     )
     assert controls.session.song_markers.selected_index == 1
     assert controls.session.song_markers.selected_flash_start_ms is not None
+
+
+def test_applying_a_measured_latency_opens_the_latency_page_on_it(
+    tmp_path: Path,
+) -> None:
+    controls = make_controls(("layer_1",))
+    controls.cfg.user_config_path = tmp_path / "config.yaml"
+    pairs = (
+        (
+            controls.av_sync._on_apply_audio_latency,
+            RowKind.SETTINGS_AUDIO_LATENCY_MS,
+            "audio_latency_ms",
+            60,
+        ),
+        (
+            controls.tap_sync._on_apply_tap_latency,
+            RowKind.SETTINGS_TAP_LATENCY_MS,
+            "tap_latency_ms",
+            -20,
+        ),
+    )
+    for apply, kind, field_name, value in pairs:
+        controls.navigator.open_page("settings.preview")
+        apply(value)
+        assert getattr(controls.cfg.editor, field_name) == value
+        assert controls.shell_focus.selected_id == "settings.latency"
+        assert controls.shell_focus.region is ShellRegion.INSPECTOR
+        assert controls.shell_focus.inspector_cursor == RowDescriptor(kind)
+        assert controls.shell_focus.inspector_command_id is None

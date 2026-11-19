@@ -333,8 +333,9 @@ def test_parent_group_on_row_specs() -> None:
         "settings_preview"
     )
     assert row_spec(RowKind.SETTINGS_AUDIO_LATENCY_MS).parent_group == (
-        "settings_preview"
+        "settings_latency"
     )
+    assert row_spec(RowKind.SETTINGS_LATENCY_HEADER).parent_group == "settings"
     assert row_spec(RowKind.SETTINGS_PREVIEW_HEADER).parent_group == "settings"
     assert row_spec(RowKind.SETTINGS_NAVIGATOR_SIDE).parent_group == "settings_ui"
     assert row_spec(RowKind.SETTINGS_HELP_SIDE).parent_group == "settings_ui"

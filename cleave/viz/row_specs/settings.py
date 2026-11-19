@@ -214,7 +214,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Preview",
         help_description=(
-            "Preview quality, and timing corrections for the preview and your taps. The preview takes its aspect ratio from Project > Resolution and its size from the window: resize the window, or press F11 for Full screen editor. Ctrl+F plays the show full screen; Esc returns.",
+            "Preview quality. The preview takes its aspect ratio from Project > Resolution and its size from the window: resize the window, or press F11 for Full screen editor. Ctrl+F plays the show full screen; Esc returns.",
         ),
         is_pinned=True,
         parent_group="settings",
@@ -336,6 +336,18 @@ SPECS: dict[RowKind, RowSpec] = {
         ),
         is_pinned=True,
         parent_group="settings_ui",
+    ),
+    RowKind.SETTINGS_LATENCY_HEADER: RowSpec(
+        affordance=RowAffordance.HEADING,
+        panel_label="Latency",
+        present_style=RowPresentStyle.HEADING,
+        fit_strategy=FitStrategy.NONE,
+        help_title="Latency",
+        help_description=(
+            "Timing corrections for the preview and the markers and clips you tap.",
+        ),
+        is_pinned=True,
+        parent_group="settings",
     ),
     RowKind.SETTINGS_DEV_TOOLS_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,
@@ -463,7 +475,7 @@ SPECS: dict[RowKind, RowSpec] = {
         ),
         is_pinned=True,
         repeatable=True,
-        parent_group="settings_preview",
+        parent_group="settings_latency",
     ),
     RowKind.SETTINGS_MEASURE_AUDIO_LATENCY: RowSpec(
         affordance=RowAffordance.COMMAND,
@@ -477,7 +489,7 @@ SPECS: dict[RowKind, RowSpec] = {
             "Flashes the preview on a beep each bar. Adjust until they land together.",
         ),
         is_pinned=True,
-        parent_group="settings_preview",
+        parent_group="settings_latency",
     ),
     RowKind.SETTINGS_CALIBRATE_TAP_TIMING: RowSpec(
         affordance=RowAffordance.COMMAND,
@@ -491,7 +503,7 @@ SPECS: dict[RowKind, RowSpec] = {
             "Plays a click track. Press Enter on each long low tone until your timing settles.",
         ),
         is_pinned=True,
-        parent_group="settings_preview",
+        parent_group="settings_latency",
     ),
     RowKind.SETTINGS_TAP_LATENCY_MS: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
@@ -509,6 +521,6 @@ SPECS: dict[RowKind, RowSpec] = {
         ),
         is_pinned=True,
         repeatable=True,
-        parent_group="settings_preview",
+        parent_group="settings_latency",
     ),
 }

@@ -44,6 +44,7 @@ if TYPE_CHECKING:
 _NODE_HEADER_KINDS: dict[str, RowKind] = {
     "settings.preview": RowKind.SETTINGS_PREVIEW_HEADER,
     "settings.ui": RowKind.SETTINGS_UI_HEADER,
+    "settings.latency": RowKind.SETTINGS_LATENCY_HEADER,
     "settings.dev_tools": RowKind.SETTINGS_DEV_TOOLS_HEADER,
     "project.projectm": RowKind.PROJECT_MILKDROP_HEADER,
     "project.compositor": RowKind.PROJECT_COMPOSITOR_HEADER,

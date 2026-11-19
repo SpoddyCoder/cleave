@@ -49,6 +49,7 @@ _PROJECT_PAGE_IDS = (
 _SETTINGS_PAGE_IDS = (
     "page.settings.preview",
     "page.settings.ui",
+    "page.settings.latency",
     "page.settings.dev_tools",
 )
 
@@ -222,6 +223,7 @@ def test_menus_list_taxonomy_ids_once() -> None:
     assert _row_ids(menus[4]) == [
         "page.settings.preview",
         "page.settings.ui",
+        "page.settings.latency",
         None,
         "settings.measure_latency",
         "settings.calibrate_tap_timing",

@@ -92,6 +92,7 @@ if TYPE_CHECKING:
 
 NOTIFICATION_TIMELINE_ENABLED_TEXT = "Timeline controls layer visibility"
 NOTIFICATION_TIMELINE_DISABLED_TEXT = "Layer panel controls visibility"
+LATENCY_PAGE_ID = "settings.latency"
 NOTIFICATION_TAP_LATENCY_UNCHANGED_TEXT = (
     "Existing marker and cue times unchanged"
 )
@@ -431,10 +432,22 @@ class TuningControls:
     def _apply_measured_audio_latency(self, latency_ms: int) -> None:
         self.settings.set_audio_latency_ms(latency_ms)
         self.on_audio_latency_changed()
+        self._show_latency_row(RowKind.SETTINGS_AUDIO_LATENCY_MS)
 
     def _apply_measured_tap_latency(self, latency_ms: int) -> None:
         self.settings.set_tap_latency_ms(latency_ms)
         self.on_tap_latency_changed()
+        self._show_latency_row(RowKind.SETTINGS_TAP_LATENCY_MS)
+
+    def _show_latency_row(self, kind: RowKind) -> None:
+        """Open Settings > Latency with the measured value focused."""
+        self.navigator.open_page(LATENCY_PAGE_ID)
+        focus = self.shell_focus
+        if focus.selected_id != LATENCY_PAGE_ID:
+            return
+        focus.inspector_cursor = RowDescriptor(kind)
+        focus.inspector_command_id = None
+        self.set_shell_region(ShellRegion.INSPECTOR)
 
     def on_audio_latency_changed(self) -> None:
         self._apply_latency()

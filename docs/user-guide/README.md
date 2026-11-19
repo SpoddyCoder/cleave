@@ -524,8 +524,9 @@ A **Render project** dialog tracks progress and tells you when the render is don
 
 The **Settings** menu holds preferences that apply to every project:
 
-- **Preview:** preview quality, and the audio latency and tap latency corrections.
+- **Preview:** preview quality.
 - **UI:** the editor theme (Ultraviolet, Chocolate, Mint, or the light Daylight) and [custom themes](custom-themes.md), UI scale, panel sides, tooltips, notification timing, what a click on a navigator row with pages under it does (navigator expand), whether the inspector title flashes when a new page opens (highlight new page), and more.
+- **Latency:** audio latency and tap latency, with the tests that measure them. After a test, Cleave opens this page on the value it set.
 - **Measure audio latency:** see [The visuals are out of time with the music](#the-visuals-are-out-of-time-with-the-music).
 - **Calibrate tap timing:** see [Markers and recorded clips land late](#markers-and-recorded-clips-land-late).
 - **Rescan presets:** re-reads the presets folder after you add presets to an existing pack, or while Cleave is open.
@@ -588,11 +589,11 @@ Cleave needs Milkdrop presets to draw anything. Get the starter set from **Setti
 
 ### The visuals are out of time with the music
 
-Some audio outputs, wireless headphones in particular, deliver the sound late, so the preview runs ahead of what you hear. Choose **Settings > Measure audio latency**: Cleave plays a beep once a bar and flashes the preview on each beep. Press Left/Right (PgUp/PgDn for bigger steps) until the flash and the beep land together, then Apply. Raise the value if the flash comes first, lower it if the beep does. You can also set it by hand with **Settings > Preview > audio latency**. It only delays the live preview; it never affects the render, or where markers and clips land.
+Some audio outputs, wireless headphones in particular, deliver the sound late, so the preview runs ahead of what you hear. Choose **Settings > Measure audio latency**: Cleave plays a beep once a bar and flashes the preview on each beep. Press Left/Right (PgUp/PgDn for bigger steps) until the flash and the beep land together, then Apply. Raise the value if the flash comes first, lower it if the beep does. You can also set it by hand with **Settings > Latency > audio latency**. It only delays the live preview; it never affects the render, or where markers and clips land.
 
 ### Markers and recorded clips land late
 
-Song markers you drop and clips you record while the song plays land where you pressed the key, which is usually a little after the beat: the sound takes time to reach you, and a wireless keyboard takes time to reach Cleave. Choose **Settings > Calibrate tap timing** and press Enter on each long, low tone of the click track, just as you would tap a marker. A stray tap is ignored, so just keep going. Once the estimate settles, usually within 8 to 12 taps, Cleave shows your tap latency and offers to apply it; from then on it moves taps back by that much. It can be below zero if you tend to tap ahead of the beat, which many people do. You can also set it by hand with **Settings > Preview > tap latency**. It only affects taps made while the song plays, and leaves anything already placed where it is.
+Song markers you drop and clips you record while the song plays land where you pressed the key, which is usually a little after the beat: the sound takes time to reach you, and a wireless keyboard takes time to reach Cleave. Choose **Settings > Calibrate tap timing** and press Enter on each long, low tone of the click track, just as you would tap a marker. A stray tap is ignored, so just keep going. Once the estimate settles, usually within 8 to 12 taps, Cleave shows your tap latency and offers to apply it; from then on it moves taps back by that much. It can be below zero if you tend to tap ahead of the beat, which many people do. You can also set it by hand with **Settings > Latency > tap latency**. It only affects taps made while the song plays, and leaves anything already placed where it is.
 
 ### Stem splitting is very slow
 
