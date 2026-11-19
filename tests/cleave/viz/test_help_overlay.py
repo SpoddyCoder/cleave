@@ -1080,6 +1080,9 @@ def test_help_titles_are_capital_case() -> None:
     titles += [effect_help_title(effect_id) for effect_id in EFFECT_IDS]
     for title in titles:
         for word in re.findall(r"[A-Za-z][A-Za-z']*", title):
+            # Names that set their own casing.
+            if word in {"projectM"}:
+                continue
             assert word[0].isupper(), title
 
 

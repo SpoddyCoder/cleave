@@ -567,7 +567,7 @@ def test_row_panel_label_names_a_track_effect() -> None:
 
 
 def test_row_panel_label_settings_header() -> None:
-    assert row_panel_label(RowKind.PROJECT_MILKDROP_HEADER) == "ProjectM"
+    assert row_panel_label(RowKind.PROJECT_MILKDROP_HEADER) == "projectM"
     assert row_panel_label(RowKind.PROJECT_COMPOSITOR_HEADER) == "Compositor"
     assert row_panel_label(RowKind.PROJECT_RESOLUTION_HEADER) == "Resolution"
 

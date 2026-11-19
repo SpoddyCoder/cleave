@@ -537,7 +537,7 @@ The **Project** menu holds settings saved with the current song:
 
 - **Resolution:** the output frame size.
 - **Compositor:** HDR compositing, which combines layers at higher bit depth to avoid banding and clipping when bright layers stack.
-- **ProjectM:** the default beat sensitivity for layers.
+- **projectM:** the default beat sensitivity for layers.
 
 ---
 

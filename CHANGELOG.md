@@ -20,6 +20,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- projectM is spelt with a lowercase p in Help > About Cleave and on the Project > projectM page.
 - Measuring latency no longer reports 0 ms when your taps land ahead of the beat.
 - Pressing Ctrl+C in the console to quit `cleave play` exits quietly instead of printing a traceback.
 - Stem separation uses the GPU straight after the Welcome to Cleave step downloads the CUDA Toolkit, instead of running on the CPU until Cleave is restarted.

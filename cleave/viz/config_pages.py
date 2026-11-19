@@ -25,7 +25,7 @@ CONFIG_PAGES: tuple[ConfigPage, ...] = (
     ConfigPage("settings.dev_tools", "Settings", "Dev Tools"),
     ConfigPage("project.resolution", "Project", "Resolution"),
     ConfigPage("project.compositor", "Project", "Compositor"),
-    ConfigPage("project.projectm", "Project", "ProjectM"),
+    ConfigPage("project.projectm", "Project", "projectM"),
 )
 
 _BY_ID: dict[str, ConfigPage] = {page.id: page for page in CONFIG_PAGES}

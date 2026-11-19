@@ -1,4 +1,4 @@
-"""Project header, ProjectM, compositor, and resolution row specs."""
+"""Project header, projectM, compositor, and resolution row specs."""
 
 from __future__ import annotations
 
@@ -96,10 +96,10 @@ def _apply_project_compositor_hdr(
 SPECS: dict[RowKind, RowSpec] = {
     RowKind.PROJECT_MILKDROP_HEADER: RowSpec(
         affordance=RowAffordance.HEADING,
-        panel_label="ProjectM",
+        panel_label="projectM",
         present_style=RowPresentStyle.HEADING,
         fit_strategy=FitStrategy.NONE,
-        help_title="ProjectM",
+        help_title="projectM",
         help_description=(
             "Project-wide projectM defaults.",
         ),

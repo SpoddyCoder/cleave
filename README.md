@@ -2,7 +2,7 @@
 
 <p align="center"><img src="assets/cleave-logo-full.png" alt="Cleave" width="420"></p>
 
-[![Version](https://img.shields.io/badge/version-v0.4.0--6%20%28dev%20build%29-orange)](https://github.com/SpoddyCoder/cleave/compare/v0.4.0...0.5.0) [![Tests](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml/badge.svg)](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml)
+[![Version](https://img.shields.io/badge/version-v0.4.0--7%20%28dev%20build%29-orange)](https://github.com/SpoddyCoder/cleave/compare/v0.4.0...0.5.0) [![Tests](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml/badge.svg)](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml)
 
 Stem-separated music visualizer. Layer together drums, bass, vocals and other stems - each driving Milkdrop presets to create your own unique visual masterpieces.
 
