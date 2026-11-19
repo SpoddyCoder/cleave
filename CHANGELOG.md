@@ -13,6 +13,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Stem separation uses the GPU straight after the Welcome to Cleave step downloads the CUDA Toolkit, instead of running on the CPU until Cleave is restarted.
+
 ## [0.4.0] - 2026-11-19
 
 ### Added

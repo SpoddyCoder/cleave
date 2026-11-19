@@ -58,11 +58,11 @@ On first start, the **Welcome to Cleave** step lists the downloads Cleave needs 
 
 | Download | What it is for | Ticked by default |
 | --- | --- | --- |
+| CUDA Toolkit | Windows with an NVIDIA GPU only. Speeds up stem separation considerably (about 2 GB). | No |
 | Milkdrop Presets | A starter set of preset and texture packs (about 60 MB). | Yes |
 | Demucs | The model that separates a song into stems. | Yes |
 | BeatThis! | The model that detects beats and downbeats. | Yes |
 | Demucs HQ | A slower, higher-quality separation model. | No |
-| CUDA Toolkit | Windows with an NVIDIA GPU only. Speeds up stem separation considerably (about 2 GB). | No |
 
 Each download reports its own progress. You can cancel at any point, and anything that fails is listed with a Retry button. Anything you skip is fetched automatically when it is first needed, or you can get it at any time from **Settings > Download packages**.
 

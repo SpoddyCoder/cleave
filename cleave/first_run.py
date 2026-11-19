@@ -162,7 +162,12 @@ def _cuda_item() -> FirstRunItem | None:
 
 
 def first_run_items() -> tuple[FirstRunItem, ...]:
-    """Every download the welcome step can offer, in download order."""
+    """Every download the welcome step can offer, in download order.
+
+    The CUDA overlay comes first: the weight downloads import torch, and once
+    the bundled CPU torch is loaded the overlay only takes effect after a
+    restart, so a split straight after the welcome step would run on the CPU.
+    """
     from cleave.model_weights import (
         DEMUCS_HQ_MODEL,
         DEMUCS_MODEL,
@@ -171,6 +176,7 @@ def first_run_items() -> tuple[FirstRunItem, ...]:
     )
 
     candidates = (
+        _cuda_item(),
         _presets_item(),
         _weight_item(
             FirstRunItemId.DEMUCS,
@@ -193,7 +199,6 @@ def first_run_items() -> tuple[FirstRunItem, ...]:
             purpose="beat detection AI model by the IoCP",
             default_on=True,
         ),
-        _cuda_item(),
     )
     return tuple(item for item in candidates if item is not None)
 

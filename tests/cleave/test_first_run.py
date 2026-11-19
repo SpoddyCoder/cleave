@@ -129,7 +129,8 @@ def test_cuda_item_only_when_supported(monkeypatch: pytest.MonkeyPatch) -> None:
     cuda = items[FirstRunItemId.CUDA]
     assert cuda.default_on is False
     assert cuda.needed()
-    assert list(items)[-1] is FirstRunItemId.CUDA
+    # First, so it activates before a weight download imports CPU torch.
+    assert list(items)[0] is FirstRunItemId.CUDA
 
     monkeypatch.setattr(cuda_extra, "cuda_extra_installed", lambda: True)
     items = {item.id: item for item in first_run_items()}
