@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import importlib
 import os
 import subprocess
@@ -1486,3 +1487,22 @@ def test_cmd_play_welcome_quit_closes_window(
     continue_launch.assert_not_called()
     separate.assert_not_called()
     window.close.assert_called_once()
+
+
+def test_main_exits_quietly_on_keyboard_interrupt(monkeypatch, capsys) -> None:
+    import pytest
+
+    from cleave import cli
+
+    def interrupt(_args) -> None:
+        raise KeyboardInterrupt
+
+    parser = cli.build_parser()
+    args = parser.parse_args(["play"])
+    monkeypatch.setattr(cli, "attach_parent_console", lambda: False)
+    monkeypatch.setattr(cli, "build_parser", lambda: parser)
+    monkeypatch.setattr(parser, "parse_args", lambda _raw: argparse.Namespace(**{**vars(args), "func": interrupt}))
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["play"])
+    assert exc.value.code == 130
+    assert "Traceback" not in capsys.readouterr().err

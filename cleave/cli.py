@@ -592,6 +592,10 @@ def main(argv: list[str] | None = None) -> None:
             raw = ["play"]
         args = parser.parse_args(normalise_argv(raw))
         args.func(args)
+    except KeyboardInterrupt:
+        # Ctrl+C in a console: exit quietly with the usual SIGINT status.
+        print(file=sys.stderr)
+        raise SystemExit(130) from None
     except SystemExit as exc:
         if _is_error_exit(exc):
             _pause_on_frozen_console_error()
