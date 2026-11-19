@@ -30,8 +30,7 @@ _SCOPE_LABELS = ("all cues", "except markers", "markers only")
 _DEFAULT_CUT_INDEX = 1
 
 _SET_CUT_HELP = (
-    "Sets the cut type of many cues at once.",
-    "The timeline's cue fades set the fade for each type.",
+    "Sets the cut type on many cues in one go. Fade lengths for each type come from Timeline > Cue Fades.",
 )
 _CUT_HELP = ("The cut type the cues get.",)
 _CUT_OPTION_HELP = (

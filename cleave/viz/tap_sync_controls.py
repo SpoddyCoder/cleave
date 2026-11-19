@@ -39,8 +39,7 @@ _APPLY_TITLE = "Detected audio latency"
 _LATENCY_STEP_MS = 10
 _LATENCY_LARGE_STEPS = 5
 _LATENCY_HELP = (
-    "Corrects for audio delay that Cleave cannot measure.",
-    "Starts on the measured value. Left/Right move in 10 ms steps.",
+    "Compensates for audio delay Cleave cannot measure. It starts at the measured value, and Left/Right adjust it in 10 ms steps.",
 )
 
 

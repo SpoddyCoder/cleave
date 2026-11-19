@@ -33,8 +33,7 @@ _TARGET_SONG_MARKERS = "song markers"
 _DEFAULT_PROXIMITY = 5.0
 
 _SNAP_HELP = (
-    "Moves the cues already on the timeline.",
-    "Cues that land on the same time merge.",
+    "Quantises the cues already on the timeline. Cues that land on the same time merge.",
 )
 _TARGET_HELP = ("Where the cues move to.",)
 _TARGET_OPTION_HELP = {
@@ -43,8 +42,7 @@ _TARGET_OPTION_HELP = {
     _TARGET_SONG_MARKERS: "cues near a song marker move onto it.",
 }
 _PROXIMITY_HELP = (
-    "How far from a song marker a cue can be and still move onto it.",
-    "Cues further away stay where they are.",
+    "How far from a song marker a cue can be and still be pulled onto it; cues further away stay put.",
 )
 _SCOPE_HELP = ("Which layers' cues move onto the song markers.",)
 _SCOPE_OPTION_HELP = {

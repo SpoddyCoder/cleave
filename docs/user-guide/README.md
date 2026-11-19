@@ -228,7 +228,7 @@ The rest of the page controls how long each preset plays and how it transitions 
 The **Preset List** page holds the presets the layer cycles through, in order. It appears whenever switching is not off.
 
 - **Add to preset list** (or P from any of the layer's rows) appends the preset you are looking at.
-- **Populate** fills the list from the current folder, shuffled or in order.
+- **Populate** rebuilds the list from the current folder, shuffled or in order. With the timeline trigger it can also cast one preset for each time the layer comes in, picked by that cue's role.
 - **Enter** on an entry plays it immediately and pauses switching; **Resume** hands control back to the list.
 - **Drag** an entry's handle, or press M, to reorder it, and press **Delete** to remove it.
 
@@ -293,6 +293,7 @@ The fastest way to get started is to let Cleave build an arrangement. Choose **G
 - **mode:** either switch whole layers in and out, or swap them through the [Pattern Mask](#pattern-mask).
 - **character:** the shape of the arrangement. Breathing is mostly one layer, sometimes two; Dialogue has the layers answer each other; Arc builds to a single climax and then settles; Pulse runs one layer at a time with short pairs.
 - **density:** how busy the arrangement is.
+- **conductor:** optionally lets the stems' audio decide which layers lead each phrase and how bright each one is.
 - **snap** and **cut type:** how cues align to the beat grid and how layers transition.
 - **refill preset lists:** optionally rebuilds each layer's preset list to suit.
 

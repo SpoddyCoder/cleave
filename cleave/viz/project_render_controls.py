@@ -45,8 +45,7 @@ from cleave.viz.session import TuningSession
 _FORM_TITLE = "Render project"
 _RANGE_STEP_LARGE_SEC = 10
 _FORM_HELP = (
-    "Renders the project to an MP4 video file in the project's renders directory.",
-    "Fps is saved with the project. Quality, start, and end last until the editor closes.",
+    "Renders the project to an MP4 in the project's renders folder. Fps is saved with the project; quality, start, and end are kept until the editor closes.",
 )
 _FPS_OPTIONS = tuple(range(RENDER_FPS_MIN, RENDER_FPS_MAX + 1))
 _PROGRESS_MESSAGE = "Rendering…"
@@ -192,7 +191,7 @@ class ProjectRenderController:
                         "quality",
                         PROJECT_RENDER_QUALITIES,
                         choice_index(PROJECT_RENDER_QUALITIES, render.quality),
-                        help=("Speed or quality for the render.",),
+                        help=("Trades render speed against output quality.",),
                         option_help=tuple(
                             text for _mode, text in PROJECT_RENDER_QUALITY_HELP_ENTRIES
                         ),

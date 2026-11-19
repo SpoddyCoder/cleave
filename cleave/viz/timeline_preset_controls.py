@@ -85,18 +85,12 @@ _KIND_BUILDERS = {
 
 
 _GENERATE_HELP = (
-    "Makes a new timeline from these settings.",
-    "This replaces the current cues.",
-    "Arrangement decides which layers play when.",
-    "Cue timing and cuts then tidy every generated cue.",
-    "Preset lists can then be refilled to match.",
-    "In layers mode, each crescendo song marker gets a crescendo.",
-    "The project keeps these settings.",
+    "Builds a new timeline from these settings, replacing the current cues. Arrangement decides which layers play when, cue timing and cuts then tidy every generated cue, and preset lists can be refilled to suit.",
+    "In layers mode, each crescendo song marker gets a crescendo. The project remembers these settings for next time.",
 )
 _CHARACTER_HELP = ("The shape of the arrangement: which layers play together, and when.",)
 _DENSITY_HELP = (
-    "How many layers tend to play at once.",
-    "Sparse favours solos; dense keeps more of the stack on.",
+    "How many layers tend to play at once: sparse favours solos, dense keeps more of the stack in.",
 )
 _CUE_SNAP_HELP = ("Moves every generated cue onto the beat or bar grid.",)
 _CUE_SNAP_OPTION_HELP = {
@@ -105,13 +99,10 @@ _CUE_SNAP_OPTION_HELP = {
     "bars": "move each cue to the nearest bar.",
 }
 _SONG_MARKER_SNAP_HELP = (
-    "Moves the closest cue on each layer onto each song marker,",
-    "when it is no further away than this.",
-    "none leaves the cues where they are.",
+    "Pulls the nearest cue on each layer onto each song marker, if it is within this distance. none leaves the cues where they are.",
 )
 _TIMELINE_CUTS_HELP = (
-    "The cut type each generated cue gets.",
-    "The timeline's cue fades set the fade for each type.",
+    "The cut type each generated cue gets. Fade lengths for each type come from Timeline > Cue Fades.",
 )
 _TIMELINE_CUTS_OPTION_HELP = {
     "by marker": "hard cuts on song markers, soft cuts elsewhere.",
@@ -120,8 +111,7 @@ _TIMELINE_CUTS_OPTION_HELP = {
     "none": "keep the cut each cue was made with.",
 }
 _REPOPULATE_HELP = (
-    "Refills the preset list of each layer whose preset switching is on",
-    "with the timeline trigger.",
+    "Rebuilds the preset list of every layer that switches presets on the timeline trigger.",
 )
 _REPOPULATE_OPTION_HELP = {
     "no": "keep the preset lists.",
@@ -130,16 +120,13 @@ _REPOPULATE_OPTION_HELP = {
     "directory sequential": "fill from the layer's preset directory, in order.",
 }
 _CONDUCTOR_HELP = (
-    "Uses the stems' audio to choose which layers lead each phrase",
-    "and how bright each one is.",
-    "In layers mode, standard song markers also get an accent.",
-    "Needs analysed signals; without them it is skipped.",
+    "Uses the stems' audio to decide which layers lead each phrase and how bright each one is. In layers mode, plain song markers also get an accent. It needs the song's audio analysis and is skipped without it.",
 )
 _CONDUCTOR_OPTION_HELP = {
     False: "levels come from the character alone.",
     True: "levels follow the music.",
 }
-_MODE_HELP = ("How the layers are staged.",)
+_MODE_HELP = ("How the arrangement brings layers in and out.",)
 _MODE_OPTION_HELP = {
     "layers": "cues turn whole layers on and off, shaped by the character.",
     "pattern_mask": (
