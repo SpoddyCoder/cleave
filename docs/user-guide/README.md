@@ -589,11 +589,11 @@ Cleave needs Milkdrop presets to draw anything. Get the starter set from **Setti
 
 ### The visuals are out of time with the music
 
-Some audio outputs, wireless headphones in particular, deliver the sound late, so the preview runs ahead of what you hear. Choose **Settings > Measure audio latency**: Cleave plays a beep once a bar and flashes the preview on each beep. Press Left/Right (PgUp/PgDn for bigger steps) until the flash and the beep land together, then Apply. Raise the value if the flash comes first, lower it if the beep does. You can also set it by hand with **Settings > Latency > audio latency**. It only delays the live preview; it never affects the render, or where markers and clips land.
+Wireless headphones and some other outputs play sound late, so the preview runs ahead. Choose **Settings > Measure audio latency**, press Left/Right until the flash and the beep land together, then Apply. It only delays the preview, never the render.
 
 ### Markers and recorded clips land late
 
-Song markers you drop and clips you record while the song plays land where you pressed the key, which is usually a little after the beat: the sound takes time to reach you, and a wireless keyboard takes time to reach Cleave. Choose **Settings > Calibrate tap timing** and press Enter on each long, low tone of the click track, just as you would tap a marker. A stray tap is ignored, so just keep going. Once the estimate settles, usually within 8 to 12 taps, Cleave shows your tap latency and offers to apply it; from then on it moves taps back by that much. It can be below zero if you tend to tap ahead of the beat, which many people do. You can also set it by hand with **Settings > Latency > tap latency**. It only affects taps made while the song plays, and leaves anything already placed where it is.
+Markers and clips you tap in during playback can land a little off the beat, from sound and keyboard delay. Choose **Settings > Calibrate tap timing** and press Enter on each long, low tone until your timing settles, then Apply. Later taps move back by that much; anything already placed stays put.
 
 ### Stem splitting is very slow
 
