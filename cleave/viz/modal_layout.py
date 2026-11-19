@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
+from cleave.viz.brand import logo_size
 from cleave.viz.text_edit import caret_index_for_line_column, caret_line_column
 from cleave.viz.modal import (
     FormRowView,
@@ -27,6 +28,8 @@ PROGRESS_PANEL_MIN_BASE = 420
 TEXT_BUTTON_LABELS = ("Confirm", "Cancel")
 EDITING_HINT = "Press Enter to confirm or ESC to cancel"
 CARET_WIDTH = 2
+# Banner logo height in text lines.
+BANNER_HEIGHT_LINES = 6
 
 
 # Spacing reads the live UI scale, so a scale change applies on the next frame.
@@ -118,6 +121,22 @@ def progress_panel_width(screen_w: int) -> int:
 
 def progress_content_width(screen_w: int) -> int:
     return max(1, progress_panel_width(screen_w) - panel_pad_x() * 2)
+
+
+def banner_size(
+    state: ModalViewState, line_h: int, *, screen_w: int
+) -> tuple[int, int] | None:
+    """Pixel size of the banner logo, or None when the dialog has none.
+
+    It is a few lines tall and never wider than the text may run.
+    """
+    if state.banner is None:
+        return None
+    if state.kind == ModalKind.PROGRESS:
+        max_w = progress_content_width(screen_w)
+    else:
+        max_w = message_max_width(screen_w)
+    return logo_size(state.banner, line_h * BANNER_HEIGHT_LINES, max_w)
 
 
 def title_lines(measure: TextMeasure, state: ModalViewState, *, screen_w: int) -> list[str]:
@@ -247,6 +266,11 @@ def measure_panel(
         content_w = max(content_w, msg_w)
         content_h += len(lines) * line_h + max(0, len(lines) - 1) * line_gap
         content_h += title_bar_pad_y()
+
+    banner = banner_size(state, line_h, screen_w=screen_w)
+    if banner is not None:
+        content_w = max(content_w, banner[0])
+        content_h += panel_pad_y() + banner[1]
 
     if state.body is not None:
         if state.message is not None:

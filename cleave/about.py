@@ -6,7 +6,7 @@ from datetime import date
 
 from cleave.build_version import display_version
 
-ABOUT_TITLE = "Cleave"
+ABOUT_TITLE = "About Cleave"
 ABOUT_TAGLINE = "Stem separated music visualizer powered by ProjectM"
 ABOUT_AUTHOR = "P. Fernihough"
 ABOUT_URL = "https://github.com/SpoddyCoder/cleave"

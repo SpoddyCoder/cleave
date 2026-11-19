@@ -9,6 +9,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- Cleave has a logo. It shows on a short splash when Cleave starts (a key or click skips it), in the Welcome to Cleave step, in Help > About Cleave, and above the progress box while a project opens or a new one is created. The C mark sits at the left of the menu bar (click it for About Cleave) and is the icon for the window, the taskbar, `cleave.exe`, the installer, and the Start Menu and desktop shortcuts. On dark themes the logo's navy lettering shows in white so it stays readable.
 - Settings > Calibrate tap timing measures how late your key presses land after the beat you hear, including keyboard delay and the habit of tapping slightly early, and stores it as Settings > Latency > tap latency. Song markers dropped and clips recorded while the song plays move back by that much so they land on the beat. Tap latency can be below zero.
 
 ### Changed

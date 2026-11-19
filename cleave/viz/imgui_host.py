@@ -33,6 +33,7 @@ from imgui_bundle.python_backends.opengl_backend_programmable import (
 )
 
 from cleave.gl_state import restore_gl_state, save_gl_state
+from cleave.viz.brand import enable_logo_textures, release_logo_textures
 from cleave.viz.imgui_theme import apply_imgui_style_scale, apply_imgui_theme
 from cleave.viz.overlay_primitives import overlay_font_path
 from cleave.viz.navigator import TWISTY_EXPANDED
@@ -315,7 +316,9 @@ class ImGuiHost:
             _load_shell_fonts()
             apply_imgui_style_scale(shell_scale())
             apply_imgui_theme()
-            renderer = _select_renderer_class()()
+            renderer_class = _select_renderer_class()
+            renderer = renderer_class()
+            enable_logo_textures(renderer_class is RENDERER_CLASS)
         except Exception:
             imgui.destroy_context(context)
             raise
@@ -393,6 +396,7 @@ class ImGuiHost:
         self._wheel_y = 0.0
 
     def destroy(self) -> None:
+        release_logo_textures()
         renderer = self.renderer
         self.renderer = None
         if renderer is not None:

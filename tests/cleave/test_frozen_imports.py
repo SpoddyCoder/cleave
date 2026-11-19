@@ -428,6 +428,7 @@ def test_frozen_cmd_play_raw_audio_uses_short_message(tmp_path: Path) -> None:
             patch("cleave.viz.continue_launch"),
             patch("cleave.viz.file_picker_host.show_picker_error", side_effect=show_error),
             patch("cleave.first_run.welcome_needed", return_value=False),
+            patch("cleave.viz.loading.show_splash"),
         ):
             cmd_play(build_parser().parse_args(["play", {str(audio)!r}]))
         if not shown or "not in this Windows build" not in shown[0]:

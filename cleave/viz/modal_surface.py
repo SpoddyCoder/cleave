@@ -11,6 +11,7 @@ from typing import Iterator
 from imgui_bundle import imgui
 
 from cleave.choice import ChoiceKind
+from cleave.viz.brand import draw_logo
 from cleave.viz.button_paint import ButtonState, ButtonTone, button_text_role, paint_button
 from cleave.viz.choice_widgets import (
     draw_choice_list,
@@ -36,6 +37,7 @@ from cleave.viz.modal_layout import (
     CARET_WIDTH,
     TEXT_BUTTON_LABELS,
     TextMeasure,
+    banner_size,
     button_gap,
     button_widths,
     caret_index_at_point,
@@ -689,6 +691,17 @@ class ModalSurface:
                 line_h,
                 line_gap,
             )
+        banner = banner_size(view, line_h, screen_w=screen_w)
+        if view.banner is not None and banner is not None:
+            y += panel_pad_y()
+            banner_w, banner_h = banner
+            draw_logo(
+                draw,
+                view.banner,
+                (ox + (panel_w - banner_w) // 2, y, banner_w, banner_h),
+                backdrop=palette().surface_bg,
+            )
+            y += banner_h
         if view.body is not None:
             if view.message is not None:
                 y += panel_pad_y()

@@ -9,6 +9,7 @@ from enum import Enum
 import pygame
 
 from cleave.choice import ChoiceKind, choice_kind, step_index
+from cleave.viz.brand import Logo
 from cleave.viz.choice_list import (
     ChoiceListKey,
     ChoiceListState,
@@ -80,6 +81,7 @@ class FormSpec:
     ``on_change`` runs after a field changes, with its id, and may adjust
     other draft values in place, such as keeping a start before an end.
     ``help`` describes the whole dialog in the help column.
+    ``banner`` draws a logo under the title.
     """
 
     title: str
@@ -93,6 +95,7 @@ class FormSpec:
     destructive: bool = False
     help: tuple[str, ...] = ()
     on_change: Callable[[str, FormValues], None] | None = None
+    banner: Logo | None = None
 
 
 @dataclass(frozen=True)
@@ -230,6 +233,8 @@ class ModalRequest:
     labeled_lines: tuple[ModalLabeledLine, ...] = ()
     progress_fraction: float | None = None
     body: str | None = None
+    # A logo centred under the title.
+    banner: Logo | None = None
 
 
 @dataclass(frozen=True)
@@ -258,6 +263,7 @@ class ModalViewState:
     form_choice: ChoiceListView | None = None
     # A stepper arrow held down with the pointer: (row, step), step -1 or 1.
     form_step_held: tuple[int, int] | None = None
+    banner: Logo | None = None
 
 
 @dataclass
@@ -351,6 +357,7 @@ class ModalHost:
                 if self._form_hold is None
                 else (self._form_hold.row, self._form_hold.delta)
             ),
+            banner=self._request.banner,
         )
 
     def prompt(self, request: ModalRequest) -> None:
@@ -423,11 +430,12 @@ class ModalHost:
         initial_focus_index: int = 0,
         labeled_lines: Sequence[ModalLabeledLine] = (),
         body: str | None = None,
+        banner: Logo | None = None,
     ) -> None:
         """Ask with a right-aligned row of buttons, one per option.
 
         Give at most one option a PRIMARY or DANGER role. Esc runs
-        ``on_dismiss``.
+        ``on_dismiss``. *banner* draws a logo under the title.
         """
         self.prompt(
             ModalRequest(
@@ -438,6 +446,7 @@ class ModalHost:
                 initial_focus_index=initial_focus_index,
                 labeled_lines=tuple(labeled_lines),
                 body=body,
+                banner=banner,
             )
         )
 
@@ -448,6 +457,7 @@ class ModalHost:
         *,
         labeled_lines: Sequence[ModalLabeledLine] = (),
         body: str | None = None,
+        banner: Logo | None = None,
     ) -> None:
         """Tell the user something, with one OK button. Esc also closes it."""
 
@@ -461,6 +471,7 @@ class ModalHost:
             on_dismiss=on_close,
             labeled_lines=labeled_lines,
             body=body,
+            banner=banner,
         )
 
     def prompt_progress(
@@ -471,6 +482,7 @@ class ModalHost:
         labeled_lines: Sequence[ModalLabeledLine] = (),
         fraction: float | None = 0.0,
         on_cancel: Callable[[], None] | None = None,
+        banner: Logo | None = None,
     ) -> None:
         """Show *title* over *body*, *labeled_lines*, and a progress bar.
 
@@ -488,6 +500,7 @@ class ModalHost:
                 labeled_lines=tuple(labeled_lines),
                 progress_fraction=_clamp_fraction(fraction),
                 body=body,
+                banner=banner,
             )
         )
 
@@ -579,6 +592,7 @@ class ModalHost:
                 on_dismiss=spec.on_cancel,
                 initial_focus_index=1 if spec.destructive else 0,
                 body=spec.body,
+                banner=spec.banner,
             )
         )
         self._form_state = state

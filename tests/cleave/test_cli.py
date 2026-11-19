@@ -53,6 +53,11 @@ def _skip_welcome(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
+@pytest.fixture(autouse=True)
+def _skip_splash(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("cleave.viz.loading.show_splash", lambda _window: None)
+
+
 def test_format_elapsed() -> None:
     assert _format_elapsed(0.4) == "0 mins 0 secs"
     assert _format_elapsed(65.4) == "1 mins 5 secs"
@@ -620,6 +625,7 @@ with (
     patch("cleave.viz.open_loading_window", return_value=window),
     patch("cleave.viz.continue_launch"),
     patch("cleave.first_run.welcome_needed", return_value=False),
+    patch("cleave.viz.loading.show_splash"),
 ):
     cmd_play(build_parser().parse_args(["play", "my-track"]))
 if "torch" in sys.modules:

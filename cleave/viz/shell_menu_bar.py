@@ -8,9 +8,11 @@ from typing import TYPE_CHECKING
 
 from imgui_bundle import imgui
 
+from cleave.viz.brand import Logo, draw_logo, logo_size
 from cleave.viz.commands import Command, CommandContext, MenuSeparator
 from cleave.viz.imgui_theme import rgba
 from cleave.viz.menu_bar import MenuBarState, menus_for_session
+from cleave.viz.pointer_cursor import PointerShape, request_pointer
 from cleave.viz.menu_rows import (
     draw_menu_rows,
     FittedWindow,
@@ -27,6 +29,8 @@ if TYPE_CHECKING:
 # Vertical padding for the menu bar and the transport bar, which shares its height.
 # Dear ImGui's default FramePadding.y is 3, which leaves both rows cramped.
 _MENU_BAR_FRAME_PADDING_Y = 8.0
+# The C mark before the first menu title: its height over the font size.
+_MARK_FONT_HEIGHTS = 1.5
 
 
 def menu_bar_height_px() -> int:
@@ -154,6 +158,7 @@ class MenuBarPanel:
                 self.height_px = max(1, int(round(bar_bottom)))
                 rule_y = bar_bottom - 1.0
                 pad_x = imgui.get_style().frame_padding.x
+                self._draw_mark(pad_x)
                 for index, menu in enumerate(menus):
                     active = menu_state.focused and menu_state.menu_index == index
                     width = imgui.calc_text_size(menu.label).x + pad_x * 2.0
@@ -194,6 +199,30 @@ class MenuBarPanel:
             imgui.pop_style_var()
             imgui.pop_style_color()
         return rule_y, anchors, menus
+
+    def _draw_mark(self, pad_x: float) -> None:
+        """The C mark at the bar's left end. A click opens About Cleave."""
+        height = imgui.get_font_size() * _MARK_FONT_HEIGHTS
+        width, mark_h = logo_size(Logo.MARK, height)
+        bar_h = imgui.get_frame_height()
+        if imgui.invisible_button("##cleave-mark", imgui.ImVec2(width + pad_x * 2.0, bar_h)):
+            self._ctx.controls.prompt_about()
+        if imgui.is_item_hovered():
+            request_pointer(PointerShape.HAND)
+        # Centred on the whole bar, which runs a little taller than its items.
+        bar_top = imgui.get_window_pos().y
+        bar_full_h = imgui.get_window_height()
+        draw_logo(
+            imgui.get_window_draw_list(),
+            Logo.MARK,
+            (
+                int(imgui.get_item_rect_min().x + pad_x),
+                int(bar_top + (bar_full_h - mark_h) / 2.0),
+                width,
+                mark_h,
+            ),
+            backdrop=palette().background,
+        )
 
     def _draw_bar_project_label(self, label_y: float, dirty: bool) -> None:
         """Right-aligned project name on the menu titles' text line.

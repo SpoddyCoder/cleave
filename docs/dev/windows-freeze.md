@@ -15,7 +15,7 @@ Three roots. Do not treat the checkout layout as the install layout.
 | Helper | Frozen | Checkout | Holds |
 | --- | --- | --- | --- |
 | `install_dir()` | Parent of `sys.executable` (onedir folder root) | Repo root | Sidecars: `ffmpeg.exe`, later `projectM-4.dll` / `projectM-4-playlist.dll` |
-| `resource_dir()` | `sys._MEIPASS` (onedir `_internal`) | Repo root | Bundled files: `assets/cleave-viz.yaml`, `assets/fonts/` |
+| `resource_dir()` | `sys._MEIPASS` (onedir `_internal`) | Repo root | Bundled files: `assets/cleave-viz.yaml`, `assets/fonts/`, the two logo PNGs |
 | `data_dir()` | User data (not the zip) | Same | Projects, presets, textures, model weights (`models/`) |
 
 `is_frozen()` is `bool(getattr(sys, "frozen", False))`. `repo_root()` is always the checkout (tests and source scans). Runtime code that needs bundled files uses `resource_dir()`.
@@ -49,6 +49,8 @@ cleave/
   _internal/                 # sys._MEIPASS: Python, pygame/SDL, datas
     assets/cleave-viz.yaml
     assets/fonts/
+    assets/cleave-logo-full.png
+    assets/cleave-logo-square.png
 ```
 
 Sidecars must sit next to `cleave.exe`. Files in `_internal` are bundled resources. Mixing those two is a common freeze bug.
@@ -114,7 +116,8 @@ The exe does not open a terminal on Start Menu, desktop, or drop-on-exe. [cleave
 That copies `packaging/windows/*.dll` and libprojectM licenses, fetches the pinned FFmpeg zip, and asserts `cleave.exe`, `ffmpeg.exe`, and the projectM DLLs sit in the onedir root. Use `--no-exe-check` only in tests that have no exe.
 
 - Entry: [cleave.py](../../cleave.py) (`cleave.cli:main`). EXE name `cleave`. COLLECT name `cleave` (writes `dist/cleave/`).
-- `datas`: `assets/cleave-viz.yaml` and `assets/fonts/` (includes `MaterialIcons-Regular.ttf`, `DejaVuSansMono.ttf`, `DejaVuSansMono-Bold.ttf`, and their licenses).
+- `datas`: `assets/cleave-viz.yaml`, `assets/fonts/` (includes `MaterialIcons-Regular.ttf`, `DejaVuSansMono.ttf`, `DejaVuSansMono-Bold.ttf`, and their licenses), and the logos `assets/cleave-logo-full.png` and `assets/cleave-logo-square.png` (splash, About, welcome step, menu bar, window icon).
+- `icon`: [packaging/windows/cleave.ico](../../packaging/windows/cleave.ico), the C mark (`assets/cleave-logo-square.png`) centred on transparent squares from 16 to 256 px. Shortcuts take their icon from `cleave.exe`. After the artwork changes, run `python scripts/make_windows_icon.py` and commit the new `.ico`.
 - Play on an existing project (stems + `signals.json`) must not import torch or librosa at module load. Dropping a music file (wav, mp3, flac, m4a, aac, ogg, aiff, or aif) or running `cleave.exe play <audio>` opens the loading window, downloads weights, splits, and analyses. The project mix is PCM WAV.
 
 `librosa` is collected for analyse. Play/render stay freeze-safe on a complete project: stem types and paths live in [cleave/stems.py](../../cleave/stems.py); PCM resample uses soxr in [cleave/pcm_io.py](../../cleave/pcm_io.py). [cleave/extract.py](../../cleave/extract.py) imports librosa for analyse only. `STEM_SPLIT_MISSING_FROZEN` remains a runtime guard if frozen torch is missing; it is not the product smoke.
@@ -125,7 +128,7 @@ That copies `packaging/windows/*.dll` and libprojectM licenses, fetches the pinn
 
 Hidden imports cover Demucs model load (`demucs.hf`, `demucs.hdemucs`, `demucs.htdemucs`, `demucs.apply`, `demucs.audio`), Beat This inference (`beat_this.inference`, `beat_this.model.beat_tracker`), librosa / soundfile, and numpy 2 `_core` internals.
 
-`datas`: `assets/cleave-viz.yaml` and `assets/fonts/`. Demucs `remote/*.yaml` travels with `collect_all("demucs")`.
+`datas`: `assets/cleave-viz.yaml`, `assets/fonts/`, and the two logo PNGs. Demucs `remote/*.yaml` travels with `collect_all("demucs")`.
 
 CUDA binaries are dropped after collect: names matching `cudart`, `cublas`, `cudnn`, `nccl`, `nvrtc`, and similar (`torch_cuda`, `c10_cuda`, ...). The `torch` Python package is not excluded. CPU wheels already omit CUDA; the filter is so PyInstaller does not copy stubs.
 
@@ -232,6 +235,7 @@ Inno Setup 6 wraps the staged onedir tree. No second freeze and no second layout
 - `AppId` is a fixed GUID chosen once (`{caf89057-3432-458e-a1de-1dba1176a4ba}`). Never change it. `AppVersion` comes from the build (`iscc /DAppVersion=X.Y.Z`), read from `cleave.__version__`; the `.iss` `#error`s if it is missing.
 - `DefaultDirName={autopf}\Cleave`, `ArchitecturesAllowed=x64compatible`, `ArchitecturesInstallIn64BitMode=x64compatible`, `PrivilegesRequired=admin` with `PrivilegesRequiredOverridesAllowed=dialog` so a non-admin can install per user.
 - `OutputBaseFilename=cleave-<version>-windows-x64-setup` at the repo root (same place as the zip).
+- `SetupIconFile=cleave.ico` (the installer exe) and `UninstallDisplayIcon={app}\cleave.exe` (Installed apps). The Start Menu and desktop shortcuts use the icon built into `cleave.exe`.
 - Tasks (both unchecked by default): `desktopicon` (`{autodesktop}\Cleave`), `addtopath` (append `{app}` to HKLM PATH when admin, HKCU when per-user; remove that entry on uninstall without duplicating PATH).
 - Start Menu shortcut `{autoprograms}\Cleave` targets `cleave.exe` with no arguments. That opens the editor window and the in-window file picker, so the user can browse for an audio file (wav, mp3, flac, m4a, aac, ogg, aiff, or aif) or a project without a terminal.
 - Uninstall removes `{app}` only. User data (`Documents\Cleave\`) and `%APPDATA%\Cleave\` survive. The finished and uninstall pages say so.

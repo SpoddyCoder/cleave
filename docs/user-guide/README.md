@@ -54,7 +54,7 @@ When you want the screen space back for the preview, press **H** again. Your pla
 
 ## First launch
 
-On first start, the **Welcome to Cleave** step lists the downloads Cleave needs and what each one is for:
+Cleave opens on a short splash with its logo and version; press any key or click to skip it. On first start, the **Welcome to Cleave** step then lists the downloads Cleave needs and what each one is for:
 
 | Download | What it is for | Ticked by default |
 | --- | --- | --- |
@@ -94,7 +94,7 @@ Each song becomes a **project**: a folder holding the stems, your settings, and 
 
 The numbers below refer to the screenshot at the top of this guide.
 
-1. **Menu bar:** File, Edit, View, Project, Settings, and Help, with the open project's name on the right.
+1. **Menu bar:** the Cleave logo (click it for **Help > About Cleave**), then File, Edit, View, Project, Settings, and Help, with the open project's name on the right.
 2. **Transport bar:** play state, current time, and current bar. Click PLAYING / PAUSED to toggle playback. Drag the time or bar sideways to scrub, or double-click either to type a position.
 3. **Navigator:** the structure of your show: Overlay, Post-FX, Pattern Mask, Timeline, and Layers. Click a row to open its page. When a project opens, Layers is expanded, plus any section that is on or has something under it switched on.
 4. **Inspector:** the settings for the page selected in the navigator.

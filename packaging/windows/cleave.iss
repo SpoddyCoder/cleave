@@ -34,6 +34,8 @@ Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 DisableProgramGroupPage=yes
+SetupIconFile=cleave.ico
+UninstallDisplayIcon={app}\cleave.exe
 ChangesEnvironment=yes
 ; Uninstall removes {app} only. Documents\Cleave\ and %APPDATA%\Cleave\ stay.
 

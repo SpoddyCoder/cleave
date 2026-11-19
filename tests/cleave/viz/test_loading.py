@@ -14,7 +14,10 @@ from imgui_bundle import imgui
 from cleave.viz.loading import (
     LoadingWindow,
     open_loading_window,
+    SPLASH_SEC,
     present_frame,
+    show_splash,
+    splash_alpha,
 )
 from cleave.viz.progress_bar import clamp_fraction
 from cleave.viz.theme import palette
@@ -498,3 +501,35 @@ def test_toggle_fullscreen_switches_desktop_fullscreen_and_back() -> None:
         window.toggle_fullscreen()
         sdl_window_obj.set_windowed.assert_called_once_with()
         assert window.fullscreen is False
+
+
+def test_splash_fades_in_holds_and_fades_out() -> None:
+    assert splash_alpha(0.0) == 0.0
+    assert splash_alpha(SPLASH_SEC / 2) == 1.0
+    assert splash_alpha(SPLASH_SEC) == 0.0
+    assert 0.0 < splash_alpha(0.1) < 1.0
+
+
+@patch("cleave.viz.loading.present_frame")
+@patch("cleave.viz.loading.pygame.event.get")
+def test_splash_ends_on_a_key(mock_get: MagicMock, mock_present: MagicMock) -> None:
+    pygame.init()
+    window = MagicMock()
+    window.quit_requested = False
+    mock_get.return_value = [pygame.event.Event(pygame.KEYDOWN, key=pygame.K_SPACE)]
+    show_splash(window)
+    mock_present.assert_not_called()
+    window.clear.assert_called_once_with()
+    assert window.quit_requested is False
+
+
+@patch("cleave.viz.loading.present_frame")
+@patch("cleave.viz.loading.pygame.event.get")
+def test_splash_close_requests_quit(mock_get: MagicMock, mock_present: MagicMock) -> None:
+    pygame.init()
+    window = MagicMock()
+    window.quit_requested = False
+    mock_get.return_value = [pygame.event.Event(pygame.QUIT)]
+    show_splash(window)
+    assert window.quit_requested is True
+    window.clear.assert_not_called()

@@ -147,6 +147,8 @@ pkg_binaries = [entry for entry in pkg_binaries if not _is_cuda_binary(entry)]
 datas = [
     (str(REPO / "assets" / "cleave-viz.yaml"), "assets"),
     (str(REPO / "assets" / "fonts"), "assets/fonts"),
+    (str(REPO / "assets" / "cleave-logo-full.png"), "assets"),
+    (str(REPO / "assets" / "cleave-logo-square.png"), "assets"),
 ]
 datas += pkg_datas
 
@@ -182,6 +184,7 @@ exe = EXE(
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
+    icon=str(SPECDIR / "windows" / "cleave.ico"),
     codesign_identity=None,
     entitlements_file=None,
 )

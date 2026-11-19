@@ -1,9 +1,10 @@
-"""The pre-project window and its progress dialog.
+"""The pre-project window, its splash, and its progress dialog.
 
 ``LoadingWindow`` is the pre-project pygame/GL handle: open the window,
-show each phase as a progress dialog (the same panel the editor uses), then
-hand the same display to ``continue_launch``. A job that reports a fraction
-gets a bar; a named wait has none.
+show the splash (:func:`show_splash`), show each phase as a progress dialog
+(the same panel the editor uses, under the full logo), then hand the same
+display to ``continue_launch``. A job that reports a fraction gets a bar; a
+named wait has none.
 """
 
 from __future__ import annotations
@@ -152,6 +153,7 @@ class _ProgressDraw:
     fraction: float | None
 
     def __call__(self) -> None:
+        from cleave.viz.brand import Logo
         from cleave.viz.modal import ModalKind, ModalViewState
         from cleave.viz.modal_surface import ImGuiTextMeasure, ModalSurface
         from cleave.viz.top_layer import TopLayer
@@ -165,10 +167,93 @@ class _ProgressDraw:
             progress_fraction=(
                 None if self.fraction is None else max(0.0, min(1.0, self.fraction))
             ),
+            banner=Logo.FULL,
         )
         layer = TopLayer()
         layer.push(ModalSurface(view, ImGuiTextMeasure()))
         layer.draw()
+
+
+SPLASH_SEC = 1.6
+"""How long the launch splash shows unless a key or click ends it."""
+
+_SPLASH_FADE_IN_SEC = 0.35
+_SPLASH_FADE_OUT_SEC = 0.3
+# Splash logo size as a fraction of the window: the smaller fit wins.
+_SPLASH_WIDTH_FRACTION = 0.45
+_SPLASH_HEIGHT_FRACTION = 0.4
+# Splash logo centre as a fraction of the window height, a little above middle.
+_SPLASH_CENTRE_Y = 0.45
+_SPLASH_FPS = 60
+
+
+def splash_alpha(elapsed: float) -> float:
+    """Opacity of the splash *elapsed* seconds in: fade in, hold, fade out."""
+    fade_in = elapsed / _SPLASH_FADE_IN_SEC
+    fade_out = (SPLASH_SEC - elapsed) / _SPLASH_FADE_OUT_SEC
+    return max(0.0, min(1.0, fade_in, fade_out))
+
+
+@dataclass(frozen=True)
+class _SplashDraw:
+    version: str
+    alpha: float
+
+    def __call__(self) -> None:
+        from cleave.viz.brand import Logo, draw_logo, logo_size
+        from cleave.viz.imgui_theme import rgba
+
+        imgui = _imgui()
+        display = imgui.get_io().display_size
+        width, height = logo_size(
+            Logo.FULL,
+            display.y * _SPLASH_HEIGHT_FRACTION,
+            display.x * _SPLASH_WIDTH_FRACTION,
+        )
+        x = int(display.x - width) // 2
+        y = int(display.y * _SPLASH_CENTRE_Y - height / 2)
+        draw = imgui.get_background_draw_list()
+        draw_logo(
+            draw,
+            Logo.FULL,
+            (x, y, width, height),
+            backdrop=palette().background,
+            alpha=self.alpha,
+        )
+        text_w = imgui.calc_text_size(self.version).x
+        draw.add_text(
+            imgui.ImVec2(
+                float(int((display.x - text_w) / 2)), float(y + height + height // 6)
+            ),
+            imgui.get_color_u32(rgba(palette().muted, self.alpha)),
+            self.version,
+        )
+
+
+def show_splash(window: LoadingWindow) -> None:
+    """Show the full logo and version on the open window for a moment.
+
+    It fades in, holds, and fades out over :data:`SPLASH_SEC`. A key or click
+    ends it at once; closing the window ends it and sets ``quit_requested``.
+    """
+    from cleave.build_version import display_version
+
+    version = display_version()
+    clock = pygame.time.Clock()
+    elapsed = 0.0
+    while elapsed < SPLASH_SEC:
+        for event in pygame.event.get():
+            window.note_event(event)
+            if event.type == pygame.QUIT:
+                window.quit_requested = True
+                return
+            if event.type in (pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN):
+                window.clear()
+                return
+        dt = clock.tick(_SPLASH_FPS) / 1000.0
+        elapsed += dt
+        present_frame(window, _SplashDraw(version, splash_alpha(elapsed)), dt=dt)
+    window.clear()
 
 
 _GL_DISPLAY_FLAGS = pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE
@@ -377,6 +462,16 @@ def _persist_geometry(geometry: WindowGeometry) -> None:
         return
 
 
+def _set_window_icon() -> None:
+    """The C mark on the title bar and taskbar. Set before the window opens."""
+    from cleave.viz.brand import window_icon
+
+    try:
+        pygame.display.set_icon(window_icon())
+    except (OSError, pygame.error):
+        return
+
+
 def _maximise() -> None:
     from pygame._sdl2.video import Window
 
@@ -397,6 +492,7 @@ def open_loading_window() -> LoadingWindow:
 
     os.environ.setdefault("SDL_VIDEO_CENTERED", "1")
     pygame.init()
+    _set_window_icon()
     geometry = fit_window_to_desktop(saved_window_geometry(), _desktop_size())
     width, height = geometry.width, geometry.height
     _set_gl_mode(width, height)

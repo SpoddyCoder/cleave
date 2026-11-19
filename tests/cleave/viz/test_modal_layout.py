@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
+from cleave.viz.brand import Logo
 from cleave.viz.modal import ModalKind, ModalLabeledLine, ModalViewState, TextFocusRegion
 from cleave.viz.modal_layout import (
+    BANNER_HEIGHT_LINES,
     CARET_WIDTH,
+    banner_size,
     MESSAGE_MAX_SCREEN_FRACTION,
     caret_index_at_point,
     measure_labeled_lines,
@@ -13,6 +18,7 @@ from cleave.viz.modal_layout import (
     message_lines,
     message_max_width,
     panel_min_width,
+    progress_content_width,
     single_line_scroll_x,
     text_max_field_lines,
     visible_field_lines,
@@ -203,3 +209,31 @@ def test_caret_index_at_point_round_trips_column_and_line() -> None:
         )
         == 3
     )
+
+
+def test_banner_adds_its_height_and_widens_the_panel() -> None:
+    measure = _FixedMeasure()
+    plain = _option_view(options=("OK",))
+    with_banner = replace(plain, banner=Logo.FULL)
+    size = banner_size(with_banner, 16, screen_w=1920)
+    assert size is not None
+    assert size[1] == 16 * BANNER_HEIGHT_LINES
+    plain_w, plain_h = measure_panel(measure, plain, line_gap=4, screen_w=1920)
+    banner_w, banner_h = measure_panel(measure, with_banner, line_gap=4, screen_w=1920)
+    assert banner_h > plain_h + size[1]
+    assert banner_w >= size[0]
+    assert banner_size(plain, 16, screen_w=1920) is None
+
+
+def test_progress_banner_fits_the_fixed_panel() -> None:
+    view = ModalViewState(
+        kind=ModalKind.PROGRESS,
+        message="Opening project",
+        options=(),
+        focus_index=0,
+        progress_fraction=0.5,
+        banner=Logo.FULL,
+    )
+    size = banner_size(view, 200, screen_w=800)
+    assert size is not None
+    assert size[0] <= progress_content_width(800)

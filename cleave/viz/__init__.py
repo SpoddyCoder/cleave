@@ -116,7 +116,13 @@ def launch(
     from cleave.open_target import OpenTarget, OpenTargetKind
     from cleave.viz.session_loop import run_editor_sessions
 
+    from cleave.viz.loading import show_splash
+
     window = open_loading_window()
+    show_splash(window)
+    if window.quit_requested:
+        window.close()
+        return
     run_editor_sessions(
         window,
         OpenTarget(path=project_dir, kind=OpenTargetKind.PROJECT),

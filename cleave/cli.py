@@ -235,6 +235,9 @@ def cmd_play(args: argparse.Namespace) -> None:
     except LaunchError as e:
         _exit_error(f"error: {e}")
         return
+    from cleave.viz.loading import show_splash
+
+    show_splash(window)
     if window.quit_requested:
         window.close()
         return

@@ -31,6 +31,7 @@ from cleave.first_run import (
     run_downloads,
 )
 from cleave.user_config import persist_first_run_state
+from cleave.viz.brand import Logo
 from cleave.viz.loading import LoadingWindow
 from cleave.viz.loading_modal import present_modal_frame
 from cleave.viz.modal import (
@@ -299,6 +300,7 @@ class WelcomeFlow:
                 on_cancel=self._complete,
                 info=info,
                 help=(_WELCOME_BODY,),
+                banner=Logo.FULL,
             )
         )
 
@@ -311,6 +313,7 @@ class WelcomeFlow:
             body=self._message,
             labeled_lines=self._view.lines(),
             on_cancel=self._cancel,
+            banner=Logo.FULL,
         )
         self._worker = _DownloadWorker(items)
 
@@ -326,6 +329,7 @@ class WelcomeFlow:
             body=_CANCELLING,
             labeled_lines=view.lines(),
             fraction=view.fraction,
+            banner=Logo.FULL,
         )
 
     def _finish_downloads(self, result: FirstRunResult) -> None:
