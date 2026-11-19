@@ -88,8 +88,9 @@ Hand the user the commands from the doc's section 5, one fenced `bash` block per
 Wait for them to report back, then:
 
 1. Ask for the output of `pkg-config --modversion projectM-4` (from a new shell) and confirm it is the new version. If not, walk through the `PROJECTM_LIB` / pkg-config / system path order to find the stale copy.
-2. Run the full test suite yourself and report failures with output. Fix failures caused by the upgrades (API changes, deprecations) as part of this step, one at a time, explaining each.
-3. Ask the user to do the manual editor check from section 5 (play with layers, short render, split a new file) and report anything odd. After an imgui-bundle jump, also ask them to open every menu, the inspector, and a modal, since unit tests do not draw the UI.
+2. Check that libprojectM carries its own C++ runtime: `ldd ~/.local/lib/libprojectM-4.so ~/.local/lib/libprojectM-4-playlist.so | grep libstdc++` must print nothing. The conda env ships its own, usually newer, `libstdc++`, and Python loads it first; a libprojectM linked to the system copy then runs on the wrong runtime and crashes with `munmap_chunk(): invalid pointer` inside `projectm_load_preset_file` (the texture scan, `TextureManager::ScanTextures`) whenever a preset asks for a texture that is not loaded yet. The wsl-builds `libprojectm` recipe bundles the runtime by default (`LIBPROJECTM_STATIC_RUNTIME=1`); if `ldd` lists `libstdc++`, the user built with `LIBPROJECTM_STATIC_RUNTIME=0` or by hand, and should rebuild with `-DCMAKE_SHARED_LINKER_FLAGS="-static-libstdc++ -static-libgcc -Wl,--exclude-libs,ALL"`. Linux / WSL only; the Windows DLLs are unaffected.
+3. Run the full test suite yourself and report failures with output. Fix failures caused by the upgrades (API changes, deprecations) as part of this step, one at a time, explaining each.
+4. Ask the user to do the manual editor check from section 5 (play with layers, short render, split a new file) and report anything odd. After an imgui-bundle jump, also ask them to open every menu, the inspector, and a modal, since unit tests do not draw the UI.
 
 ## 6. Windows libprojectM DLLs (user, then agent)
 

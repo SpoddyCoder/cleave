@@ -133,6 +133,14 @@ Bump `actions/checkout`, `actions/setup-python`, and `actions/upload-artifact` i
 
    wsl-builds sets `PKG_CONFIG_PATH` in the shell rc, so check from a new shell.
 
+   Then check that libprojectM bundles its own C++ runtime. This must print nothing:
+
+   ```bash
+   ldd ~/.local/lib/libprojectM-4.so ~/.local/lib/libprojectM-4-playlist.so | grep libstdc++
+   ```
+
+   The conda env ships its own (usually newer) `libstdc++`, which Python loads first. A libprojectM linked to the system copy then runs on that runtime and crashes with `munmap_chunk(): invalid pointer` inside `projectm_load_preset_file` whenever a preset asks for a texture that is not loaded yet (projectM's texture folder scan). The wsl-builds recipe bundles the runtime by default (`LIBPROJECTM_STATIC_RUNTIME=1`). If `ldd` lists `libstdc++`, rebuild with that setting on, or by hand with `-DCMAKE_SHARED_LINKER_FLAGS="-static-libstdc++ -static-libgcc -Wl,--exclude-libs,ALL"`. The Windows DLLs are not affected.
+
 4. Run the full test suite (dependency changes are cross-cutting):
 
    ```bash
