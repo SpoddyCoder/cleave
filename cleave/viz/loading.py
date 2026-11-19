@@ -174,11 +174,13 @@ class _ProgressDraw:
         layer.draw()
 
 
-SPLASH_SEC = 1.6
+_SPLASH_FADE_IN_SEC = 0.6
+_SPLASH_HOLD_SEC = 1.95
+_SPLASH_FADE_OUT_SEC = 0.3
+
+SPLASH_SEC = _SPLASH_FADE_IN_SEC + _SPLASH_HOLD_SEC + _SPLASH_FADE_OUT_SEC
 """How long the launch splash shows unless a key or click ends it."""
 
-_SPLASH_FADE_IN_SEC = 0.35
-_SPLASH_FADE_OUT_SEC = 0.3
 # Splash logo size as a fraction of the window: the smaller fit wins.
 _SPLASH_WIDTH_FRACTION = 0.45
 _SPLASH_HEIGHT_FRACTION = 0.4
