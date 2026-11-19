@@ -95,11 +95,12 @@ def _mix_click_into_stereo(
     click_samples = min(len(click), (len(out) - sample_offset) // 2)
     if click_samples <= 0:
         return click
-    for i in range(click_samples):
-        sample = float(click[i])
-        idx = sample_offset + i * 2
-        out[idx] = min(1.0, max(-1.0, out[idx] + sample))
-        out[idx + 1] = min(1.0, max(-1.0, out[idx + 1] + sample))
+    end = sample_offset + click_samples * 2
+    span = out[sample_offset:end]
+    head = click[:click_samples]
+    span[0::2] += head
+    span[1::2] += head
+    np.clip(span, -1.0, 1.0, out=span)
     if click_samples < len(click):
         return click[click_samples:]
     return None
@@ -372,9 +373,13 @@ class MixPlayer:
         self._next_click_index = 0
         self._click_tail: np.ndarray | None = None
 
-    def set_residual_latency_sec(self, sec: float) -> None:
+    def set_audio_latency_sec(self, sec: float) -> None:
         with self._lock:
-            self._clock.set_residual_latency_sec(sec)
+            self._clock.set_audio_latency_sec(sec)
+
+    def set_tap_latency_sec(self, sec: float) -> None:
+        with self._lock:
+            self._clock.set_tap_latency_sec(sec)
 
     def set_click_schedule(
         self,
@@ -591,9 +596,13 @@ class MixPlayer:
         with self._lock:
             return self._clock.audible_position_sec()
 
-    def audible_position_zero_residual_latency_sec(self) -> float:
+    def raw_audible_position_sec(self) -> float:
         with self._lock:
-            return self._clock.audible_position_zero_residual_latency_sec()
+            return self._clock.raw_audible_position_sec()
+
+    def tap_position_sec(self) -> float:
+        with self._lock:
+            return self._clock.tap_position_sec()
 
     def finished(self) -> bool:
         with self._lock:

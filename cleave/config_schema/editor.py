@@ -46,8 +46,12 @@ EDITOR_PREVIEW_QUALITY_HELP_ENTRIES: tuple[
 )
 
 DEFAULT_EDITOR_PREVIEW_QUALITY: EditorPreviewQuality = "full-quality"
-DEFAULT_RESIDUAL_LATENCY_MS = 0
-MAX_RESIDUAL_LATENCY_MS = 2000
+DEFAULT_AUDIO_LATENCY_MS = 0
+MAX_AUDIO_LATENCY_MS = 2000
+DEFAULT_TAP_LATENCY_MS = 0
+# Taps may land before the sound (people tap ahead of a steady beat).
+MIN_TAP_LATENCY_MS = -250
+MAX_TAP_LATENCY_MS = 750
 DEFAULT_NOTIFICATION_DISPLAY_SEC = 10
 NOTIFICATION_DISPLAY_MAX_SEC = 20
 
@@ -141,8 +145,20 @@ def notification_display_label(sec: int) -> str:
     return f"{sec}s"
 
 
-def clamp_residual_latency_ms(value: int | float) -> int:
-    return max(0, min(int(round(value)), MAX_RESIDUAL_LATENCY_MS))
+def clamp_audio_latency_ms(value: int | float) -> int:
+    return max(0, min(int(round(value)), MAX_AUDIO_LATENCY_MS))
+
+
+def clamp_tap_latency_ms(value: int | float) -> int:
+    return max(MIN_TAP_LATENCY_MS, min(int(round(value)), MAX_TAP_LATENCY_MS))
+
+
+def _parse_tap_latency_ms(raw: Any, ctx: ParseCtx, label: str) -> int:
+    try:
+        number = int(raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{label} must be a number") from exc
+    return clamp_tap_latency_ms(number)
 
 
 def _parse_editor_preview_quality(
@@ -206,12 +222,18 @@ EDITOR_FIELDS: tuple[FieldDescriptor, ...] = (
         lambda value, _ctx: clamp_notification_display_sec(value),
     ),
     FieldDescriptor(
-        "residual_latency_ms",
-        DEFAULT_RESIDUAL_LATENCY_MS,
-        lambda raw, ctx, label: clamp_residual_latency_ms(
+        "audio_latency_ms",
+        DEFAULT_AUDIO_LATENCY_MS,
+        lambda raw, ctx, label: clamp_audio_latency_ms(
             int(require_non_negative_number(raw, label, as_int=True))
         ),
-        lambda value, _ctx: clamp_residual_latency_ms(value),
+        lambda value, _ctx: clamp_audio_latency_ms(value),
+    ),
+    FieldDescriptor(
+        "tap_latency_ms",
+        DEFAULT_TAP_LATENCY_MS,
+        _parse_tap_latency_ms,
+        lambda value, _ctx: clamp_tap_latency_ms(value),
     ),
     FieldDescriptor(
         "inspector_width",
@@ -309,7 +331,8 @@ def parse_editor_section(data: dict[str, Any]) -> Any:
     return EditorSettings(
         preview_quality=parsed["preview_quality"],
         notification_display_sec=parsed["notification_display_sec"],
-        residual_latency_ms=parsed["residual_latency_ms"],
+        audio_latency_ms=parsed["audio_latency_ms"],
+        tap_latency_ms=parsed["tap_latency_ms"],
         inspector_width=parsed["inspector_width"],
         help_width=parsed["help_width"],
         navigator_height=parsed["navigator_height"],
@@ -329,7 +352,8 @@ def dump_editor_section(editor: Any) -> dict[str, Any]:
     values = {
         "preview_quality": editor.preview_quality,
         "notification_display_sec": editor.notification_display_sec,
-        "residual_latency_ms": editor.residual_latency_ms,
+        "audio_latency_ms": editor.audio_latency_ms,
+        "tap_latency_ms": editor.tap_latency_ms,
         "inspector_width": editor.inspector_width,
         "help_width": editor.help_width,
         "navigator_height": editor.navigator_height,
@@ -357,7 +381,8 @@ def editor_config_from_settings(editor: Any | None = None) -> Any:
     return EditorConfig(
         preview_quality=editor.preview_quality,
         notification_display_sec=editor.notification_display_sec,
-        residual_latency_ms=editor.residual_latency_ms,
+        audio_latency_ms=editor.audio_latency_ms,
+        tap_latency_ms=editor.tap_latency_ms,
         inspector_width=editor.inspector_width,
         help_width=editor.help_width,
         navigator_height=editor.navigator_height,

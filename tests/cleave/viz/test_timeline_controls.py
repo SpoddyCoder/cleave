@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pygame
+import pytest
 
 from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from tests.support.config import TEST_LAYER_STEMS
@@ -2149,3 +2150,16 @@ def test_arming_mid_take_starts_from_the_lane_level() -> None:
     controls.handle_keydown(keydown(pygame.K_r))
     controls.handle_keydown(keydown(pygame.K_a))
     assert session.timeline.record_baseline["layer_2"] == 0.4
+
+
+def test_r_while_playing_starts_at_the_tapped_time() -> None:
+    controls, session, _, _, _, _ = make_timeline_controls(
+        armed_slots={"layer_1"},
+        position_sec=3.2,
+    )
+    controls.playback.paused = False
+    controls.playback.player.set_tap_latency_sec(0.2)
+
+    controls.handle_keydown(keydown(pygame.K_r))
+    assert session.timeline.recording is True
+    assert session.timeline.record_start_sec == pytest.approx(3.0)

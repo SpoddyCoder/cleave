@@ -58,10 +58,15 @@ def _format_settings_ui_scale(
 ) -> str:
     return ui_scale_label(state.settings.ui_scale)
 
-def _format_settings_residual_latency_ms(
+def _format_settings_audio_latency_ms(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{state.settings.residual_latency_ms} ms"
+    return f"{state.settings.audio_latency_ms} ms"
+
+def _format_settings_tap_latency_ms(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return f"{state.settings.tap_latency_ms:+d} ms"
 
 def _apply_settings_preview_quality(
     controls: TuningControls,
@@ -140,6 +145,16 @@ def _apply_settings_ui_reload_themes(
 ) -> None:
     command_by_id("settings.reload_themes").run(controls)
 
+def _apply_settings_measure_audio_latency(
+    controls: TuningControls, _desc: RowDescriptor
+) -> None:
+    command_by_id("settings.measure_latency").run(controls)
+
+def _apply_settings_calibrate_tap_timing(
+    controls: TuningControls, _desc: RowDescriptor
+) -> None:
+    command_by_id("settings.calibrate_tap_timing").run(controls)
+
 def _apply_settings_ui_theme(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _large: bool,
 ) -> None:
@@ -150,14 +165,23 @@ def _apply_settings_ui_scale(
 ) -> None:
     controls.settings.adjust_ui_scale(forward=forward, large=large)
 
-def _apply_settings_residual_latency_ms(
+def _apply_settings_audio_latency_ms(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
     large: bool,
 ) -> None:
-    controls.settings.adjust_residual_latency_ms(forward=forward, large=large)
-    controls.on_residual_latency_changed()
+    controls.settings.adjust_audio_latency_ms(forward=forward, large=large)
+    controls.on_audio_latency_changed()
+
+def _apply_settings_tap_latency_ms(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    large: bool,
+) -> None:
+    controls.settings.adjust_tap_latency_ms(forward=forward, large=large)
+    controls.on_tap_latency_changed()
 
 def _jump_settings_preview_quality(
     controls: TuningControls, _desc: RowDescriptor, delta: int
@@ -190,7 +214,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Preview",
         help_description=(
-            "Preview quality and audio latency correction. The preview takes its aspect ratio from Project > Resolution and its size from the window: resize the window, or press F11 for Full screen editor. Ctrl+F plays the show full screen; Esc returns.",
+            "Preview quality, and timing corrections for the preview and your taps. The preview takes its aspect ratio from Project > Resolution and its size from the window: resize the window, or press F11 for Full screen editor. Ctrl+F plays the show full screen; Esc returns.",
         ),
         is_pinned=True,
         parent_group="settings",
@@ -423,19 +447,65 @@ SPECS: dict[RowKind, RowSpec] = {
         repeatable=True,
         parent_group="settings_ui",
     ),
-    RowKind.SETTINGS_RESIDUAL_LATENCY_MS: RowSpec(
+    RowKind.SETTINGS_AUDIO_LATENCY_MS: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="audio latency",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_settings_residual_latency_ms,
-        apply_horizontal=_apply_settings_residual_latency_ms,
+        format_value=_format_settings_audio_latency_ms,
+        apply_horizontal=_apply_settings_audio_latency_ms,
         help_title="Audio Latency",
         help_entries=(
             ("Left/Right", "adjust audio latency (10 ms)"),
             ("PgUp/PgDn", "large step (50 ms)"),
         ),
         help_description=(
-            "Compensates for audio delay Cleave cannot measure, typically from Bluetooth or other wireless headphones. It shifts the live view and the placement of new cues and song markers; anything already placed stays where it is.",
+            "Delays the preview to match late sound, such as from wireless headphones. Preview only; renders are unaffected.",
+        ),
+        is_pinned=True,
+        repeatable=True,
+        parent_group="settings_preview",
+    ),
+    RowKind.SETTINGS_MEASURE_AUDIO_LATENCY: RowSpec(
+        affordance=RowAffordance.COMMAND,
+        panel_label="Measure audio latency",
+        present_style=RowPresentStyle.FULL_LINE,
+        apply_action=_apply_settings_measure_audio_latency,
+        fit_strategy=FitStrategy.NONE,
+        help_title="Measure Audio Latency",
+        help_entries=(("Enter", "start the test"),),
+        help_description=(
+            "Flashes the preview on a beep each bar. Adjust until they land together.",
+        ),
+        is_pinned=True,
+        parent_group="settings_preview",
+    ),
+    RowKind.SETTINGS_CALIBRATE_TAP_TIMING: RowSpec(
+        affordance=RowAffordance.COMMAND,
+        panel_label="Calibrate tap timing",
+        present_style=RowPresentStyle.FULL_LINE,
+        apply_action=_apply_settings_calibrate_tap_timing,
+        fit_strategy=FitStrategy.NONE,
+        help_title="Calibrate Tap Timing",
+        help_entries=(("Enter", "start the test"),),
+        help_description=(
+            "Plays a click track. Press Enter on each long low tone until your timing settles.",
+        ),
+        is_pinned=True,
+        parent_group="settings_preview",
+    ),
+    RowKind.SETTINGS_TAP_LATENCY_MS: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="tap latency",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_settings_tap_latency_ms,
+        apply_horizontal=_apply_settings_tap_latency_ms,
+        help_title="Tap Latency",
+        help_entries=(
+            ("Left/Right", "adjust tap latency (10 ms)"),
+            ("PgUp/PgDn", "large step (50 ms)"),
+        ),
+        help_description=(
+            "Moves song markers and recorded clips you tap during playback back by this much, so they land on the beat. Below zero if you tap early.",
         ),
         is_pinned=True,
         repeatable=True,

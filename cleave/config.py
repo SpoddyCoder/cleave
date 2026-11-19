@@ -35,7 +35,8 @@ from cleave.config_schema.editor import (
     BEAT_SENSITIVITY_MIN,
     DEFAULT_BEAT_SENSITIVITY,
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
-    DEFAULT_RESIDUAL_LATENCY_MS,
+    DEFAULT_AUDIO_LATENCY_MS,
+    DEFAULT_TAP_LATENCY_MS,
     DEFAULT_HELP_WIDTH,
     DEFAULT_NAVIGATOR_HEIGHT,
     DEFAULT_TIMELINE_HEIGHT,
@@ -190,7 +191,8 @@ class LayerConfig:
 class EditorConfig:
     preview_quality: EditorPreviewQuality = DEFAULT_EDITOR_PREVIEW_QUALITY
     notification_display_sec: int = DEFAULT_NOTIFICATION_DISPLAY_SEC
-    residual_latency_ms: int = DEFAULT_RESIDUAL_LATENCY_MS
+    audio_latency_ms: int = DEFAULT_AUDIO_LATENCY_MS
+    tap_latency_ms: int = DEFAULT_TAP_LATENCY_MS
     inspector_width: int = DEFAULT_INSPECTOR_WIDTH
     help_width: int = DEFAULT_HELP_WIDTH
     navigator_height: int = DEFAULT_NAVIGATOR_HEIGHT

@@ -14,7 +14,8 @@ from cleave.config_schema.editor import (
     DEFAULT_TIMELINE_HEIGHT,
     EDITOR_PREVIEW_QUALITIES,
     NAVIGATOR_EXPAND_CLICKS,
-    clamp_residual_latency_ms,
+    clamp_audio_latency_ms,
+    clamp_tap_latency_ms,
     clamp_navigator_height,
     clamp_timeline_height,
     clamp_ui_scale,
@@ -48,18 +49,33 @@ class SettingsControls:
         self._on_notification = on_notification
         self._on_notification_display_changed = on_notification_display_changed
 
-    def adjust_residual_latency_ms(self, *, forward: bool, large: bool) -> None:
+    def adjust_audio_latency_ms(self, *, forward: bool, large: bool) -> None:
         step = 50 if large else 10
         delta = step if forward else -step
-        current = self.cfg.editor.residual_latency_ms
-        new_value = clamp_residual_latency_ms(current + delta)
-        self.cfg.editor = replace(self.cfg.editor, residual_latency_ms=new_value)
+        current = self.cfg.editor.audio_latency_ms
+        new_value = clamp_audio_latency_ms(current + delta)
+        self.cfg.editor = replace(self.cfg.editor, audio_latency_ms=new_value)
         persist_editor_settings(self.cfg)
 
-    def set_residual_latency_ms(self, ms: int) -> None:
+    def set_audio_latency_ms(self, ms: int) -> None:
         self.cfg.editor = replace(
             self.cfg.editor,
-            residual_latency_ms=clamp_residual_latency_ms(ms),
+            audio_latency_ms=clamp_audio_latency_ms(ms),
+        )
+        persist_editor_settings(self.cfg)
+
+    def adjust_tap_latency_ms(self, *, forward: bool, large: bool) -> None:
+        step = 50 if large else 10
+        delta = step if forward else -step
+        current = self.cfg.editor.tap_latency_ms
+        new_value = clamp_tap_latency_ms(current + delta)
+        self.cfg.editor = replace(self.cfg.editor, tap_latency_ms=new_value)
+        persist_editor_settings(self.cfg)
+
+    def set_tap_latency_ms(self, ms: int) -> None:
+        self.cfg.editor = replace(
+            self.cfg.editor,
+            tap_latency_ms=clamp_tap_latency_ms(ms),
         )
         persist_editor_settings(self.cfg)
 

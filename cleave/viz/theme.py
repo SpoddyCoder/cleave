@@ -38,7 +38,7 @@ Accent colors for modes and icons (not label/value roles):
   highlight, error_notification, notification_on_fill, move_mode, lock_icon,
   preset_icon, preset_file_icon,
   timeline_track_colors, timeline_off_segment, bar_grid, song_bound, playhead, playhead_flash,
-  song_marker, song_marker_selected
+  song_marker, song_marker_selected, calibration_flash
 
 Buttons (fills, not text roles). Each tone has a rest fill, a lit hover fill
 and border, and a pressed fill; button_paint.button_look() turns them into a
@@ -402,6 +402,8 @@ class Palette:
     playhead_flash: RGB
     song_marker: RGB
     song_marker_selected: RGB
+    # Flash over the preview while Measure audio latency runs.
+    calibration_flash: RGB
     # Timeline strip scrollbar: a faint rail and a neutral pill, so it does not
     # read as a layer row's level bar.
     timeline_scroll_rail: RGB
@@ -526,6 +528,7 @@ def _ultraviolet() -> Palette:
         playhead_flash=(220, 170, 255),
         song_marker=(220, 40, 40),
         song_marker_selected=(255, 170, 40),
+        calibration_flash=(255, 255, 255),
         timeline_scroll_rail=song_bound,
         timeline_scroll_thumb=muted,
         scrollbar_track=(26, 29, 38),
@@ -639,6 +642,7 @@ def _chocolate() -> Palette:
         playhead_flash=(255, 210, 160),
         song_marker=(220, 42, 40),
         song_marker_selected=(255, 176, 42),
+        calibration_flash=(255, 255, 255),
         timeline_scroll_rail=(74, 52, 38),
         timeline_scroll_thumb=(171, 146, 124),
         scrollbar_track=(30, 20, 14),
@@ -750,6 +754,7 @@ def _mint() -> Palette:
         playhead_flash=(180, 255, 226),
         song_marker=(220, 40, 40),
         song_marker_selected=(255, 170, 40),
+        calibration_flash=(255, 255, 255),
         timeline_scroll_rail=(36, 68, 60),
         timeline_scroll_thumb=(134, 168, 158),
         scrollbar_track=(14, 26, 23),
@@ -872,6 +877,7 @@ def _daylight() -> Palette:
         playhead_flash=(200, 150, 255),
         song_marker=(200, 40, 40),
         song_marker_selected=(230, 140, 0),
+        calibration_flash=(255, 255, 255),
         timeline_scroll_rail=song_bound,
         timeline_scroll_thumb=muted,
         scrollbar_track=(232, 234, 240),

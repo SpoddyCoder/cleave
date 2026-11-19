@@ -1,16 +1,20 @@
-"""Tap-to-sync inference for machine-local residual latency."""
+"""Tap timing calibration: how late key presses land after the heard beat."""
 
 from __future__ import annotations
 
+import math
 import statistics
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from cleave.viz.transport_clock import MAX_RESIDUAL_LATENCY_SEC
-
-MIN_TAP_COUNT = 4
-CONSISTENCY_WINDOW = 4
-MAX_DELTA_SPREAD_SEC = 0.030
+# Recent taps the estimate draws on.
+TAP_HISTORY = 16
+# A tap this far from the median of recent taps is a slip and is set aside.
+OUTLIER_SEC = 0.050
+# Fewest kept taps before a result can be reported.
+MIN_KEPT_TAPS = 6
+# Lock in once the estimate's standard error is this small.
+SETTLED_SEC = 0.007
 # Late taps still belong to the long bar tone (output latency).
 MAX_ACCENT_ACCEPT_SEC = 0.75
 # Early window stays inside one quarter (140 BPM quarter is ~0.43s) so the
@@ -49,27 +53,9 @@ def build_metronome_schedule(
     return tuple(clicks)
 
 
-def metronome_click_times(schedule: Sequence[MetronomeClick]) -> tuple[float, ...]:
-    return tuple(click.time_sec for click in schedule)
-
-
 def metronome_accent_times(schedule: Sequence[MetronomeClick]) -> tuple[float, ...]:
     """Return accented click times (downbeats) from a metronome schedule."""
     return tuple(click.time_sec for click in schedule if click.accented)
-
-
-def _nearest_click_index(tap_sec: float, click_times: Sequence[float]) -> int | None:
-    if not click_times:
-        return None
-    return min(range(len(click_times)), key=lambda index: abs(click_times[index] - tap_sec))
-
-
-def tap_delta_sec(tap_sec: float, click_times: Sequence[float]) -> float | None:
-    """Return tap minus nearest click time, or None when no clicks exist."""
-    index = _nearest_click_index(tap_sec, click_times)
-    if index is None:
-        return None
-    return tap_sec - click_times[index]
 
 
 def _nearest_forward_accent_index(
@@ -126,70 +112,62 @@ def accept_tap_for_accent(
     return index, tap_sec - accent_times[index]
 
 
-def append_streak_delta(
-    streak: Sequence[float],
-    new_delta: float,
+@dataclass(frozen=True)
+class TapEstimate:
+    """Where recent taps put the tap latency, and how settled that is.
+
+    ``latency_sec`` is the mean of the kept taps; ``margin_sec`` is its
+    standard error (None with fewer than two kept taps).
+    """
+
+    taps: int
+    kept: int
+    latency_sec: float | None
+    margin_sec: float | None
+
+
+def push_tap_delta(
+    history: Sequence[float],
+    delta: float,
     *,
-    max_spread_sec: float = MAX_DELTA_SPREAD_SEC,
+    limit: int = TAP_HISTORY,
 ) -> list[float]:
-    """Append *new_delta* to the streak buffer, resetting when spread breaks."""
-    buffer = list(streak)
-    if buffer:
-        trial = buffer + [new_delta]
-        if max(trial) - min(trial) > max_spread_sec:
-            return [new_delta]
-    buffer.append(new_delta)
-    return buffer
+    """Append *delta*, keeping only the last *limit* taps."""
+    return [*history, delta][-limit:]
 
 
-def streak_ready_to_lock(
-    streak: Sequence[float],
+def kept_tap_deltas(
+    history: Sequence[float],
     *,
-    window: int = CONSISTENCY_WINDOW,
-    max_spread_sec: float = MAX_DELTA_SPREAD_SEC,
+    outlier_sec: float = OUTLIER_SEC,
+) -> list[float]:
+    """Taps within *outlier_sec* of the median; the rest are slips."""
+    if not history:
+        return []
+    centre = statistics.median(history)
+    return [delta for delta in history if abs(delta - centre) <= outlier_sec]
+
+
+def estimate_tap_latency(history: Sequence[float]) -> TapEstimate:
+    kept = kept_tap_deltas(history)
+    if not kept:
+        return TapEstimate(len(history), 0, None, None)
+    latency = statistics.fmean(kept)
+    margin = (
+        statistics.stdev(kept) / math.sqrt(len(kept)) if len(kept) >= 2 else None
+    )
+    return TapEstimate(len(history), len(kept), latency, margin)
+
+
+def tap_estimate_settled(
+    estimate: TapEstimate,
+    *,
+    min_kept: int = MIN_KEPT_TAPS,
+    settled_sec: float = SETTLED_SEC,
+    history_limit: int = TAP_HISTORY,
 ) -> bool:
-    """True when the streak buffer has *window* deltas within *max_spread_sec*."""
-    if len(streak) < window:
+    """True when enough taps are kept and either agree closely, or the
+    history is full (a steady but loose tapper still gets a result)."""
+    if estimate.kept < min_kept or estimate.margin_sec is None:
         return False
-    window_deltas = streak[-window:]
-    return max(window_deltas) - min(window_deltas) <= max_spread_sec
-
-
-def mean_latency_from_deltas(
-    deltas: Sequence[float],
-    *,
-    window: int = CONSISTENCY_WINDOW,
-) -> float:
-    """Mean of the last *window* tap deltas."""
-    return statistics.mean(deltas[-window:])
-
-
-def delta_spread_sec(
-    deltas: Sequence[float],
-    *,
-    min_count: int = 2,
-) -> float | None:
-    """Spread (max - min) of the streak buffer, or None when too few deltas."""
-    if len(deltas) < min_count:
-        return None
-    return max(deltas) - min(deltas)
-
-
-def infer_residual_latency_sec(
-    tap_audible_zero_residual_latency: Sequence[float],
-    click_times: Sequence[float],
-) -> float:
-    """Infer residual latency from taps captured with residual forced to zero."""
-    if len(tap_audible_zero_residual_latency) < MIN_TAP_COUNT or not click_times:
-        return 0.0
-
-    deltas: list[float] = []
-    for tap in tap_audible_zero_residual_latency:
-        delta = tap_delta_sec(tap, click_times)
-        if delta is not None:
-            deltas.append(delta)
-
-    if len(deltas) < MIN_TAP_COUNT:
-        return 0.0
-
-    return max(0.0, min(statistics.median(deltas), MAX_RESIDUAL_LATENCY_SEC))
+    return estimate.margin_sec <= settled_sec or estimate.taps >= history_limit

@@ -14,7 +14,8 @@ from cleave.config_schema.compositor import DEFAULT_COMPOSITOR_HDR
 from cleave.config_schema.editor import (
     DEFAULT_BEAT_SENSITIVITY,
     DEFAULT_EDITOR_PREVIEW_QUALITY,
-    DEFAULT_RESIDUAL_LATENCY_MS,
+    DEFAULT_AUDIO_LATENCY_MS,
+    DEFAULT_TAP_LATENCY_MS,
     DEFAULT_HELP_SIDE,
     DEFAULT_HIGHLIGHT_NEW_PAGE,
     DEFAULT_SHOW_TOOLTIPS,
@@ -400,7 +401,8 @@ class SettingsBlock:
     notification_display_sec: int = DEFAULT_NOTIFICATION_DISPLAY_SEC
     theme: str = DEFAULT_THEME
     ui_scale: int = DEFAULT_UI_SCALE
-    residual_latency_ms: int = DEFAULT_RESIDUAL_LATENCY_MS
+    audio_latency_ms: int = DEFAULT_AUDIO_LATENCY_MS
+    tap_latency_ms: int = DEFAULT_TAP_LATENCY_MS
 
     @classmethod
     def from_session(
@@ -418,7 +420,8 @@ class SettingsBlock:
             notification_display_sec=editor.notification_display_sec,
             theme=editor.theme,
             ui_scale=editor.ui_scale,
-            residual_latency_ms=editor.residual_latency_ms,
+            audio_latency_ms=editor.audio_latency_ms,
+            tap_latency_ms=editor.tap_latency_ms,
         )
 
 

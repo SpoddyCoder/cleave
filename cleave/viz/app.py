@@ -612,7 +612,7 @@ class VisualizerApp:
         pm_time_sec = self._pm_clock.advance(dt_sec, paused=paused)
         blank_visualizers = (
             isinstance(self._runtime, LiveVisualizerRuntime)
-            and self._runtime.controls.tap_sync.active
+            and self._runtime.controls.calibrating
         )
         self._was_paused = tick_frame_core(
             self._runtime,

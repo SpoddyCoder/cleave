@@ -364,7 +364,7 @@ You can also perform the timeline live, cueing layers in and out by hand as the 
 3. Press a layer's **number key**, or click its eye, to bring it in or drop it out in time with the music.
 4. Press **R** again to stop.
 
-Only armed rows are recorded, and each take is a single undo step.
+Only armed rows are recorded, and each take is a single undo step. If your presses land late or early, see [Markers and recorded clips land late](#markers-and-recorded-clips-land-late).
 
 ### Taking a row over for a moment
 
@@ -372,7 +372,7 @@ Sometimes you want to see a layer the timeline has switched off. Click the row's
 
 ### Song markers
 
-**Song markers** map the structure of the song: the drop, the chorus, the breakdown. Press **Ctrl+Enter** to drop one at the playhead, or right-click the time ruler and drop one there.
+**Song markers** map the structure of the song: the drop, the chorus, the breakdown. Press **Ctrl+Enter** to drop one at the playhead, or right-click the time ruler and drop one there. Markers dropped while the song plays allow for your tap latency (see [Markers and recorded clips land late](#markers-and-recorded-clips-land-late)).
 
 Markers pay off in three ways: clips snap to them, you can jump between them, and Generate timeline builds its arrangement around them.
 
@@ -524,9 +524,10 @@ A **Render project** dialog tracks progress and tells you when the render is don
 
 The **Settings** menu holds preferences that apply to every project:
 
-- **Preview:** preview quality and audio latency correction.
+- **Preview:** preview quality, and the audio latency and tap latency corrections.
 - **UI:** the editor theme (Ultraviolet, Chocolate, Mint, or the light Daylight) and [custom themes](custom-themes.md), UI scale, panel sides, tooltips, notification timing, what a click on a navigator row with pages under it does (navigator expand), whether the inspector title flashes when a new page opens (highlight new page), and more.
 - **Measure audio latency:** see [The visuals are out of time with the music](#the-visuals-are-out-of-time-with-the-music).
+- **Calibrate tap timing:** see [Markers and recorded clips land late](#markers-and-recorded-clips-land-late).
 - **Rescan presets:** re-reads the presets folder after you add presets to an existing pack, or while Cleave is open.
 - **Download packages:** fetches anything you skipped on first launch. Presets downloaded here are indexed immediately, ready to curate.
 - **Dev Tools:** a crash log for bug reports.
@@ -587,7 +588,11 @@ Cleave needs Milkdrop presets to draw anything. Get the starter set from **Setti
 
 ### The visuals are out of time with the music
 
-Some audio outputs, wireless headphones in particular, add latency. Choose **Settings > Measure audio latency** and press Enter on each long, low tone it plays; Cleave calculates the delay and offers to correct it. You can also set it by hand with **Settings > Preview > audio latency**. The correction shifts the live preview and the placement of new markers and clips, and never affects the render.
+Some audio outputs, wireless headphones in particular, deliver the sound late, so the preview runs ahead of what you hear. Choose **Settings > Measure audio latency**: Cleave plays a beep once a bar and flashes the preview on each beep. Press Left/Right (PgUp/PgDn for bigger steps) until the flash and the beep land together, then Apply. Raise the value if the flash comes first, lower it if the beep does. You can also set it by hand with **Settings > Preview > audio latency**. It only delays the live preview; it never affects the render, or where markers and clips land.
+
+### Markers and recorded clips land late
+
+Song markers you drop and clips you record while the song plays land where you pressed the key, which is usually a little after the beat: the sound takes time to reach you, and a wireless keyboard takes time to reach Cleave. Choose **Settings > Calibrate tap timing** and press Enter on each long, low tone of the click track, just as you would tap a marker. A stray tap is ignored, so just keep going. Once the estimate settles, usually within 8 to 12 taps, Cleave shows your tap latency and offers to apply it; from then on it moves taps back by that much. It can be below zero if you tend to tap ahead of the beat, which many people do. You can also set it by hand with **Settings > Preview > tap latency**. It only affects taps made while the song plays, and leaves anything already placed where it is.
 
 ### Stem splitting is very slow
 

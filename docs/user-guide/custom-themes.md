@@ -56,6 +56,7 @@ Every key a theme can set, grouped by where it appears:
 | Rows | `hover`, `hover_bg_alpha`, `row_select_tint`, `row_selected_alpha`, `row_selected_bar`, `row_focused_alpha`, `row_focused_bar`, `row_focus_edge` |
 | Icon hover | `icon_hover_fg`, `icon_hover_bg`, `icon_hover_bg_alpha`, `icon_hover_edge`, `icon_lit_hover_lift`, `icon_lit_hover_edge_lift` |
 | Timeline strip | `timeline_track_colors`, `timeline_off_segment`, `bar_grid`, `song_bound`, `playhead`, `playhead_flash`, `song_marker`, `song_marker_selected`, `timeline_scroll_rail`, `timeline_scroll_thumb` |
+| Calibration | `calibration_flash` |
 | Scrollbars | `scrollbar_track`, `scrollbar_thumb`, `scrollbar_thumb_hover` |
 
 ## Starter theme
@@ -182,6 +183,9 @@ song_marker: "#dc2828"
 song_marker_selected: "#ffaa28"
 timeline_scroll_rail: "#3a4254"
 timeline_scroll_thumb: "#8c97b0"
+
+# Calibration
+calibration_flash: "#ffffff"
 
 # Scrollbars
 scrollbar_track: "#1a1d26"

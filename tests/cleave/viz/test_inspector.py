@@ -180,14 +180,20 @@ def test_settings_pages() -> None:
     preview = build_inspector_rows(state, "settings.preview")
     assert _kinds(preview) == [
         RowKind.SETTINGS_PREVIEW_QUALITY,
-        RowKind.SETTINGS_RESIDUAL_LATENCY_MS,
+        RowKind.SETTINGS_AUDIO_LATENCY_MS,
+        RowKind.SETTINGS_TAP_LATENCY_MS,
     ]
-    assert preview[-1].command_ids == ("settings.measure_latency",)
+    assert preview[-1].command_ids == (
+        "settings.measure_latency",
+        "settings.calibrate_tap_timing",
+    )
     assert preview[-1].depth == 0
-    # Audio latency sits under the divider with Measure audio latency.
-    assert preview[-3].divider
+    # Both latencies sit under the divider with their measuring commands.
+    assert preview[-4].divider
+    assert preview[-3].descriptor is not None
+    assert preview[-3].descriptor.kind == RowKind.SETTINGS_AUDIO_LATENCY_MS
     assert preview[-2].descriptor is not None
-    assert preview[-2].descriptor.kind == RowKind.SETTINGS_RESIDUAL_LATENCY_MS
+    assert preview[-2].descriptor.kind == RowKind.SETTINGS_TAP_LATENCY_MS
     ui = build_inspector_rows(state, "settings.ui")
     assert _kinds(ui) == [
         RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY,

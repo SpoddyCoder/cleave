@@ -72,6 +72,7 @@ _STATIC_IDS = (
     "project.restore",
     *_SETTINGS_PAGE_IDS,
     "settings.measure_latency",
+    "settings.calibrate_tap_timing",
     "settings.rescan_presets",
     "settings.download_packages",
     "help.overlay",
@@ -155,6 +156,7 @@ def _fake_controls(
         prompt_about=MagicMock(),
         editor_mode=SimpleNamespace(prompt_change_editor_mode=MagicMock()),
         tap_sync=SimpleNamespace(prompt_start=MagicMock()),
+        av_sync=SimpleNamespace(prompt_start=MagicMock()),
         shell_focus=SimpleNamespace(
             selected_id=selected_id,
             region=ShellRegion.NAVIGATOR,
@@ -222,6 +224,7 @@ def test_menus_list_taxonomy_ids_once() -> None:
         "page.settings.ui",
         None,
         "settings.measure_latency",
+        "settings.calibrate_tap_timing",
         None,
         "settings.rescan_presets",
         "settings.download_packages",
@@ -385,6 +388,7 @@ def test_disabled_run_does_not_call_a_controller() -> None:
     controls.project_render.prompt.assert_not_called()
     controls.editor_mode.prompt_change_editor_mode.assert_not_called()
     controls.tap_sync.prompt_start.assert_not_called()
+    controls.av_sync.prompt_start.assert_not_called()
     controls.layer_lifecycle.add.assert_not_called()
     controls.layer_lifecycle.prompt_delete.assert_not_called()
     controls.navigator.select.assert_not_called()
@@ -428,6 +432,7 @@ def test_wired_run_calls_controllers() -> None:
     command_by_id("project.render", menus).run(controls)
     command_by_id("view.preset_curation", menus).run(controls)
     command_by_id("settings.measure_latency", menus).run(controls)
+    command_by_id("settings.calibrate_tap_timing", menus).run(controls)
     command_by_id("settings.rescan_presets", menus).run(controls)
     command_by_id("settings.download_packages", menus).run(controls)
     command_by_id("help.about", menus).run(controls)
@@ -439,6 +444,7 @@ def test_wired_run_calls_controllers() -> None:
     controls.preset_rescan.start.assert_called_once_with()
     controls.prompt_about.assert_called_once_with()
     controls.tap_sync.prompt_start.assert_called_once_with()
+    controls.av_sync.prompt_start.assert_called_once_with()
 
     curation = command_by_id("view.preset_curation", menus)
     assert curation.kind == "check"
@@ -985,3 +991,24 @@ def test_page_back_and_forward_follow_the_history() -> None:
     assert forward.enabled(command_context(controls)) is True
     forward.run(controls)
     assert controls.shell_focus.selected_id == "post_fx"
+
+
+def test_latency_buttons_have_their_own_help_and_run_their_tests() -> None:
+    from unittest.mock import patch
+
+    controls = make_controls(("layer_1",))
+    pairs = (
+        ("settings.measure_latency", RowKind.SETTINGS_MEASURE_AUDIO_LATENCY, "av_sync"),
+        ("settings.calibrate_tap_timing", RowKind.SETTINGS_CALIBRATE_TAP_TIMING, "tap_sync"),
+    )
+    for command_id, kind, controller in pairs:
+        controls.shell_focus.region = ShellRegion.INSPECTOR
+        controls.shell_focus.inspector_command_id = command_id
+        followed = help_focus_descriptor(
+            RowDescriptor(RowKind.SETTINGS_PREVIEW_HEADER), controls.shell_focus
+        )
+        assert followed == RowDescriptor(kind)
+        assert row_spec(kind).help_description
+        with patch.object(getattr(controls, controller), "prompt_start") as start:
+            assert apply_field_action(controls, RowDescriptor(kind)) is True
+            start.assert_called_once_with()

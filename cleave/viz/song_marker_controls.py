@@ -16,7 +16,7 @@ from cleave.song_markers import (
 )
 from cleave.timeline import snap_placement_time
 from cleave.viz.modal import ModalHost
-from cleave.viz.playback import PlaybackState, current_sec
+from cleave.viz.playback import PlaybackState, tap_sec
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.session import TuningSession
 
@@ -76,8 +76,8 @@ class SongMarkerController:
             self._on_notification(warning)
 
     def drop(self) -> None:
-        """Drop or replace a song marker at the playhead (session until Save)."""
-        self.drop_at(current_sec(self._playback, self._duration_sec))
+        """Drop or replace a song marker where the user tapped (session until Save)."""
+        self.drop_at(tap_sec(self._playback, self._duration_sec))
 
     def drop_at(self, t_sec: float) -> None:
         """Drop or replace a song marker at *t_sec*, snapped as placement snaps."""

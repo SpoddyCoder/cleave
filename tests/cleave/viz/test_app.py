@@ -57,6 +57,9 @@ def _quiet_live_controls(controls: MagicMock) -> None:
     controls.tap_sync.active = False
     controls.tap_sync.showing_progress = False
     controls.tap_sync.progress_view.return_value = None
+    controls.av_sync.active = False
+    controls.av_sync.flash_level.return_value = 0.0
+    controls.calibrating = False
     # A MagicMock message is not None, so draw_ui would push a toast and call
     # ImGui. These run() doubles have no ImGui context.
     controls.notification_active.return_value = PanelNotificationActive(

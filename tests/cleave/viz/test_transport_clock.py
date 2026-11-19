@@ -79,12 +79,12 @@ def test_audible_subtracts_latency_and_floors_at_zero() -> None:
     assert clock.audible_position_sec(now=1.0) == pytest.approx(0.0)
 
 
-def test_audible_subtracts_residual_latency() -> None:
+def test_audible_subtracts_audio_latency() -> None:
     clock = _clock(latency_frames=100)
-    clock.set_residual_latency_sec(0.2)
+    clock.set_audio_latency_sec(0.2)
     clock.reanchor(500, wall_time=0.0)
     assert clock.file_position_sec(now=0.0) == pytest.approx(0.5)
-    assert clock.audible_position_zero_residual_latency_sec(now=0.0) == pytest.approx(0.4)
+    assert clock.raw_audible_position_sec(now=0.0) == pytest.approx(0.4)
     assert clock.audible_position_sec(now=0.0) == pytest.approx(0.2)
 
     clock.reanchor(100, wall_time=1.0)
@@ -92,12 +92,54 @@ def test_audible_subtracts_residual_latency() -> None:
     assert clock.file_position_sec(now=1.0) == pytest.approx(0.1)
 
 
-def test_set_residual_latency_sec_clamps() -> None:
+def test_set_audio_latency_sec_clamps() -> None:
     clock = _clock()
-    clock.set_residual_latency_sec(-1.0)
-    assert clock.residual_latency_sec == 0.0
-    clock.set_residual_latency_sec(5.0)
-    assert clock.residual_latency_sec == 2.0
+    clock.set_audio_latency_sec(-1.0)
+    assert clock.audio_latency_sec == 0.0
+    clock.set_audio_latency_sec(5.0)
+    assert clock.audio_latency_sec == 2.0
+
+
+def test_tap_position_subtracts_tap_latency_and_ignores_audio_latency() -> None:
+    clock = _clock(latency_frames=100)
+    clock.set_audio_latency_sec(0.3)
+    clock.set_tap_latency_sec(0.05)
+    clock.reanchor(1500, wall_time=0.0)
+    assert clock.raw_audible_position_sec(now=0.0) == pytest.approx(1.4)
+    assert clock.tap_position_sec(now=0.0) == pytest.approx(1.35)
+
+
+def test_tap_position_with_negative_tap_latency_lands_later() -> None:
+    clock = _clock()
+    clock.set_tap_latency_sec(-0.04)
+    clock.reanchor(1000, wall_time=0.0)
+    assert clock.tap_position_sec(now=0.0) == pytest.approx(1.04)
+
+
+def test_tap_position_while_paused_is_the_displayed_playhead() -> None:
+    clock = _clock(latency_frames=100)
+    clock.set_audio_latency_sec(0.2)
+    clock.set_tap_latency_sec(0.5)
+    clock.reanchor(1000, wall_time=0.0)
+    clock.set_paused(True, wall_time=0.0)
+    assert clock.tap_position_sec(now=5.0) == pytest.approx(
+        clock.audible_position_sec(now=5.0)
+    )
+
+
+def test_tap_position_never_goes_below_zero() -> None:
+    clock = _clock()
+    clock.set_tap_latency_sec(0.5)
+    clock.reanchor(100, wall_time=0.0)
+    assert clock.tap_position_sec(now=0.0) == 0.0
+
+
+def test_set_tap_latency_sec_clamps_to_the_tap_range() -> None:
+    clock = _clock()
+    clock.set_tap_latency_sec(-1.0)
+    assert clock.tap_latency_sec == pytest.approx(-0.25)
+    clock.set_tap_latency_sec(5.0)
+    assert clock.tap_latency_sec == pytest.approx(0.75)
 
 
 def test_determinism_same_anchors_and_now_sequence() -> None:

@@ -17,6 +17,11 @@ def current_sec(state: PlaybackState, duration_sec: float) -> float:
     return min(state.player.audible_position_sec(), duration_sec)
 
 
+def tap_sec(state: PlaybackState, duration_sec: float) -> float:
+    """Song time for a placement the user taps while listening."""
+    return min(state.player.tap_position_sec(), duration_sec)
+
+
 def format_mmss(sec: float) -> str:
     s = max(0, int(sec))
     return f"{s // 60:02d}:{s % 60:02d}"

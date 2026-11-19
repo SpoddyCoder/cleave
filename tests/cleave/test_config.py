@@ -227,7 +227,7 @@ def test_editor_config_from_settings_uses_user_editor() -> None:
     editor = EditorSettings(
         preview_quality="performance",
         notification_display_sec=5,
-        residual_latency_ms=0,
+        audio_latency_ms=0,
         inspector_width=640,
         help_width=360,
         navigator_height=300,
@@ -496,7 +496,7 @@ def test_load_config_editor_settings_from_user_config(tmp_path: Path) -> None:
     editor = EditorSettings(
         preview_quality="performance",
         notification_display_sec=5,
-        residual_latency_ms=0,
+        audio_latency_ms=0,
     )
     user_cfg_path = tmp_path / "user-config.yaml"
     write_user_config_file(user_cfg_path, editor=editor)
@@ -515,7 +515,7 @@ def test_load_config_ignores_editor_fields_in_project_yaml(tmp_path: Path) -> No
     user_editor = EditorSettings(
         preview_quality="performance",
         notification_display_sec=5,
-        residual_latency_ms=0,
+        audio_latency_ms=0,
     )
     user_cfg_path = tmp_path / "user-config.yaml"
     write_user_config_file(user_cfg_path, editor=user_editor)

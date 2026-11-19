@@ -9,10 +9,16 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- Settings > Calibrate tap timing measures how late your key presses land after the beat you hear, including keyboard delay and the habit of tapping slightly early, and stores it as Settings > Preview > tap latency. Song markers dropped and clips recorded while the song plays move back by that much so they land on the beat. Tap latency can be below zero.
+
 ### Changed
+
+- Settings > Measure audio latency is now a flash-and-beep test: the preview flashes on a beep each bar, and you step the audio latency until the two land together. Audio latency only delays the live preview; tapped markers and recordings use tap latency instead. The setting is stored under a new name, so measure it again after updating.
+- Calibrate tap timing no longer needs an unbroken streak of matching taps. It averages your recent taps, ignores a stray one instead of starting over, and reports a value once at least six taps agree to within a few milliseconds, or after 16 taps however loose they are. The progress box shows how many taps it has kept and how settled the estimate is.
 
 ### Fixed
 
+- Measuring latency no longer reports 0 ms when your taps land ahead of the beat.
 - Stem separation uses the GPU straight after the Welcome to Cleave step downloads the CUDA Toolkit, instead of running on the CPU until Cleave is restarted.
 
 ## [0.4.0] - 2026-11-19

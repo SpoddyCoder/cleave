@@ -136,9 +136,14 @@ SETTINGS_PREVIEW_SECTION = SectionDef(
     children=(
         SectionNode(leaf_kind=RowKind.SETTINGS_PREVIEW_QUALITY),
         SectionNode(
-            leaf_kind=RowKind.SETTINGS_RESIDUAL_LATENCY_MS, with_commands=True
+            leaf_kind=RowKind.SETTINGS_AUDIO_LATENCY_MS, with_commands=True
         ),
-        SectionNode(commands=("settings.measure_latency",)),
+        SectionNode(
+            leaf_kind=RowKind.SETTINGS_TAP_LATENCY_MS, with_commands=True
+        ),
+        SectionNode(
+            commands=("settings.measure_latency", "settings.calibrate_tap_timing")
+        ),
     ),
 )
 

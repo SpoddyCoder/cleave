@@ -2,7 +2,8 @@
 
 Anchors to a consumed PCM frame and wall time, then interpolates with
 ``time.perf_counter()`` between audio-callback reanchors. Exposes file
-(decode) and audible (latency-corrected) positions.
+(decode) and audible (latency-corrected) positions, plus the tap position:
+where a key press made while listening lands in the song.
 """
 
 from __future__ import annotations
@@ -11,7 +12,9 @@ import time
 from dataclasses import dataclass
 
 
-MAX_RESIDUAL_LATENCY_SEC = 2.0
+MAX_AUDIO_LATENCY_SEC = 2.0
+MIN_TAP_LATENCY_SEC = -0.25
+MAX_TAP_LATENCY_SEC = 0.75
 
 
 @dataclass
@@ -22,7 +25,8 @@ class TransportClock:
     anchor_wall_time: float = 0.0
     sample_rate: int = 44100
     latency_frames: int = 0
-    residual_latency_sec: float = 0.0
+    audio_latency_sec: float = 0.0
+    tap_latency_sec: float = 0.0
     paused: bool = False
     total_frames: int = 0
     max_ahead_frames: int = 0
@@ -48,8 +52,13 @@ class TransportClock:
     def set_latency_frames(self, n: int) -> None:
         self.latency_frames = max(0, int(n))
 
-    def set_residual_latency_sec(self, sec: float) -> None:
-        self.residual_latency_sec = max(0.0, min(float(sec), MAX_RESIDUAL_LATENCY_SEC))
+    def set_audio_latency_sec(self, sec: float) -> None:
+        self.audio_latency_sec = max(0.0, min(float(sec), MAX_AUDIO_LATENCY_SEC))
+
+    def set_tap_latency_sec(self, sec: float) -> None:
+        self.tap_latency_sec = max(
+            MIN_TAP_LATENCY_SEC, min(float(sec), MAX_TAP_LATENCY_SEC)
+        )
 
     def file_position_frames(self, now: float | None = None) -> float:
         if self.paused:
@@ -67,7 +76,7 @@ class TransportClock:
             return 0.0
         return self.file_position_frames(now) / self.sample_rate
 
-    def audible_position_zero_residual_latency_sec(self, now: float | None = None) -> float:
+    def raw_audible_position_sec(self, now: float | None = None) -> float:
         if self.sample_rate <= 0:
             return 0.0
         file_frames = self.file_position_frames(now)
@@ -79,7 +88,19 @@ class TransportClock:
             return 0.0
         file_frames = self.file_position_frames(now)
         total_latency_frames = (
-            float(self.latency_frames) + self.residual_latency_sec * self.sample_rate
+            float(self.latency_frames) + self.audio_latency_sec * self.sample_rate
         )
         audible_frames = max(0.0, file_frames - total_latency_frames)
         return audible_frames / self.sample_rate
+
+    def tap_position_sec(self, now: float | None = None) -> float:
+        """Song time a key press made now was aimed at.
+
+        While playing, the raw audible position less the tap latency (sound
+        reaching the ear, the key reaching Cleave, and how early the user
+        taps). Audio latency plays no part, so changing it never moves taps.
+        While paused, the displayed playhead.
+        """
+        if self.paused:
+            return self.audible_position_sec(now)
+        return max(0.0, self.raw_audible_position_sec(now) - self.tap_latency_sec)

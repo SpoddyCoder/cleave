@@ -147,7 +147,7 @@ def test_centre_pad_fixes_the_width() -> None:
 
 def test_a_stepper_keeps_the_widest_width_it_has_shown() -> None:
     with _inspector("settings.preview") as (host, _controls):
-        kind = RowKind.SETTINGS_RESIDUAL_LATENCY_MS
+        kind = RowKind.SETTINGS_AUDIO_LATENCY_MS
         assert host.inspector.values.fixed_width_value(kind, "100 ms") == "100 ms"
         assert host.inspector.values.fixed_width_value(kind, "5 ms") == " 5 ms "
 

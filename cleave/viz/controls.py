@@ -44,7 +44,9 @@ from cleave.viz.project_controls import ProjectControls
 from cleave.viz.project_render_controls import ProjectRenderController
 from cleave.viz.project_switch import ProjectSwitchController
 from cleave.viz.song_marker_controls import SongMarkerController
-from cleave.viz.tap_sync_controls import TapSyncControls, TapSyncUiSnapshot
+from cleave.viz.av_sync_controls import AvSyncControls
+from cleave.viz.calibration_clicks import CalibrationClicks, CalibrationUiSnapshot
+from cleave.viz.tap_sync_controls import TapSyncControls
 from cleave.viz.transport_controls import TransportControls, hold_paused
 from cleave.viz.welcome_host import CANCEL_LABEL, WelcomeFlow
 from cleave.viz.window_controls import WindowControls
@@ -90,7 +92,7 @@ if TYPE_CHECKING:
 
 NOTIFICATION_TIMELINE_ENABLED_TEXT = "Timeline controls layer visibility"
 NOTIFICATION_TIMELINE_DISABLED_TEXT = "Layer panel controls visibility"
-NOTIFICATION_RESIDUAL_LATENCY_UNCHANGED_TEXT = (
+NOTIFICATION_TAP_LATENCY_UNCHANGED_TEXT = (
     "Existing marker and cue times unchanged"
 )
 SEEK_TINY = 2
@@ -328,17 +330,28 @@ class TuningControls:
             get_layer_bindings=lambda: self._layer_bindings,
             on_notification=lambda message: self.show_notification(message),
         )
-        self._tap_sync = TapSyncControls(
-            cfg,
+        calibration_clicks = CalibrationClicks(
             playback,
             duration_sec,
+            on_ui_begin=self._begin_calibration_ui,
+            on_ui_restore=self._restore_calibration_ui,
+        )
+        self._tap_sync = TapSyncControls(
+            cfg,
+            calibration_clicks,
             self._modal_host,
             on_notification=self.show_notification,
-            on_apply_residual_latency=self._apply_residual_latency,
-            on_calibration_ui_begin=self._begin_tap_sync_calibration_ui,
-            on_calibration_ui_restore=self._restore_tap_sync_calibration_ui,
+            on_apply_tap_latency=self._apply_measured_tap_latency,
         )
-        self._apply_residual_latency()
+        self._av_sync = AvSyncControls(
+            cfg,
+            calibration_clicks,
+            self._modal_host,
+            on_notification=self.show_notification,
+            on_preview_audio_latency=self._preview_audio_latency,
+            on_apply_audio_latency=self._apply_measured_audio_latency,
+        )
+        self._apply_latency()
         self.editor_mode = EditorModeController(
             session,
             cfg,
@@ -361,11 +374,20 @@ class TuningControls:
         return self._tap_sync
 
     @property
+    def av_sync(self) -> AvSyncControls:
+        return self._av_sync
+
+    @property
+    def calibrating(self) -> bool:
+        """True while either latency calibration has the preview."""
+        return self._tap_sync.active or self._av_sync.active
+
+    @property
     def preset_curation(self) -> PresetCurationController:
         return self._preset_curation
 
-    def _begin_tap_sync_calibration_ui(self) -> TapSyncUiSnapshot:
-        snapshot = TapSyncUiSnapshot(
+    def _begin_calibration_ui(self) -> CalibrationUiSnapshot:
+        snapshot = CalibrationUiSnapshot(
             help_visible=self.session.help_visible,
             timeline_panel_open=self.session.timeline.panel_open,
             focus_cursor=self.focus_cursor,
@@ -381,7 +403,7 @@ class TuningControls:
             self.exit_timeline_submenu()
         return snapshot
 
-    def _restore_tap_sync_calibration_ui(self, snapshot: TapSyncUiSnapshot) -> None:
+    def _restore_calibration_ui(self, snapshot: CalibrationUiSnapshot) -> None:
         self.session.help_visible = snapshot.help_visible
         self.session.timeline.panel_open = snapshot.timeline_panel_open
         if (
@@ -396,14 +418,31 @@ class TuningControls:
             # Exact snapshot: a saved strip cursor outside Timeline stays put.
             self.shell_focus.region = snapshot.shell_region
 
-    def _apply_residual_latency(self) -> None:
-        latency_sec = self.cfg.editor.residual_latency_ms / 1000.0
-        self.playback.player.set_residual_latency_sec(latency_sec)
+    def _apply_latency(self) -> None:
+        editor = self.cfg.editor
+        player = self.playback.player
+        player.set_audio_latency_sec(editor.audio_latency_ms / 1000.0)
+        player.set_tap_latency_sec(editor.tap_latency_ms / 1000.0)
 
-    def on_residual_latency_changed(self) -> None:
-        self._apply_residual_latency()
+    def _preview_audio_latency(self, latency_ms: int) -> None:
+        """Try a draft audio latency on the player without saving it."""
+        self.playback.player.set_audio_latency_sec(latency_ms / 1000.0)
+
+    def _apply_measured_audio_latency(self, latency_ms: int) -> None:
+        self.settings.set_audio_latency_ms(latency_ms)
+        self.on_audio_latency_changed()
+
+    def _apply_measured_tap_latency(self, latency_ms: int) -> None:
+        self.settings.set_tap_latency_ms(latency_ms)
+        self.on_tap_latency_changed()
+
+    def on_audio_latency_changed(self) -> None:
+        self._apply_latency()
+
+    def on_tap_latency_changed(self) -> None:
+        self._apply_latency()
         if self._project_has_markers_or_cues():
-            self.show_notification(NOTIFICATION_RESIDUAL_LATENCY_UNCHANGED_TEXT)
+            self.show_notification(NOTIFICATION_TAP_LATENCY_UNCHANGED_TEXT)
 
     def _project_has_markers_or_cues(self) -> bool:
         if self.session.song_markers.times:

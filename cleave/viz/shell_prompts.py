@@ -1,4 +1,4 @@
-"""Prompts the shell draws on its top layer: tap sync progress, a modal, the project picker."""
+"""Prompts the shell draws on its top layer: calibration, a modal, the project picker."""
 
 from __future__ import annotations
 
@@ -14,13 +14,14 @@ from cleave.viz.modal_surface import (
     text_field_wrap,
 )
 from cleave.viz.tap_sync_controls import tap_sync_info_panel
-from cleave.viz.top_layer import InfoPanelSurface, TopLayer
+from cleave.viz.top_layer import FlashSurface, InfoPanelSurface, Rect, TopLayer
 
 
 class ShellPrompts:
     """Pushes the open prompt before the shell frame, applies its clicks after.
 
-    The modal wins over the project picker; tap sync progress stacks under either.
+    The modal wins over the project picker; tap sync progress and the audio
+    latency flash stack under either.
     """
 
     def __init__(self, controls: TuningControls, modal_host: ModalHost) -> None:
@@ -29,10 +30,12 @@ class ShellPrompts:
         self._modal: ModalSurface | None = None
         self._picker: FilePickerSurface | None = None
 
-    def push(self, top_layer: TopLayer) -> None:
+    def push(self, top_layer: TopLayer, visualiser: Rect | None = None) -> None:
         """Queue this frame's prompt surfaces on the top layer."""
         self._modal = None
         self._picker = None
+        if visualiser is not None and self._controls.av_sync.flash_level() > 0.0:
+            top_layer.push(FlashSurface(visualiser))
         tap_sync = self._controls.tap_sync
         if tap_sync.showing_progress:
             progress = tap_sync.progress_view()

@@ -15,7 +15,7 @@ from cleave.config_schema.editor import (
     DEFAULT_NAVIGATOR_SIDE,
     DEFAULT_EDITOR_PREVIEW_QUALITY,
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
-    DEFAULT_RESIDUAL_LATENCY_MS,
+    DEFAULT_AUDIO_LATENCY_MS,
     MIN_COLUMN_WIDTH,
 )
 from dataclasses import replace
@@ -42,7 +42,7 @@ def test_load_user_config_missing_file_returns_defaults(tmp_path: Path) -> None:
     assert cfg.texture_paths is None
     assert cfg.editor.preview_quality == DEFAULT_EDITOR_PREVIEW_QUALITY
     assert cfg.editor.notification_display_sec == DEFAULT_NOTIFICATION_DISPLAY_SEC
-    assert cfg.editor.residual_latency_ms == DEFAULT_RESIDUAL_LATENCY_MS
+    assert cfg.editor.audio_latency_ms == DEFAULT_AUDIO_LATENCY_MS
     assert cfg.editor.inspector_width == DEFAULT_INSPECTOR_WIDTH == 495
     assert cfg.editor.help_width == DEFAULT_HELP_WIDTH == 460
     assert cfg.editor.navigator_side == DEFAULT_NAVIGATOR_SIDE == "left"
@@ -53,7 +53,7 @@ def test_default_editor_settings_matches_schema_defaults() -> None:
     editor = default_editor_settings()
     assert editor.preview_quality == DEFAULT_EDITOR_PREVIEW_QUALITY
     assert editor.notification_display_sec == DEFAULT_NOTIFICATION_DISPLAY_SEC
-    assert editor.residual_latency_ms == DEFAULT_RESIDUAL_LATENCY_MS
+    assert editor.audio_latency_ms == DEFAULT_AUDIO_LATENCY_MS
     assert editor.inspector_width == DEFAULT_INSPECTOR_WIDTH == 495
     assert editor.help_width == DEFAULT_HELP_WIDTH == 460
     assert editor.navigator_side == DEFAULT_NAVIGATOR_SIDE == "left"
@@ -132,7 +132,7 @@ def test_write_user_config_preserves_paths_and_rewrites_editor(tmp_path: Path) -
     new_editor = EditorSettings(
         preview_quality="ultra-performance",
         notification_display_sec=12,
-        residual_latency_ms=210,
+        audio_latency_ms=210,
     )
     write_user_config(new_editor, config_path)
 
@@ -143,7 +143,7 @@ def test_write_user_config_preserves_paths_and_rewrites_editor(tmp_path: Path) -
     assert data["editor"]["preview_quality"] == "ultra-performance"
     assert "ui_fade" not in data["editor"]
     assert data["editor"]["notification_display_sec"] == 12
-    assert data["editor"]["residual_latency_ms"] == 210
+    assert data["editor"]["audio_latency_ms"] == 210
     assert data["paths"]["preset_root"] == str(preset_root)
     assert data["paths"]["texture_paths"] == [str(tmp_path / "tex.png")]
     assert data["future_key"] == {"keep": True}
@@ -153,7 +153,7 @@ def test_editor_settings_from_config() -> None:
     vis = EditorConfig(
         preview_quality="performance",
         notification_display_sec=8,
-        residual_latency_ms=150,
+        audio_latency_ms=150,
         inspector_width=640,
         help_width=360,
         navigator_side="right",
@@ -163,7 +163,7 @@ def test_editor_settings_from_config() -> None:
     assert editor == EditorSettings(
         preview_quality="performance",
         notification_display_sec=8,
-        residual_latency_ms=150,
+        audio_latency_ms=150,
         inspector_width=640,
         help_width=360,
         navigator_side="right",
@@ -181,7 +181,7 @@ def test_persist_editor_settings_writes_visualizer_editor_fields(
         editor=EditorConfig(
             preview_quality="ultra-performance",
             notification_display_sec=3,
-            residual_latency_ms=200,
+            audio_latency_ms=200,
             inspector_width=640,
             help_width=360,
             navigator_side="right",
@@ -194,7 +194,7 @@ def test_persist_editor_settings_writes_visualizer_editor_fields(
     loaded = load_user_config(user_path)
     assert loaded.editor.preview_quality == "ultra-performance"
     assert loaded.editor.notification_display_sec == 3
-    assert loaded.editor.residual_latency_ms == 200
+    assert loaded.editor.audio_latency_ms == 200
     assert loaded.editor.inspector_width == 640
     assert loaded.editor.help_width == 360
     assert loaded.editor.navigator_side == "right"
@@ -573,3 +573,44 @@ def test_theme_defaults_round_trips_and_rejects_blank(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="editor.theme must be a theme name"):
         load_user_config(config_path)
     assert saved_editor_settings(config_path).theme == DEFAULT_THEME
+
+
+def test_tap_latency_defaults_zero_round_trips_negative_and_clamps(
+    tmp_path: Path,
+) -> None:
+    from cleave.config_schema.editor import (
+        DEFAULT_TAP_LATENCY_MS,
+        MAX_TAP_LATENCY_MS,
+        MIN_TAP_LATENCY_MS,
+    )
+
+    config_path = tmp_path / "config.yaml"
+    assert load_user_config(config_path).editor.tap_latency_ms == 0
+    assert DEFAULT_TAP_LATENCY_MS == 0
+
+    write_user_config(replace(default_editor_settings(), tap_latency_ms=-40), config_path)
+    saved = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    assert saved["editor"]["tap_latency_ms"] == -40
+    assert load_user_config(config_path).editor.tap_latency_ms == -40
+
+    config_path.write_text(
+        yaml.safe_dump({"editor": {"tap_latency_ms": -900}}, sort_keys=False),
+        encoding="utf-8",
+    )
+    assert load_user_config(config_path).editor.tap_latency_ms == MIN_TAP_LATENCY_MS
+    config_path.write_text(
+        yaml.safe_dump({"editor": {"tap_latency_ms": 5000}}, sort_keys=False),
+        encoding="utf-8",
+    )
+    assert load_user_config(config_path).editor.tap_latency_ms == MAX_TAP_LATENCY_MS
+
+
+def test_old_residual_latency_key_is_ignored(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        yaml.safe_dump({"editor": {"residual_latency_ms": 120}}, sort_keys=False),
+        encoding="utf-8",
+    )
+    editor = load_user_config(config_path).editor
+    assert editor.audio_latency_ms == 0
+    assert editor.tap_latency_ms == 0

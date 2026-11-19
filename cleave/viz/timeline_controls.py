@@ -34,7 +34,13 @@ from cleave.viz.layer_visibility import (
     effective_layer_enabled,
     timeline_committed_level,
 )
-from cleave.viz.playback import PlaybackState, current_sec, seek, toggle_pause
+from cleave.viz.playback import (
+    PlaybackState,
+    current_sec,
+    seek,
+    tap_sec,
+    toggle_pause,
+)
 from cleave.viz.timeline_clip_edits import (
     ClipEditor,
     clip_edits_allowed,
@@ -207,7 +213,7 @@ class TimelineControls:
                     slot = self._slot_for_layer_index(_LAYER_KEY_INDEX[event.key])
                     if slot is not None:
                         self._drop_hold_cue_at(
-                            slot, current_sec(self.playback, self.duration_sec)
+                            slot, tap_sec(self.playback, self.duration_sec)
                         )
                 return True
 
@@ -542,7 +548,7 @@ class TimelineControls:
         tl = self.session.timeline
         if tl.recording:
             self._toggle_armed_layer_at(
-                slot, current_sec(self.playback, self.duration_sec)
+                slot, tap_sec(self.playback, self.duration_sec)
             )
         elif slot not in tl.armed_slots:
             # A row the timeline drives takes an override, then flips.
@@ -651,7 +657,7 @@ class TimelineControls:
                 tl.override_visible.pop(slot, None)
                 self._refresh_visibility()
             if tl.recording:
-                t_sec = current_sec(self.playback, self.duration_sec)
+                t_sec = tap_sec(self.playback, self.duration_sec)
                 tl.record_baseline[slot] = (
                     self._record_on_level(slot, t_sec)
                     if effective_layer_enabled(self.session, slot, t_sec)
@@ -669,7 +675,7 @@ class TimelineControls:
             return
 
         record_stop = self._snap_placement(
-            current_sec(self.playback, self.duration_sec)
+            tap_sec(self.playback, self.duration_sec)
         )
         punch_end = self._snap_placement(
             max(record_stop, tl.record_high_water_mark or record_stop)
@@ -704,7 +710,7 @@ class TimelineControls:
             self._notify("Arm at least one layer to record")
             return
 
-        t_sec = current_sec(self.playback, self.duration_sec)
+        t_sec = tap_sec(self.playback, self.duration_sec)
         snapped = self._snap_placement(t_sec)
         tl.record_baseline = {
             stem: (
@@ -742,7 +748,7 @@ class TimelineControls:
             return
 
         record_stop = self._snap_placement(
-            current_sec(self.playback, self.duration_sec)
+            tap_sec(self.playback, self.duration_sec)
         )
         punch_end = self._snap_placement(
             max(record_stop, tl.record_high_water_mark or record_stop)

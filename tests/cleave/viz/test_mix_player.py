@@ -438,3 +438,30 @@ def test_stop_pauses_without_gil_before_close(monkeypatch) -> None:
     player.stop()
     assert calls == ["gil_free_pause(7)", "close"]
     assert player._device is None
+
+
+def test_mix_player_click_lands_at_its_offset_on_both_channels() -> None:
+    mix = np.zeros(FREQUENCY_HZ * 2, dtype=np.float32)
+    player = MixPlayer(mix, FREQUENCY_HZ)
+    player.set_click_only(True)
+    offset = 100
+    player.set_click_schedule(((offset / FREQUENCY_HZ, True),))
+    out = np.zeros(DEFAULT_CHUNKSIZE * 2, dtype=np.float32)
+    player._fill_output_buffer(out)
+    left = out[0::2]
+    right = out[1::2]
+    accent = player._click_accent_sample
+    assert np.all(left[:offset] == 0.0)
+    np.testing.assert_allclose(left[offset : offset + 200], accent[:200])
+    np.testing.assert_array_equal(left, right)
+
+
+def test_mix_player_click_over_the_mix_clips_to_full_scale() -> None:
+    mix = np.full(FREQUENCY_HZ * 4, 0.9, dtype=np.float32)
+    player = MixPlayer(mix, FREQUENCY_HZ)
+    player.set_click_schedule(((0.0, True),))
+    out = np.zeros(DEFAULT_CHUNKSIZE * 2, dtype=np.float32)
+    player._fill_output_buffer(out)
+    assert np.max(out) <= 1.0
+    assert np.min(out) >= -1.0
+    assert np.max(out) == pytest.approx(1.0)

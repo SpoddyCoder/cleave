@@ -22,6 +22,7 @@ Rect = tuple[int, int, int, int]
 
 _SCRIM_WINDOW = "##top-scrim"
 _INFO_WINDOW = "##info-panel"
+_FLASH_WINDOW = "##calibration-flash"
 _SCRIM_FLAGS = (
     int(imgui.WindowFlags_.no_title_bar)
     | int(imgui.WindowFlags_.no_resize)
@@ -42,6 +43,12 @@ _INFO_FLAGS = (
     | int(imgui.WindowFlags_.no_focus_on_appearing)
     | int(imgui.WindowFlags_.no_nav)
     | int(imgui.WindowFlags_.no_bring_to_front_on_focus)
+)
+
+_FLASH_FLAGS = (
+    _SCRIM_FLAGS
+    | int(imgui.WindowFlags_.no_inputs)
+    | int(imgui.WindowFlags_.no_background)
 )
 
 
@@ -163,6 +170,40 @@ class InfoPanelSurface:
             return _current_rect()
         finally:
             imgui.end()
+
+
+class FlashSurface:
+    """Fills the visualiser with the calibration flash, above the scrim.
+
+    Push it before a modal so the dialog stays on top. It takes no pointer.
+    """
+
+    modal = False
+
+    def __init__(self, rect: Rect) -> None:
+        self.rect = rect
+
+    def draw(self) -> Rect:
+        x, y, w, h = self.rect
+        imgui.set_next_window_pos(imgui.ImVec2(float(x), float(y)), imgui.Cond_.always)
+        imgui.set_next_window_size(
+            imgui.ImVec2(float(w), float(h)), imgui.Cond_.always
+        )
+        imgui.push_style_var(imgui.StyleVar_.window_border_size, 0.0)
+        try:
+            imgui.begin(_FLASH_WINDOW, None, _FLASH_FLAGS)
+            try:
+                _raise(_FLASH_WINDOW)
+                imgui.get_window_draw_list().add_rect_filled(
+                    imgui.ImVec2(float(x), float(y)),
+                    imgui.ImVec2(float(x + w), float(y + h)),
+                    int(imgui.get_color_u32(rgba(palette().calibration_flash))),
+                )
+            finally:
+                imgui.end()
+        finally:
+            imgui.pop_style_var()
+        return (0, 0, 0, 0)
 
 
 class TopLayer:

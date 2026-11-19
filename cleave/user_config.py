@@ -28,7 +28,8 @@ from cleave.config_schema.editor import (
     DEFAULT_NAVIGATOR_SIDE,
     DEFAULT_EDITOR_PREVIEW_QUALITY,
     DEFAULT_NOTIFICATION_DISPLAY_SEC,
-    DEFAULT_RESIDUAL_LATENCY_MS,
+    DEFAULT_AUDIO_LATENCY_MS,
+    DEFAULT_TAP_LATENCY_MS,
     ColumnSide,
     EditorPreviewQuality,
     dump_editor_section,
@@ -73,7 +74,8 @@ def user_config_path() -> Path:
 class EditorSettings:
     preview_quality: EditorPreviewQuality
     notification_display_sec: int
-    residual_latency_ms: int
+    audio_latency_ms: int
+    tap_latency_ms: int = DEFAULT_TAP_LATENCY_MS
     inspector_width: int = DEFAULT_INSPECTOR_WIDTH
     help_width: int = DEFAULT_HELP_WIDTH
     navigator_height: int = DEFAULT_NAVIGATOR_HEIGHT
@@ -100,7 +102,8 @@ def default_editor_settings() -> EditorSettings:
     return EditorSettings(
         preview_quality=DEFAULT_EDITOR_PREVIEW_QUALITY,
         notification_display_sec=DEFAULT_NOTIFICATION_DISPLAY_SEC,
-        residual_latency_ms=DEFAULT_RESIDUAL_LATENCY_MS,
+        audio_latency_ms=DEFAULT_AUDIO_LATENCY_MS,
+        tap_latency_ms=DEFAULT_TAP_LATENCY_MS,
         inspector_width=DEFAULT_INSPECTOR_WIDTH,
         help_width=DEFAULT_HELP_WIDTH,
         navigator_height=DEFAULT_NAVIGATOR_HEIGHT,
@@ -185,7 +188,8 @@ def editor_settings_from_config(cfg: EditorConfig) -> EditorSettings:
     return EditorSettings(
         preview_quality=cfg.preview_quality,
         notification_display_sec=cfg.notification_display_sec,
-        residual_latency_ms=cfg.residual_latency_ms,
+        audio_latency_ms=cfg.audio_latency_ms,
+        tap_latency_ms=cfg.tap_latency_ms,
         inspector_width=cfg.inspector_width,
         help_width=cfg.help_width,
         navigator_height=cfg.navigator_height,

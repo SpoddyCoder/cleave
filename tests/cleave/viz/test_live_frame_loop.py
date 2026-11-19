@@ -76,6 +76,7 @@ def _quiet_controls() -> MagicMock:
     controls.window = WindowControls()
     controls.navigator.history_targets.return_value = (None, None)
     controls.tap_sync.showing_progress = False
+    controls.av_sync.flash_level.return_value = 0.0
     controls.project_switch.active = False
     controls.notification_active.return_value = PanelNotificationActive(
         persistent_message=None,
@@ -88,7 +89,9 @@ def _quiet_controls() -> MagicMock:
 
 
 def _loop_with_fake_shell(rt: MagicMock) -> tuple[LiveFrameLoop, SimpleNamespace]:
-    shell = SimpleNamespace(top_layer=_FakeTopLayer(), transport_notice_clicked=True)
+    shell = SimpleNamespace(
+        top_layer=_FakeTopLayer(), transport_notice_clicked=True, layout=None
+    )
     with (
         patch("cleave.viz.live_frame_loop.build_shell", return_value=shell),
         patch("cleave.viz.live_frame_loop.pygame"),

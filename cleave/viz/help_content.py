@@ -182,6 +182,8 @@ _INSPECTOR_COMMAND_KINDS = {
     "settings.open_crash_log_folder": RowKind.SETTINGS_DEV_TOOLS_OPEN_CRASH_LOG_FOLDER,
     "settings.open_themes_folder": RowKind.SETTINGS_UI_OPEN_THEMES_FOLDER,
     "settings.reload_themes": RowKind.SETTINGS_UI_RELOAD_THEMES,
+    "settings.measure_latency": RowKind.SETTINGS_MEASURE_AUDIO_LATENCY,
+    "settings.calibrate_tap_timing": RowKind.SETTINGS_CALIBRATE_TAP_TIMING,
 }
 
 

@@ -246,7 +246,10 @@ class LiveFrameLoop:
             shell.draw_play_frame(self.overlay_dt)
             return
         notice = rt.controls.notification_active()
-        self.prompts.push(shell.top_layer)
+        layout = shell.layout
+        self.prompts.push(
+            shell.top_layer, None if layout is None else layout.visualiser
+        )
         position = current_sec(rt.playback, rt.seed.duration_sec)
         signals = rt.seed.signals
         readout = TransportReadout(

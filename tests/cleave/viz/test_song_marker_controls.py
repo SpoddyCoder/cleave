@@ -171,3 +171,31 @@ def test_set_type_changes_the_type_and_warns() -> None:
     assert notes == ["begin has no crescendo/diminuendo after it"]
     controller.set_type(0, "begin")
     assert len(notes) == 1
+
+
+def test_drop_while_playing_subtracts_tap_latency() -> None:
+    controller, session, _modal = _make_controller()
+    player = controller._playback.player
+    player.seek(15.25)
+    player.set_tap_latency_sec(0.25)
+    controller.drop()
+    assert session.song_markers.times == [15.0]
+
+
+def test_drop_while_paused_ignores_tap_latency() -> None:
+    controller, session, _modal = _make_controller()
+    player = controller._playback.player
+    player.seek(15.0)
+    player.set_tap_latency_sec(0.25)
+    player.pause(True)
+    controller.drop()
+    assert session.song_markers.times == [15.0]
+
+
+def test_drop_with_negative_tap_latency_lands_later() -> None:
+    controller, session, _modal = _make_controller()
+    player = controller._playback.player
+    player.seek(15.0)
+    player.set_tap_latency_sec(-0.05)
+    controller.drop()
+    assert session.song_markers.times == [15.05]

@@ -1,74 +1,73 @@
-"""Tap-to-sync calibration orchestration for latency compensation."""
+"""Calibrate tap timing: measure tap latency from Enter presses on a click track."""
 
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 from cleave.config import CleaveConfig
 from cleave.config_schema.editor import (
-    MAX_RESIDUAL_LATENCY_MS,
-    clamp_residual_latency_ms,
+    MAX_TAP_LATENCY_MS,
+    MIN_TAP_LATENCY_MS,
+    clamp_tap_latency_ms,
 )
-from cleave.user_config import persist_editor_settings
-from cleave.viz.focus_nav import FocusCursor
+from cleave.viz.calibration_clicks import CalibrationClicks
 from cleave.viz.info_panel import InfoPanelViewState
 from cleave.viz.modal import FormField, FormSpec, FormValues, ModalHost
-from cleave.viz.shell_focus import ShellRegion
-from cleave.viz.playback import PlaybackState, toggle_pause
 from cleave.viz.tap_sync import (
-    CONSISTENCY_WINDOW,
+    MIN_KEPT_TAPS,
+    SETTLED_SEC,
     accept_tap_for_accent,
-    append_streak_delta,
-    build_metronome_schedule,
-    delta_spread_sec,
-    mean_latency_from_deltas,
+    estimate_tap_latency,
     metronome_accent_times,
-    streak_ready_to_lock,
+    push_tap_delta,
+    tap_estimate_settled,
 )
-from cleave.viz.transport_clock import MAX_RESIDUAL_LATENCY_SEC
 
-_TAP_SYNC_CONFIRM_TITLE = "Measure Audio Latency"
+_TAP_SYNC_CONFIRM_TITLE = "Calibrate tap timing"
 _TAP_SYNC_CONFIRM_BODY = (
-    "A 140 BPM click track will play: a long low tone, then three short clicks. "
-    "Press Enter on each long low tone until the latency is detected."
+    "Press Enter on each long low tone until your timing settles."
 )
 
-_APPLY_TITLE = "Detected audio latency"
-# Matches the Settings > Preview audio latency row: 10 ms, 50 ms large.
+_APPLY_TITLE = "Detected tap latency"
+# Matches the Settings > Preview tap latency row: 10 ms, 50 ms large.
 _LATENCY_STEP_MS = 10
 _LATENCY_LARGE_STEPS = 5
 _LATENCY_HELP = (
-    "Compensates for audio delay Cleave cannot measure. It starts at the measured value, and Left/Right adjust it in 10 ms steps.",
+    "Plus means you tap after the beat, minus before it.",
 )
 
 
+def format_tap_latency_ms(ms: int) -> str:
+    return f"{ms:+d} ms"
+
+
 def latency_options_ms(detected_ms: int) -> tuple[int, ...]:
-    """Every 10 ms from 0 to the maximum, plus the measured value in order."""
-    steps = range(0, MAX_RESIDUAL_LATENCY_MS + 1, _LATENCY_STEP_MS)
-    return tuple(sorted({*steps, clamp_residual_latency_ms(detected_ms)}))
-
-
-@dataclass(frozen=True)
-class TapSyncUiSnapshot:
-    help_visible: bool
-    timeline_panel_open: bool
-    focus_cursor: FocusCursor
-    shell_region: ShellRegion
+    """Every 10 ms across the tap range, plus the measured value in order."""
+    steps = range(MIN_TAP_LATENCY_MS, MAX_TAP_LATENCY_MS + 1, _LATENCY_STEP_MS)
+    return tuple(sorted({*steps, clamp_tap_latency_ms(detected_ms)}))
 
 
 @dataclass(frozen=True)
 class TapSyncProgressView:
-    streak: int
-    spread_ms: int | None
+    kept: int
+    margin_ms: int | None
     estimate_ms: int | None
+
+
+def _ms(sec: float) -> int:
+    return int(round(sec * 1000.0))
 
 
 def tap_sync_info_panel(progress: TapSyncProgressView) -> InfoPanelViewState:
     """Copy for the detection box shown while calibration is listening."""
-    spread_text = "--" if progress.spread_ms is None else f"{progress.spread_ms} ms"
+    margin_text = (
+        "--" if progress.margin_ms is None else f"+/-{progress.margin_ms} ms"
+    )
     estimate_text = (
-        "--" if progress.estimate_ms is None else f"{progress.estimate_ms} ms"
+        "--"
+        if progress.estimate_ms is None
+        else format_tap_latency_ms(progress.estimate_ms)
     )
     return InfoPanelViewState(
         title_lines=(
@@ -76,8 +75,8 @@ def tap_sync_info_panel(progress: TapSyncProgressView) -> InfoPanelViewState:
             "Tap Enter on the long low tone",
         ),
         body_lines=(
-            f"Streak: {progress.streak}/{CONSISTENCY_WINDOW}",
-            f"Spread: {spread_text}",
+            f"Taps: {progress.kept} (needs {MIN_KEPT_TAPS})",
+            f"Settled to: {margin_text} (needs +/-{_ms(SETTLED_SEC)} ms)",
             f"Estimate: {estimate_text}",
         ),
         footer_line="Esc to cancel",
@@ -85,35 +84,27 @@ def tap_sync_info_panel(progress: TapSyncProgressView) -> InfoPanelViewState:
 
 
 class TapSyncControls:
-    """Thin controller for measure-latency calibration."""
+    """Thin controller for tap timing calibration."""
 
     def __init__(
         self,
         cfg: CleaveConfig,
-        playback: PlaybackState,
-        duration_sec: float,
+        clicks: CalibrationClicks,
         modal_host: ModalHost,
         *,
         on_notification: Callable[[str], None],
-        on_apply_residual_latency: Callable[[], None],
-        on_calibration_ui_begin: Callable[[], TapSyncUiSnapshot],
-        on_calibration_ui_restore: Callable[[TapSyncUiSnapshot], None],
+        on_apply_tap_latency: Callable[[int], None],
     ) -> None:
         self.cfg = cfg
-        self.playback = playback
-        self.duration_sec = duration_sec
+        self._clicks = clicks
         self._modal_host = modal_host
         self._on_notification = on_notification
-        self._on_apply_residual_latency = on_apply_residual_latency
-        self._on_calibration_ui_begin = on_calibration_ui_begin
-        self._on_calibration_ui_restore = on_calibration_ui_restore
+        self._on_apply_tap_latency = on_apply_tap_latency
         self._active = False
         self._awaiting_confirm = False
-        self._taps: list[float] = []
-        self._streak_deltas: list[float] = []
+        self._tap_deltas: list[float] = []
         self._last_accent_index: int | None = None
         self._metronome_accent_times: tuple[float, ...] = ()
-        self._ui_snapshot: TapSyncUiSnapshot | None = None
 
     @property
     def active(self) -> bool:
@@ -130,34 +121,19 @@ class TapSyncControls:
     def progress_view(self) -> TapSyncProgressView | None:
         if not self.showing_progress:
             return None
-        spread_sec = delta_spread_sec(self._streak_deltas)
-        spread_ms = (
-            None if spread_sec is None else int(round(spread_sec * 1000.0))
-        )
-        estimate_ms = None
-        if self._streak_deltas:
-            estimate_sec = mean_latency_from_deltas(self._streak_deltas)
-            estimate_ms = int(round(estimate_sec * 1000.0))
+        estimate = estimate_tap_latency(self._tap_deltas)
         return TapSyncProgressView(
-            streak=len(self._streak_deltas),
-            spread_ms=spread_ms,
-            estimate_ms=estimate_ms,
+            kept=estimate.kept,
+            margin_ms=(
+                None if estimate.margin_sec is None else _ms(estimate.margin_sec)
+            ),
+            estimate_ms=(
+                None if estimate.latency_sec is None else _ms(estimate.latency_sec)
+            ),
         )
-
-    def _pause_transport(self) -> None:
-        if not self.playback.paused:
-            toggle_pause(self.playback, self.duration_sec)
-
-    def _run_click_device_while_transport_paused(self) -> None:
-        """Run SDL audio for metronome clicks while transport stays paused."""
-        self.playback.player.pause(False)
-
-    def _stop_click_device_leave_transport_paused(self) -> None:
-        self.playback.paused = True
-        self.playback.player.pause(True)
 
     def prompt_start(self) -> None:
-        self._pause_transport()
+        self._clicks.pause_transport()
         self._modal_host.prompt_confirm(
             _TAP_SYNC_CONFIRM_TITLE,
             "Start",
@@ -166,50 +142,31 @@ class TapSyncControls:
         )
 
     def _begin_calibration(self) -> None:
-        self._pause_transport()
-        self._ui_snapshot = self._on_calibration_ui_begin()
-        start_sec = self.playback.player.file_position_sec()
-        schedule = build_metronome_schedule(start_sec, self.duration_sec)
+        schedule = self._clicks.begin()
         self._metronome_accent_times = metronome_accent_times(schedule)
-        click_schedule = tuple(
-            (click.time_sec, click.accented) for click in schedule
-        )
         self._active = True
         self._awaiting_confirm = False
-        self._taps.clear()
-        self._streak_deltas.clear()
+        self._tap_deltas.clear()
         self._last_accent_index = None
-        self.playback.player.set_click_only(True)
-        self.playback.player.set_click_schedule(click_schedule)
-        self._run_click_device_while_transport_paused()
 
     def cancel(self) -> None:
         if not self._active:
             return
-        self._restore_calibration_ui()
+        self._clicks.restore_ui()
         self._finish_calibration()
-
-    def _restore_calibration_ui(self) -> None:
-        snapshot = self._ui_snapshot
-        self._ui_snapshot = None
-        if snapshot is not None:
-            self._on_calibration_ui_restore(snapshot)
 
     def _finish_calibration(self) -> None:
         self._active = False
         self._awaiting_confirm = False
-        self._taps.clear()
-        self._streak_deltas.clear()
+        self._tap_deltas.clear()
         self._last_accent_index = None
         self._metronome_accent_times = ()
-        self.playback.player.set_click_schedule(None)
-        self.playback.player.set_click_only(False)
-        self._stop_click_device_leave_transport_paused()
+        self._clicks.stop_clicks()
 
     def record_tap(self) -> None:
         if not self._active or self._awaiting_confirm:
             return
-        tap = self.playback.player.audible_position_zero_residual_latency_sec()
+        tap = self._clicks.playback.player.raw_audible_position_sec()
         accent_index, delta = accept_tap_for_accent(
             tap,
             self._metronome_accent_times,
@@ -218,28 +175,22 @@ class TapSyncControls:
         if accent_index is None or delta is None:
             return
         self._last_accent_index = accent_index
-        self._taps.append(tap)
-        self._streak_deltas = append_streak_delta(self._streak_deltas, delta)
-        if streak_ready_to_lock(self._streak_deltas):
+        self._tap_deltas = push_tap_delta(self._tap_deltas, delta)
+        if tap_estimate_settled(estimate_tap_latency(self._tap_deltas)):
             self._prompt_apply_detected_latency()
 
-    def _proposed_latency_sec(self) -> float:
-        return max(
-            0.0,
-            min(mean_latency_from_deltas(self._streak_deltas), MAX_RESIDUAL_LATENCY_SEC),
-        )
+    def _proposed_latency_ms(self) -> int:
+        latency_sec = estimate_tap_latency(self._tap_deltas).latency_sec
+        if latency_sec is None:
+            return 0
+        return clamp_tap_latency_ms(latency_sec * 1000.0)
 
     def _prompt_apply_detected_latency(self) -> None:
-        self.playback.player.set_click_schedule(None)
-        self.playback.player.set_click_only(False)
-        self._stop_click_device_leave_transport_paused()
-        self._restore_calibration_ui()
+        self._clicks.end()
         self._awaiting_confirm = True
-        latency_ms = clamp_residual_latency_ms(
-            int(round(self._proposed_latency_sec() * 1000.0))
-        )
+        latency_ms = self._proposed_latency_ms()
         options = latency_options_ms(latency_ms)
-        current_ms = self.cfg.editor.residual_latency_ms
+        current_ms = self.cfg.editor.tap_latency_ms
 
         def apply(values: FormValues) -> None:
             self._apply_detected_latency(options[values["latency"]])
@@ -250,8 +201,8 @@ class TapSyncControls:
                 fields=(
                     FormField(
                         "latency",
-                        "audio latency",
-                        tuple(f"{ms} ms" for ms in options),
+                        "tap latency",
+                        tuple(format_tap_latency_ms(ms) for ms in options),
                         options.index(latency_ms),
                         help=_LATENCY_HELP,
                         stepper=True,
@@ -261,16 +212,16 @@ class TapSyncControls:
                 confirm_label="Apply",
                 on_confirm=apply,
                 on_cancel=self._dismiss_without_apply,
-                info=lambda _values: f"(now {current_ms} ms)",
+                info=lambda _values: f"(now {format_tap_latency_ms(current_ms)})",
             )
         )
 
     def _apply_detected_latency(self, latency_ms: int) -> None:
-        self.cfg.editor = replace(self.cfg.editor, residual_latency_ms=latency_ms)
-        self._on_apply_residual_latency()
-        persist_editor_settings(self.cfg)
+        self._on_apply_tap_latency(latency_ms)
         self._finish_calibration()
-        self._on_notification(f"Audio latency set to {latency_ms} ms")
+        self._on_notification(
+            f"Tap latency set to {format_tap_latency_ms(latency_ms)}"
+        )
 
     def _dismiss_without_apply(self) -> None:
         self._finish_calibration()

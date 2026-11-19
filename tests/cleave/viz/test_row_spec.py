@@ -137,7 +137,8 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.SETTINGS_HELP_SIDE,
         RowKind.SETTINGS_UI_SCALE,
         RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY,
-        RowKind.SETTINGS_RESIDUAL_LATENCY_MS,
+        RowKind.SETTINGS_AUDIO_LATENCY_MS,
+        RowKind.SETTINGS_TAP_LATENCY_MS,
         RowKind.PROJECT_RESOLUTION_WIDTH,
         RowKind.PROJECT_RESOLUTION_HEIGHT,
         RowKind.PROJECT_MILKDROP_BEAT_SENSITIVITY,
@@ -331,7 +332,7 @@ def test_parent_group_on_row_specs() -> None:
     assert row_spec(RowKind.SETTINGS_PREVIEW_QUALITY).parent_group == (
         "settings_preview"
     )
-    assert row_spec(RowKind.SETTINGS_RESIDUAL_LATENCY_MS).parent_group == (
+    assert row_spec(RowKind.SETTINGS_AUDIO_LATENCY_MS).parent_group == (
         "settings_preview"
     )
     assert row_spec(RowKind.SETTINGS_PREVIEW_HEADER).parent_group == "settings"

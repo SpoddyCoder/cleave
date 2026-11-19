@@ -4189,7 +4189,7 @@ def test_settings_notification_display_writes_user_config_without_dirty(
     )
 
 
-def test_settings_residual_latency_writes_user_config_without_dirty(
+def test_settings_audio_latency_writes_user_config_without_dirty(
     tmp_path: Path,
 ) -> None:
     user_path = tmp_path / "config.yaml"
@@ -4197,12 +4197,38 @@ def test_settings_residual_latency_writes_user_config_without_dirty(
     controls.cfg.user_config_path = user_path
     assert not controls.config_dirty
     _expand_settings_preview(controls)
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_RESIDUAL_LATENCY_MS)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_AUDIO_LATENCY_MS)
     _press_focused(controls, keydown(pygame.K_RIGHT))
     assert not controls.config_dirty
     assert user_path.is_file()
     loaded = load_user_config(user_path)
-    assert loaded.editor.residual_latency_ms == controls.cfg.editor.residual_latency_ms
+    assert loaded.editor.audio_latency_ms == controls.cfg.editor.audio_latency_ms
+
+
+def test_settings_tap_latency_steps_below_zero_and_reaches_the_player(
+    tmp_path: Path,
+) -> None:
+    user_path = tmp_path / "config.yaml"
+    controls = make_controls(("layer_1",))
+    controls.cfg.user_config_path = user_path
+    _expand_settings_preview(controls)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_TAP_LATENCY_MS)
+    _press_focused(controls, keydown(pygame.K_LEFT))
+    assert controls.cfg.editor.tap_latency_ms == -10
+    assert controls.playback.player._tap_latency_sec == pytest.approx(-0.01)
+    assert not controls.config_dirty
+    assert load_user_config(user_path).editor.tap_latency_ms == -10
+
+
+def test_settings_audio_latency_leaves_tap_latency_alone(tmp_path: Path) -> None:
+    controls = make_controls(("layer_1",))
+    controls.cfg.user_config_path = tmp_path / "config.yaml"
+    _expand_settings_preview(controls)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_AUDIO_LATENCY_MS)
+    _press_focused(controls, keydown(pygame.K_RIGHT))
+    assert controls.cfg.editor.audio_latency_ms == 10
+    assert controls.cfg.editor.tap_latency_ms == 0
+    assert controls.playback.player._tap_latency_sec == 0.0
 
 
 def test_settings_step_column_sides(tmp_path: Path) -> None:

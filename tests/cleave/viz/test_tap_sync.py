@@ -5,29 +5,27 @@ from __future__ import annotations
 import pytest
 
 from cleave.viz.tap_sync import (
-    CONSISTENCY_WINDOW,
+    MIN_KEPT_TAPS,
+    OUTLIER_SEC,
+    SETTLED_SEC,
+    TAP_HISTORY,
+    estimate_tap_latency,
+    kept_tap_deltas,
+    push_tap_delta,
+    tap_estimate_settled,
     MAX_ACCENT_ACCEPT_SEC,
     MAX_ACCENT_EARLY_SEC,
-    MAX_DELTA_SPREAD_SEC,
     METRONOME_BPM,
     METRONOME_QUARTER_SEC,
-    MIN_TAP_COUNT,
     accept_tap_for_accent,
-    append_streak_delta,
     build_metronome_schedule,
-    delta_spread_sec,
-    infer_residual_latency_sec,
-    mean_latency_from_deltas,
     metronome_accent_times,
-    metronome_click_times,
-    streak_ready_to_lock,
-    tap_delta_sec,
 )
 
 
 def test_build_metronome_schedule_quarter_spacing() -> None:
     schedule = build_metronome_schedule(1.0, 3.0)
-    times = metronome_click_times(schedule)
+    times = tuple(click.time_sec for click in schedule)
     quarter = 60.0 / METRONOME_BPM
     assert times == pytest.approx(tuple(1.0 + index * quarter for index in range(len(times))))
     assert METRONOME_QUARTER_SEC == pytest.approx(60.0 / METRONOME_BPM)
@@ -57,12 +55,6 @@ def test_metronome_accent_times_every_bar_at_140_bpm() -> None:
     assert expected[1] - expected[0] == pytest.approx(bar_sec)
 
 
-def test_tap_delta_sec_nearest_click() -> None:
-    clicks = (0.0, 0.5, 1.0)
-    assert tap_delta_sec(0.22, clicks) == pytest.approx(0.22)
-    assert tap_delta_sec(0.72, clicks) == pytest.approx(0.22)
-
-
 def test_accept_tap_for_accent_maps_to_nearest_forward_accent() -> None:
     bar_sec = 4.0 * 60.0 / METRONOME_BPM
     accents = (0.0, bar_sec, 2 * bar_sec, 3 * bar_sec)
@@ -90,7 +82,7 @@ def test_accept_tap_for_accent_rejects_quiet_quarter_nearby() -> None:
     assert quiet_tap_delta is None
 
 
-def test_accept_tap_for_accent_high_residual_stays_on_accent_not_quiet() -> None:
+def test_accept_tap_for_accent_late_tap_stays_on_accent_not_quiet() -> None:
     bar_sec = 4.0 * 60.0 / METRONOME_BPM
     accents = (0.0, bar_sec, 2 * bar_sec, 3 * bar_sec)
     index, delta = accept_tap_for_accent(0.3, accents, None)
@@ -159,75 +151,76 @@ def test_accept_tap_for_accent_rejects_taps_beyond_max_distance() -> None:
     assert MAX_ACCENT_ACCEPT_SEC == pytest.approx(0.75)
 
 
-def test_append_streak_delta_grows_when_consistent() -> None:
-    streak = append_streak_delta([], 0.20)
-    streak = append_streak_delta(streak, 0.21)
-    streak = append_streak_delta(streak, 0.19)
-    assert streak == pytest.approx([0.20, 0.21, 0.19])
+def test_push_tap_delta_keeps_only_the_most_recent_taps() -> None:
+    history: list[float] = []
+    for index in range(TAP_HISTORY + 3):
+        history = push_tap_delta(history, float(index))
+    assert len(history) == TAP_HISTORY
+    assert history[0] == 3.0
+    assert history[-1] == float(TAP_HISTORY + 2)
 
 
-def test_append_streak_delta_resets_when_spread_breaks() -> None:
-    streak = append_streak_delta([], 0.20)
-    streak = append_streak_delta(streak, 0.21)
-    streak = append_streak_delta(streak, 0.50)
-    assert streak == pytest.approx([0.50])
+def test_kept_tap_deltas_sets_aside_a_stray_tap() -> None:
+    history = [0.20, 0.21, 0.19, 0.20, 0.45, 0.205]
+    kept = kept_tap_deltas(history)
+    assert 0.45 not in kept
+    assert len(kept) == 5
+    assert OUTLIER_SEC == pytest.approx(0.05)
 
 
-def test_streak_ready_to_lock_within_spread() -> None:
-    streak = [0.20, 0.21, 0.19, 0.20]
-    assert streak_ready_to_lock(streak) is True
-    assert MAX_DELTA_SPREAD_SEC == pytest.approx(0.030)
+def test_estimate_is_the_mean_of_kept_taps_with_its_standard_error() -> None:
+    history = [0.18, 0.22, 0.18, 0.22]
+    estimate = estimate_tap_latency(history)
+    assert estimate.taps == 4
+    assert estimate.kept == 4
+    assert estimate.latency_sec == pytest.approx(0.20)
+    # stdev 0.0231 over sqrt(4)
+    assert estimate.margin_sec == pytest.approx(0.011547, abs=1e-5)
 
 
-def test_streak_ready_to_lock_rejects_wide_spread() -> None:
-    streak = [0.10, 0.20, 0.30, 0.40]
-    assert streak_ready_to_lock(streak) is False
+def test_estimate_with_one_tap_has_no_margin() -> None:
+    estimate = estimate_tap_latency([0.2])
+    assert estimate.latency_sec == pytest.approx(0.2)
+    assert estimate.margin_sec is None
+    assert estimate_tap_latency([]).latency_sec is None
 
 
-def test_streak_ready_to_lock_requires_full_window() -> None:
-    streak = [0.20, 0.21, 0.19]
-    assert streak_ready_to_lock(streak, window=CONSISTENCY_WINDOW) is False
+def test_a_stray_tap_does_not_move_the_estimate() -> None:
+    steady = [0.20, 0.21, 0.19, 0.20, 0.21, 0.19]
+    estimate = estimate_tap_latency([*steady[:3], 0.60, *steady[3:]])
+    assert estimate.kept == len(steady)
+    assert estimate.latency_sec == pytest.approx(0.20)
+    assert tap_estimate_settled(estimate) is True
 
 
-def test_mean_latency_from_deltas_uses_last_window() -> None:
-    deltas = (0.10, 0.20, 0.21, 0.19, 0.20)
-    assert mean_latency_from_deltas(deltas) == pytest.approx(0.20)
+def test_settled_needs_enough_kept_taps() -> None:
+    estimate = estimate_tap_latency([0.20] * (MIN_KEPT_TAPS - 1))
+    assert tap_estimate_settled(estimate) is False
+    estimate = estimate_tap_latency([0.20] * MIN_KEPT_TAPS)
+    assert tap_estimate_settled(estimate) is True
 
 
-def test_delta_spread_sec_requires_at_least_two_deltas() -> None:
-    deltas = (0.20,)
-    assert delta_spread_sec(deltas) is None
+def test_loose_taps_settle_once_there_are_enough_of_them() -> None:
+    # Taps 20 ms either side of 0.2 s: six do not agree closely enough,
+    # but the standard error shrinks as more arrive.
+    loose = [0.18, 0.22] * 3
+    estimate = estimate_tap_latency(loose)
+    assert estimate.margin_sec > SETTLED_SEC
+    assert tap_estimate_settled(estimate) is False
+    estimate = estimate_tap_latency([0.18, 0.22] * 5)
+    assert estimate.margin_sec <= SETTLED_SEC
+    assert tap_estimate_settled(estimate) is True
+    assert estimate.latency_sec == pytest.approx(0.20)
 
 
-def test_delta_spread_sec_uses_full_streak_buffer() -> None:
-    deltas = (0.10, 0.20, 0.21, 0.19, 0.20)
-    assert delta_spread_sec(deltas) == pytest.approx(0.11)
+def test_a_full_history_settles_even_when_loose() -> None:
+    wide = [0.16, 0.24] * (TAP_HISTORY // 2)
+    estimate = estimate_tap_latency(wide)
+    assert estimate.margin_sec > SETTLED_SEC
+    assert tap_estimate_settled(estimate) is True
 
 
-def test_infer_residual_latency_median_of_nearest_click_deltas() -> None:
-    clicks = (0.0, 1.0, 2.0, 3.0)
-    taps = (0.2, 1.2, 2.2, 3.2)
-    assert infer_residual_latency_sec(taps, clicks) == pytest.approx(0.2)
-
-
-def test_infer_residual_latency_clamps_high() -> None:
-    clicks = (0.0, 10.0, 20.0, 30.0)
-    taps = (5.0, 15.0, 25.0, 35.0)
-    assert infer_residual_latency_sec(taps, clicks) == pytest.approx(2.0)
-
-
-def test_infer_residual_latency_clamps_low() -> None:
-    clicks = (1.0, 2.0, 3.0, 4.0)
-    taps = (0.0, 0.1, 0.2, 0.3)
-    assert infer_residual_latency_sec(taps, clicks) == pytest.approx(0.0)
-
-
-def test_infer_residual_latency_requires_min_taps() -> None:
-    clicks = (0.0, 1.0, 2.0, 3.0)
-    assert infer_residual_latency_sec((0.2, 1.2, 2.2), clicks) == 0.0
-    assert infer_residual_latency_sec((), clicks) == 0.0
-
-
-def test_infer_residual_latency_empty_clicks() -> None:
-    taps = tuple(0.2 + i for i in range(MIN_TAP_COUNT))
-    assert infer_residual_latency_sec(taps, ()) == 0.0
+def test_negative_taps_settle_below_zero() -> None:
+    estimate = estimate_tap_latency([-0.03, -0.02, -0.04, -0.03, -0.025, -0.035])
+    assert tap_estimate_settled(estimate) is True
+    assert estimate.latency_sec == pytest.approx(-0.03)
