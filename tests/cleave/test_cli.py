@@ -49,7 +49,7 @@ def _mock_loading_window() -> MagicMock:
 @pytest.fixture(autouse=True)
 def _skip_welcome(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "cleave.first_run.welcome_needed", lambda _needed, _state: False
+        "cleave.first_run.welcome_needed", lambda _needed, _state, **_kw: False
     )
 
 
@@ -1452,7 +1452,7 @@ def test_cmd_play_runs_welcome_when_needed(
 ) -> None:
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     monkeypatch.setattr(
-        "cleave.first_run.welcome_needed", lambda _needed, _state: True
+        "cleave.first_run.welcome_needed", lambda _needed, _state, **_kw: True
     )
     project = _complete_project(tmp_path)
     window = _mock_loading_window()
@@ -1475,7 +1475,7 @@ def test_cmd_play_welcome_quit_closes_window(
 ) -> None:
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     monkeypatch.setattr(
-        "cleave.first_run.welcome_needed", lambda _needed, _state: True
+        "cleave.first_run.welcome_needed", lambda _needed, _state, **_kw: True
     )
     window = _mock_loading_window()
 

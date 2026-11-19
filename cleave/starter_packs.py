@@ -1,8 +1,9 @@
 """First-run Milkdrop preset and texture pack downloads into ``data_dir``.
 
-The editor offers them in the welcome step (``cleave.first_run``). This module is pygame-free: fetch zipballs,
-extract the GitHub top-level folder, and move it into place. Failed fetches
-raise :class:`StarterPackError`.
+The editor offers each pack as its own line in the welcome step
+(``cleave.first_run``). This module is pygame-free: fetch a zipball, extract
+the GitHub top-level folder, and move it into place. Failed fetches raise
+:class:`StarterPackError`.
 """
 
 from __future__ import annotations
@@ -28,14 +29,12 @@ StarterPackProgress = Callable[[str, float | None], None]
 
 _GITHUB_OWNER = "projectM-visualizer"
 _ZIP_BRANCH = "master"
-STARTER_PACKS_SIZE_MB = 60
 _USER_AGENT = "Cleave"
 _DOWNLOAD_TIMEOUT_S = 300
 _CHUNK_SIZE = 64 * 1024
 _PROGRESS_MIN_INTERVAL_SEC = 0.1
 _PROGRESS_MIN_DELTA = 0.01
 _EXTRACT_PULSE_EVERY = 100
-_DOWNLOAD_MESSAGE = f"Downloading starter packs (~{STARTER_PACKS_SIZE_MB} MB)…"
 
 
 class StarterPackError(RuntimeError):
@@ -48,36 +47,32 @@ class PackSpec:
 
     repo: str
     dest_parent_key: str
-    dest_name: str
-    url: str
+    size_mb: int
+
+    @property
+    def dest_name(self) -> str:
+        return self.repo
+
+    @property
+    def url(self) -> str:
+        return (
+            f"https://github.com/{_GITHUB_OWNER}/{self.repo}/"
+            f"archive/refs/heads/{_ZIP_BRANCH}.zip"
+        )
 
 
-def _zipball_url(repo: str, branch: str) -> str:
-    return (
-        f"https://github.com/{_GITHUB_OWNER}/{repo}/"
-        f"archive/refs/heads/{branch}.zip"
-    )
-
+MILKDROP_ORIGINAL = PackSpec("presets-milkdrop-original", "presets", 2)
+MILKDROP_TEXTURES = PackSpec("presets-milkdrop-texture-pack", "textures", 4)
+CREAM_OF_THE_CROP = PackSpec("presets-cream-of-the-crop", "presets", 31)
+PROJECTM_CLASSIC = PackSpec("presets-projectm-classic", "presets", 9)
+EN_D = PackSpec("presets-en-d", "presets", 3)
 
 STARTER_PACKS: tuple[PackSpec, ...] = (
-    PackSpec(
-        repo="presets-cream-of-the-crop",
-        dest_parent_key="presets",
-        dest_name="presets-cream-of-the-crop",
-        url=_zipball_url("presets-cream-of-the-crop", _ZIP_BRANCH),
-    ),
-    PackSpec(
-        repo="presets-milkdrop-original",
-        dest_parent_key="presets",
-        dest_name="presets-milkdrop-original",
-        url=_zipball_url("presets-milkdrop-original", _ZIP_BRANCH),
-    ),
-    PackSpec(
-        repo="presets-milkdrop-texture-pack",
-        dest_parent_key="textures",
-        dest_name="presets-milkdrop-texture-pack",
-        url=_zipball_url("presets-milkdrop-texture-pack", _ZIP_BRANCH),
-    ),
+    MILKDROP_ORIGINAL,
+    MILKDROP_TEXTURES,
+    CREAM_OF_THE_CROP,
+    PROJECTM_CLASSIC,
+    EN_D,
 )
 
 
@@ -89,28 +84,29 @@ def starter_packs_needed() -> bool:
     return not dir_has_presets(root)
 
 
-def download_starter_packs(
+def pack_needed(pack: PackSpec) -> bool:
+    """True when *pack* is not yet in :func:`data_dir`."""
+    return not _already_present(_pack_dest(pack))
+
+
+def download_pack(
+    pack: PackSpec,
     on_progress: StarterPackProgress | None = None,
 ) -> None:
-    """Download missing starter packs into :func:`data_dir`.
+    """Download *pack* into :func:`data_dir` unless it is already there.
 
-    Skips a pack when its destination already exists and is non-empty.
-    *on_progress* is the editor loading-screen hook
-    ``(message, fraction)``. Fraction stays in 0-1 after download starts;
-    missing Content-Length uses pack-index progress, not None.
+    *on_progress* is the editor loading-screen hook ``(message, fraction)``.
+    Fraction stays in 0-1 after download starts; missing Content-Length
+    reports 0 until the pack finishes, not None.
     """
-    pending = tuple(
-        pack for pack in STARTER_PACKS if not _already_present(_pack_dest(pack))
-    )
-    if not pending:
+    if not pack_needed(pack):
         return
-
-    _report(on_progress, _DOWNLOAD_MESSAGE, 0.0)
-    aggregator = _DownloadProgress(len(pending), on_progress, _DOWNLOAD_MESSAGE)
+    message = f"Downloading {pack.repo} (~{pack.size_mb} MB)…"
+    _report(on_progress, message, 0.0)
+    aggregator = _DownloadProgress(1, on_progress, message)
     try:
-        for pack in pending:
-            _download_one_pack(pack, aggregator)
-            aggregator.finish_file()
+        _download_one_pack(pack, aggregator)
+        aggregator.finish_file()
     except StarterPackError:
         raise
     except (
@@ -123,7 +119,7 @@ def download_starter_packs(
         zipfile.LargeZipFile,
     ) as exc:
         raise StarterPackError(
-            "Failed to download starter packs. "
+            f"Failed to download {pack.repo}. "
             "A network connection is required the first time."
         ) from exc
 
@@ -142,8 +138,6 @@ def _already_present(dest: Path) -> bool:
 
 def _download_one_pack(pack: PackSpec, aggregator: _DownloadProgress) -> None:
     dest = _pack_dest(pack)
-    if _already_present(dest):
-        return
     parent = dest.parent
     parent.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix=f".{pack.dest_name}.", dir=parent))

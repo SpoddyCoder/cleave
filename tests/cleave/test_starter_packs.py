@@ -13,7 +13,8 @@ from cleave.starter_packs import (
     STARTER_PACKS,
     StarterPackError,
     _DownloadProgress,
-    download_starter_packs,
+    download_pack,
+    pack_needed,
     starter_packs_needed,
 )
 
@@ -91,19 +92,18 @@ def test_starter_packs_needed_no_dir(
     assert starter_packs_needed() is True
 
 
-def test_download_starter_packs_extracts_and_renames(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+@pytest.mark.parametrize("branch", ["main", "master"])
+def test_download_pack_extracts_and_renames(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, branch: str
 ) -> None:
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
-    payloads = {
-        pack.url: _zip_bytes(pack.repo, branch="main" if pack is STARTER_PACKS[0] else "master")
-        for pack in STARTER_PACKS
-    }
+    payloads = {pack.url: _zip_bytes(pack.repo, branch=branch) for pack in STARTER_PACKS}
     _install_fake_urlopen(monkeypatch, payloads)
 
-    download_starter_packs()
-
     for pack in STARTER_PACKS:
+        assert pack_needed(pack)
+        download_pack(pack)
+        assert not pack_needed(pack)
         dest = tmp_path / pack.dest_parent_key / pack.dest_name
         assert dest.is_dir()
         assert (dest / "marker.txt").read_text() == pack.repo
@@ -111,57 +111,39 @@ def test_download_starter_packs_extracts_and_renames(
         assert not (dest.parent / f"{pack.repo}-master").exists()
 
 
-def test_download_starter_packs_skips_existing(
+def test_download_pack_skips_existing(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
-    existing = STARTER_PACKS[0]
-    dest = tmp_path / existing.dest_parent_key / existing.dest_name
+    pack = STARTER_PACKS[0]
+    dest = tmp_path / pack.dest_parent_key / pack.dest_name
     dest.mkdir(parents=True)
     (dest / "keep.txt").write_text("keep")
+    requested = _install_fake_urlopen(monkeypatch, {pack.url: _zip_bytes(pack.repo)})
 
-    payloads = {pack.url: _zip_bytes(pack.repo) for pack in STARTER_PACKS}
-    requested = _install_fake_urlopen(monkeypatch, payloads)
+    assert not pack_needed(pack)
+    download_pack(pack)
 
-    download_starter_packs()
-
-    assert existing.url not in requested
+    assert requested == []
     assert (dest / "keep.txt").read_text() == "keep"
     assert not (dest / "marker.txt").exists()
-    for pack in STARTER_PACKS[1:]:
-        assert pack.url in requested
-        assert (tmp_path / pack.dest_parent_key / pack.dest_name / "marker.txt").is_file()
 
 
-def test_download_starter_packs_reports_progress(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+@pytest.mark.parametrize("content_length", [True, False])
+def test_download_pack_reports_progress(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, content_length: bool
 ) -> None:
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
-    payloads = {pack.url: _zip_bytes(pack.repo) for pack in STARTER_PACKS}
-    _install_fake_urlopen(monkeypatch, payloads)
+    pack = STARTER_PACKS[0]
+    _install_fake_urlopen(
+        monkeypatch, {pack.url: _zip_bytes(pack.repo)}, content_length=content_length
+    )
     calls: list[tuple[str, float | None]] = []
 
-    download_starter_packs(lambda message, fraction: calls.append((message, fraction)))
+    download_pack(pack, lambda message, fraction: calls.append((message, fraction)))
 
     assert calls
-    assert all(message.startswith("Downloading starter packs") for message, _ in calls)
-    assert all(isinstance(fraction, float) for _, fraction in calls)
-    fractions = [fraction for _, fraction in calls]
-    assert all(0.0 <= fraction <= 1.0 for fraction in fractions)
-    assert fractions[-1] == pytest.approx(1.0)
-
-
-def test_download_starter_packs_progress_without_content_length(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
-    payloads = {pack.url: _zip_bytes(pack.repo) for pack in STARTER_PACKS}
-    _install_fake_urlopen(monkeypatch, payloads, content_length=False)
-    calls: list[tuple[str, float | None]] = []
-
-    download_starter_packs(lambda message, fraction: calls.append((message, fraction)))
-
-    assert calls
+    assert all(message.startswith(f"Downloading {pack.repo}") for message, _ in calls)
     assert all(isinstance(fraction, float) for _, fraction in calls)
     fractions = [fraction for _, fraction in calls]
     assert all(0.0 <= fraction <= 1.0 for fraction in fractions)
@@ -190,7 +172,7 @@ def test_download_progress_never_none_without_content_length() -> None:
     assert calls[-1][1] == pytest.approx(1.0)
 
 
-def test_download_starter_packs_network_error(
+def test_download_pack_network_error(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
@@ -201,7 +183,7 @@ def test_download_starter_packs_network_error(
     monkeypatch.setattr("cleave.starter_packs.urllib.request.urlopen", boom)
 
     with pytest.raises(StarterPackError, match="network connection"):
-        download_starter_packs()
+        download_pack(STARTER_PACKS[0])
 
 
 def test_starter_pack_urls_pin_master_branch() -> None:

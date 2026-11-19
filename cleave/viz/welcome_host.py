@@ -22,6 +22,7 @@ import yaml
 
 from cleave.config_schema.first_run import FirstRunState
 from cleave.first_run import (
+    PRESET_PACK_IDS,
     FirstRunCancelled,
     FirstRunItem,
     FirstRunItemId,
@@ -50,6 +51,7 @@ _WELCOME_BODY = (
     "Anything you skip downloads when it is first needed."
 )
 _SECTION = "Downloads"
+_PACKS_SECTION = "projectM curated preset packs"
 SKIP_LABEL = "Skip"
 CANCEL_LABEL = "Cancel"
 _OFF_ON = ("Off", "On")
@@ -290,7 +292,9 @@ class WelcomeFlow:
                         options=_OFF_ON,
                         value=1 if item.default_on else 0,
                         help=(f"{item.name}: {item.purpose}.",),
-                        section=_SECTION,
+                        section=(
+                            _PACKS_SECTION if item.id in PRESET_PACK_IDS else _SECTION
+                        ),
                     )
                     for item in items
                 ),

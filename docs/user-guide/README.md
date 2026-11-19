@@ -58,13 +58,17 @@ Cleave opens on a short splash with its logo, credit, and version; press any key
 
 | Download | What it is for | Ticked by default |
 | --- | --- | --- |
+| Milkdrop Original | The presets from the last official Milkdrop release (about 2 MB). | Yes |
+| Milkdrop Textures | The textures many presets draw with (about 4 MB). | Yes |
+| Cream of the Crop | Jason Fletcher's pick of the best Milkdrop presets (about 31 MB). | No |
+| projectM Classic | About 4,200 presets from earlier projectM releases (about 9 MB). | No |
+| En D | About 50 presets created or remixed by En D (about 3 MB). | No |
 | CUDA Toolkit | Windows with an NVIDIA GPU only. Speeds up stem separation considerably (about 2 GB). | No |
-| Milkdrop Presets | A starter set of preset and texture packs (about 60 MB). | Yes |
 | Demucs | The model that separates a song into stems. | Yes |
 | BeatThis! | The model that detects beats and downbeats. | Yes |
 | Demucs HQ | A slower, higher-quality separation model. | No |
 
-Each download reports its own progress. You can cancel at any point, and anything that fails is listed with a Retry button. Anything you skip is fetched automatically when it is first needed, or you can get it at any time from **Settings > Download packages**.
+The five preset packs are grouped under **projectM curated preset packs**, one line each, so you can pick just the ones you want. Each download reports its own progress. You can cancel at any point, and anything that fails is listed with a Retry button. Anything you skip is fetched automatically when it is first needed, or you can get it at any time from **Settings > Download packages**.
 
 ---
 

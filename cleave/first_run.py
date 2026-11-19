@@ -1,6 +1,6 @@
 """First-run downloads gathered for the editor's welcome step.
 
-Milkdrop starter packs, the Demucs and Beat This weights, and (on the frozen
+Each projectM curated preset pack, the Demucs and Beat This weights, and (on the frozen
 Windows build with a new enough NVIDIA driver) the CUDA torch overlay, each as
 one :class:`FirstRunItem`. No viz and no torch at import: checking what is missing
 only reads the data dir and the hub cache. The editor presents the step
@@ -31,12 +31,26 @@ class FirstRunCancelled(Exception):
 
 
 class FirstRunItemId(Enum):
-    PRESETS = "presets"
+    MILKDROP_ORIGINAL = "milkdrop_original"
+    MILKDROP_TEXTURES = "milkdrop_textures"
+    CREAM_OF_THE_CROP = "cream_of_the_crop"
+    PROJECTM_CLASSIC = "projectm_classic"
+    EN_D = "en_d"
     DEMUCS = "demucs"
     DEMUCS_HQ = "demucs_hq"
     BEAT_THIS = "beat_this"
     CUDA = "cuda"
 
+
+PRESET_PACK_IDS = frozenset(
+    {
+        FirstRunItemId.MILKDROP_ORIGINAL,
+        FirstRunItemId.MILKDROP_TEXTURES,
+        FirstRunItemId.CREAM_OF_THE_CROP,
+        FirstRunItemId.PROJECTM_CLASSIC,
+        FirstRunItemId.EN_D,
+    }
+)
 
 @dataclass(frozen=True)
 class FirstRunItem:
@@ -89,21 +103,63 @@ class FirstRunResult:
         return any(r.outcome is ItemOutcome.CANCELLED for r in self.results)
 
 
-def _presets_item() -> FirstRunItem:
-    from cleave.starter_packs import (
-        STARTER_PACKS_SIZE_MB,
-        download_starter_packs,
-        starter_packs_needed,
-    )
+def _pack_items() -> tuple[FirstRunItem, ...]:
+    from cleave import starter_packs as packs
 
-    return FirstRunItem(
-        id=FirstRunItemId.PRESETS,
-        name="Milkdrop Presets",
-        purpose="standard projectM preset and texture packs",
-        size_mb=STARTER_PACKS_SIZE_MB,
-        default_on=True,
-        needed=starter_packs_needed,
-        download=download_starter_packs,
+    def item(
+        item_id: FirstRunItemId,
+        pack: packs.PackSpec,
+        *,
+        name: str,
+        purpose: str,
+        default_on: bool,
+    ) -> FirstRunItem:
+        return FirstRunItem(
+            id=item_id,
+            name=name,
+            purpose=purpose,
+            size_mb=pack.size_mb,
+            default_on=default_on,
+            needed=lambda: packs.pack_needed(pack),
+            download=lambda on_progress: packs.download_pack(pack, on_progress),
+        )
+
+    return (
+        item(
+            FirstRunItemId.MILKDROP_ORIGINAL,
+            packs.MILKDROP_ORIGINAL,
+            name="Milkdrop Original",
+            purpose="the presets from the last official Milkdrop release",
+            default_on=True,
+        ),
+        item(
+            FirstRunItemId.MILKDROP_TEXTURES,
+            packs.MILKDROP_TEXTURES,
+            name="Milkdrop Textures",
+            purpose="the textures many presets draw with",
+            default_on=True,
+        ),
+        item(
+            FirstRunItemId.CREAM_OF_THE_CROP,
+            packs.CREAM_OF_THE_CROP,
+            name="Cream of the Crop",
+            purpose="Jason Fletcher's pick of the best Milkdrop presets",
+            default_on=False,
+        ),
+        item(
+            FirstRunItemId.PROJECTM_CLASSIC,
+            packs.PROJECTM_CLASSIC,
+            name="projectM Classic",
+            purpose="about 4,200 presets from earlier projectM releases",
+            default_on=False,
+        ),
+        item(
+            FirstRunItemId.EN_D,
+            packs.EN_D,
+            name="En D",
+            purpose="about 50 presets created or remixed by En D",
+            default_on=False,
+        ),
     )
 
 
@@ -164,9 +220,10 @@ def _cuda_item() -> FirstRunItem | None:
 def first_run_items() -> tuple[FirstRunItem, ...]:
     """Every download the welcome step can offer, in download order.
 
-    The CUDA overlay comes first: the weight downloads import torch, and once
-    the bundled CPU torch is loaded the overlay only takes effect after a
-    restart, so a split straight after the welcome step would run on the CPU.
+    The preset packs come first, then the CUDA overlay: the weight downloads
+    import torch, and once the bundled CPU torch is loaded the overlay only
+    takes effect after a restart, so a split straight after the welcome step
+    would run on the CPU.
     """
     from cleave.model_weights import (
         DEMUCS_HQ_MODEL,
@@ -176,8 +233,8 @@ def first_run_items() -> tuple[FirstRunItem, ...]:
     )
 
     candidates = (
+        *_pack_items(),
         _cuda_item(),
-        _presets_item(),
         _weight_item(
             FirstRunItemId.DEMUCS,
             lambda: demucs_weight_spec(DEMUCS_MODEL),
@@ -208,13 +265,17 @@ def needed_items(items: tuple[FirstRunItem, ...]) -> tuple[FirstRunItem, ...]:
 
 
 def welcome_needed(
-    needed: tuple[FirstRunItem, ...], state: FirstRunState
+    needed: tuple[FirstRunItem, ...],
+    state: FirstRunState,
+    *,
+    presets_missing: bool,
 ) -> bool:
-    """Show the step when presets are missing, or a default weight is missing
-    and the step has not been completed yet. *needed* is already filtered.
+    """Show the step when the preset folder has no presets and a pack is still
+    offered, or a default-on item is missing and the step has not been
+    completed yet. *needed* is already filtered.
     """
     for item in needed:
-        if item.id is FirstRunItemId.PRESETS:
+        if presets_missing and item.id in PRESET_PACK_IDS:
             return True
         if item.default_on and not state.welcome_done:
             return True

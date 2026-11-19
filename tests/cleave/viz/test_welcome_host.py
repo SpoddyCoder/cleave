@@ -82,7 +82,7 @@ def _start(items: tuple[FirstRunItem, ...]) -> tuple[WelcomeFlow, ModalHost]:
 
 def test_skip_marks_done_without_downloading(persist: MagicMock) -> None:
     log: list[str] = []
-    flow, host = _start((_item(FirstRunItemId.PRESETS, _recording(log, "presets")),))
+    flow, host = _start((_item(FirstRunItemId.MILKDROP_ORIGINAL, _recording(log, "presets")),))
     host.handle_keydown(_keydown(pygame.K_ESCAPE))
     assert not flow.active
     assert log == []
@@ -94,7 +94,7 @@ def test_download_runs_ticked_items_only(persist: MagicMock) -> None:
     log: list[str] = []
     flow, host = _start(
         (
-            _item(FirstRunItemId.PRESETS, _recording(log, "presets")),
+            _item(FirstRunItemId.MILKDROP_ORIGINAL, _recording(log, "presets")),
             _item(FirstRunItemId.DEMUCS_HQ, _recording(log, "hq"), default_on=False),
         )
     )
@@ -117,7 +117,7 @@ def test_failure_then_retry_downloads_failed_item_again(persist: MagicMock) -> N
 
     flow, host = _start(
         (
-            _item(FirstRunItemId.PRESETS, _recording(log, "presets")),
+            _item(FirstRunItemId.MILKDROP_ORIGINAL, _recording(log, "presets")),
             _item(FirstRunItemId.DEMUCS, flaky),
         )
     )
@@ -157,7 +157,7 @@ def test_cancel_stops_downloads_and_marks_done(persist: MagicMock) -> None:
 
     flow, host = _start(
         (
-            _item(FirstRunItemId.PRESETS, slow),
+            _item(FirstRunItemId.MILKDROP_ORIGINAL, slow),
             _item(FirstRunItemId.DEMUCS, _recording(log, "demucs")),
         )
     )
@@ -179,7 +179,7 @@ def test_abort_does_not_mark_done(persist: MagicMock) -> None:
         release.wait(_WAIT_SEC)
         progress("msg", 0.5)
 
-    flow, host = _start((_item(FirstRunItemId.PRESETS, slow),))
+    flow, host = _start((_item(FirstRunItemId.MILKDROP_ORIGINAL, slow),))
     host.handle_keydown(_keydown(pygame.K_RETURN))
     release.set()
     flow.abort()
@@ -217,14 +217,14 @@ def _run_on_window(
 
 def test_loading_window_runs_the_step_to_the_end(persist: MagicMock) -> None:
     log: list[str] = []
-    items = (_item(FirstRunItemId.PRESETS, _recording(log, "presets")),)
+    items = (_item(FirstRunItemId.MILKDROP_ORIGINAL, _recording(log, "presets")),)
     _run_on_window(items, [[_keydown(pygame.K_RETURN)]])
     assert log == ["presets"]
     persist.assert_called_once()
 
 
 def test_closing_the_window_does_not_mark_done(persist: MagicMock) -> None:
-    items = (_item(FirstRunItemId.PRESETS, lambda _p: None),)
+    items = (_item(FirstRunItemId.MILKDROP_ORIGINAL, lambda _p: None),)
     window = _run_on_window(items, [[pygame.event.Event(pygame.QUIT)]])
     assert window.quit_requested
     persist.assert_not_called()
@@ -234,7 +234,7 @@ def test_on_close_runs_when_the_step_closes_but_not_on_abort(
     persist: MagicMock,
 ) -> None:
     closed: list[str] = []
-    items = (_item(FirstRunItemId.PRESETS, lambda _p: None),)
+    items = (_item(FirstRunItemId.MILKDROP_ORIGINAL, lambda _p: None),)
 
     host = ModalHost()
     flow = WelcomeFlow(host)
@@ -269,7 +269,7 @@ def _editor_controls(*, paused: bool) -> SimpleNamespace:
 
 def test_editor_pauses_playback_while_the_step_is_open(persist: MagicMock) -> None:
     controls = _editor_controls(paused=False)
-    item = _item(FirstRunItemId.PRESETS, lambda _p: None)
+    item = _item(FirstRunItemId.MILKDROP_ORIGINAL, lambda _p: None)
     with patch("cleave.first_run.first_run_items", return_value=(item,)):
         TuningControls.prompt_welcome(controls)
     assert controls.playback.paused
@@ -301,9 +301,9 @@ def _download_in_editor(
 
 def test_editor_rescans_presets_after_downloading_them(persist: MagicMock) -> None:
     controls = _editor_controls(paused=False)
-    _download_in_editor(controls, _item(FirstRunItemId.PRESETS, lambda _p: None))
+    _download_in_editor(controls, _item(FirstRunItemId.MILKDROP_ORIGINAL, lambda _p: None))
 
-    assert controls.welcome.downloaded == frozenset({FirstRunItemId.PRESETS})
+    assert controls.welcome.downloaded == frozenset({FirstRunItemId.MILKDROP_ORIGINAL})
     controls.preset_rescan.start.assert_called_once_with()
     assert not controls.playback.paused
 
@@ -327,7 +327,7 @@ def test_editor_skips_rescan_when_the_presets_download_fails(
     controls = _editor_controls(paused=False)
     _download_in_editor(
         controls,
-        _item(FirstRunItemId.PRESETS, fail),
+        _item(FirstRunItemId.MILKDROP_ORIGINAL, fail),
         until=lambda: _message(controls.host) == "Some downloads failed",
     )
     controls.host.handle_keydown(_keydown(pygame.K_ESCAPE))
@@ -344,13 +344,13 @@ def _buttons(host: ModalHost) -> tuple[str, ...]:
 
 
 def test_startup_form_offers_skip(persist: MagicMock) -> None:
-    _flow, host = _start((_item(FirstRunItemId.PRESETS, lambda _p: None),))
+    _flow, host = _start((_item(FirstRunItemId.MILKDROP_ORIGINAL, lambda _p: None),))
     assert _buttons(host) == ("Download", "Skip")
 
 
 def test_editor_form_offers_cancel(persist: MagicMock) -> None:
     controls = _editor_controls(paused=True)
-    item = _item(FirstRunItemId.PRESETS, lambda _p: None)
+    item = _item(FirstRunItemId.MILKDROP_ORIGINAL, lambda _p: None)
     with patch("cleave.first_run.first_run_items", return_value=(item,)):
         TuningControls.prompt_welcome(controls)
     assert _buttons(controls.host) == ("Download", "Cancel")

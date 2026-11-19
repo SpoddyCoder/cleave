@@ -37,24 +37,42 @@ def _item(
     )
 
 
-PRESETS = _item(FirstRunItemId.PRESETS)
+PRESETS = _item(FirstRunItemId.MILKDROP_ORIGINAL)
+CLASSIC = _item(FirstRunItemId.PROJECTM_CLASSIC, default_on=False)
 DEMUCS = _item(FirstRunItemId.DEMUCS)
 HQ = _item(FirstRunItemId.DEMUCS_HQ, default_on=False)
 
 
 @pytest.mark.parametrize(
-    ("needed", "done", "expected"),
+    ("needed", "done", "missing", "expected"),
     [
-        ((), False, False),
-        ((PRESETS,), True, True),
-        ((DEMUCS,), False, True),
-        ((DEMUCS,), True, False),
-        ((HQ,), False, False),
-        ((HQ, PRESETS), True, True),
+        ((), False, True, False),
+        ((PRESETS,), True, True, True),
+        ((PRESETS,), True, False, False),
+        ((PRESETS,), False, False, True),
+        ((CLASSIC,), True, True, True),
+        ((CLASSIC,), False, False, False),
+        ((DEMUCS,), False, False, True),
+        ((DEMUCS,), True, False, False),
+        ((HQ,), False, False, False),
+        ((HQ, PRESETS), True, True, True),
     ],
 )
-def test_welcome_needed(needed, done, expected) -> None:
-    assert welcome_needed(needed, FirstRunState(welcome_done=done)) is expected
+def test_welcome_needed(needed, done, missing, expected) -> None:
+    state = FirstRunState(welcome_done=done)
+    assert welcome_needed(needed, state, presets_missing=missing) is expected
+
+
+def test_preset_packs_are_separate_items() -> None:
+    from cleave.first_run import PRESET_PACK_IDS, first_run_items
+
+    items = {item.id: item for item in first_run_items()}
+    assert PRESET_PACK_IDS <= set(items)
+    on = {i for i in PRESET_PACK_IDS if items[i].default_on}
+    assert on == {FirstRunItemId.MILKDROP_ORIGINAL, FirstRunItemId.MILKDROP_TEXTURES}
+    # Packs first; CUDA still before any weight download.
+    order = list(items)
+    assert set(order[: len(PRESET_PACK_IDS)]) == PRESET_PACK_IDS
 
 
 def test_needed_items_filters() -> None:
@@ -93,7 +111,7 @@ def test_run_downloads_cancel_stops_the_rest() -> None:
         progress("msg", 0.1)
 
     items = (
-        _item(FirstRunItemId.PRESETS, download=first),
+        _item(FirstRunItemId.MILKDROP_ORIGINAL, download=first),
         _item(FirstRunItemId.DEMUCS, download=lambda _p: later.append("x")),
     )
 
@@ -129,8 +147,9 @@ def test_cuda_item_only_when_supported(monkeypatch: pytest.MonkeyPatch) -> None:
     cuda = items[FirstRunItemId.CUDA]
     assert cuda.default_on is False
     assert cuda.needed()
-    # First, so it activates before a weight download imports CPU torch.
-    assert list(items)[0] is FirstRunItemId.CUDA
+    # Before the weights, so it activates before one imports CPU torch.
+    order = list(items)
+    assert order.index(FirstRunItemId.CUDA) < order.index(FirstRunItemId.DEMUCS)
 
     monkeypatch.setattr(cuda_extra, "cuda_extra_installed", lambda: True)
     items = {item.id: item for item in first_run_items()}

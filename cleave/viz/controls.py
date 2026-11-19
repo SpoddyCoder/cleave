@@ -526,9 +526,9 @@ class TuningControls:
         """Open the Welcome to Cleave step for whatever is still missing.
 
         Playback pauses while the step is open and resumes when it closes.
-        When the presets were downloaded, Rescan presets runs next.
+        When a preset pack was downloaded, Rescan presets runs next.
         """
-        from cleave.first_run import FirstRunItemId, first_run_items, needed_items
+        from cleave.first_run import PRESET_PACK_IDS, first_run_items, needed_items
 
         if self.welcome.active:
             return
@@ -536,7 +536,7 @@ class TuningControls:
 
         def closed() -> None:
             resume()
-            if FirstRunItemId.PRESETS in self.welcome.downloaded:
+            if PRESET_PACK_IDS & self.welcome.downloaded:
                 self.preset_rescan.start()
 
         self.welcome.start(
