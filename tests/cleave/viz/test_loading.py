@@ -533,3 +533,14 @@ def test_splash_close_requests_quit(mock_get: MagicMock, mock_present: MagicMock
     show_splash(window)
     assert window.quit_requested is True
     window.clear.assert_not_called()
+
+
+def test_splash_draw_runs_in_an_imgui_frame() -> None:
+    from cleave.viz.loading import _SplashDraw
+
+    with _host() as host:
+        host.begin_frame(1.0 / 60.0)
+        base = imgui.get_font_size()
+        _SplashDraw("tagline", "credit © 2031", "v1.0.0", 0.5)()
+        assert imgui.get_font_size() == base
+        host.end_frame()

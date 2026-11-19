@@ -7,19 +7,26 @@ from datetime import date
 from cleave.build_version import display_version
 
 ABOUT_TITLE = "About Cleave"
-ABOUT_TAGLINE = "Stem separated music visualizer powered by projectM"
+ABOUT_SUMMARY = "Stem separated music visualizer"
+"""What Cleave is, in a few words. The splash shows it under the logo."""
+ABOUT_TAGLINE = f"{ABOUT_SUMMARY} powered by projectM"
 ABOUT_AUTHOR = "P. Fernihough"
 ABOUT_URL = "https://github.com/SpoddyCoder/cleave"
 
 
-def about_body(today: date | None = None) -> str:
-    """Lines under the About title. The year is the current year."""
+def about_credit(today: date | None = None) -> str:
+    """The author and copyright line. The year is the current year."""
     year = (today or date.today()).year
+    return f"Created by {ABOUT_AUTHOR} \u00a9 {year}"
+
+
+def about_body(today: date | None = None) -> str:
+    """Lines under the About title."""
     return "\n".join(
         (
             ABOUT_TAGLINE,
             "",
-            f"Created by {ABOUT_AUTHOR}, {year}",
+            about_credit(today),
             ABOUT_URL,
             "",
             display_version(),

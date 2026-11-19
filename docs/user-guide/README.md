@@ -54,7 +54,7 @@ When you want the screen space back for the preview, press **H** again. Your pla
 
 ## First launch
 
-Cleave opens on a short splash with its logo and version; press any key or click to skip it. On first start, the **Welcome to Cleave** step then lists the downloads Cleave needs and what each one is for:
+Cleave opens on a short splash with its logo, credit, and version; press any key or click to skip it. On first start, the **Welcome to Cleave** step then lists the downloads Cleave needs and what each one is for:
 
 | Download | What it is for | Ticked by default |
 | --- | --- | --- |

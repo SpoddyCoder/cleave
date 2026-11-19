@@ -175,7 +175,7 @@ class _ProgressDraw:
 
 
 _SPLASH_FADE_IN_SEC = 0.6
-_SPLASH_HOLD_SEC = 1.95
+_SPLASH_HOLD_SEC = 2.95
 _SPLASH_FADE_OUT_SEC = 0.3
 
 SPLASH_SEC = _SPLASH_FADE_IN_SEC + _SPLASH_HOLD_SEC + _SPLASH_FADE_OUT_SEC
@@ -187,6 +187,9 @@ _SPLASH_HEIGHT_FRACTION = 0.4
 # Splash logo centre as a fraction of the window height, a little above middle.
 _SPLASH_CENTRE_Y = 0.45
 _SPLASH_FPS = 60
+# Splash summary and credit sizes over the shell font size.
+_SPLASH_SUMMARY_SCALE = 2.0
+_SPLASH_CREDIT_SCALE = 1.125
 
 
 def splash_alpha(elapsed: float) -> float:
@@ -198,12 +201,15 @@ def splash_alpha(elapsed: float) -> float:
 
 @dataclass(frozen=True)
 class _SplashDraw:
+    """The full logo, then the summary, the credit, and the version under it."""
+
+    summary: str
+    credit: str
     version: str
     alpha: float
 
     def __call__(self) -> None:
         from cleave.viz.brand import Logo, draw_logo, logo_size
-        from cleave.viz.imgui_theme import rgba
 
         imgui = _imgui()
         display = imgui.get_io().display_size
@@ -222,25 +228,53 @@ class _SplashDraw:
             backdrop=palette().background,
             alpha=self.alpha,
         )
-        text_w = imgui.calc_text_size(self.version).x
-        draw.add_text(
-            imgui.ImVec2(
-                float(int((display.x - text_w) / 2)), float(y + height + height // 6)
-            ),
-            imgui.get_color_u32(rgba(palette().muted, self.alpha)),
-            self.version,
+        text_y = float(y + height + height // 6)
+        lines = (
+            (self.summary, palette().value, _SPLASH_SUMMARY_SCALE),
+            (self.credit, palette().muted, _SPLASH_CREDIT_SCALE),
         )
+        base = imgui.get_style().font_size_base
+        for text, colour, scale in lines:
+            imgui.push_font(None, base * scale)
+            try:
+                text_y = self._centred_line(draw, text, colour, text_y)
+            finally:
+                imgui.pop_font()
+        text_y += imgui.get_text_line_height_with_spacing()
+        self._centred_line(draw, self.version, palette().muted, text_y)
+
+    def _centred_line(
+        self, draw: imgui.ImDrawList, text: str, colour: tuple[int, int, int], y: float
+    ) -> float:
+        """One line centred across the window in the current font. Returns the next y."""
+        from cleave.viz.imgui_theme import rgba
+
+        imgui = _imgui()
+        display = imgui.get_io().display_size
+        text_w = imgui.calc_text_size(text).x
+        draw.add_text(
+            imgui.get_font(),
+            imgui.get_font_size(),
+            imgui.ImVec2(float(int((display.x - text_w) / 2)), y),
+            imgui.get_color_u32(rgba(colour, self.alpha)),
+            text,
+        )
+        return y + imgui.get_text_line_height_with_spacing()
 
 
 def show_splash(window: LoadingWindow) -> None:
     """Show the full logo and version on the open window for a moment.
 
-    It fades in, holds, and fades out over :data:`SPLASH_SEC`. A key or click
+    The summary, credit, and version sit under the logo. It fades in, holds,
+    and fades out over :data:`SPLASH_SEC`. A key or click
     ends it at once; closing the window ends it and sets ``quit_requested``.
     """
+    from cleave.about import ABOUT_SUMMARY, about_credit
     from cleave.build_version import display_version
 
-    version = display_version()
+    splash = functools.partial(
+        _SplashDraw, ABOUT_SUMMARY, about_credit(), display_version()
+    )
     clock = pygame.time.Clock()
     elapsed = 0.0
     while elapsed < SPLASH_SEC:
@@ -254,7 +288,7 @@ def show_splash(window: LoadingWindow) -> None:
                 return
         dt = clock.tick(_SPLASH_FPS) / 1000.0
         elapsed += dt
-        present_frame(window, _SplashDraw(version, splash_alpha(elapsed)), dt=dt)
+        present_frame(window, splash(splash_alpha(elapsed)), dt=dt)
     window.clear()
 
 
