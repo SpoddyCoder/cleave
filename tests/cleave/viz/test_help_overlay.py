@@ -1007,6 +1007,7 @@ def test_help_column_draws_the_subject_stop() -> None:
             tracks={},
         ),
         inline_edit=InlineEditController(),
+        preset_browser=SimpleNamespace(active=False, view_state=lambda: None),
         context_menu=ContextMenuState(),
         modal_host=ModalHost(),
         transport=MagicMock(),

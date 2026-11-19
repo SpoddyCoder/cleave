@@ -1,9 +1,11 @@
-"""Right-click menu for a preset row in the inspector.
+"""Right-click menu for a preset row in the inspector or the preset browser.
 
-The directory row offers a Jump to directory submenu of the library
-collections (favourites, roles, blacklisted). A preset list entry offers Audition, Move up and down, Remove, Add current
-preset, Populate, then Favourite, Blacklist, and a Role submenu. The layer's
-current preset row offers Add to preset list and the same curation items.
+The directory row offers Browse presets and a Jump to directory submenu of the
+library collections (favourites, roles, blacklisted). A preset list entry
+offers Audition, Move up and down, Remove, Add current preset, Populate, then
+Favourite, Blacklist, and a Role submenu. The layer's current preset row offers
+Browse presets, Add to preset list, and the same curation items. A preset in
+the browser offers the curation items.
 Each item calls the same path as its key, and a disabled item says why in
 its hint.
 """
@@ -67,15 +69,45 @@ def preset_row_menu_entries(
             ]
         )
     if desc.kind is RowKind.TRACK_PRESET_DIR:
-        return _jump_items(controls, desc, slot)
+        return join_groups(
+            [(_browse_item(controls, desc, slot),), _jump_items(controls, desc, slot)]
+        )
     if desc.kind is RowKind.TRACK_PRESET:
         return join_groups(
             [
+                (_browse_item(controls, desc, slot),),
                 (_add_item(controls, desc, slot, label="Add to preset list"),),
                 _curate_items(controls, desc, slot),
             ]
         )
     return ()
+
+
+def browser_preset_menu(
+    controls: TuningControls, slot: str, path: Path
+) -> ContextMenuProvider:
+    """Provider for a preset listed in the preset browser."""
+    desc = RowDescriptor(RowKind.TRACK_PRESET, slot=slot)
+
+    def entries() -> tuple[ContextMenuEntry, ...]:
+        if slot not in controls.session.layers:
+            return ()
+        return _curate_path_items(controls, desc, slot, path)
+
+    return entries
+
+
+def _browse_item(
+    controls: TuningControls, desc: RowDescriptor, slot: str
+) -> ContextMenuItem:
+    locked = section_lock_blocks_mutation(controls.session, desc)
+    return ContextMenuItem(
+        id="preset.browse",
+        label="Browse presets…",
+        run=lambda: controls.preset_browser.open(slot),
+        enabled=not locked,
+        hint=_LOCK_HINT if locked else None,
+    )
 
 
 def _jump_items(
@@ -199,9 +231,16 @@ def _fill_hint(controls: TuningControls, desc: RowDescriptor) -> str | None:
 def _curate_items(
     controls: TuningControls, desc: RowDescriptor, slot: str
 ) -> tuple[ContextMenuEntry, ...]:
-    """Favourite, Blacklist, and Role; each one undoes itself."""
-    curation = controls.preset_curation
+    """Favourite, Blacklist, and Role for the row's preset file."""
     src = controls.preset_list.resolve_file_path(slot, desc.kind, desc)
+    return _curate_path_items(controls, desc, slot, src)
+
+
+def _curate_path_items(
+    controls: TuningControls, desc: RowDescriptor, slot: str, src: Path | None
+) -> tuple[ContextMenuEntry, ...]:
+    """Favourite, Blacklist, and Role for *src*; each one undoes itself."""
+    curation = controls.preset_curation
     if section_lock_blocks_mutation(controls.session, desc):
         hint: str | None = _LOCK_HINT
     elif src is None or not src.is_file():

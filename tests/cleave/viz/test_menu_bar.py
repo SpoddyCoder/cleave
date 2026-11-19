@@ -1342,6 +1342,7 @@ def _shell_controls() -> SimpleNamespace:
         disarm_value_nudge=MagicMock(),
         begin_value_nudge=MagicMock(),
         inline_edit=InlineEditController(),
+        preset_browser=SimpleNamespace(active=False, view_state=lambda: None),
         context_menu=ContextMenuState(),
         modal_host=ModalHost(),
         transport=MagicMock(),

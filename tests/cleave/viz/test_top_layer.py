@@ -98,6 +98,7 @@ def _host() -> Iterator[object]:
         set_shell_region=MagicMock(),
         disarm_value_nudge=MagicMock(),
         inline_edit=InlineEditController(),
+        preset_browser=SimpleNamespace(active=False, view_state=lambda: None),
         context_menu=ContextMenuState(),
         modal_host=ModalHost(),
         transport=MagicMock(),

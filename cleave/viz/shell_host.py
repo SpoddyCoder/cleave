@@ -17,6 +17,7 @@ from cleave.viz.context_menu import ContextMenuProvider
 from cleave.viz.help_column import draw_help_column
 from cleave.viz.choice_widgets import raise_open_choice_lists
 from cleave.viz.help_content import (
+    PRESET_BROWSER_SECTIONS,
     help_section_kwargs,
     help_sections_for_stop,
     modal_help_content,
@@ -29,7 +30,13 @@ from cleave.viz.navigator_context_menu import navigator_node_menu
 from cleave.viz.overlay_profiler import OverlayProfiler
 from cleave.viz.panel_notification import PanelNotificationActive
 from cleave.viz.pointer_cursor import PointerShape, request_pointer
-from cleave.viz.preset_context_menu import PRESET_MENU_KINDS, preset_row_menu
+from cleave.viz.preset_browser import BrowserRowKind
+from cleave.viz.preset_browser_surface import PresetBrowserSurface
+from cleave.viz.preset_context_menu import (
+    PRESET_MENU_KINDS,
+    browser_preset_menu,
+    preset_row_menu,
+)
 from cleave.viz.profiler_panel import draw_profiler_panel
 from cleave.viz.row_kinds import RowDescriptor
 from cleave.viz.shell_context import ShellContext, ShellFrame
@@ -106,6 +113,7 @@ class ShellHost:
             lambda: self.context.controls.context_menu
         )
         self._context_submenu_surface = ContextSubmenuSurface(self._context_surface)
+        self._browser_surface: PresetBrowserSurface | None = None
 
     @property
     def menu_bar_height_px(self) -> int:
@@ -327,6 +335,12 @@ class ShellHost:
                 self.strip.cancel()
             return provider
         layout = self.context.layout
+        if self.context.controls.preset_browser.active:
+            if layout is not None and (
+                rect_has_point(layout.navigator, x, y)
+                or rect_has_point(layout.inspector, x, y)
+            ):
+                return self._browser_menu_at(x, y)
         if layout is not None and rect_has_point(layout.inspector, x, y):
             return self._inspector_menu_at(x, y)
         if layout is not None and rect_has_point(layout.visualiser, x, y):
@@ -599,21 +613,23 @@ class ShellHost:
                 imgui.pop_style_var()
             navigator = overlap_panel(layout.navigator, overlap)
             inspector = overlap_panel(layout.inspector, overlap)
-            draw_fixed_window(
-                "##shell-navigator",
-                navigator,
-                active=stop is CycleStop.NAVIGATOR,
-                idle_border=palette().panel_edge,
-                body=lambda: self.navigator.draw(frame),
-                scrollable=True,
-            )
-            draw_fixed_window(
-                "##shell-inspector",
-                inspector,
-                active=stop is CycleStop.INSPECTOR,
-                idle_border=palette().panel_edge,
-                body=lambda: self.inspector.draw(frame),
-            )
+            browsing = self._draw_preset_browser(layout, overlap)
+            if not browsing:
+                draw_fixed_window(
+                    "##shell-navigator",
+                    navigator,
+                    active=stop is CycleStop.NAVIGATOR,
+                    idle_border=palette().panel_edge,
+                    body=lambda: self.navigator.draw(frame),
+                    scrollable=True,
+                )
+                draw_fixed_window(
+                    "##shell-inspector",
+                    inspector,
+                    active=stop is CycleStop.INSPECTOR,
+                    idle_border=palette().panel_edge,
+                    body=lambda: self.inspector.draw(frame),
+                )
             self._draw_help(
                 layout.help,
                 overlap,
@@ -629,9 +645,9 @@ class ShellHost:
                     if stop is CycleStop.TIMELINE
                     else rgba(palette().panel_edge),
                 )
-            if stop is CycleStop.NAVIGATOR:
+            if stop is CycleStop.NAVIGATOR and not browsing:
                 draw_panel_border(navigator, rgba(palette().panel_focus_edge))
-            elif stop is CycleStop.INSPECTOR:
+            elif stop is CycleStop.INSPECTOR and not browsing:
                 draw_panel_border(inspector, rgba(palette().panel_focus_edge))
             elif stop is CycleStop.PREVIEW:
                 draw_panel_border(
@@ -653,6 +669,38 @@ class ShellHost:
         ):
             inline.finish()
 
+    def _draw_preset_browser(self, layout: ShellLayout, overlap: int) -> bool:
+        """Draw the open preset browser over the navigator column. False when closed."""
+        browser = self.context.controls.preset_browser
+        view = browser.view_state()
+        if view is None:
+            self._browser_surface = None
+            return False
+        nav = layout.navigator
+        insp = layout.inspector
+        column = (nav[0], nav[1], nav[2], nav[3] + insp[3])
+        surface = PresetBrowserSurface(view)
+        surface.draw(overlap_panel(column, overlap), active=True)
+        self._browser_surface = surface
+        browser.apply_pointer(surface.intent)
+        return True
+
+    def _browser_menu_at(self, x: float, y: float) -> ContextMenuProvider | None:
+        """Curation menu for the browser's preset row under (*x*, *y*)."""
+        surface = self._browser_surface
+        controls = self.context.controls
+        browser = controls.preset_browser.browser
+        slot = controls.preset_browser.slot
+        if surface is None or browser is None or slot is None:
+            return None
+        index = surface.row_at(x, y)
+        if index is None or not 0 <= index < len(browser.rows):
+            return None
+        path = browser.rows[index].path
+        if browser.rows[index].kind is not BrowserRowKind.PRESET or path is None:
+            return None
+        return browser_preset_menu(controls, slot, path)
+
     def _draw_help(
         self,
         rect: tuple[int, int, int, int],
@@ -668,6 +716,9 @@ class ShellHost:
         def body() -> None:
             if modal_help:
                 draw_help_column(modal_help_content(modal_help))
+                return
+            if self.context.controls.preset_browser.active:
+                draw_help_column(PRESET_BROWSER_SECTIONS)
                 return
             if state is None:
                 return

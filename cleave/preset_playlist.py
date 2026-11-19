@@ -340,6 +340,10 @@ class PresetPlaylist:
         self._dir_display = display
         return display
 
+    def replace_with(self, other: PresetPlaylist) -> None:
+        """Take *other*'s folder or collection, presets, and position."""
+        self._apply(other)
+
     def _apply(self, other: PresetPlaylist) -> None:
         self.current_dir = other.current_dir
         self.paths = other.paths

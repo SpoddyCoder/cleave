@@ -209,12 +209,32 @@ A **preset** is a single Milkdrop visual. Cleave can draw on thousands of them, 
 On a layer's **Milkdrop Preset** page:
 
 - **preset directory** is the folder the layer browses. Left/Right steps to the neighbouring folder, Enter (or the down arrow) opens the first subfolder, and Backspace (or the up arrow) goes up a level.
-- **preset** is the preset currently rendering. Left/Right steps through the folder, and PgUp/PgDn jumps further.
+- **preset** is the preset currently rendering. Left/Right steps through the folder, and PgUp/PgDn jumps further. Enter or a double-click opens the [preset browser](#browsing-presets).
 - **beat sensitivity** sets how hard the preset responds to the beat.
 
 Many preset packs keep their presets in subfolders. When the folder you are in has none of its own, the **preset** row says how many subfolders are below and how many presets they hold: press Enter (or the down arrow) on **preset directory** to open the first one.
 
 At the top level of the preset folders, Left/Right also reaches your collections: **Favourites**, one per **Role**, and **Blacklisted**. To go straight to one, right-click the preset directory row and choose **Jump to directory**. See [Curating your presets](#curating-your-presets).
+
+### Browsing presets
+
+The preset browser shows every folder and preset at once, so you can see what a pack holds and find a preset by name. Open it with Enter or a double-click on a layer's **preset** row, or right-click the preset or preset directory row and choose **Browse presets**. It takes over the navigator and inspector column while it is open, so the preview stays in view.
+
+The list starts in the layer's folder, with the current preset selected. It shows `..` (the folder above), then the subfolders with how many presets each holds, then the presets with their curation tags. At the top level your collections (Favourites, Roles, Blacklisted) come first. The path along the top shows where you are; click a part of it to jump back up.
+
+Moving to a preset plays it on the layer straight away, so you can step through a folder and watch each one. When you find one you like, press Enter (or double-click it) to keep it; the layer then browses that preset's folder. Esc puts back the preset and folder you started with.
+
+Start typing to filter. The filter searches every preset in the folder you are in and all the folders under it, matching the folder names as well as the preset name, so `geiss tunnel` finds Geiss presets with "tunnel" in their name. At the top level it searches the whole library. Blacklisted presets stay hidden.
+
+| Key | In the browser |
+| --- | --- |
+| Up/Down, PgUp/PgDn, Home/End | Move through the list, playing each preset you land on |
+| Enter | Open a folder, or keep the selected preset |
+| Right / Left | Open a folder / go to the folder above |
+| Backspace | Delete a filter letter, or go to the folder above |
+| Esc | Clear the filter, or close and go back to the starting preset |
+
+Right-click a preset in the browser to favourite it, blacklist it, or give it a role. Space still plays and pauses while the filter is empty, and shortcuts such as Ctrl+S still work.
 
 ### Preset switching
 

@@ -391,6 +391,13 @@ def _apply_preset_dir_action(controls: TuningControls, desc: RowDescriptor) -> N
     controls.layer_mutations.enter_directory(slot)
 
 
+def _apply_preset_browse_action(controls: TuningControls, desc: RowDescriptor) -> None:
+    slot = desc.slot
+    if slot is None:
+        return
+    controls.preset_browser.open(slot)
+
+
 def _apply_preset_dir_parent_action(
     controls: TuningControls, desc: RowDescriptor
 ) -> None:
@@ -569,10 +576,12 @@ SPECS: dict[RowKind, RowSpec] = {
         format_position=_format_track_preset_position,
         format_markers=_format_track_preset_markers,
         apply_horizontal=_apply_track_preset,
+        apply_action=_apply_preset_browse_action,
+        activate_on_double_click=True,
         fit_strategy=FitStrategy.NONE,
         help_title="Milkdrop Preset File",
         help_description=(
-            "The Milkdrop preset this layer is rendering. Tags after the name mark its curation status and role; hover over one for a reminder:",
+            "The Milkdrop preset this layer is rendering. Enter or a double-click opens the preset browser, to see every folder and preset and filter them by name. Tags after the name mark its curation status and role; hover over one for a reminder:",
         ),
         help_mode_entries=_PRESET_MARKER_HELP_ENTRIES,
         repeatable=True,

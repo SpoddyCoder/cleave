@@ -330,3 +330,37 @@ def test_open_upgrades_version_1_and_keeps_curation(tmp_path: Path) -> None:
     conn = sqlite3.connect(db)
     assert conn.execute("PRAGMA user_version").fetchone()[0] == preset_library.SCHEMA_VERSION
     conn.close()
+
+
+def test_indexed_paths_sorted_and_follow_reindex(tmp_path: Path) -> None:
+    root = tmp_path / "presets"
+    b = _write(root / "b" / "two.milk", "two")
+    a = _write(root / "a" / "one.milk", "one")
+    library = PresetLibrary.in_memory()
+    assert library.indexed_paths() == ()
+    library.index(root)
+    assert library.indexed_paths() == (a.resolve(), b.resolve())
+
+    c = _write(root / "a" / "deep" / "three.milk", "three")
+    library.index(root)
+    assert c.resolve() in library.indexed_paths()
+
+
+def test_preset_counts_by_dir_counts_below_and_drop_blacklisted(tmp_path: Path) -> None:
+    root = tmp_path / "presets"
+    _write(root / "pack" / "one.milk", "one")
+    hide = _write(root / "pack" / "deep" / "two.milk", "two")
+    _write(root / "pack" / "deep" / "three.milk", "three")
+    library = PresetLibrary.in_memory()
+    library.index(root)
+    resolved = root.resolve()
+
+    counts = library.preset_counts_by_dir()
+    assert counts[resolved] == 3
+    assert counts[resolved / "pack"] == 3
+    assert counts[resolved / "pack" / "deep"] == 2
+
+    library.set_blacklisted(hide, True)
+    counts = library.preset_counts_by_dir()
+    assert counts[resolved / "pack"] == 2
+    assert counts[resolved / "pack" / "deep"] == 1

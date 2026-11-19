@@ -181,7 +181,10 @@ class LiveFrameLoop:
                 dispatch_keyup(event, rt)
             elif event.type == pygame.TEXTINPUT:
                 if not rt.controls.inline_edit.handle_text_input(event.text):
-                    rt.modal_host.handle_text_input(event.text)
+                    if rt.modal_host.active or not (
+                        rt.controls.preset_browser.handle_text_input(event.text)
+                    ):
+                        rt.modal_host.handle_text_input(event.text)
 
         apply_window_requests(
             rt.controls.window,

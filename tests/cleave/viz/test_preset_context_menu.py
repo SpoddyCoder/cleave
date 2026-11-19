@@ -154,6 +154,7 @@ def test_current_preset_row_offers_add_and_curate() -> None:
     desc = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
     items = _entries(controls, desc)
     assert list(items) == [
+        "preset.browse",
         "preset.add_current",
         "preset.favourite",
         "preset.blacklist",
@@ -181,18 +182,20 @@ def _controls_with_library(tmp: str):
     return controls, paths
 
 
-def test_directory_row_has_no_menu_without_collections() -> None:
+def test_directory_row_has_only_browse_without_collections() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         controls, _paths = _controls_with_list(tmp)
         controls.session.layers["layer_1"].playlist.catalog = UNFILTERED_CATALOG
-        assert preset_row_menu_entries(controls, _dir_desc()) == ()
+        entries = preset_row_menu_entries(controls, _dir_desc())
+        assert [entry.id for entry in entries] == ["preset.browse"]
 
 
 def test_directory_row_jumps_to_a_collection() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         controls, _paths = _controls_with_library(tmp)
         items = _entries(controls, _dir_desc())
-        assert list(items) == ["preset.jump"]
+        assert list(items) == ["preset.browse", "preset.jump"]
+        assert items["preset.browse"].label == "Browse presets…"
         jump = items["preset.jump"]
         assert jump.label == "Jump to directory"
         assert [item.label for item in jump.items] == [

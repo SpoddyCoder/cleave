@@ -108,6 +108,10 @@ class PresetCatalog(Protocol):
 
     def collection_paths(self, collection: PresetCollection) -> tuple[Path, ...]: ...
 
+    def indexed_paths(self) -> tuple[Path, ...]: ...
+
+    def preset_counts_by_dir(self) -> dict[Path, int]: ...
+
 
 class UnfilteredCatalog:
     """Catalog for headless callers (render, CI): no filter, no collections."""
@@ -121,6 +125,12 @@ class UnfilteredCatalog:
     def collection_paths(self, collection: PresetCollection) -> tuple[Path, ...]:
         del collection
         return ()
+
+    def indexed_paths(self) -> tuple[Path, ...]:
+        return ()
+
+    def preset_counts_by_dir(self) -> dict[Path, int]:
+        return {}
 
 
 UNFILTERED_CATALOG = UnfilteredCatalog()
@@ -290,6 +300,10 @@ class PresetLibrary:
         self._blacklist: set[str] = set()
         self._roles: dict[str, CueRole] = {}
         self.revision = 0
+        self._sorted_paths: tuple[Path, ...] = ()
+        self._sorted_paths_source: dict[str, str] | None = None
+        self._dir_counts: dict[Path, int] = {}
+        self._dir_counts_revision = -1
         self._load_curation()
 
     @classmethod
@@ -514,6 +528,31 @@ class PresetLibrary:
         if not self._blacklist:
             return tuple(paths)
         return tuple(p for p in paths if self.hash_of(p) not in self._blacklist)
+
+    def indexed_paths(self) -> tuple[Path, ...]:
+        """Every indexed preset, sorted by path; empty before the first index."""
+        if self._sorted_paths_source is not self._path_hash:
+            self._sorted_paths = tuple(Path(key) for key in sorted(self._path_hash))
+            self._sorted_paths_source = self._path_hash
+        return self._sorted_paths
+
+    def preset_counts_by_dir(self) -> dict[Path, int]:
+        """Visible presets at or below each indexed folder, up to the root."""
+        if self._dir_counts_revision != self.revision:
+            counts: dict[Path, int] = {}
+            root = self._root
+            for path in self.indexed_paths():
+                if self._path_hash.get(str(path)) in self._blacklist:
+                    continue
+                folder = path.parent
+                while True:
+                    counts[folder] = counts.get(folder, 0) + 1
+                    if folder == root or folder.parent == folder:
+                        break
+                    folder = folder.parent
+            self._dir_counts = counts
+            self._dir_counts_revision = self.revision
+        return self._dir_counts
 
     def marker(self, path: Path, *, in_preset_list: bool = False) -> str:
         """Panel marker such as ``" [F] [L] [R:B]"``; empty when uncurated.

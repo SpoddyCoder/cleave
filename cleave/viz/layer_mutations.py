@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 from cleave.blend_modes import BLEND_MODES
@@ -14,7 +15,13 @@ from cleave.config_schema.layers import (
 )
 from cleave.stems import STEM_SOURCES
 from cleave.preset_library import PresetCollection
-from cleave.preset_playlist import is_top_level_browse_dir
+from cleave.preset_playlist import (
+    PresetPlaylist,
+    is_top_level_browse_dir,
+    playlist_at_collection,
+    preset_browse_floor,
+    scan_preset_playlist,
+)
 from cleave.choice import step_choice
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.preset_list_populate import needed_preset_count
@@ -24,6 +31,17 @@ from cleave.viz.session import TuningSession
 NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT = (
     "Timeline is disabled; enable it to switch presets"
 )
+
+
+@dataclass(frozen=True)
+class BrowseSnapshot:
+    """A layer's browse folder or collection and position, to put back later."""
+
+    current_dir: Path
+    paths: tuple[Path, ...]
+    index: int
+    collection: PresetCollection | None
+    browse_floor: Path
 
 
 class LayerMutations:
@@ -108,6 +126,60 @@ class LayerMutations:
             self.preset_root, browse_floor=layer.browse_floor
         ):
             self._publish_browse_preset(slot)
+
+    def browse_snapshot(self, slot: str) -> BrowseSnapshot:
+        layer = self.session.layers[slot]
+        playlist = layer.playlist
+        return BrowseSnapshot(
+            current_dir=playlist.current_dir,
+            paths=playlist.paths,
+            index=playlist.index,
+            collection=playlist.collection,
+            browse_floor=layer.browse_floor,
+        )
+
+    def browse_to_preset(
+        self,
+        slot: str,
+        path: Path,
+        *,
+        collection: PresetCollection | None = None,
+    ) -> None:
+        """Play *path*, browsing its folder (or *collection*) from now on."""
+        layer = self.session.layers[slot]
+        playlist = layer.playlist
+        resolved = path.resolve()
+        if collection is not None:
+            target = playlist_at_collection(
+                collection, current_dir=playlist.current_dir, catalog=playlist.catalog
+            )
+            if resolved not in target.paths:
+                return
+            target.index = target.paths.index(resolved)
+        else:
+            try:
+                target = scan_preset_playlist(resolved, catalog=playlist.catalog)
+            except (OSError, ValueError):
+                return
+            layer.browse_floor = preset_browse_floor(resolved, self.preset_root)
+        playlist.replace_with(target)
+        self._publish_browse_preset(slot)
+
+    def restore_browse(self, slot: str, snapshot: BrowseSnapshot) -> None:
+        """Put back the browse position and preset from *snapshot*."""
+        layer = self.session.layers[slot]
+        playlist = layer.playlist
+        playlist.replace_with(
+            PresetPlaylist(
+                current_dir=snapshot.current_dir,
+                paths=snapshot.paths,
+                index=snapshot.index,
+                catalog=playlist.catalog,
+                collection=snapshot.collection,
+            )
+        )
+        layer.browse_floor = snapshot.browse_floor
+        self._publish_browse_preset(slot)
 
     def step_preset(self, slot: str, *, forward: bool, large: bool) -> None:
         layer = self.session.layers[slot]

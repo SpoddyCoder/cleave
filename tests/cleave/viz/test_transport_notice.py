@@ -58,6 +58,7 @@ def _host() -> Iterator[object]:
         build_view_state=lambda **_kwargs: None,
         set_shell_region=MagicMock(),
         inline_edit=InlineEditController(),
+        preset_browser=SimpleNamespace(active=False, view_state=lambda: None),
         context_menu=ContextMenuState(),
         modal_host=ModalHost(),
         transport=MagicMock(),

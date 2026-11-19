@@ -243,7 +243,7 @@ def _imgui():
     return imgui_mod
 
 
-def _request_hand() -> None:
+def request_hand() -> None:
     from cleave.viz.pointer_cursor import PointerShape, request_pointer
 
     request_pointer(PointerShape.HAND)
@@ -283,28 +283,28 @@ def _contains(rect: Rect, x: float, y: float) -> bool:
     return rw > 0 and rh > 0 and rx <= x < rx + rw and ry <= y < ry + rh
 
 
-def _index_at(rects: tuple[Rect, ...], x: float, y: float) -> int | None:
+def index_at(rects: tuple[Rect, ...], x: float, y: float) -> int | None:
     for index, rect in enumerate(rects):
         if _contains(rect, x, y):
             return index
     return None
 
 
-def _text(draw: Any, x: int, y: int, text: str, role: _Role) -> None:
+def draw_text(draw: Any, x: int, y: int, text: str, role: _Role) -> None:
     if not text:
         return
     imgui = _imgui()
     draw.add_text(imgui.ImVec2(float(x), float(y)), _packed(role), text)
 
 
-def _paint(draw: Any, rect: Rect, state: Literal["HOVER", "SELECTED", "FOCUSED"]) -> None:
+def paint_list_row(draw: Any, rect: Rect, state: Literal["HOVER", "SELECTED", "FOCUSED"]) -> None:
     """A row or chip in the shell's row look, named by its ``RowState``."""
     from cleave.viz.row_paint import RowState, paint_row
 
     paint_row(draw, rect, RowState[state])
 
 
-def _push_list_highlight_clip(draw: Any) -> None:
+def push_list_highlight_clip(draw: Any) -> None:
     """Let the row outline draw into the padding around the list.
 
     The directory list is a child window whose clip starts on the text. The
@@ -324,7 +324,7 @@ def _push_list_highlight_clip(draw: Any) -> None:
     )
 
 
-def _outset(rect: Rect) -> Rect:
+def outset_list_row(rect: Rect) -> Rect:
     """Grow a line of text into its highlight, padded as a dialog form row."""
     x, y, width, height = rect
     pad_y = form_row_pad_y()
@@ -350,7 +350,7 @@ def _chip_hits(
         view, content_w=content_w, text_width=text_width
     ):
         screen_x = content_x + chip_x
-        hit = _outset(
+        hit = outset_list_row(
             (
                 screen_x - _SHORTCUT_HIGHLIGHT_PAD,
                 y,
@@ -369,10 +369,10 @@ def _pointer_hover(
     """Shortcut index and row index under the pointer. A row wins if both match."""
     pos = _imgui().get_io().mouse_pos
     x, y = float(pos.x), float(pos.y)
-    row_at = _index_at(tuple(row[2] for row in rows), x, y)
+    row_at = index_at(tuple(row[2] for row in rows), x, y)
     if row_at is not None:
         return None, rows[row_at][0]
-    chip_at = _index_at(tuple(chip[3] for chip in chips), x, y)
+    chip_at = index_at(tuple(chip[3] for chip in chips), x, y)
     if chip_at is not None:
         return chips[chip_at][0], None
     return None, None
@@ -421,7 +421,7 @@ def _raise_window() -> None:
     )
 
 
-def _list_flags() -> int:
+def list_child_flags() -> int:
     imgui = _imgui()
     # The wheel is applied by this overlay. NoScrollWithMouse keeps ImGui from
     # scrolling the child again, and leaves the scrollbar in place.
@@ -544,7 +544,7 @@ class FilePickerSurface:
             float(bar_bottom),
         )
         for line in title_lines:
-            _text(draw, content_x, y, fit_text_to_width(measure, line, content_w), palette().on_accent)
+            draw_text(draw, content_x, y, fit_text_to_width(measure, line, content_w), palette().on_accent)
             y += step
         y = bar_bottom + line_gap
 
@@ -600,7 +600,7 @@ class FilePickerSurface:
             )
             footer_y += step
         if view.status:
-            _text(
+            draw_text(
                 draw,
                 content_x,
                 footer_y,
@@ -631,11 +631,11 @@ class FilePickerSurface:
             selected = shortcut_is_selected(view, index)
             current = shortcut_is_current(view, index)
             if selected:
-                _paint(draw, hit, "FOCUSED")
+                paint_list_row(draw, hit, "FOCUSED")
             elif hover_chip == index:
-                _paint(draw, hit, "HOVER")
+                paint_list_row(draw, hit, "HOVER")
             color = palette().highlight if current and not selected else palette().value
-            _text(draw, screen_x, y, text, color)
+            draw_text(draw, screen_x, y, text, color)
             rects.append(hit)
             indices.append(index)
         self.chip_rects = tuple(rects)
@@ -651,11 +651,11 @@ class FilePickerSurface:
         content_w: int,
         icon_gap: int,
     ) -> None:
-        _text(draw, x, y, FOLDER_GLYPH, palette().preset_icon)
+        draw_text(draw, x, y, FOLDER_GLYPH, palette().preset_icon)
         prefix_w = measure.size(FOLDER_GLYPH)[0] + icon_gap
         text_w = max(1, content_w - prefix_w)
         fitted = location_text(location, text_w, lambda text: measure.size(text)[0])
-        _text(draw, x + prefix_w, y + location_text_lift(), fitted, palette().value)
+        draw_text(draw, x + prefix_w, y + location_text_lift(), fitted, palette().value)
 
     def _paint_list(
         self,
@@ -678,7 +678,7 @@ class FilePickerSurface:
         imgui.push_style_var(imgui.StyleVar_.window_padding, imgui.ImVec2(0.0, 0.0))
         imgui.push_style_var(imgui.StyleVar_.item_spacing, imgui.ImVec2(0.0, 0.0))
         imgui.push_style_var(imgui.StyleVar_.scrollbar_size, float(scrollbar_width))
-        flags = _list_flags()
+        flags = list_child_flags()
         if total * step > list_h:
             flags |= int(imgui.WindowFlags_.always_vertical_scrollbar)
         begun = False
@@ -707,12 +707,12 @@ class FilePickerSurface:
             for index in range(start, end):
                 top = int(round(float(origin.y) + index * step - scroll_y))
                 text_y = top + form_row_pad_y()
-                rect = _outset((left, text_y, row_w, line_h))
+                rect = outset_list_row((left, text_y, row_w, line_h))
                 rows_list.append((index, text_y, rect))
             rows = tuple(rows_list)
             hover_chip, hover_row = _pointer_hover(chips, rows)
             if hover_chip is not None:
-                _request_hand()
+                request_hand()
             self._paint_rows(
                 imgui.get_window_draw_list(),
                 view,
@@ -795,19 +795,19 @@ class FilePickerSurface:
             row = view.rows[index]
             selected = index == view.selected_index
             if selected or hover_row == index:
-                _push_list_highlight_clip(draw)
+                push_list_highlight_clip(draw)
                 try:
                     if not selected:
-                        _paint(draw, rect, "HOVER")
+                        paint_list_row(draw, rect, "HOVER")
                     elif view.focus is PickerFocus.LIST:
-                        _paint(draw, rect, "FOCUSED")
+                        paint_list_row(draw, rect, "FOCUSED")
                     else:
                         # The shortcuts hold the keys; the row stays chosen.
-                        _paint(draw, rect, "SELECTED")
+                        paint_list_row(draw, rect, "SELECTED")
                 finally:
                     draw.pop_clip_rect()
             color = palette().value if selected else _row_color(row)
-            _text(
+            draw_text(
                 draw,
                 content_x,
                 y,
@@ -834,9 +834,9 @@ class FilePickerSurface:
             if index:
                 cursor += gap
             prefix = f"{key}: "
-            _text(draw, cursor, y, prefix, palette().label)
+            draw_text(draw, cursor, y, prefix, palette().label)
             cursor += measure.size(prefix)[0]
-            _text(draw, cursor, y, label, palette().value)
+            draw_text(draw, cursor, y, label, palette().value)
             cursor += measure.size(label)[0]
 
     def _record_pointer(self) -> None:
@@ -846,11 +846,11 @@ class FilePickerSurface:
         x, y = float(pos.x), float(pos.y)
         clicked = bool(io.mouse_clicked[0])
         double = bool(imgui.is_mouse_double_clicked(0))
-        row_at = _index_at(self.row_rects, x, y)
-        chip_at = _index_at(self.chip_rects, x, y)
-        button_at = _index_at(self.button_rects, x, y)
+        row_at = index_at(self.row_rects, x, y)
+        chip_at = index_at(self.chip_rects, x, y)
+        button_at = index_at(self.button_rects, x, y)
         if button_at is not None:
-            _request_hand()
+            request_hand()
             if clicked:
                 self.intent = PickerPointerIntent(
                     PickerPointerKind.OPEN_SELECTED

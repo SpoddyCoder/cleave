@@ -445,6 +445,12 @@ def dispatch_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) 
         runtime.menu_bar.cancel_alt_tap()
         return True
 
+    # The browser covers the navigator and inspector, so their Shift+F10
+    # menus wait until it closes.
+    if runtime.controls.preset_browser.handle_keydown(event):
+        runtime.menu_bar.cancel_alt_tap()
+        return True
+
     if _open_focus_context_menu(event, runtime):
         runtime.menu_bar.cancel_alt_tap()
         return True
@@ -496,6 +502,7 @@ def dispatch_keyup(event: pygame.event.Event, runtime: LiveVisualizerRuntime) ->
         return
     if runtime.controls.inline_edit.handle_keyup(event):
         return
+    runtime.controls.preset_browser.handle_keyup(event)
     if runtime.modal_host.active:
         runtime.menu_bar.cancel_alt_tap()
     elif runtime.controls.project_switch.active:

@@ -134,6 +134,31 @@ PREVIEW_SECTION = HelpSection(
 )
 
 
+PRESET_BROWSER_SECTIONS: tuple[HelpContent, ...] = (
+    description_section(
+        "Browse Presets",
+        lines=(
+            "Folders, then presets, for this layer. The layer plays the preset you move to; Enter keeps it and Esc goes back to the one you started with.",
+            "Type to filter every preset in this folder and the folders under it.",
+        ),
+    ),
+    HelpSection(
+        KEYBOARD_CONTROLS_SECTION_TITLE,
+        (
+            ("Up/Down", "move"),
+            ("PgUp/PgDn, Home/End", "move further"),
+            ("Enter", "open folder / keep preset"),
+            ("Right", "open folder"),
+            ("Left", "parent folder"),
+            ("Backspace", "delete a filter letter, or parent folder"),
+            ("Esc", "clear the filter, or go back and close"),
+            ("Double-click", "open folder / keep preset"),
+            ("Right-click preset", "favourite, blacklist, role"),
+        ),
+    ),
+)
+
+
 _NAVIGATOR_SECTION = HelpSection(
     "Navigator",
     (

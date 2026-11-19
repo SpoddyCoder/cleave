@@ -14,6 +14,7 @@ from cleave.preset_library import PresetLibrary
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.layer_lifecycle_controls import LayerLifecycleController
 from cleave.viz.layer_mutations import LayerMutations
+from cleave.viz.preset_browser_controls import PresetBrowserControls
 from cleave.viz.editor_mode_controls import (
     EditorModeController,
     curation_focus_slot,
@@ -331,6 +332,17 @@ class TuningControls:
             get_layer_bindings=lambda: self._layer_bindings,
             on_notification=lambda message: self.show_notification(message),
         )
+        self.preset_browser = PresetBrowserControls(
+            session,
+            preset_root,
+            self.library,
+            self.layer_mutations,
+            start_text_input=self._modal_host.start_text_input,
+            stop_text_input=self._modal_host.stop_text_input,
+            text_input_shared=lambda: (
+                self._modal_host.active or self.inline_edit.text_target is not None
+            ),
+        )
         calibration_clicks = CalibrationClicks(
             playback,
             duration_sec,
@@ -624,6 +636,9 @@ class TuningControls:
         self.page_history.observe(self.shell_focus.selected_id, dt_sec)
         self.inline_edit.tick(dt_sec)
         self.project_switch.tick(dt_sec)
+        if self.project_switch.active and self.preset_browser.active:
+            self.preset_browser.cancel()
+        self.preset_browser.tick(dt_sec)
         self.value_nudge.tick(dt_sec)
         self.visualiser_resolution.tick(dt_sec)
         self._notification_host.clear_expired()

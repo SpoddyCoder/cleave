@@ -32,6 +32,7 @@ def _open_shell(menu: MenuBarState):
         context_menu=ContextMenuState(),
         modal_host=ModalHost(),
         inline_edit=InlineEditController(),
+        preset_browser=SimpleNamespace(active=False, view_state=lambda: None),
         session=SimpleNamespace(layer_z_order=()),
         disarm_value_nudge=MagicMock(),
         cfg=SimpleNamespace(project_slug="song"),

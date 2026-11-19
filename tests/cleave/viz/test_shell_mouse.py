@@ -372,6 +372,7 @@ def _host() -> Iterator[ShellHost]:
         context_menu=ContextMenuState(),
         modal_host=ModalHost(),
         inline_edit=InlineEditController(),
+        preset_browser=SimpleNamespace(active=False, view_state=lambda: None),
     )
     with patch("cleave.viz.imgui_host._gl_context_current", return_value=False):
         imgui_host = ImGuiHost.create()
