@@ -514,20 +514,46 @@ def test_prompt_populate_opens_on_the_last_source() -> None:
         assert row.options[row.value] == "in order"
 
 
-def test_resume_clears_the_list_entry_selection() -> None:
+def test_resume_moves_the_list_selection_to_the_scheduled_entry() -> None:
     from cleave.viz.row_kinds import RowDescriptor, RowKind
     from tests.support.viz import make_controls, noop_layer_bindings
 
     controls = make_controls(("layer_1",))
     controls.preset_list._layer_bindings = noop_layer_bindings()
+    controls.session.layers["layer_1"].switching_list_index = 1
     focus = controls.shell_focus
     focus.inspector_cursor = RowDescriptor(
         RowKind.TRACK_PRESET_LIST_ITEM, slot="layer_1", preset_index=2
     )
     controls.preset_list.resume("layer_1")
-    assert focus.inspector_cursor is None
+    assert focus.inspector_cursor == RowDescriptor(
+        RowKind.TRACK_PRESET_LIST_ITEM, slot="layer_1", preset_index=1
+    )
 
     other = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
     focus.inspector_cursor = other
     controls.preset_list.resume("layer_1")
     assert focus.inspector_cursor == other
+
+
+def test_auditioning_the_scheduled_entry_does_not_preview() -> None:
+    from tests.support.viz import make_controls, noop_layer_bindings
+
+    controls = make_controls(("layer_1",))
+    layer = controls.session.layers["layer_1"]
+    layer.preset_list = ["/tmp/a.milk", "/tmp/b.milk"]
+    layer.switching_list_index = 1
+    seen: list[tuple[str, str]] = []
+    controls.preset_list._layer_bindings = noop_layer_bindings(
+        on_preset_change=lambda slot, _playlist: seen.append(("change", slot)),
+        on_switching_resume=lambda slot: seen.append(("resume", slot)),
+    )
+    controls.preset_list.audition("layer_1", 1)
+    assert seen == []
+
+    layer.switching_paused = True
+    controls.preset_list.audition("layer_1", 1)
+    assert seen == [("resume", "layer_1")]
+
+    controls.preset_list.audition("layer_1", 0)
+    assert seen[-1] == ("change", "layer_1")
