@@ -78,8 +78,15 @@ def test_go_to_preset_list_hides_while_switching_is_off() -> None:
             )
         }
     )
-    page_id = layer_page_node_id("layer_1", "milkdrop_preset")
-    assert page_title_command(state, page_id) is None
+    for page in ("milkdrop_preset", "preset_switching"):
+        page_id = layer_page_node_id("layer_1", page)
+        assert page_title_command(state, page_id) is None
+
+
+def test_preset_switching_page_has_go_to_preset_list() -> None:
+    state = minimal_view_state(tracks={"layer_1": _track_block()})
+    page_id = layer_page_node_id("layer_1", "preset_switching")
+    assert page_title_command(state, page_id) == "layers.go_to_preset_list"
 
 
 def test_preset_switching_trigger_off_hides_switching_rows() -> None:

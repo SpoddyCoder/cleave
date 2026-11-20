@@ -622,6 +622,8 @@ TRACK_PRESET_SWITCHING_SECTION = SectionDef(
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_TRIGGER),
         SectionNode(conditional=PRESET_SWITCHING_ACTIVE),
     ),
+    title_command="layers.go_to_preset_list",
+    title_command_when=_preset_switching_active,
 )
 
 TRACK_EFFECTS_SECTION = SectionDef(
