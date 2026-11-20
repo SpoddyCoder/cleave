@@ -678,7 +678,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Resume Switching",
         help_description=(
-            "Browsing presets by hand pauses automatic switching. This hands control back to the list.",
+            "Browsing presets by hand pauses automatic switching. This hands control back to the list, at the highlighted preset list entry.",
         ),
         parent_group="track",
         blocked_by_section_lock=True,
@@ -723,7 +723,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Preset List Entry",
         help_description=(
-            "A preset in this layer's switching list. Tags after the name mark its curation status and role; hover over one for a reminder:",
+            "A preset in this layer's switching list. The highlighted entry is the one playing, or, while switching is paused, the one it picks up from. Tags after the name mark its curation status and role; hover over one for a reminder:",
         ),
         help_mode_entries=_PRESET_LIST_MARKER_HELP_ENTRIES,
         can_enter_move_mode=True,

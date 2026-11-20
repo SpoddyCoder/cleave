@@ -66,6 +66,7 @@ from cleave.viz.focus_nav import (
 from cleave.viz.inspector_controls import InspectorControls
 from cleave.viz.navigator import (
     build_navigator,
+    first_problem_target,
     initial_expanded_ids,
     layer_node_id,
     timeline_row_node_id,
@@ -450,6 +451,20 @@ class TuningControls:
         self.settings.set_tap_latency_ms(latency_ms)
         self.on_tap_latency_changed()
         self._show_latency_row(RowKind.SETTINGS_TAP_LATENCY_MS)
+
+    def show_first_problem(self, slot: str) -> None:
+        """Open the page that fixes the layer's first problem, on its row."""
+        target = first_problem_target(self.session, slot)
+        if target is None:
+            return
+        self.navigator.select(target.page_id)
+        focus = self.shell_focus
+        if target.row is None or focus.selected_id != target.page_id:
+            return
+        self._apply_focus_cursor(MainFocus(target.row))
+        focus.inspector_cursor = target.row
+        focus.inspector_command_id = None
+        self.set_shell_region(ShellRegion.INSPECTOR)
 
     def _show_latency_row(self, kind: RowKind) -> None:
         """Open Settings > Latency with the measured value focused."""

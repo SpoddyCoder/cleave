@@ -231,14 +231,13 @@ def test_browse_while_timeline_on_blocks_later_advance_load() -> None:
     layer.pm.load_preset.assert_not_called()
 
 
-def test_on_switching_resume_clears_pause_and_reapplies() -> None:
+def test_on_switching_resume_reapplies_switching() -> None:
     ctx, factory, layer = _make_factory()
     layer.switching_paused = True
     seen: list[str] = []
     ctx.notification_sink = seen.append
     with patch(f"{_FACTORY}.apply_preset_switching") as mock_apply:
         factory.on_switching_resume("layer_1")
-    assert layer.switching_paused is False
     mock_apply.assert_called_once()
     assert mock_apply.call_args.kwargs["mode"] == "on"
     assert mock_apply.call_args.kwargs["trigger"] == "projectm"
@@ -292,3 +291,86 @@ def test_solo_audio_source_and_mix_player_sync() -> None:
     assert solo_audio_source(session) == "drums"
     sync_mix_player_solo(session, mix)
     mix.set_solo_source.assert_called_with("drums")
+
+
+def _stateful_projectm_playlist(paths: tuple[Path, ...]) -> MagicMock:
+    playlist = MagicMock()
+    state = {"position": 0}
+    playlist.size.return_value = len(paths)
+    playlist.get_position.side_effect = lambda: state["position"]
+    playlist.set_position.side_effect = (
+        lambda index, hard_cut=False: state.update(position=index)
+    )
+    playlist.item.side_effect = (
+        lambda index: paths[index] if 0 <= index < len(paths) else None
+    )
+    return playlist
+
+
+def _stub_projectm_timing(layer: StemLayer) -> None:
+    for name in (
+        "set_preset_duration",
+        "set_soft_cut_duration",
+        "set_easter_egg",
+        "set_hard_cut_duration",
+        "set_hard_cut_sensitivity",
+    ):
+        setattr(layer.pm, name, MagicMock())
+
+
+_THREE = (
+    Path("/tmp/presets/layer_1/a.milk"),
+    Path("/tmp/presets/layer_1/b.milk"),
+    Path("/tmp/presets/layer_1/c.milk"),
+)
+
+
+@patch("cleave.viz.preset_switching.ProjectMPlaylist")
+def test_resume_returns_to_list_item_playing_at_pause(
+    mock_playlist_cls: MagicMock,
+) -> None:
+    from cleave.viz.preset_switching import switching_list_index
+
+    mock_playlist_cls.create.side_effect = (
+        lambda: _stateful_projectm_playlist(_THREE)
+    )
+    _ctx, factory, layer = _make_factory(preset_list=[str(p) for p in _THREE])
+    _stub_projectm_timing(layer)
+    factory.on_preset_switching_change("layer_1")
+    layer.projectm_playlist.set_position(2)
+    assert switching_list_index(layer) == 2
+
+    browsed = PresetPlaylist(
+        current_dir=Path("/tmp/presets/layer_1"), paths=_THREE, index=0
+    )
+    factory.on_preset_change("layer_1", browsed)
+    assert layer.switching_paused is True
+    assert switching_list_index(layer) == 2
+
+    factory.on_switching_resume("layer_1")
+    assert layer.switching_paused is False
+    assert switching_list_index(layer) == 2
+    assert layer.auto_preset_path == _THREE[2].resolve()
+
+
+@patch("cleave.viz.preset_switching.ProjectMPlaylist")
+def test_list_audition_while_paused_moves_resume_point(
+    mock_playlist_cls: MagicMock,
+) -> None:
+    from cleave.viz.preset_switching import switching_list_index
+
+    mock_playlist_cls.create.side_effect = (
+        lambda: _stateful_projectm_playlist(_THREE)
+    )
+    _ctx, factory, layer = _make_factory(preset_list=[str(p) for p in _THREE])
+    _stub_projectm_timing(layer)
+    factory.on_preset_switching_change("layer_1")
+    item = PresetPlaylist(
+        current_dir=Path("/tmp/presets/layer_1"), paths=_THREE, index=1
+    )
+    factory.on_preset_list_audition("layer_1", 1, item)
+    assert layer.switching_paused is True
+    assert switching_list_index(layer) == 1
+
+    factory.on_switching_resume("layer_1")
+    assert switching_list_index(layer) == 1

@@ -513,11 +513,28 @@ def scan_preset_playlist(
 ) -> PresetPlaylist:
     """Build a playlist from a .milk file or a directory of presets.
 
-    Missing anchors yield an empty playlist at the intended directory so play and
-    render can still open when browse packs are absent (e.g. after restore).
-    A blacklisted anchor file stays selected so a saved project still opens on it.
+    A missing ``.milk`` anchor stays selected among its folder's presets, so the
+    preset row names the missing file and marks it, instead of reading as an
+    empty folder. A missing directory yields an empty playlist there, so play
+    and render can still open when browse packs are absent (e.g. after
+    restore). A blacklisted anchor file stays selected so a saved project still
+    opens on it.
     """
     resolved = anchor.resolve()
+    if not resolved.exists() and resolved.suffix.lower() == ".milk":
+        current_dir = resolved.parent
+        present = (
+            catalog.visible(p.resolve() for p in milk_files_in_dir(current_dir))
+            if current_dir.is_dir()
+            else ()
+        )
+        paths = tuple(sorted((*present, resolved)))
+        return PresetPlaylist(
+            current_dir=current_dir,
+            paths=paths,
+            index=paths.index(resolved),
+            catalog=catalog,
+        )
     if not resolved.exists():
         return PresetPlaylist(
             current_dir=_anchor_directory(anchor),

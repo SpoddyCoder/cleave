@@ -254,9 +254,16 @@ A layer can move through presets on its own. On the **Preset Switching** page, t
 
 The rest of the page controls how long each preset plays and how it transitions into the next; the help column describes each setting.
 
+Switching always starts at the first preset in the list when the song starts, in the editor and in renders. The preset you browsed to last does not change where the list starts. On the Preset List page, the entry that is playing is highlighted.
+
 ### When switching pauses
 
 Picking a preset yourself, in the preset browser or by playing a preset list entry, pauses that layer's switching so the preset stays while you look at it. While it is paused, a yellow pause icon shows on the layer's row in the navigator and in the icon line under the title of each of the layer's pages. Click it (or **Resume** on the Preset Switching page) to hand control back to the list.
+
+While switching is paused, the preset list keeps the entry where switching will pick up again highlighted, not the preset you are looking at:
+
+- **projectm trigger:** the entry that was playing when you started browsing. Playing a list entry yourself moves the highlight to that entry, so switching carries on from there.
+- **timer and timeline triggers:** the entry for the current song position, which keeps moving as the song plays.
 
 Switching also resumes on its own when you populate the list, add or remove an entry, or change any Preset Switching setting.
 
@@ -275,17 +282,17 @@ All of these are also in the entry's context menu.
 
 ### When a layer has a problem
 
-A red exclamation mark on a layer's navigator row, and in the icon line under the title of each of its pages, means the layer cannot do what you have set it to do. Hover over it to see every problem, and click it to go to the page where you fix the first one. It shows when:
+A red exclamation mark on a layer's navigator row, and in the icon line under the title of each of its pages, means the layer cannot do what you have set it to do. Hover over it to see every problem, and click it to go to the page where you fix the first one, with the row to fix (such as the first bad preset list entry) selected. It shows when:
 
 | Problem | Fix |
 | --- | --- |
 | Preset switching is on, but the preset list is empty. | Add presets to the list, or Populate it. |
-| None of the presets in the list can load. | Replace the entries marked in the list. |
+| Some or all of the presets in the list can't load. | Replace or remove the entries marked in the list. |
 | Switching follows the timeline, but the timeline is off, or the layer has no clips on it. | Turn the timeline on, add clips to the layer, or pick another trigger. |
 | Switching is off, and the layer's preset is missing or failed to load. | Choose another preset. |
 | The layer's stem is silent in this song (for example, vocals on an instrumental). | Pick another stem on the Compositing page. |
 
-A preset file that is missing (moved, renamed, or left out of a restored project) or that failed to load shows a red exclamation mark in place of its file icon, on the preset row and on its preset list entry. Hover over the row to see why. Cleave looks for missing files when a project opens; a file that disappears while you work is marked once a layer tries to load it. A few bad entries in a list that still has presets it can play only mark those entries; the layer's icon lights once nothing in the list can play.
+A preset file that is missing (moved, renamed, or left out of a restored project) or that failed to load shows the same red warning sign as the layer, just left of its position number (such as 4/15), on the preset row and on its preset list entry. Hover over the sign to see why. Cleave looks for missing files when a project opens; a file that disappears while you work is marked once a layer tries to load it. A bad entry in the preset list also lights the layer's icon, since switching skips it. Playing a missing entry keeps its name on the preset row with the mark, so you can see which file is gone.
 
 ### Preset markers
 

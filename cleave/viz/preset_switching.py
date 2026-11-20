@@ -68,7 +68,6 @@ def _apply_projectm_timing(
 def _clear_list_rotation(layer: StemLayer) -> None:
     layer.preset_rotation = None
     layer.list_switch_index = 0
-    layer.rotation_anchor = 0
 
 
 def _timeline_list_index(on_transition_count: int) -> int:
@@ -151,9 +150,15 @@ def apply_preset_switching(
     on_empty: Callable[[], None] | None = None,
     session=None,
 ) -> None:
+    resuming = layer.switching_paused
+    resume_index = layer.resume_list_index
     layer.switching_paused = False
+    layer.resume_list_index = None
     pm = layer.pm
 
+    # A running list edit keeps the playing item; a fresh start begins at
+    # item 1; a resume returns to the item that was playing at the pause.
+    keep_playing = layer.projectm_playlist is not None and not resuming
     if layer.projectm_playlist is not None:
         layer.projectm_playlist.destroy()
         layer.projectm_playlist = None
@@ -178,9 +183,11 @@ def apply_preset_switching(
         return
 
     if trigger in ("timer", "timeline"):
-        # Timer and timeline index the list (timer by duration; timeline by
-        # on-transitions when the timeline is enabled).
-        if trigger == "timeline" and layer.preset_rotation is not None:
+        # Timer and timeline index the list from song time (timer by
+        # duration; timeline by on-transitions when the timeline is enabled).
+        # An existing rotation keeps its index: the per-frame advance tracks
+        # song time, including while paused.
+        if layer.preset_rotation is not None:
             rebuild_list_rotation_preserving_index(
                 layer,
                 preset_list=preset_list,
@@ -212,7 +219,13 @@ def apply_preset_switching(
     playlist.add_presets(paths, allow_duplicates=True)
     playlist.set_shuffle(False)
     layer.projectm_playlist = playlist
-    _sync_projectm_playlist_position(layer)
+    if resuming:
+        start = 0 if resume_index is None else resume_index
+    elif keep_playing:
+        start = _list_index_of(playlist, layer.auto_preset_path)
+    else:
+        start = 0
+    _start_projectm_playlist_at(layer, start)
     restart_projectm_preset_timer(layer)
 
 
@@ -227,10 +240,8 @@ def _apply_indexed_list_switching(
     pm.set_hard_cut_enabled(False)
     pm.set_preset_start_clean(preset_start_clean)
 
-    anchor = _anchor_index(layer, paths)
-    layer.rotation_anchor = anchor
     layer.list_switch_index = 0
-    layer.preset_rotation = PresetRotation(paths=tuple(paths), anchor=anchor)
+    layer.preset_rotation = PresetRotation(paths=tuple(paths))
     path = layer.preset_rotation.path_for(0)
     if path is None:
         return
@@ -243,16 +254,15 @@ def rebuild_list_rotation_preserving_index(
     preset_list: list[str] | None = None,
     preset_start_clean: bool = DEFAULT_PRESET_START_CLEAN,
 ) -> None:
-    """Rebuild list rotation; keep anchor and switch index."""
+    """Rebuild list rotation; keep the switch index."""
     paths = _preset_paths(preset_list)
     if not paths:
         _clear_list_rotation(layer)
         layer.auto_preset_path = None
         return
 
-    anchor = layer.rotation_anchor
     index = layer.list_switch_index
-    layer.preset_rotation = PresetRotation(paths=tuple(paths), anchor=anchor)
+    layer.preset_rotation = PresetRotation(paths=tuple(paths))
     path = layer.preset_rotation.path_for(index)
     if path is None:
         return
@@ -547,32 +557,46 @@ def playing_switching_preset_path(layer: StemLayer) -> Path | None:
     return None
 
 
-def _sync_projectm_playlist_position(layer: StemLayer) -> None:
+def switching_list_index(layer: StemLayer) -> int | None:
+    """Switching-list index that is playing, or that resumes after a pause.
+
+    Timer and timeline follow song time, so their index keeps moving while
+    paused. The projectM trigger resumes at the item playing when browsing
+    paused it, or at the list item auditioned since.
+    """
+    rotation = layer.preset_rotation
+    if rotation is not None:
+        if not rotation.paths:
+            return None
+        return layer.list_switch_index % len(rotation.paths)
+    if layer.switching_paused:
+        return layer.resume_list_index
+    playlist = layer.projectm_playlist
+    if playlist is None or playlist.size() == 0:
+        return None
+    return playlist.get_position()
+
+
+def _list_index_of(playlist: ProjectMPlaylist, path: Path | None) -> int:
+    if path is None:
+        return 0
+    target = path.resolve()
+    for index in range(playlist.size()):
+        item = playlist.item(index)
+        if item is not None and item.resolve() == target:
+            return index
+    return 0
+
+
+def _start_projectm_playlist_at(layer: StemLayer, index: int) -> None:
     playlist = layer.projectm_playlist
     if playlist is None:
         return
-    target_path = layer.auto_preset_path
-    if target_path is None and layer.playlist.current is not None:
-        target_path = layer.playlist.current
-    if target_path is not None:
-        target = target_path.resolve()
-        for index in range(playlist.size()):
-            item = playlist.item(index)
-            if item is not None and item.resolve() == target:
-                playlist.set_position(index, hard_cut=True)
-                _record_auto_preset(layer, item)
-                return
-    item = playlist.item(playlist.get_position())
+    size = playlist.size()
+    if size == 0:
+        return
+    index = min(max(0, index), size - 1)
+    playlist.set_position(index, hard_cut=True)
+    item = playlist.item(index)
     if item is not None:
         _record_auto_preset(layer, item)
-
-
-def _anchor_index(layer: StemLayer, paths: Sequence[Path]) -> int:
-    current = layer.playlist.current
-    if current is None or not paths:
-        return 0
-    resolved = current.resolve()
-    for index, candidate in enumerate(paths):
-        if candidate.resolve() == resolved:
-            return index
-    return 0

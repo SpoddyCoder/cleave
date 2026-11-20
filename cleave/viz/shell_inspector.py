@@ -13,7 +13,8 @@ from cleave.preset_library import marker_tooltip
 from cleave.viz.choice_widgets import ChoiceTone
 from cleave.viz.commands import command_by_id, command_context, CommandContext
 from cleave.viz.drag_reorder import DRAG_PRESET
-from cleave.viz.imgui_icon_button import glyph_drop
+from cleave.viz.icon_button import box_contains, icon_box, icon_gap
+from cleave.viz.imgui_icon_button import glyph_drop, paint_box
 from cleave.viz.imgui_theme import padded_row_spacing_y, padded_rows, rgba
 from cleave.viz.inspector import build_inspector_rows, InspectorRow
 from cleave.viz.inspector_controls import (
@@ -223,10 +224,15 @@ def _draw_two_line_row_text(
     lead: str = "",
     icon: tuple[str, tuple[int, int, int]] | None = None,
     draw_value: bool = True,
+    problem: str | None = None,
 ) -> bool:
     """Markers after the label, stopping short of the arrows, and the value below.
 
-    True when the pointer is over a marker token, which shows its own tooltip.
+    True when the pointer is over a marker token or the problem sign, which
+    show their own tooltips.
+
+    *problem* paints the layer warning sign just left of the value cluster on
+    the first line, and the markers stop short of it.
 
     Markers are painted, not part of the selectable label: ImGui hashes the
     visible label into the id, and a press must survive the markers changing.
@@ -239,13 +245,30 @@ def _draw_two_line_row_text(
     sizer = ImguiTextSizer()
     draw = imgui.get_window_draw_list()
     on_marker = False
+    cluster_x = nudge_cluster_origin_x(
+        right_x,
+        [imgui.calc_text_size(text).x for text, _color in parts],
+        pad,
+    )
+    if problem is not None:
+        line = imgui.get_text_line_height()
+        band = (imgui.get_item_rect_min().y, imgui.get_item_rect_max().y - line)
+        side = band[1] - band[0]
+        cluster_x -= side + icon_gap()
+        box = icon_box(cluster_x, band)
+        paint_box(
+            box,
+            PROBLEM_GLYPH,
+            color=palette().on_danger,
+            hovered=False,
+            fill=palette().button_danger_bg,
+        )
+        mouse = imgui.get_mouse_pos()
+        if imgui.is_item_hovered() and box_contains(box, mouse.x, mouse.y):
+            show_tooltip(problem)
+            on_marker = True
     if markers:
         marker_x = origin_x + imgui.calc_text_size(f"{lead}{label} ").x
-        cluster_x = nudge_cluster_origin_x(
-            right_x,
-            [imgui.calc_text_size(text).x for text, _color in parts],
-            pad,
-        )
         fitted = fit_text_to_width(
             sizer, markers, int(cluster_x - marker_x - imgui.calc_text_size(" ").x)
         )
@@ -254,7 +277,7 @@ def _draw_two_line_row_text(
             imgui.get_color_u32(label_color),
             fitted,
         )
-        if imgui.is_item_hovered():
+        if imgui.is_item_hovered() and not on_marker:
             on_marker = _marker_tooltip_at(markers, fitted, marker_x, origin_y)
     if not draw_value:
         return on_marker
@@ -666,8 +689,6 @@ class InspectorPanel:
         elif look.stepped and cluster and not two_line:
             cluster = self.values.fixed_width_value(desc.kind, cluster)
         icon = path_row_icon(desc.kind)
-        if icon is not None and preset_row_problem(state, desc) is not None:
-            icon = PROBLEM_GLYPH, palette().error_notification
         if icon is not None and not two_line:
             origin_x, origin_y = selectable_label_origin()
             if look.label:
@@ -745,6 +766,7 @@ class InspectorPanel:
                 lead=look.lead,
                 icon=icon,
                 draw_value=not crumbs,
+                problem=preset_row_problem(state, desc),
             )
             if on_marker:
                 self.values.control_hovered = True

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -24,7 +23,8 @@ from cleave.viz.navigator import (
     TOGGLE_ENABLED,
     TOGGLE_WARN,
     build_navigator,
-    first_problem_page_id,
+    ProblemTarget,
+    first_problem_target,
     layer_node_id,
     layer_page_node_id,
     page_toggles,
@@ -32,6 +32,7 @@ from cleave.viz.navigator import (
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_specs.track import preset_row_problem
 from cleave.viz.session import LayerRuntime, TuningSession
+from cleave.viz.shell_focus import ShellRegion
 from tests.support.viz import make_controls
 
 GOOD = Path(__file__)
@@ -71,13 +72,15 @@ def test_switching_on_with_an_empty_list_is_a_problem() -> None:
     assert "preset list is empty" in problem.message
 
 
-def test_some_bad_list_entries_mark_only_the_entries() -> None:
+def test_a_bad_list_entry_marks_the_entry_and_the_layer() -> None:
     layer = _layer()
     layer.preset_switching = "on"
     layer.preset_switching_trigger = "timer"
     layer.preset_list = [str(GOOD), str(MISSING)]
     session = _session(layer)
-    assert layer_problems(session, "layer_1") == ()
+    (problem,) = layer_problems(session, "layer_1")
+    assert problem.page is ProblemPage.PRESET_LIST
+    assert problem.message == "1 preset in the preset list can't load"
     assert session.preset_health.list_problems("layer_1", layer) == (
         None,
         PRESET_FILE_MISSING,
@@ -90,12 +93,13 @@ def test_a_list_where_nothing_can_load_is_a_layer_problem() -> None:
     layer.preset_switching_trigger = "timer"
     layer.preset_list = [str(MISSING), str(GOOD)]
     session = _session(layer)
-    assert layer_problems(session, "layer_1") == ()
+    assert _messages(session) == ["1 preset in the preset list can't load"]
     # A failure arriving later is picked up through the revision, not the disk.
     layer.failed_presets = {preset_failure_key(GOOD): "parse error"}
     layer.failed_presets_revision = 1
     (problem,) = layer_problems(session, "layer_1")
     assert problem.page is ProblemPage.PRESET_LIST
+    assert problem.message == "None of the presets in the preset list can load"
     assert session.preset_health.file_problem(layer, GOOD) == (
         "Failed to load: parse error"
     )
@@ -204,25 +208,44 @@ def test_first_problem_page_falls_back_when_the_list_page_is_hidden() -> None:
     layer.preset_switching = "on"
     layer.preset_switching_trigger = "timer"
     session = _session(layer)
-    assert first_problem_page_id(session, "layer_1") == layer_page_node_id(
-        "layer_1", "preset_list"
+    assert first_problem_target(session, "layer_1") == ProblemTarget(
+        layer_page_node_id("layer_1", "preset_list")
     )
     layer.preset_switching_trigger = "off"
-    assert first_problem_page_id(session, "layer_1") == layer_page_node_id(
-        "layer_1", "preset_switching"
+    assert first_problem_target(session, "layer_1") == ProblemTarget(
+        layer_page_node_id("layer_1", "preset_switching")
     )
     layer.preset_switching = "off"
-    assert first_problem_page_id(session, "layer_1") is None
+    assert first_problem_target(session, "layer_1") is None
 
 
-def test_warning_toggle_selects_the_page_of_the_first_problem() -> None:
-    session = _session(_layer(MISSING))
-    controls = SimpleNamespace(session=session, navigator=MagicMock())
+def test_first_problem_target_is_the_first_bad_list_entry() -> None:
+    layer = _layer()
+    layer.preset_switching = "on"
+    layer.preset_switching_trigger = "timer"
+    layer.preset_list = [str(GOOD), str(MISSING), str(MISSING)]
+    session = _session(layer)
+    assert first_problem_target(session, "layer_1") == ProblemTarget(
+        layer_page_node_id("layer_1", "preset_list"),
+        RowDescriptor(RowKind.TRACK_PRESET_LIST_ITEM, slot="layer_1", preset_index=1),
+    )
+
+
+def test_warning_toggle_focuses_the_row_of_the_first_problem() -> None:
+    controls = make_controls(("layer_1",))
+    layer = controls.session.layers["layer_1"]
+    layer.preset_switching = "on"
+    layer.preset_switching_trigger = "timer"
+    layer.preset_list = [str(GOOD), str(MISSING)]
+    controls.session.preset_health.check_on_disk(controls.session)
     row_hotkeys.activate_header_toggle(
         controls, TOGGLE_WARN, RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
     )
-    controls.navigator.select.assert_called_once_with(
-        layer_page_node_id("layer_1", "milkdrop_preset")
+    focus = controls.shell_focus
+    assert focus.selected_id == layer_page_node_id("layer_1", "preset_list")
+    assert focus.region is ShellRegion.INSPECTOR
+    assert focus.inspector_cursor == RowDescriptor(
+        RowKind.TRACK_PRESET_LIST_ITEM, slot="layer_1", preset_index=1
     )
 
 

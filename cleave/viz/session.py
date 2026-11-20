@@ -470,6 +470,9 @@ class LayerRuntime:
     # Browse pause while switching is on; not persisted. Mirrored from
     # StemLayer.switching_paused while the live layer map is available.
     switching_paused: bool = False
+    # Switching-list index playing, or resuming after a browse pause; not
+    # persisted. Mirrored from the live StemLayer.
+    switching_list_index: int | None = None
     # Presets whose last load failed on this layer, by preset_failure_key, with
     # libprojectM's reason; not persisted. Mirrored from the live ProjectM.
     failed_presets: dict[str, str] = field(default_factory=dict)

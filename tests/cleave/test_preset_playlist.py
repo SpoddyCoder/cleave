@@ -562,16 +562,31 @@ def test_scan_preset_playlist_missing_dir_returns_empty() -> None:
         assert preset_filename_display(playlist) == "NO PRESETS FOUND"
 
 
-def test_scan_preset_playlist_missing_milk_returns_empty() -> None:
+def test_scan_preset_playlist_missing_milk_stays_selected() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         pack = root / "pack"
         pack.mkdir()
+        (pack / "a.milk").write_text("milk")
+        (pack / "z.milk").write_text("milk")
         missing = pack / "gone.milk"
         playlist = scan_preset_playlist(missing)
-        assert playlist.current is None
-        assert playlist.paths == ()
+        assert playlist.current == missing.resolve()
+        assert playlist.paths == (
+            (pack / "a.milk").resolve(),
+            missing.resolve(),
+            (pack / "z.milk").resolve(),
+        )
         assert playlist.current_dir == pack.resolve()
+        assert preset_filename_display(playlist) == "gone.milk"
+
+
+def test_scan_preset_playlist_missing_milk_in_missing_dir_stays_selected() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        missing = Path(tmp) / "gone" / "gone.milk"
+        playlist = scan_preset_playlist(missing)
+        assert playlist.current == missing.resolve()
+        assert playlist.paths == (missing.resolve(),)
 
 
 def test_preset_browse_floor_missing_milk_uses_parent() -> None:

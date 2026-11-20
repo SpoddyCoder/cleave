@@ -24,7 +24,6 @@ from cleave.viz.navigator import (
     TOGGLE_PREVIEW,
     TOGGLE_SOLO,
     TOGGLE_WARN,
-    first_problem_page_id,
     layer_page_of,
     layer_slot_of,
     root_id,
@@ -159,9 +158,7 @@ def activate_header_toggle(
     """Run the header mutation for a navigator icon click."""
     if toggle_id == TOGGLE_WARN:
         if desc.kind == RowKind.TRACK_HEADER and desc.slot is not None:
-            page_id = first_problem_page_id(controls.session, desc.slot)
-            if page_id is not None:
-                controls.navigator.select(page_id)
+            controls.show_first_problem(desc.slot)
         return
     if toggle_id == TOGGLE_HOLD:
         if desc.kind == RowKind.TRACK_HEADER and desc.slot is not None:

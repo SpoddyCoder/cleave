@@ -598,6 +598,7 @@ def view_state_structure_signature(
                 else str(layer.auto_preset_path)
             ),
             "switching_paused": layer.switching_paused,
+            "switching_list_index": layer.switching_list_index,
         }
     ro = session.overlays
     pp = session.post_fx
@@ -701,7 +702,10 @@ class TuningViewStateBuilder:
         """Mirror the playing switching preset onto session for panel display."""
         if not isinstance(self._layers_by_slot, dict) or not self._layers_by_slot:
             return
-        from cleave.viz.preset_switching import playing_switching_preset_path
+        from cleave.viz.preset_switching import (
+            playing_switching_preset_path,
+            switching_list_index,
+        )
 
         for slot, stem in self._layers_by_slot.items():
             runtime = self.session.layers.get(slot)
@@ -712,6 +716,7 @@ class TuningViewStateBuilder:
                 stem.auto_preset_path = playing
             runtime.auto_preset_path = stem.auto_preset_path
             runtime.switching_paused = stem.switching_paused
+            runtime.switching_list_index = switching_list_index(stem)
             revision = stem.pm.failure_revision
             if runtime.failed_presets_revision != revision:
                 runtime.failed_presets = dict(stem.pm.failed_presets)
@@ -782,15 +787,19 @@ class TuningViewStateBuilder:
 
     @staticmethod
     def _active_preset_list_index(layer: LayerRuntime) -> int | None:
-        """Return the preset_list index matching the playing preset, if any.
+        """Return the preset_list index to highlight, if any.
 
-        Computed only when the view structure rebuilds (``auto_preset_path`` and
+        While switching runs, that is the list position (paused: where it
+        resumes), not the preset being browsed. Otherwise the list item that
+        matches the playing preset. Computed only when the view structure rebuilds (``auto_preset_path`` and
         playlist index are part of ``view_state_structure_signature``), so the
         draw path can read a precomputed index without resolving paths per frame.
         """
         paths = layer.preset_list
         if not paths:
             return None
+        if layer.switching_list_index is not None:
+            return min(layer.switching_list_index, len(paths) - 1)
         active = layer.auto_preset_path
         if active is None:
             current = layer.playlist.current

@@ -13,6 +13,7 @@ from cleave.stems import stem_overlay_header
 from cleave.config_schema.layers import MAX_LAYER_COUNT
 from cleave.viz.editor_mode_controls import curation_focus_slot, is_preset_curation_mode
 from cleave.viz.layer_problems import ProblemPage, layer_problems, layer_problems_tooltip
+from cleave.viz.row_kinds import RowDescriptor
 from cleave.viz.theme import palette
 
 if TYPE_CHECKING:
@@ -586,15 +587,33 @@ _PROBLEM_PAGES = {
 }
 
 
-def first_problem_page_id(session: TuningSession, slot: str) -> str | None:
-    """Navigator id of the page that fixes the layer's first problem, if any."""
+@dataclass(frozen=True)
+class ProblemTarget:
+    """Where the layer's first problem is fixed: a page, and a row on it."""
+
+    page_id: str
+    row: RowDescriptor | None = None
+
+
+def first_problem_target(session: TuningSession, slot: str) -> ProblemTarget | None:
+    """Page, and row on it, that fixes the layer's first problem, if any.
+
+    When that page is hidden the target falls back to Preset Switching with
+    no row, since the problem's row is not on it.
+    """
     problems = layer_problems(session, slot)
     if not problems:
         return None
-    page = _PROBLEM_PAGES[problems[0].page]
+    problem = problems[0]
+    page = _PROBLEM_PAGES[problem.page]
     if not _layer_page_visible(session, slot, page):
-        page = LAYER_PAGE_PRESET_SWITCHING
-    return layer_page_node_id(slot, page)
+        return ProblemTarget(layer_page_node_id(slot, LAYER_PAGE_PRESET_SWITCHING))
+    row = (
+        None
+        if problem.row is None
+        else RowDescriptor(problem.row, slot=slot, preset_index=problem.preset_index)
+    )
+    return ProblemTarget(layer_page_node_id(slot, page), row)
 
 
 def switching_held(session: TuningSession, slot: str) -> bool:

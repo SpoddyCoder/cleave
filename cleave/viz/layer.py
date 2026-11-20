@@ -24,5 +24,6 @@ class StemLayer:
     limiter_gain: float = 1.0
     preset_rotation: PresetRotation | None = None
     list_switch_index: int = 0
-    rotation_anchor: int = 0
     switching_paused: bool = False
+    # projectM trigger: list index to resume at when browsing ends the pause.
+    resume_list_index: int | None = None

@@ -2,8 +2,9 @@
 
 A layer problem lights the layer's warning icon on its navigator row and its
 pages' title line; the tooltip lists every one. A preset file problem marks
-that file's row (the preset row, or a preset list entry) and does not light
-the layer icon unless it leaves the layer with nothing to play.
+that file's row (the preset row, or a preset list entry). It lights the layer
+icon too while the layer would play that file: the preset while switching is
+off, or any preset list entry while switching is on.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from cleave.projectm import preset_failure_key
+from cleave.viz.row_kinds import RowKind
 from cleave.stems import stem_control_label
 
 if TYPE_CHECKING:
@@ -36,7 +38,7 @@ class PresetHealth:
     """
 
     missing: frozenset[str] = frozenset()
-    _lists: dict[str, tuple[object, tuple[str | None, ...], bool]] = field(
+    _lists: dict[str, tuple[object, tuple[str | None, ...]]] = field(
         default_factory=dict, repr=False
     )
 
@@ -66,23 +68,13 @@ class PresetHealth:
 
     def list_problems(self, slot: str, layer: LayerRuntime) -> tuple[str | None, ...]:
         """:meth:`file_problem` for each preset list entry, in list order."""
-        return self._list_entry(slot, layer)[0]
-
-    def list_unplayable(self, slot: str, layer: LayerRuntime) -> bool:
-        """True when the list has entries and none of them can play."""
-        return self._list_entry(slot, layer)[1]
-
-    def _list_entry(
-        self, slot: str, layer: LayerRuntime
-    ) -> tuple[tuple[str | None, ...], bool]:
         key = (tuple(layer.preset_list), layer.failed_presets_revision)
         cached = self._lists.get(slot)
         if cached is not None and cached[0] == key:
-            return cached[1], cached[2]
+            return cached[1]
         problems = tuple(self.file_problem(layer, path) for path in layer.preset_list)
-        unplayable = bool(problems) and all(problems)
-        self._lists[slot] = (key, problems, unplayable)
-        return problems, unplayable
+        self._lists[slot] = (key, problems)
+        return problems
 
 
 class ProblemPage(Enum):
@@ -96,8 +88,12 @@ class ProblemPage(Enum):
 
 @dataclass(frozen=True)
 class LayerProblem:
+    """A problem, the page that fixes it, and the row on that page to focus."""
+
     message: str
     page: ProblemPage
+    row: RowKind | None = None
+    preset_index: int | None = None
 
 
 def layer_problems(session: TuningSession, slot: str) -> tuple[LayerProblem, ...]:
@@ -113,13 +109,32 @@ def layer_problems(session: TuningSession, slot: str) -> tuple[LayerProblem, ...
                     ProblemPage.PRESET_LIST,
                 )
             )
-        elif health.list_unplayable(slot, layer):
-            problems.append(
-                LayerProblem(
-                    "None of the presets in the preset list can load",
-                    ProblemPage.PRESET_LIST,
+        else:
+            entry_problems = health.list_problems(slot, layer)
+            bad = sum(1 for problem in entry_problems if problem is not None)
+            if bad == len(entry_problems):
+                problems.append(
+                    LayerProblem(
+                        "None of the presets in the preset list can load",
+                        ProblemPage.PRESET_LIST,
+                        RowKind.TRACK_PRESET_LIST_ITEM,
+                        0,
+                    )
                 )
-            )
+            elif bad:
+                noun = "preset" if bad == 1 else "presets"
+                problems.append(
+                    LayerProblem(
+                        f"{bad} {noun} in the preset list can't load",
+                        ProblemPage.PRESET_LIST,
+                        RowKind.TRACK_PRESET_LIST_ITEM,
+                        next(
+                            index
+                            for index, problem in enumerate(entry_problems)
+                            if problem is not None
+                        ),
+                    )
+                )
         if layer.preset_switching_trigger == "timeline":
             lane = session.timeline.lanes.get(slot)
             if not session.timeline.enabled:
@@ -127,6 +142,7 @@ def layer_problems(session: TuningSession, slot: str) -> tuple[LayerProblem, ...
                     LayerProblem(
                         "Switching follows the timeline, but the timeline is off",
                         ProblemPage.PRESET_SWITCHING,
+                        RowKind.TRACK_PRESET_SWITCHING_TRIGGER,
                     )
                 )
             elif lane is None or not lane.cues:
@@ -134,20 +150,27 @@ def layer_problems(session: TuningSession, slot: str) -> tuple[LayerProblem, ...
                     LayerProblem(
                         "Switching follows the timeline, but this layer has no clips on it",
                         ProblemPage.PRESET_SWITCHING,
+                        RowKind.TRACK_PRESET_SWITCHING_TRIGGER,
                     )
                 )
     else:
         current = layer.playlist.current
         if current is None:
             problems.append(
-                LayerProblem("Milkdrop preset not found", ProblemPage.MILKDROP_PRESET)
+                LayerProblem(
+                    "Milkdrop preset not found",
+                    ProblemPage.MILKDROP_PRESET,
+                    RowKind.TRACK_PRESET,
+                )
             )
         else:
             problem = health.file_problem(layer, current)
             if problem is not None:
                 problems.append(
                     LayerProblem(
-                        f"{current.name}: {problem}", ProblemPage.MILKDROP_PRESET
+                        f"{current.name}: {problem}",
+                        ProblemPage.MILKDROP_PRESET,
+                        RowKind.TRACK_PRESET,
                     )
                 )
     if layer.stem in session.silent_stems:
@@ -156,6 +179,7 @@ def layer_problems(session: TuningSession, slot: str) -> tuple[LayerProblem, ...
                 f"The {stem_control_label(layer.stem)} stem is silent, "
                 "so this layer has no audio to react to",
                 ProblemPage.COMPOSITING,
+                RowKind.TRACK_STEM,
             )
         )
     return tuple(problems)

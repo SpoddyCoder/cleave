@@ -30,6 +30,7 @@ from cleave.viz.preset_switching import (
     load_manual_preset_clean,
     reapply_projectm_preset_switching,
     resync_timeline_preset_switching,
+    switching_list_index,
 )
 from cleave.viz.post_fx_bindings import PostFxBindings
 from cleave.viz.session import TuningSession
@@ -73,6 +74,7 @@ class LiveLayerBindingsFactory:
     def layer_bindings(self) -> LiveLayerBindings:
         return LiveLayerBindings(
             on_preset_change=self.on_preset_change,
+            on_preset_list_audition=self.on_preset_list_audition,
             on_preset_switching_change=self.on_preset_switching_change,
             on_switching_resume=self.on_switching_resume,
             lock_preset_for_modal=self.lock_preset_for_modal,
@@ -109,11 +111,13 @@ class LiveLayerBindingsFactory:
         if mode != "on" and playlist.current is None:
             layer.switching_paused = False
             return
+        entered_pause = mode == "on" and not layer.switching_paused
+        if entered_pause:
+            layer.resume_list_index = switching_list_index(layer)
         load_manual_preset_clean(
             layer, preset_start_clean=runtime.preset_start_clean
         )
         if mode == "on":
-            entered_pause = not layer.switching_paused
             layer.switching_paused = True
             layer.pm.lock_preset(True)
             layer.pm.set_hard_cut_enabled(False)
@@ -123,11 +127,20 @@ class LiveLayerBindingsFactory:
         layer.pm.lock_preset(True)
         layer.switching_paused = False
 
+    def on_preset_list_audition(
+        self, slot: str, index: int, playlist: PresetPlaylist
+    ) -> None:
+        """Preview list item *index*; switching resumes from it."""
+        self.on_preset_change(slot, playlist)
+        layer = self.ctx.layers_by_slot[slot]
+        if layer.switching_paused:
+            layer.resume_list_index = index
+
     def on_preset_switching_change(self, slot: str) -> None:
         self._apply_preset_switching(slot)
 
     def on_switching_resume(self, slot: str) -> None:
-        self.ctx.layers_by_slot[slot].switching_paused = False
+        # apply_preset_switching clears the pause and resumes the list.
         self._apply_preset_switching(slot)
 
     def lock_preset_for_modal(self, slot: str) -> None:

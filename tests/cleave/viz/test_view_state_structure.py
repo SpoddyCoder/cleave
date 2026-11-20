@@ -292,6 +292,7 @@ def test_builder_mirrors_switching_paused_into_inspector() -> None:
     stem.auto_preset_path = None
     stem.preset_rotation = None
     stem.projectm_playlist = None
+    stem.resume_list_index = None
     stem.playlist = layer.playlist
     controls._view_state._layers_by_slot = {"layer_1": stem}
 

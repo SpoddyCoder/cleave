@@ -17,6 +17,7 @@ from cleave.viz.preset_switching import (
     load_manual_preset_clean,
     playing_switching_preset_path,
     reapply_projectm_preset_switching,
+    switching_list_index,
 )
 from cleave.viz.session import LayerRuntime, TuningSession
 
@@ -491,3 +492,58 @@ def test_layer_notification_uses_panel_number() -> None:
         )
         == "Layer 2: No presets in switching list"
     )
+
+
+@patch("cleave.viz.preset_switching.ProjectMPlaylist")
+def test_apply_projectm_starts_at_first_item_not_browse_preset(
+    mock_playlist_cls: MagicMock,
+) -> None:
+    layer = _stem_layer(index=1)
+    playlist = _mock_projectm_playlist()
+    mock_playlist_cls.create.return_value = playlist
+    apply_preset_switching(
+        layer, mode="on", trigger="projectm", preset_list=_LIST
+    )
+    playlist.set_position.assert_called_once_with(0, hard_cut=True)
+    assert layer.auto_preset_path == _MILK[0].resolve()
+
+
+@patch("cleave.viz.preset_switching.ProjectMPlaylist")
+def test_apply_projectm_list_edit_keeps_playing_item(
+    mock_playlist_cls: MagicMock,
+) -> None:
+    layer = _stem_layer()
+    layer.projectm_playlist = _mock_projectm_playlist(position=2)
+    layer.auto_preset_path = _MILK[2].resolve()
+    playlist = _mock_projectm_playlist()
+    mock_playlist_cls.create.return_value = playlist
+    apply_preset_switching(
+        layer, mode="on", trigger="projectm", preset_list=_LIST
+    )
+    playlist.set_position.assert_called_once_with(2, hard_cut=True)
+
+
+def test_apply_timer_starts_at_first_item_not_browse_preset() -> None:
+    layer = _stem_layer(index=2)
+    apply_preset_switching(
+        layer, mode="on", trigger="timer", preset_list=_LIST
+    )
+    assert layer.preset_rotation is not None
+    assert layer.preset_rotation.path_for(0) == _MILK[0]
+    layer.pm.load_preset.assert_called_with(_MILK[0], smooth=False)
+    assert switching_list_index(layer) == 0
+
+
+def test_switching_list_index_follows_timer_while_paused() -> None:
+    layer = _stem_layer()
+    session = _session(trigger="timer", duration=10.0)
+    apply_preset_switching(
+        layer,
+        mode="on",
+        trigger="timer",
+        preset_list=_LIST,
+        preset_duration=10.0,
+    )
+    layer.switching_paused = True
+    advance_preset_switching(session, {"layer_1": layer}, 25.0)
+    assert switching_list_index(layer) == 2

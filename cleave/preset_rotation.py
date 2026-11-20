@@ -8,22 +8,16 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class PresetRotation:
-    """Maps a non-negative index to a preset path.
+    """Maps a non-negative index to a preset path, wrapping round the list.
 
-    Wraps ``paths`` with an ``anchor`` offset so ``path_for(count)`` returns
-    ``paths[(anchor + count) % n]``.
+    ``path_for(count)`` returns ``paths[count % n]``, so index 0 is always the
+    first list item.
     """
 
     paths: tuple[Path, ...]
-    anchor: int = 0
-
-    def __post_init__(self) -> None:
-        n = len(self.paths)
-        if n > 0 and not (0 <= self.anchor < n):
-            object.__setattr__(self, "anchor", self.anchor % n)
 
     def path_for(self, count: int) -> Path | None:
         n = len(self.paths)
         if n == 0:
             return None
-        return self.paths[(self.anchor + int(count)) % n]
+        return self.paths[int(count) % n]
