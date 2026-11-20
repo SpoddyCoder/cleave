@@ -9,10 +9,10 @@ the boundary rolls it (both clips change) and just inside either clip trims
 only that clip, opening a gap (``ClipGrip``, ``ClipEditor.begin_drag`` /
 ``update_drag``). Release keeps the
 result as one undo step; Esc puts the clip back. A
-double-click on a row seeks, and holding the second press scrubs. A press on a song marker selects it and shows it on the Song
-Markers page: on the ruler it also seeks to the marker, and on a row a
-clip under the pointer wins. A press on a row's label (layer number and
-stem) focuses it. Its header buttons act on one press: arm toggles arming,
+double-click on a row seeks, and holding the second press scrubs. A press
+on a song marker selects it, shows it on the Song Markers page, and seeks
+to it, on the ruler or a row; on a row a clip under the pointer wins. A
+press on a row's label (layer number and stem) focuses it. Its header buttons act on one press: arm toggles arming,
 solo solos the layer, the eye toggles visibility as the number key does
 (taking the row over from the timeline, or recording an armed row during a
 take), and back to timeline releases an override. A right-click on a row focuses it and
@@ -125,6 +125,7 @@ class StripTimeMenu(Protocol):
         *,
         commands: bool,
         marker_index: int | None = None,
+        marker_selected: bool = True,
     ) -> tuple[ContextMenuEntry, ...]: ...
 
 
@@ -267,7 +268,11 @@ class TimelinePointer:
             if row_marker is not None and not on_clip:
                 self._actions.select_song_marker(row_marker)
             time_entries = lambda: time_menu.entries(  # noqa: E731
-                row_t, row_tolerance, commands=False, marker_index=row_marker
+                row_t,
+                row_tolerance,
+                commands=False,
+                marker_index=row_marker,
+                marker_selected=not on_clip,
             )
 
         return timeline_row_menu(
@@ -346,13 +351,21 @@ class TimelinePointer:
         # clip the hit names.
         clip_t = hit.clip_start if hit.clip_start is not None else hit.t_sec
         on_clip = slot is not None and self._actions.select_clip_at(slot, clip_t)
+        # Off a clip, a song marker under the pointer is selected and the
+        # playhead goes to it, as on the ruler.
+        marker_t = (
+            self._marker_time(hit.marker_index)
+            if not on_clip and hit.marker_index is not None
+            else None
+        )
         if double:
             self._last_row_press = None
-            self._start_scrub(hit.t_sec)
+            self._start_scrub(marker_t if marker_t is not None else hit.t_sec)
             return True
         self._last_row_press = (now, x, y, hit.row, hit.target)
-        if not on_clip and hit.marker_index is not None:
+        if marker_t is not None and hit.marker_index is not None:
             self._actions.select_song_marker(hit.marker_index)
+            self._actions.seek_to(marker_t)
         if on_clip and slot is not None and clip_edits_allowed(self._session):
             self._clip_pending = (x, slot, hit.clip_grip)
         elif self._view.zoomed:

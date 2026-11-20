@@ -39,7 +39,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Browsing to a preset folder that only holds subfolders no longer shows NO PRESETS FOUND. The preset row says how many subfolders lie below and how many presets they hold, so you know to go deeper; a folder whose presets are all blacklisted says so.
 - Calibrate tap timing no longer needs an unbroken streak of matching taps. It averages your recent taps, ignores a stray one instead of starting over, and reports a value once at least six taps agree to within a few milliseconds, or after 16 taps however loose they are. The progress box shows how many taps it has kept and how settled the estimate is.
 - Double-clicking a timeline row now always moves the playhead, the same on a clip or in a gap; it no longer adds a clip in a gap. Right-click a gap and choose Add clip here to add one.
-- Right-clicking a clip on the timeline now offers Seek here, Play from here, and Drop song marker here after the clip's own items, the same as a gap, or a song marker's items when one is under the pointer.
+- Right-clicking a clip on the timeline now offers Seek here, Play from here, and Drop song marker here after the clip's own items, the same as a gap, or a song marker's items when one is under the pointer. The clip stays selected, so Delete still deletes the clip.
+- Clicking a song marker in a gap on a timeline row now moves the playhead to the marker, as clicking it on the time ruler does, and a double-click there lands on the marker instead of beside it.
 
 ### Fixed
 

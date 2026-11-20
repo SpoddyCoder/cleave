@@ -80,6 +80,17 @@ def test_marker_items_replace_the_time_items() -> None:
     assert entries[4].shortcut == "Delete"
 
 
+def test_unselected_marker_delete_item_shows_no_key() -> None:
+    controls = make_controls()
+    controls.session.song_markers.markers = [SongMarker(time=12.2, marker_type="begin")]
+    entries = TimelineTimeMenu(controls, _Transport()).entries(
+        12.0, 0.5, commands=False, marker_index=0, marker_selected=False
+    )
+    assert entries[4].id == "timeline.marker.delete"
+    assert entries[4].shortcut is None
+    assert entries[4].enabled
+
+
 def test_marker_type_submenu_checks_and_sets_the_type() -> None:
     controls = make_controls()
     controls.session.song_markers.markers = [

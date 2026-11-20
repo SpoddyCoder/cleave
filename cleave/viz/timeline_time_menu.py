@@ -64,13 +64,18 @@ class TimelineTimeMenu:
         *,
         commands: bool,
         marker_index: int | None = None,
+        marker_selected: bool = True,
     ) -> tuple[ContextMenuEntry, ...]:
         """Items at *t_sec*, or for song marker *marker_index* when given.
 
         *commands* adds Undo, Redo, and the timeline commands.
+        *marker_selected* False (a clip keeps the selection) leaves the Delete
+        key off the marker's delete item, since the key acts on the clip.
         """
         marker_items = (
-            self._marker_items(marker_index) if marker_index is not None else None
+            self._marker_items(marker_index, marker_selected)
+            if marker_index is not None
+            else None
         )
         time_items = (
             marker_items if marker_items is not None else self._time_items(t_sec)
@@ -117,7 +122,9 @@ class TimelineTimeMenu:
             ),
         )
 
-    def _marker_items(self, index: int) -> tuple[ContextMenuEntry, ...] | None:
+    def _marker_items(
+        self, index: int, selected: bool
+    ) -> tuple[ContextMenuEntry, ...] | None:
         """Seek, play, type, and delete for song marker *index*; None when gone."""
         session_markers = self._controls.session.song_markers.markers
         if not 0 <= index < len(session_markers):
@@ -164,7 +171,7 @@ class TimelineTimeMenu:
                 label=f"Delete marker {format_marker_time(marker.time)}…",
                 run=lambda: markers.prompt_delete(index),
                 enabled=not recording,
-                shortcut="Delete",
+                shortcut="Delete" if selected else None,
                 hint=hint,
             ),
         )

@@ -556,6 +556,7 @@ def test_row_menu_focuses_the_row_and_anchors_under_its_label() -> None:
 class _TimeMenu:
     def __init__(self) -> None:
         self.calls: list[tuple] = []
+        self.marker_selected: list[bool] = []
 
     def entries(
         self,
@@ -564,8 +565,10 @@ class _TimeMenu:
         *,
         commands: bool,
         marker_index: int | None = None,
+        marker_selected: bool = True,
     ):
         self.calls.append((t_sec, tolerance_sec, commands, marker_index))
+        self.marker_selected.append(marker_selected)
         return (
             ContextMenuItem(id="time.seek", label="Seek here", run=lambda: None),
         )
@@ -669,7 +672,9 @@ def test_row_on_a_clip_keeps_the_clicked_time_items(monkeypatch) -> None:
     assert captured["add_clip_t"] is None
     captured["time_entries"]()
     assert time_menu.calls == [(30.0, 0.2, False, 0)]
-    # The clip keeps the selection over a marker, as on a press.
+    # The clip keeps the selection over a marker, as on a press, so the
+    # marker's Delete item shows no key.
+    assert time_menu.marker_selected == [False]
     assert ("marker", 0) not in actions.calls
 
 
@@ -692,18 +697,54 @@ def test_row_press_on_a_clip_keeps_the_clip_over_a_marker() -> None:
     assert ("marker", 0) not in actions.calls
 
 
-def test_row_press_on_a_marker_in_a_gap_selects_it() -> None:
+def test_row_press_on_a_marker_in_a_gap_selects_it_and_seeks_to_it() -> None:
     actions = _Actions()
     pointer = TimelinePointer(
-        _Geometry(StripHit(0, 30.0, 0.2, marker_index=0)), actions, _session()
+        _Geometry(StripHit(0, 30.2, 0.4, marker_index=0)), actions, _session()
     )
     pointer.press(0, 0)
     assert actions.calls == [
         ("focus", 0),
-        ("select", "layer_1", 30.0),
+        ("select", "layer_1", 30.2),
         ("marker", 0),
+        ("seek", 30.0),
     ]
     assert not pointer.scrubbing
+
+
+def test_row_double_click_on_a_marker_in_a_gap_seeks_to_the_marker() -> None:
+    clock = _Clock()
+    actions = _Actions()
+    pointer = TimelinePointer(
+        _Geometry(StripHit(0, 30.2, 0.4, marker_index=0)),
+        actions,
+        _session(),
+        clock=clock,
+    )
+    pointer.press(10, 10)
+    pointer.release()
+    clock.now += 0.2
+    actions.calls.clear()
+    pointer.press(12, 11)
+    assert actions.calls[-1] == ("seek", 30.0)
+    assert pointer.scrubbing
+
+
+def test_row_double_click_on_a_clip_over_a_marker_seeks_where_clicked() -> None:
+    clock = _Clock()
+    actions = _Actions(clip_hit=True)
+    pointer = TimelinePointer(
+        _Geometry(StripHit(0, 30.2, 0.4, marker_index=0)),
+        actions,
+        _session(),
+        clock=clock,
+    )
+    pointer.press(10, 10)
+    pointer.release()
+    clock.now += 0.2
+    pointer.press(12, 11)
+    assert actions.calls[-1] == ("seek", 30.2)
+    assert ("marker", 0) not in actions.calls
 
 
 def test_right_click_on_a_marker_selects_it_and_asks_for_its_items() -> None:
