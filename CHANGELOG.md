@@ -27,6 +27,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - With switching on, browsing presets no longer changes the layer's saved preset or marks the project as changed. Turning switching off brings back the preset you chose with it off.
 - The help for the projectm trigger now says it is live, so the editor and a render can switch at different moments.
 - The inspector's page title now sits on its own line above a line of the page's icons (on/off, solo, lock, pause, and back and forward), so a long title is no longer squeezed by the icons.
+- UI scale is now the first setting on Settings > UI, in its own group. Above 100%, the navigator and inspector column starts wider to fit the larger text: changing the scale sets it to the width for the new scale, and double-clicking its border or View > Reset panel layout puts it back at the width for your scale. At 100% and below it keeps its usual width.
 - The < and > arrows on an inspector value, and on stepper settings in dialogs, are now square buttons, the same size as the icons in the inspector title and navigator rows, so they are easier to hit.
 - The coloured bar that swipes in behind the inspector title when a new page opens now stays there instead of sliding away.
 - Audio latency and tap latency have their own page, Settings > Latency, with buttons for both tests. Applying a measurement opens the page on the value it set.

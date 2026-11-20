@@ -157,6 +157,8 @@ SETTINGS_UI_SECTION = SectionDef(
     header_kind=RowKind.SETTINGS_UI_HEADER,
     context="global",
     children=(
+        SectionNode(leaf_kind=RowKind.SETTINGS_UI_SCALE),
+        SectionNode(divider=True),
         SectionNode(leaf_kind=RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY),
         SectionNode(leaf_kind=RowKind.SETTINGS_UI_HIGHLIGHT_NEW_PAGE),
         SectionNode(leaf_kind=RowKind.SETTINGS_UI_SHOW_TOOLTIPS),
@@ -166,7 +168,6 @@ SETTINGS_UI_SECTION = SectionDef(
         SectionNode(divider=True),
         SectionNode(leaf_kind=RowKind.SETTINGS_HELP_SIDE),
         SectionNode(divider=True),
-        SectionNode(leaf_kind=RowKind.SETTINGS_UI_SCALE),
         SectionNode(leaf_kind=RowKind.SETTINGS_UI_THEME),
         SectionNode(
             commands=("settings.open_themes_folder", "settings.reload_themes")

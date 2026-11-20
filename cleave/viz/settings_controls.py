@@ -9,7 +9,6 @@ from cleave.config import CleaveConfig, EditorPreviewQuality
 from cleave.config_schema.editor import (
     COLUMN_SIDES,
     DEFAULT_HELP_WIDTH,
-    DEFAULT_INSPECTOR_WIDTH,
     DEFAULT_NAVIGATOR_HEIGHT,
     DEFAULT_TIMELINE_HEIGHT,
     EDITOR_PREVIEW_QUALITIES,
@@ -21,6 +20,7 @@ from cleave.config_schema.editor import (
     clamp_ui_scale,
     clamp_shell_column_width,
     clamp_notification_display_sec,
+    default_inspector_width,
 )
 from cleave.user_config import persist_editor_settings
 from cleave.choice import step_choice
@@ -163,7 +163,8 @@ class SettingsControls:
             self.set_timeline_height(DEFAULT_TIMELINE_HEIGHT)
         elif which == "insp":
             self.set_shell_column_widths(
-                DEFAULT_INSPECTOR_WIDTH, self.cfg.editor.help_width
+                default_inspector_width(self.cfg.editor.ui_scale),
+                self.cfg.editor.help_width,
             )
         elif which == "help":
             self.set_shell_column_widths(
@@ -174,7 +175,7 @@ class SettingsControls:
         """Put every column width and band height back at its default."""
         self.cfg.editor = replace(
             self.cfg.editor,
-            inspector_width=DEFAULT_INSPECTOR_WIDTH,
+            inspector_width=default_inspector_width(self.cfg.editor.ui_scale),
             help_width=DEFAULT_HELP_WIDTH,
             navigator_height=DEFAULT_NAVIGATOR_HEIGHT,
             timeline_height=DEFAULT_TIMELINE_HEIGHT,
@@ -196,7 +197,11 @@ class SettingsControls:
         new_value = clamp_ui_scale(current + (step if forward else -step))
         if new_value == current:
             return
-        self.cfg.editor = replace(self.cfg.editor, ui_scale=new_value)
+        self.cfg.editor = replace(
+            self.cfg.editor,
+            ui_scale=new_value,
+            inspector_width=default_inspector_width(new_value),
+        )
         set_ui_scale_percent(new_value)
         persist_editor_settings(self.cfg)
 

@@ -127,6 +127,16 @@ def clamp_ui_scale(value: int | float) -> int:
     return max(UI_SCALE_MIN, min(UI_SCALE_MAX, int(round(value))))
 
 
+def default_inspector_width(ui_scale: int) -> int:
+    """Default navigator and inspector stack width at *ui_scale* percent.
+
+    Above 100% the width grows with the scale so larger text fits. At or below
+    100% it stays at DEFAULT_INSPECTOR_WIDTH.
+    """
+    percent = max(DEFAULT_UI_SCALE, clamp_ui_scale(ui_scale))
+    return int(round(DEFAULT_INSPECTOR_WIDTH * percent / DEFAULT_UI_SCALE))
+
+
 def ui_scale_label(percent: int) -> str:
     return f"{percent}%"
 

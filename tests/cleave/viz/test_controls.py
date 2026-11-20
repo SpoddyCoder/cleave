@@ -38,6 +38,8 @@ from cleave.config_schema.editor import (
     DEFAULT_INSPECTOR_WIDTH,
     DEFAULT_NAVIGATOR_SIDE,
     MIN_COLUMN_WIDTH,
+    DEFAULT_UI_SCALE,
+    default_inspector_width,
 )
 from cleave.config_schema.layers import (
     DEFAULT_LAYER_SLOTS,
@@ -96,7 +98,7 @@ from cleave.viz.row_spec import (
     row_spec,
 )
 from cleave.viz.commands import command_by_id, command_context
-from cleave.viz.theme import palette
+from cleave.viz.theme import palette, set_ui_scale_percent
 from cleave.viz.material_icons import (
     FILE_GLYPH,
     FOLDER_GLYPH,
@@ -4336,6 +4338,42 @@ def test_reset_panel_layout_resets_every_size_and_persists(tmp_path: Path) -> No
     assert editor.navigator_height == 0
     assert editor.timeline_height == 0
     assert not controls.config_dirty
+
+
+def test_default_inspector_width_grows_only_above_100_percent() -> None:
+    assert default_inspector_width(80) == DEFAULT_INSPECTOR_WIDTH
+    assert default_inspector_width(100) == DEFAULT_INSPECTOR_WIDTH
+    assert default_inspector_width(150) == round(DEFAULT_INSPECTOR_WIDTH * 1.5)
+    assert default_inspector_width(200) == DEFAULT_INSPECTOR_WIDTH * 2
+
+
+def test_ui_scale_change_resets_stack_width_to_scaled_default(
+    tmp_path: Path,
+) -> None:
+    controls = make_controls(("layer_1",))
+    controls.cfg.user_config_path = tmp_path / "user.yaml"
+    settings = controls.settings
+    assert controls.cfg.editor.inspector_width == DEFAULT_INSPECTOR_WIDTH
+    try:
+
+        settings.adjust_ui_scale(forward=True, large=True)
+        assert controls.cfg.editor.ui_scale == 150
+        assert controls.cfg.editor.inspector_width == default_inspector_width(150)
+        settings.adjust_ui_scale(forward=False, large=False)
+        assert controls.cfg.editor.inspector_width == default_inspector_width(140)
+        settings.adjust_ui_scale(forward=False, large=True)
+        settings.adjust_ui_scale(forward=False, large=False)
+        assert controls.cfg.editor.ui_scale == 80
+        assert controls.cfg.editor.inspector_width == DEFAULT_INSPECTOR_WIDTH
+
+        settings.set_shell_column_widths(530, controls.cfg.editor.help_width)
+        settings.adjust_ui_scale(forward=True, large=True)
+        assert controls.cfg.editor.inspector_width == default_inspector_width(130)
+        settings.set_shell_column_widths(530, controls.cfg.editor.help_width)
+        settings.reset_splitter("insp")
+        assert controls.cfg.editor.inspector_width == default_inspector_width(130)
+    finally:
+        set_ui_scale_percent(DEFAULT_UI_SCALE)
 
 
 def test_move_mode_swap_calls_apply_preview_resolutions() -> None:

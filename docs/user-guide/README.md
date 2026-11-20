@@ -115,7 +115,7 @@ The whole editor works with the mouse:
 - **Click** a row to select it, and click a setting's options or arrows to change it.
 - **Drag** a number sideways for quick, coarse changes.
 - **Right-click** a navigator row, a preset, the preview, or anything on the timeline strip for a context menu.
-- **Drag** the borders between panels to resize them, including the divider between the navigator and the inspector. **Double-click** a border to reset it, or use **View > Reset panel layout** to reset them all.
+- **Drag** the borders between panels to resize them, including the divider between the navigator and the inspector. **Double-click** a border to reset it, or use **View > Reset panel layout** to reset them all. Above 100% UI scale, the navigator and inspector column resets to a wider width so the larger text fits.
 - **Scroll** long lists with the mouse wheel.
 
 ### Keyboard
@@ -593,7 +593,7 @@ A **Render project** dialog tracks progress and tells you when the render is don
 The **Settings** menu holds preferences that apply to every project:
 
 - **Preview:** preview quality.
-- **UI:** the editor theme (Ultraviolet, Chocolate, Mint, or the light Daylight) and [custom themes](custom-themes.md), UI scale, panel sides, tooltips, notification timing, what a click on a navigator row with pages under it does (navigator expand), whether a coloured bar swipes in behind the inspector title when a new page opens and stays there (highlight new page), and more.
+- **UI:** the editor theme (Ultraviolet, Chocolate, Mint, or the light Daylight) and [custom themes](custom-themes.md), UI scale (first on the page; changing it puts the navigator and inspector column back at its width for that scale, which is wider above 100%), panel sides, tooltips, notification timing, what a click on a navigator row with pages under it does (navigator expand), whether a coloured bar swipes in behind the inspector title when a new page opens and stays there (highlight new page), and more.
 - **Latency:** audio latency and tap latency, with the tests that measure them. After a test, Cleave opens this page on the value it set.
 - **Measure audio latency:** see [The visuals are out of time with the music](#the-visuals-are-out-of-time-with-the-music).
 - **Calibrate tap timing:** see [Markers and recorded clips land late](#markers-and-recorded-clips-land-late).

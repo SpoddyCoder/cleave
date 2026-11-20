@@ -192,24 +192,25 @@ def test_settings_pages() -> None:
     assert latency[-2].divider
     ui = build_inspector_rows(state, "settings.ui")
     assert _kinds(ui) == [
+        RowKind.SETTINGS_UI_SCALE,
         RowKind.SETTINGS_UI_NOTIFICATION_DISPLAY,
         RowKind.SETTINGS_UI_HIGHLIGHT_NEW_PAGE,
         RowKind.SETTINGS_UI_SHOW_TOOLTIPS,
         RowKind.SETTINGS_NAVIGATOR_SIDE,
         RowKind.SETTINGS_NAVIGATOR_EXPAND_CLICK,
         RowKind.SETTINGS_HELP_SIDE,
-        RowKind.SETTINGS_UI_SCALE,
         RowKind.SETTINGS_UI_THEME,
     ]
-    # UI scale, Theme, and the theme buttons share the last group: one
-    # divider above UI scale, none between Theme and the buttons.
+    # UI scale is first, alone in its group. Theme and the theme buttons share
+    # the last group: one divider above Theme, none before the buttons.
+    assert ui[0].descriptor.kind is RowKind.SETTINGS_UI_SCALE
+    assert ui[1].divider
     theme = next(
         i
         for i, row in enumerate(ui)
         if not row.divider and row.descriptor.kind is RowKind.SETTINGS_UI_THEME
     )
-    assert ui[theme - 1].descriptor.kind is RowKind.SETTINGS_UI_SCALE
-    assert ui[theme - 2].divider
+    assert ui[theme - 1].divider
     assert ui[theme + 1].command_ids == (
         "settings.open_themes_folder",
         "settings.reload_themes",
