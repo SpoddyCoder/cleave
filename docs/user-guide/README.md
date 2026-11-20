@@ -276,7 +276,7 @@ Editing the list or the Preset Switching settings keeps the preview on screen. T
 The **Preset List** page holds the presets the layer cycles through, in order. It appears whenever switching is not off.
 
 - **Add to preset list** (or P from any of the layer's rows) appends the preset you are looking at.
-- **Populate** rebuilds the whole list. Under **pick from**, choose **shuffled (current directory)** or **in order (current directory)** to fill it from the layer's preset folder. With the timeline trigger you can also choose **cue roles**, which casts one preset for each time the layer comes in, picked by that cue's role.
+- **Populate** rebuilds the whole list. Under **pick from**, choose **shuffled (current directory)** or **in order (current directory)** to fill it from the layer's preset folder. With the timeline trigger you can also choose **clip roles**, which casts one preset for each of the layer's clips, picked by that clip's role.
 - **Enter** on an entry previews it; click the layer's pause icon, or **Resume switching**, to return to the schedule. Enter on the highlighted scheduled entry does not preview it, since it is already playing; during a preview it resumes switching.
 - **Drag** an entry's handle, or press M, to reorder it, and press **Delete** to remove it.
 
@@ -348,7 +348,7 @@ Curation never moves, copies, or deletes preset files, and your marks survive re
 
 ## The timeline
 
-The timeline sequences your layers across the song. Without it, every enabled layer plays throughout. With it, layers come in and drop out on cue: the drums might carry the chorus, then hand back to the vocals for the verse.
+The timeline sequences your layers across the song. Without it, every enabled layer plays throughout. With it, layers come in and drop out on clips: the drums might carry the chorus, then hand back to the vocals for the verse.
 
 Enable it with the on/off icon on the **Timeline** row in the navigator, and the **timeline strip** opens along the bottom of the window. While the timeline is on, it owns layer visibility and the layers' own on/off switches are ignored.
 
@@ -362,8 +362,8 @@ The fastest way to get started is to let Cleave build an arrangement. Choose **G
 - **character:** the shape of the arrangement. Breathing is mostly one layer, sometimes two; Dialogue has the layers answer each other; Arc builds to a single climax and then settles; Pulse runs one layer at a time with short pairs.
 - **density:** how busy the arrangement is.
 - **conductor:** optionally lets the stems' audio decide which layers lead each phrase and how bright each one is.
-- **snap** and **cut type:** how cues align to the beat grid and how layers transition.
-- **refill preset lists:** optionally rebuilds the preset list of each layer that switches on the timeline: by cue roles, or shuffled or in order from each layer's preset folder.
+- **snap** and **cut type:** how clip edges align to the beat grid and how layers transition.
+- **refill preset lists:** optionally rebuilds the preset list of each layer that switches on the timeline: by clip roles, or shuffled or in order from each layer's preset folder.
 
 Press H in the dialog for a full description of each option. You will get much better results if you [mark the song's structure](#song-markers) and [assign roles to your presets](#curating-your-presets) first.
 
@@ -421,11 +421,11 @@ Each clip begins and ends with a **cut**:
 - **soft:** a longer, gentler fade.
 - **none:** instant, with no fade.
 
-Fade lengths for hard and soft cuts are set on **Timeline > Cue Fades**.
+Fade lengths for hard and soft cuts are set on **Timeline > Clip Fades**.
 
 ### Recording a take
 
-You can also perform the timeline live, cueing layers in and out by hand as the song plays:
+You can also perform the timeline live, bringing layers in and out by hand as the song plays:
 
 1. **Arm** the rows you want to record, with their arm buttons or A on a row.
 2. Press **R** (or click **REC**) to start recording; playback starts with it.
@@ -472,7 +472,7 @@ Cleave detects the beat and bar grid when it first prepares a song. On **Timelin
 - **placement snap** quantises new clips and markers to the nearest beat or bar. Turn it off if detection got the song wrong.
 - **bar phase** shifts the grid by one beat, for when the downbeat has been detected in the wrong place.
 
-For bulk clean-up, use **Snap cues** on this page, **Snap cues to markers** on the Song Markers page, and **Set cut type on cues** on the Cue Fades page.
+For bulk clean-up, use **Snap clips** on this page, **Snap clips to markers** on the Song Markers page, and **Set cut type on clips** on the Clip Fades page.
 
 ---
 

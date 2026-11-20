@@ -43,7 +43,7 @@ PRESET_SWITCHING_TRIGGER_HELP_ENTRIES: tuple[
     ),
     (
         "timeline",
-        "next preset at each timeline start cue; needs the timeline on.",
+        "next preset at the start of each timeline clip; needs the timeline on.",
     ),
 )
 DEFAULT_PRESET_SWITCHING: PresetSwitchingMode = "off"

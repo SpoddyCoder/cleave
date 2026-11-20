@@ -45,7 +45,7 @@ The inspector holds live properties. Commands are buttons. A command that needs 
 
 "Ellipsis" here means the single character U+2026 in the Python string, never three dots. Docs stay ASCII, so prose names a label without it (Project > Render).
 
-- An action label ends in an ellipsis when it opens a dialog, picker, or confirm before anything happens: Render, Delete layer, Blacklist, Snap cues. An action that runs at once, opens a window that asks nothing (About, Help), or hands off to the OS (Open crash log folder) has none. When one item switches between asking and not asking, the label follows: Blacklist has one, Unblacklist does not.
+- An action label ends in an ellipsis when it opens a dialog, picker, or confirm before anything happens: Render, Delete layer, Blacklist, Snap clips. An action that runs at once, opens a window that asks nothing (About, Help), or hands off to the OS (Open crash log folder) has none. When one item switches between asking and not asking, the label follows: Blacklist has one, Unblacklist does not.
 - Dialog titles, modal headings, and confirm buttons never end in an ellipsis. The confirm button is a plain verb (Blacklist, Delete).
 - In-progress status (a progress dialog's step line, toasts) ends in an ellipsis (Separating stems). Truncated text ends in one too (`text_fit.py`).
 - A progress dialog's title names the job and has no ellipsis (Render project, Creating project); the changing step goes in its body.

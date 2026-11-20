@@ -571,7 +571,7 @@ SPECS: dict[RowKind, RowSpec] = {
         inert=lambda state, _desc: state.timeline.enabled,
         help_title="Layer Enabled",
         help_description=(
-            "Shows or hides the layer. While the timeline is on, its cues control visibility and this switch is ignored.",
+            "Shows or hides the layer. While the timeline is on, its clips control visibility and this switch is ignored.",
         ),
         parent_group="track",
         blocked_by_section_lock=True,
@@ -675,7 +675,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Preset Switching",
         help_description=(
-            "Moves the layer through a list of presets automatically, on a timer, on projectM's own schedule, or on timeline cues.",
+            "Moves the layer through a list of presets automatically, on a timer, on projectM's own schedule, or on timeline clips.",
         ),
         parent_group="track",
     ),

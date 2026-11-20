@@ -460,7 +460,7 @@ def test_timeline_presets_help_lists_characters() -> None:
     description = _description_section(sections)
     assert description is not None
     assert description.title == "Generate Timeline"
-    assert _says(description.lines, 'replacing the current cues', 'crescendo')
+    assert _says(description.lines, 'replacing the current clips', 'crescendo')
     assert description.entries == TIMELINE_PRESET_HELP_ENTRIES
     assert [name for name, _ in description.entries] == [
         "Breathing",
@@ -951,7 +951,7 @@ def test_timeline_strip_help_recording_while_playing() -> None:
     assert "Ctrl + Enter" not in entries
     assert entries["1-4"] == "show / hide an armed layer"
     assert entries["Click eye"] == "show / hide an armed layer"
-    assert entries["Ctrl + 1-4"] == "drop cue (keep level)"
+    assert entries["Ctrl + 1-4"] == "drop a clip edge (keep level)"
     assert "Shift + Enter" not in entries
     assert entries["Left/Right"] == "skip 10s, fills range"
     assert "Shift + Left/Right" not in entries

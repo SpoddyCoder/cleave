@@ -157,7 +157,7 @@ def test_full_tree_order_and_labels() -> None:
         "Edges & Motion",
         "Timeline",
         "Beat / Bar Grid",
-        "Cue Fades",
+        "Clip Fades",
         "Song Markers",
         "Layers",
         "1  DRUMS",

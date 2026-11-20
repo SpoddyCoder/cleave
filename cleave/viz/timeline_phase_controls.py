@@ -30,7 +30,7 @@ class TimelinePhaseController:
         if tl.recording:
             return
         if not any(lane.cues for lane in tl.lanes.values()):
-            self._notify("No timeline cues to shift")
+            self._notify("No timeline clips to shift")
             return
         if not self._beat_times:
             self._notify("No beats available; re-run separate")

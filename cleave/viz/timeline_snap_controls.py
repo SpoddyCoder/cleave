@@ -33,24 +33,24 @@ _TARGET_SONG_MARKERS = "song markers"
 _DEFAULT_PROXIMITY = 5.0
 
 _SNAP_HELP = (
-    "Quantises the cues already on the timeline. Cues that land on the same time merge.",
+    "Quantises the clips already on the timeline. Clip edges that land on the same time merge.",
 )
-_TARGET_HELP = ("Where the cues move to.",)
+_TARGET_HELP = ("Where the clip edges move to.",)
 _TARGET_OPTION_HELP = {
-    _TARGET_BEATS: "every cue moves to the nearest beat.",
-    _TARGET_BARS: "every cue moves to the nearest bar.",
-    _TARGET_SONG_MARKERS: "cues near a song marker move onto it.",
+    _TARGET_BEATS: "every clip edge moves to the nearest beat.",
+    _TARGET_BARS: "every clip edge moves to the nearest bar.",
+    _TARGET_SONG_MARKERS: "clip edges near a song marker move onto it.",
 }
 _PROXIMITY_HELP = (
-    "How far from a song marker a cue can be and still be pulled onto it; cues further away stay put.",
+    "How far from a song marker a clip edge can be and still be pulled onto it; edges further away stay put.",
 )
-_SCOPE_HELP = ("Which layers' cues move onto the song markers.",)
+_SCOPE_HELP = ("Which layers' clips move onto the song markers.",)
 _SCOPE_OPTION_HELP = {
     SONG_MARKER_SNAP_SCOPE_CLOSEST_WINS: (
-        "one cue per marker: the closest on any layer."
+        "one clip edge per marker: the closest on any layer."
     ),
     SONG_MARKER_SNAP_SCOPE_EACH_LAYER: (
-        "on each layer, the closest cue moves onto each marker."
+        "on each layer, the closest clip edge moves onto each marker."
     ),
 }
 
@@ -59,7 +59,7 @@ def _scope_option_help(scope: str, layer_z_order: Sequence[str]) -> str:
     text = _SCOPE_OPTION_HELP.get(scope)
     if text is not None:
         return text
-    return f"only layer {layer_z_order.index(scope) + 1}'s closest cue moves."
+    return f"only layer {layer_z_order.index(scope) + 1}'s closest clip edge moves."
 
 
 def song_marker_snap_scope_options(layer_z_order: Sequence[str]) -> tuple[str, ...]:
@@ -138,7 +138,7 @@ class TimelineSnapController:
         if tl.locked or tl.recording:
             return True
         if not any(lane.cues for lane in tl.lanes.values()):
-            self._notify("No timeline cues to snap")
+            self._notify("No timeline clips to snap")
             return True
         return False
 
@@ -170,7 +170,7 @@ class TimelineSnapController:
             self._last_target = chosen
             self._last_proximity = proximity
             self._last_scope = chosen_scope
-            with self._history.recording("Snap cues"):
+            with self._history.recording("Snap clips"):
                 if chosen == _TARGET_SONG_MARKERS:
                     self._snap_song_markers(proximity=proximity, scope=chosen_scope)
                 elif chosen == _TARGET_BARS:
@@ -180,7 +180,7 @@ class TimelineSnapController:
 
         self._modal.prompt_form(
             FormSpec(
-                title="Snap cues",
+                title="Snap clips",
                 fields=(
                     FormField(
                         "target",
@@ -219,7 +219,7 @@ class TimelineSnapController:
                         ),
                     ),
                 ),
-                confirm_label="Snap cues",
+                confirm_label="Snap clips",
                 on_confirm=confirm,
                 info=lambda values: self._move_info(*resolved(values)),
                 help=_SNAP_HELP,
@@ -241,7 +241,7 @@ class TimelineSnapController:
                 slots=slots,
                 mode=mode,
             )
-            return f"(moves {moved} of {total} cues)"
+            return f"(moves {moved} of {total} clip edges)"
         grid = self._bar_times if target == _TARGET_BARS else self._beat_times
         if not grid:
             return None
@@ -249,7 +249,7 @@ class TimelineSnapController:
         for lane in tl.lanes.values():
             snapped = {cue.t for cue in snap_lane_to_beats(lane, grid).cues}
             moved += sum(1 for cue in lane.cues if cue.t not in snapped)
-        return f"(moves {moved} of {total} cues)"
+        return f"(moves {moved} of {total} clip edges)"
 
     def _snap_song_markers(
         self,
@@ -261,7 +261,7 @@ class TimelineSnapController:
         layer_z_order = tuple(self.session.layer_z_order)
         slots, mode = resolve_song_marker_snap(scope, layer_z_order)
         if not any((tl.lanes.get(slot) or empty_lane()).cues for slot in slots):
-            self._notify("No timeline cues to snap")
+            self._notify("No timeline clips to snap")
             return
         updated, moved = snap_lanes_to_song_markers(
             tl.lanes,
@@ -275,23 +275,23 @@ class TimelineSnapController:
             if slot in updated:
                 tl.lanes[slot] = updated[slot]
         if moved == 0:
-            self._notify("No cues within snap proximity")
+            self._notify("No clip edges within snap proximity")
             return
-        noun = "cue" if moved == 1 else "cues"
+        noun = "clip edge" if moved == 1 else "clip edges"
         self._notify(f"Snapped {moved} {noun} to song markers")
 
     def _snap_to_beats(self) -> None:
         self._snap_to(
             self._beat_times,
             empty_grid_msg="No beats available; re-run separate",
-            done_msg="Snapped timeline cues to beats",
+            done_msg="Snapped timeline clips to beats",
         )
 
     def _snap_to_bars(self) -> None:
         self._snap_to(
             self._bar_times,
             empty_grid_msg="No bars available; re-run separate",
-            done_msg="Snapped timeline cues to bars",
+            done_msg="Snapped timeline clips to bars",
         )
 
     def _snap_to(

@@ -62,6 +62,7 @@ from cleave.viz.modal import (
     ModalHost,
 )
 from cleave.viz.session import TuningSession
+from cleave.viz.timeline_clip_edits import row_clips
 from cleave.viz.timeline_cut_controls import apply_cut_to_lanes
 from cleave.viz.timeline_history import TimelineHistory
 
@@ -73,7 +74,7 @@ _PATTERN_MASK_TRANSITION_SEC = 1.0
 # Generate dialog sections: what the arrangement is, then how its cues are
 # tidied, then what happens to the layers' preset lists.
 _ARRANGEMENT_SECTION = "Arrangement"
-_CUES_SECTION = "Cue timing and cuts"
+_CUES_SECTION = "Clip timing and cuts"
 _PRESETS_SECTION = "Preset lists"
 
 _KIND_BUILDERS = {
@@ -85,37 +86,37 @@ _KIND_BUILDERS = {
 
 
 _GENERATE_HELP = (
-    "Builds a new timeline from these settings, replacing the current cues. Arrangement decides which layers play when, cue timing and cuts then tidy every generated cue, and preset lists can be refilled to suit.",
+    "Builds a new timeline from these settings, replacing the current clips. Arrangement decides which layers play when, clip timing and cuts then tidy every generated clip, and preset lists can be refilled to suit.",
     "In layers mode, each crescendo song marker gets a crescendo. The project remembers these settings for next time.",
 )
 _CHARACTER_HELP = ("The shape of the arrangement: which layers play together, and when.",)
 _DENSITY_HELP = (
     "How many layers tend to play at once: sparse favours solos, dense keeps more of the stack in.",
 )
-_CUE_SNAP_HELP = ("Moves every generated cue onto the beat or bar grid.",)
+_CUE_SNAP_HELP = ("Moves the edges of every generated clip onto the beat or bar grid.",)
 _CUE_SNAP_OPTION_HELP = {
-    "none": "keep the generated cue times.",
-    "beats": "move each cue to the nearest beat.",
-    "bars": "move each cue to the nearest bar.",
+    "none": "keep the generated clip times.",
+    "beats": "move each clip edge to the nearest beat.",
+    "bars": "move each clip edge to the nearest bar.",
 }
 _SONG_MARKER_SNAP_HELP = (
-    "Pulls the nearest cue on each layer onto each song marker, if it is within this distance. none leaves the cues where they are.",
+    "Pulls the nearest clip edge on each layer onto each song marker, if it is within this distance. none leaves the clips where they are.",
 )
 _TIMELINE_CUTS_HELP = (
-    "The cut type each generated cue gets. Fade lengths for each type come from Timeline > Cue Fades.",
+    "The cut type each generated clip edge gets. Fade lengths for each type come from Timeline > Clip Fades.",
 )
 _TIMELINE_CUTS_OPTION_HELP = {
     "by marker": "hard cuts on song markers, soft cuts elsewhere.",
-    "all soft": "every cue is a soft cut.",
-    "all hard": "every cue is a hard cut.",
-    "none": "keep the cut each cue was made with.",
+    "all soft": "every clip edge is a soft cut.",
+    "all hard": "every clip edge is a hard cut.",
+    "none": "keep the cut each clip edge was made with.",
 }
 _REPOPULATE_HELP = (
     "Rebuilds the preset list of every layer that switches presets on the timeline trigger.",
 )
 _REPOPULATE_OPTION_HELP = {
     "no": "keep the preset lists.",
-    "cue roles": "one preset per on-cue, picked for that cue's role.",
+    "cue roles": "one preset per clip, picked for that clip's role.",
     "directory random": "fill from the layer's preset directory, shuffled.",
     "directory sequential": "fill from the layer's preset directory, in order.",
 }
@@ -128,13 +129,13 @@ _CONDUCTOR_OPTION_HELP = {
 }
 _MODE_HELP = ("How the arrangement brings layers in and out.",)
 _MODE_OPTION_HELP = {
-    "layers": "cues turn whole layers on and off, shaped by the character.",
+    "layers": "clips turn whole layers on and off, shaped by the character.",
     "pattern_mask": (
         "short sections swap layers through the pattern mask; "
         "turns the mask on with strips. It has no character."
     ),
 }
-_RESET_HELP = ("Removes every cue on the timeline.",)
+_RESET_HELP = ("Removes every clip on the timeline.",)
 _RESET_LAYERS_HELP = ("What every layer does for the whole song after the reset.",)
 _RESET_LAYERS_OPTION_HELP = (
     "every layer stays off.",
@@ -175,8 +176,8 @@ def _layers_mode(values: FormValues) -> bool:
     return TIMELINE_PRESET_MODE_OPTIONS[values["mode"]] == "layers"
 
 
-def _cues_label(count: int) -> str:
-    return "1 cue" if count == 1 else f"{count} cues"
+def _clips_label(count: int) -> str:
+    return "1 clip" if count == 1 else f"{count} clips"
 
 
 class TimelinePresetController:
@@ -298,19 +299,23 @@ class TimelinePresetController:
                 on_confirm=lambda values: self._confirm_generate(
                     values, duration_sec
                 ),
-                info=lambda _values: self._generate_info(),
+                info=lambda _values: self._generate_info(duration_sec),
                 help=_GENERATE_HELP,
             )
         )
 
-    def _generate_info(self) -> str | None:
-        count = self._cue_count()
+    def _generate_info(self, duration_sec: float) -> str | None:
+        count = self._clip_count(duration_sec)
         if count == 0:
             return None
-        return f"(replaces {_cues_label(count)} on the timeline)"
+        return f"(replaces {_clips_label(count)} on the timeline)"
 
-    def _cue_count(self) -> int:
-        return sum(len(lane.cues) for lane in self.session.timeline.lanes.values())
+    def _clip_count(self, duration_sec: float) -> int:
+        return sum(
+            len(row_clips(self.session, slot, duration_sec))
+            for slot in self.session.timeline.lanes
+            if slot in self.session.layers
+        )
 
     def _confirm_generate(self, values: FormValues, duration_sec: float) -> None:
         tl = self.session.timeline
@@ -333,14 +338,14 @@ class TimelinePresetController:
         with self._history.recording("Generate timeline"):
             self._apply(tl.timeline_preset_kind, duration_sec)
 
-    def prompt_reset(self) -> None:
+    def prompt_reset(self, duration_sec: float) -> None:
         if self.session.timeline.locked:
             return
-        count = self._cue_count()
+        count = self._clip_count(duration_sec)
         self._modal.prompt_form(
             FormSpec(
                 title=_RESET_TITLE,
-                info=lambda _values: f"(removes {_cues_label(count)})",
+                info=lambda _values: f"(removes {_clips_label(count)})",
                 fields=(
                     FormField(
                         "layers",

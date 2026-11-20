@@ -34,8 +34,8 @@ from cleave.timeline_presets.motifs import (
 )
 
 _RESET_HELP_ENTRIES: tuple[tuple[str, str], ...] = (
-    ("Layers off", "removes all cues; all layers off."),
-    ("Layers on", "removes all cues; all layers on."),
+    ("Layers off", "removes all clips; all layers off."),
+    ("Layers on", "removes all clips; all layers on."),
 )
 
 TIMELINE_PRESET_HELP_ENTRIES: tuple[tuple[str, str], ...] = CHARACTER_HELP_ENTRIES

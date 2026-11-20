@@ -187,10 +187,10 @@ class PresetListController:
             populate_count = on_segment_populate_count(self.session, slot)
             sources.append(
                 (
-                    "cue roles",
+                    "clip roles",
                     "cue_roles",
                     "one preset for each time the layer turns on, picked at "
-                    "random from presets with that cue's role.",
+                    "random from presets with that clip's role.",
                 )
             )
         else:

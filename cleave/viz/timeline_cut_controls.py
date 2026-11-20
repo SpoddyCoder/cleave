@@ -26,23 +26,23 @@ ApplyCutScope = Literal["all", "except_markers", "markers_only"]
 
 _CUT_OPTIONS: tuple[CutType, ...] = ("hard", "soft", "none")
 _SCOPE_OPTIONS: tuple[ApplyCutScope, ...] = ("all", "except_markers", "markers_only")
-_SCOPE_LABELS = ("all cues", "except markers", "markers only")
+_SCOPE_LABELS = ("all clips", "except markers", "markers only")
 _DEFAULT_CUT_INDEX = 1
 
 _SET_CUT_HELP = (
-    "Sets the cut type on many cues in one go. Fade lengths for each type come from Timeline > Cue Fades.",
+    "Sets the cut type on many clips in one go. Fade lengths for each type come from Timeline > Clip Fades.",
 )
-_CUT_HELP = ("The cut type the cues get.",)
+_CUT_HELP = ("The cut type the clip edges get.",)
 _CUT_OPTION_HELP = (
-    "the cue fades with the hard cut fades.",
-    "the cue fades with the soft cut fades.",
+    "the clip edges fade with the hard cut fades.",
+    "the clip edges fade with the soft cut fades.",
     "no cut type: the layer steps on or off with no fade.",
 )
-_SCOPE_HELP = ("Which cues change.",)
+_SCOPE_HELP = ("Which clip edges change.",)
 _SCOPE_OPTION_HELP = (
-    "every cue on every layer.",
-    "every cue except those on a song marker.",
-    "only cues on a song marker.",
+    "every clip edge on every layer.",
+    "every clip edge except those on a song marker.",
+    "only clip edges on a song marker.",
 )
 
 
@@ -130,11 +130,11 @@ class TimelineCutController:
         if tl.recording:
             return
         if not any(lane.cues for lane in tl.lanes.values()):
-            self._notify("No timeline cues to update")
+            self._notify("No timeline clips to update")
             return
         self._modal.prompt_form(
             FormSpec(
-                title="Set cut type on cues",
+                title="Set cut type on clips",
                 fields=(
                     FormField(
                         "cut",
@@ -170,7 +170,7 @@ class TimelineCutController:
             song_marker_times=self.session.song_markers.times,
             scope=_SCOPE_OPTIONS[values["scope"]],
         )
-        return f"(changes {changed} of {total} cues)"
+        return f"(changes {changed} of {total} clip edges)"
 
     def _confirm(self, values: FormValues) -> None:
         self._last_values = values
@@ -188,9 +188,9 @@ class TimelineCutController:
             scope=scope,
         )
         if count == 0:
-            self._notify("No matching cues to update")
+            self._notify("No matching clip edges to update")
             return
-        noun = "cue" if count == 1 else "cues"
+        noun = "clip edge" if count == 1 else "clip edges"
         self._notify(f"{_applied_prefix(cut)} {count} {noun}")
 
     def _notify(self, message: str) -> None:

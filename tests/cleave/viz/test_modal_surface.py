@@ -813,7 +813,7 @@ def _form_host_view() -> tuple[ModalHost, list[dict[str, int]]]:
     confirmed: list[dict[str, int]] = []
     modal.prompt_form(
         FormSpec(
-            title="Snap cues",
+            title="Snap clips",
             body="Moves cues.",
             fields=(
                 FormField("target", "snap to", ("a", "b"), 0),

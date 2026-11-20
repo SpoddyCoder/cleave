@@ -584,7 +584,7 @@ _RESET = Command(
 )
 _SNAP = Command(
     id="timeline.snap_cues",
-    label="Snap cues…",
+    label="Snap clips…",
     kind="command",
     enabled=_timeline_actions_enabled,
     run=_when_enabled(_timeline_actions_enabled, _run_snap_cues),
@@ -592,7 +592,7 @@ _SNAP = Command(
 )
 _SNAP_TO_MARKERS = Command(
     id="timeline.snap_to_markers",
-    label="Snap cues to markers…",
+    label="Snap clips to markers…",
     kind="command",
     enabled=_timeline_actions_enabled,
     run=_when_enabled(_timeline_actions_enabled, _run_snap_to_markers),
@@ -600,7 +600,7 @@ _SNAP_TO_MARKERS = Command(
 )
 _SET_CUT_TYPE = Command(
     id="timeline.set_cut_type",
-    label="Set cut type on cues…",
+    label="Set cut type on clips…",
     kind="command",
     enabled=_timeline_actions_enabled,
     run=_when_enabled(_timeline_actions_enabled, _run_set_cut_type),

@@ -1578,7 +1578,7 @@ def _confirm_snap_song_markers(
     _press_focused(controls, keydown(pygame.K_RETURN))
     _set_form_field(controls, "proximity", proximity_label)
     _set_form_field(controls, "layers", scope_label)
-    choose_modal_option(controls, "Snap cues")
+    choose_modal_option(controls, "Snap clips")
 
 
 def _focus_timeline_bar_phase(controls: TuningControls) -> None:
@@ -1607,7 +1607,7 @@ def _set_form_field(controls: TuningControls, label: str, option: str) -> None:
 
 def _snap_to(controls: TuningControls, target: str) -> None:
     _set_form_field(controls, "snap to", target)
-    choose_modal_option(controls, "Snap cues")
+    choose_modal_option(controls, "Snap clips")
 
 
 def _set_cut_type(controls: TuningControls, cut: str, scope: str) -> None:
@@ -1644,7 +1644,7 @@ def test_generate_opens_a_form_seeded_from_the_session() -> None:
         None,
         None,
         None,
-        "Cue timing and cuts",
+        "Clip timing and cuts",
         None,
         None,
         "Preset lists",
@@ -1661,7 +1661,7 @@ def test_generate_names_the_cues_it_replaces_under_the_title() -> None:
     _press_focused(controls, keydown(pygame.K_RETURN))
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
-    assert modal_view.form_info == "(replaces 1 cue on the timeline)"
+    assert modal_view.form_info == "(replaces 1 clip on the timeline)"
 
 
 def test_generate_hides_character_in_pattern_mask_mode() -> None:
@@ -1877,7 +1877,7 @@ def test_timeline_reset_enter_opens_choice_modal() -> None:
     assert modal_view.focus_index == 1
     assert "reset" in modal_view.message.lower()
     assert modal_view.body is None
-    assert modal_view.form_info == "(removes 0 cues)"
+    assert modal_view.form_info == "(removes 0 clips)"
 
 
 def test_timeline_reset_all_off() -> None:
@@ -2077,11 +2077,11 @@ def test_timeline_snap_cues_opens_a_form() -> None:
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
     assert modal_view.kind == ModalKind.FORM
-    assert modal_view.options == ("Snap cues", "Cancel")
-    assert modal_view.message == "Snap cues"
+    assert modal_view.options == ("Snap clips", "Cancel")
+    assert modal_view.message == "Snap clips"
     assert [row.label for row in modal_view.form_rows] == ["snap to"]
     assert modal_view.form_rows[0].options == ("beats", "bars")
-    assert modal_view.form_info == "(moves 1 of 1 cues)"
+    assert modal_view.form_info == "(moves 1 of 1 clip edges)"
 
 
 def test_timeline_snap_beats_mutates_cues() -> None:
@@ -2104,7 +2104,7 @@ def test_timeline_snap_beats_mutates_cues() -> None:
         SlotCue(t=2.0, level=0.0),
     ]
     view = controls.build_view_state(paused=False)
-    assert view.notification_message == "Snapped timeline cues to beats"
+    assert view.notification_message == "Snapped timeline clips to beats"
 
 
 def test_timeline_snap_bars_mutates_cues() -> None:
@@ -2128,7 +2128,7 @@ def test_timeline_snap_bars_mutates_cues() -> None:
         SlotCue(t=4.0, level=0.0),
     ]
     view = controls.build_view_state(paused=False)
-    assert view.notification_message == "Snapped timeline cues to bars"
+    assert view.notification_message == "Snapped timeline clips to bars"
 
 
 def test_timeline_snap_beats_recording_blocks() -> None:
@@ -2157,7 +2157,7 @@ def test_timeline_snap_beats_no_cues_notifies() -> None:
     assert _press_focused(controls, keydown(pygame.K_RETURN)) is True
     assert not controls.modal_host.active
     view = controls.build_view_state(paused=False)
-    assert view.notification_message == "No timeline cues to snap"
+    assert view.notification_message == "No timeline clips to snap"
 
 
 def test_timeline_bar_phase_right_nudges_cues_and_offset() -> None:
@@ -2296,7 +2296,7 @@ def test_snap_to_markers_opens_one_form_with_proximity_and_layers() -> None:
     assert layers.options[layers.value] == "All Layers"
     assert "Closest Wins" in layers.options
     assert "Layer 1" in layers.options
-    assert modal_view.form_info == "(moves 1 of 1 cues)"
+    assert modal_view.form_info == "(moves 1 of 1 clip edges)"
 
 
 def test_snap_form_hides_marker_fields_for_beats() -> None:
@@ -2327,7 +2327,7 @@ def test_timeline_snap_song_markers_layer_mutates_only_that_lane() -> None:
         SlotCue(t=4.2, level=0.0),
     ]
     view = controls.build_view_state(paused=False)
-    assert view.notification_message == "Snapped 1 cue to song markers"
+    assert view.notification_message == "Snapped 1 clip edge to song markers"
 
 
 def test_timeline_snap_song_markers_each_layer_vs_closest_wins() -> None:
@@ -2346,7 +2346,7 @@ def test_timeline_snap_song_markers_each_layer_vs_closest_wins() -> None:
         SlotCue(t=5.0, level=0.0),
     ]
     view = controls.build_view_state(paused=False)
-    assert view.notification_message == "Snapped 2 cues to song markers"
+    assert view.notification_message == "Snapped 2 clip edges to song markers"
 
     controls.session.timeline.lanes = {
         "layer_1": _lane(None, (4.5, True)),
@@ -2361,7 +2361,7 @@ def test_timeline_snap_song_markers_each_layer_vs_closest_wins() -> None:
         SlotCue(t=5.0, level=0.0),
     ]
     view = controls.build_view_state(paused=False)
-    assert view.notification_message == "Snapped 1 cue to song markers"
+    assert view.notification_message == "Snapped 1 clip edge to song markers"
 
 
 def test_timeline_snap_song_markers_recording_blocks() -> None:
@@ -2399,7 +2399,7 @@ def test_timeline_snap_song_markers_no_cues_notifies() -> None:
     assert _press_focused(controls, keydown(pygame.K_RETURN)) is True
     assert not controls.modal_host.active
     view = controls.build_view_state(paused=False)
-    assert view.notification_message == "No timeline cues to snap"
+    assert view.notification_message == "No timeline clips to snap"
 
 
 def test_timeline_snap_song_markers_uses_proximity() -> None:
@@ -2414,7 +2414,7 @@ def test_timeline_snap_song_markers_uses_proximity() -> None:
         SlotCue(t=3.0, level=1.0),
     ]
     view = controls.build_view_state(paused=False)
-    assert view.notification_message == "No cues within snap proximity"
+    assert view.notification_message == "No clip edges within snap proximity"
 
 
 def test_set_cut_type_opens_one_form_with_a_live_count() -> None:
@@ -2429,12 +2429,12 @@ def test_set_cut_type_opens_one_form_with_a_live_count() -> None:
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
     assert modal_view.kind == ModalKind.FORM
-    assert modal_view.message == "Set cut type on cues"
+    assert modal_view.message == "Set cut type on clips"
     assert [row.label for row in modal_view.form_rows] == ["cut type", "applies to"]
     assert modal_view.form_rows[0].options == ("hard", "soft", "none")
-    assert modal_view.form_info == "(changes 2 of 2 cues)"
+    assert modal_view.form_info == "(changes 2 of 2 clip edges)"
     _set_form_field(controls, "applies to", "markers only")
-    assert controls.modal_host.view_state().form_info == "(changes 1 of 2 cues)"
+    assert controls.modal_host.view_state().form_info == "(changes 1 of 2 clip edges)"
     assert controls.session.timeline.lanes == before
 
 
@@ -2471,7 +2471,7 @@ def test_set_cut_type_hard_on_markers_only() -> None:
         SlotCue(t=10.0, level=0.0, cut="hard"),
     ]
     view = controls.build_view_state(paused=False)
-    assert view.notification_message == "Applied hard cuts to 1 cue"
+    assert view.notification_message == "Applied hard cuts to 1 clip edge"
 
 
 def test_set_cut_type_hard_on_all_cues() -> None:
@@ -2487,13 +2487,13 @@ def test_set_cut_type_hard_on_all_cues() -> None:
     }
     _focus_timeline_set_cut_type(controls)
     _press_focused(controls, keydown(pygame.K_RETURN))
-    _set_cut_type(controls, "hard", "all cues")
+    _set_cut_type(controls, "hard", "all clips")
     assert controls.session.timeline.lanes["layer_1"].cues == [
         SlotCue(t=4.0, level=1.0, cut="hard"),
         SlotCue(t=10.0, level=0.0, cut="hard"),
     ]
     view = controls.build_view_state(paused=False)
-    assert view.notification_message == "Applied hard cuts to 2 cues"
+    assert view.notification_message == "Applied hard cuts to 2 clip edges"
 
 
 def test_set_cut_type_soft_except_markers() -> None:
@@ -2538,7 +2538,7 @@ def test_set_cut_type_none_on_markers_only() -> None:
         SlotCue(t=10.0, level=0.0, cut="none"),
     ]
     view = controls.build_view_state(paused=False)
-    assert view.notification_message == "Removed cuts from 1 cue"
+    assert view.notification_message == "Removed cuts from 1 clip edge"
 
 
 def test_set_cut_type_none_on_all_clears_every_cut() -> None:
@@ -2554,13 +2554,13 @@ def test_set_cut_type_none_on_all_clears_every_cut() -> None:
     }
     _focus_timeline_set_cut_type(controls)
     _press_focused(controls, keydown(pygame.K_RETURN))
-    _set_cut_type(controls, "none", "all cues")
+    _set_cut_type(controls, "none", "all clips")
     assert controls.session.timeline.lanes["layer_1"].cues == [
         SlotCue(t=4.0, level=1.0, cut="none"),
         SlotCue(t=10.0, level=0.0, cut="none"),
     ]
     view = controls.build_view_state(paused=False)
-    assert view.notification_message == "Removed cuts from 2 cues"
+    assert view.notification_message == "Removed cuts from 2 clip edges"
 
 
 def test_timeline_e_toggles_enabled() -> None:
@@ -5113,7 +5113,7 @@ def test_populate_modal_options_keyed_by_timeline_trigger() -> None:
     assert view.body == "Replaces the whole list with 1 preset."
     labels = list(view.form_rows[0].options)
     assert labels == [
-        "cue roles",
+        "clip roles",
         "shuffled (current directory)",
         "in order (current directory)",
     ]

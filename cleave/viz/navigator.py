@@ -134,7 +134,7 @@ _STATIC_CHILDREN: dict[str, tuple[tuple[str, str], ...]] = {
     ),
     "timeline": (
         ("timeline.grid", "Beat / Bar Grid"),
-        ("timeline.cue_fades", "Cue Fades"),
+        ("timeline.cue_fades", "Clip Fades"),
         ("timeline.song_markers", "Song Markers"),
     ),
 }

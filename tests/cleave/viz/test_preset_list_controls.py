@@ -226,7 +226,7 @@ def test_prompt_populate_timeline_trigger_includes_cue_roles() -> None:
         assert view.body == "Replaces the whole list with 1 preset."
         assert view.options == ("Populate", "Cancel")
         assert view.form_rows[0].options == (
-            "cue roles",
+            "clip roles",
             "shuffled (current directory)",
             "in order (current directory)",
         )

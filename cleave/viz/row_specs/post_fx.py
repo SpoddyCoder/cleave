@@ -735,7 +735,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Visual Limiter",
         help_description=(
-            "Works like an audio compressor for visual density: when the composite gets too busy, it pulls the layers down. With the timeline on, cue roles decide which layers give way most. Post FX solo and lock do not affect it.",
+            "Works like an audio compressor for visual density: when the composite gets too busy, it pulls the layers down. With the timeline on, clip roles decide which layers give way most. Post FX solo and lock do not affect it.",
         ),
         help_entries=(("E", "enable/disable"),),
         toggle_enabled=_toggle_post_fx_limiter_enabled,

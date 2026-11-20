@@ -29,20 +29,20 @@ def _session() -> SimpleNamespace:
 def test_undo_and_redo_restore_lanes() -> None:
     session = _session()
     history = TimelineHistory(session)
-    with history.recording("Snap cues"):
+    with history.recording("Snap clips"):
         session.timeline.lanes["layer_1"] = _lane(2.0)
     assert history.can_undo is True
-    assert history.undo() == "Snap cues"
+    assert history.undo() == "Snap clips"
     assert session.timeline.lanes["layer_1"].cues[0].t == 1.0
     assert history.can_undo is False
-    assert history.redo() == "Snap cues"
+    assert history.redo() == "Snap clips"
     assert session.timeline.lanes["layer_1"].cues[0].t == 2.0
 
 
 def test_a_command_that_changes_nothing_is_not_recorded() -> None:
     session = _session()
     history = TimelineHistory(session)
-    with history.recording("Snap cues"):
+    with history.recording("Snap clips"):
         pass
     assert history.can_undo is False
 
@@ -95,7 +95,7 @@ def test_undo_restores_everything_generate_touches() -> None:
 def test_a_new_command_clears_redo() -> None:
     session = _session()
     history = TimelineHistory(session)
-    with history.recording("Snap cues"):
+    with history.recording("Snap clips"):
         session.timeline.lanes["layer_1"] = _lane(2.0)
     history.undo()
     with history.recording("Set cut type"):
@@ -107,7 +107,7 @@ def test_history_is_bounded() -> None:
     session = _session()
     history = TimelineHistory(session)
     for index in range(30):
-        with history.recording("Snap cues"):
+        with history.recording("Snap clips"):
             session.timeline.lanes["layer_1"] = _lane(float(index + 2))
     undone = 0
     while history.undo() is not None:
@@ -192,7 +192,7 @@ def test_an_edit_outside_the_history_breaks_a_merge() -> None:
 def test_begin_and_commit_span_frames_and_block_undo_meanwhile() -> None:
     session = _session()
     history = TimelineHistory(session)
-    with history.recording("Snap cues"):
+    with history.recording("Snap clips"):
         session.timeline.lanes["layer_1"] = _lane(2.0)
     history.begin("Record take")
     session.timeline.lanes["layer_1"] = _lane(3.0)

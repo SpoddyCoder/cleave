@@ -364,7 +364,7 @@ def timeline_strip_section(
     if recording:
         entries.append((layer_keys, "show / hide an armed layer"))
         entries.append(("Click eye", "show / hide an armed layer"))
-        entries.append((f"Ctrl + {layer_keys}", "drop cue (keep level)"))
+        entries.append((f"Ctrl + {layer_keys}", "drop a clip edge (keep level)"))
 
     if recording:
         entries.append(("R", "stop record"))

@@ -96,7 +96,7 @@ NOTIFICATION_TIMELINE_ENABLED_TEXT = "Timeline controls layer visibility"
 NOTIFICATION_TIMELINE_DISABLED_TEXT = "Layer panel controls visibility"
 LATENCY_PAGE_ID = "settings.latency"
 NOTIFICATION_TAP_LATENCY_UNCHANGED_TEXT = (
-    "Existing marker and cue times unchanged"
+    "Existing marker and clip times unchanged"
 )
 SEEK_TINY = 2
 SEEK_SHORT = 10
@@ -963,7 +963,7 @@ class TuningControls:
         self._timeline_presets.prompt(self.duration_sec)
 
     def prompt_reset_timeline(self) -> None:
-        self._timeline_presets.prompt_reset()
+        self._timeline_presets.prompt_reset(self.duration_sec)
 
     def prompt_snap_cues(self) -> None:
         self._timeline_snap.prompt_cues()

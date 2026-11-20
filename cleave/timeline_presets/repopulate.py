@@ -23,7 +23,7 @@ TIMELINE_PRESET_REPOPULATE_OPTIONS: tuple[TimelinePresetRepopulate, ...] = (
 
 _DISPLAY: dict[TimelinePresetRepopulate, str] = {
     "no": "no, keep the lists",
-    "cue roles": "cue roles",
+    "cue roles": "clip roles",
     "directory random": "shuffled (each layer's directory)",
     "directory sequential": "in order (each layer's directory)",
 }
