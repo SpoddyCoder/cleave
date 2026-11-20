@@ -5,6 +5,7 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
+from cleave.preset_library import UNFILTERED_CATALOG, PresetCatalog, PresetLibrary
 from cleave.preset_playlist import PresetPlaylist
 from cleave.viz.modal import ModalHost
 from cleave.viz.preset_list_controls import PresetListController
@@ -31,6 +32,7 @@ def _make_controller(
     get_active_config_path=None,
     on_focus_preset_item=None,
     preset_list: list[str] | None = None,
+    catalog: PresetCatalog = UNFILTERED_CATALOG,
 ) -> tuple[PresetListController, TuningSession, ModalHost]:
     modal_host = modal if modal is not None else ModalHost()
     milk = preset_root / "pack" / "demo.milk"
@@ -62,6 +64,7 @@ def _make_controller(
         on_notification=on_notification,
         get_active_config_path=get_active_config_path,
         on_focus_preset_item=on_focus_preset_item,
+        catalog=catalog,
     )
     return controller, session, modal_host
 
@@ -216,7 +219,12 @@ def test_prompt_populate_timeline_trigger_includes_cue_roles() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp) / "presets"
         _write(root / "pack" / "demo.milk", "milk")
-        controller, session, modal = _make_controller(preset_root=root)
+        library = PresetLibrary.in_memory()
+        library.index(root)
+        library.set_role(root / "pack" / "demo.milk", "bed")
+        controller, session, modal = _make_controller(
+            preset_root=root, catalog=library
+        )
         session.layers["layer_1"].preset_switching_trigger = "timeline"
         session.timeline.enabled = False
         controller.prompt_populate("layer_1")
@@ -227,6 +235,26 @@ def test_prompt_populate_timeline_trigger_includes_cue_roles() -> None:
         assert view.options == ("Populate", "Cancel")
         assert view.form_rows[0].options == (
             "clip roles",
+            "shuffled (current directory)",
+            "in order (current directory)",
+        )
+
+
+def test_prompt_populate_timeline_trigger_omits_cue_roles_without_role_presets() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp) / "presets"
+        _write(root / "pack" / "demo.milk", "milk")
+        library = PresetLibrary.in_memory()
+        library.index(root)
+        controller, session, modal = _make_controller(
+            preset_root=root, catalog=library
+        )
+        session.layers["layer_1"].preset_switching_trigger = "timeline"
+        session.timeline.enabled = False
+        controller.prompt_populate("layer_1")
+        view = modal.view_state()
+        assert view is not None
+        assert view.form_rows[0].options == (
             "shuffled (current directory)",
             "in order (current directory)",
         )

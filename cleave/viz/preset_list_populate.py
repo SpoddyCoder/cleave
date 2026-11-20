@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal
 
-from cleave.cue_roles import CueRole
+from cleave.cue_roles import CUE_ROLES, CueRole
 from cleave.preset_library import PresetCatalog
 from cleave.preset_playlist import PresetPlaylist, milk_files_in_dir
 from cleave.timeline import (
@@ -93,6 +93,11 @@ def browse_pool(playlist: PresetPlaylist) -> tuple[Path, ...]:
     if playlist.collection is not None:
         return playlist.catalog.collection_paths(playlist.collection)
     return playlist.catalog.visible(milk_files_in_dir(playlist.current_dir))
+
+
+def catalog_has_role_presets(catalog: PresetCatalog) -> bool:
+    """Whether the preset library gives any preset a clip role."""
+    return any(catalog.collection_paths(role) for role in CUE_ROLES)
 
 
 def _pick_random(pool: Sequence[Path], rng: random.Random) -> Path | None:

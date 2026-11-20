@@ -243,6 +243,7 @@ class TuningControls:
             signals=signals,
             on_notification=self.show_notification,
             on_repopulate=self.preset_list.repopulate,
+            has_role_presets=self.preset_list.has_role_presets,
             history=self.timeline_history,
         )
         self.timeline_phase = TimelinePhaseController(

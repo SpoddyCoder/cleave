@@ -13,6 +13,7 @@ from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.modal import FormField, FormSpec, ModalHost
 from cleave.viz.preset_list_populate import (
     browse_pool,
+    catalog_has_role_presets,
     needed_preset_count,
     on_segment_populate_count,
     populate_from_cue_marker_roles,
@@ -161,6 +162,10 @@ class PresetListController:
         if self._layer_bindings is not None:
             self._layer_bindings.on_preset_switching_change(slot)
 
+    def has_role_presets(self) -> bool:
+        """Whether the preset library gives any preset a clip role."""
+        return catalog_has_role_presets(self._catalog)
+
     def repopulate(self) -> None:
         if self.project_dir is None:
             return
@@ -185,14 +190,15 @@ class PresetListController:
         sources: list[tuple[str, str, str]] = []
         if layer.preset_switching_trigger == "timeline":
             populate_count = on_segment_populate_count(self.session, slot)
-            sources.append(
-                (
-                    "clip roles",
-                    "cue_roles",
-                    "one preset for each time the layer turns on, picked at "
-                    "random from presets with that clip's role.",
+            if self.has_role_presets():
+                sources.append(
+                    (
+                        "clip roles",
+                        "cue_roles",
+                        "one preset for each time the layer turns on, picked at "
+                        "random from presets with that clip's role.",
+                    )
                 )
-            )
         else:
             needed = needed_preset_count(
                 song_duration_sec=self.duration_sec,

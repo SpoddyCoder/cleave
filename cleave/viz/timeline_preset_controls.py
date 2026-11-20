@@ -43,7 +43,9 @@ from cleave.timeline_presets.density import (
     timeline_preset_density_display,
 )
 from cleave.timeline_presets.repopulate import (
+    DEFAULT_TIMELINE_PRESET_REPOPULATE,
     TIMELINE_PRESET_REPOPULATE_OPTIONS,
+    TimelinePresetRepopulate,
     timeline_preset_repopulate_display,
 )
 from cleave.timeline_presets.song_marker_snap import (
@@ -193,6 +195,7 @@ class TimelinePresetController:
         signals: Signals | None = None,
         on_notification: Callable[[str], None] | None = None,
         on_repopulate: Callable[[], None] | None = None,
+        has_role_presets: Callable[[], bool] | None = None,
         history: TimelineHistory | None = None,
     ) -> None:
         self.session = session
@@ -203,13 +206,30 @@ class TimelinePresetController:
         self._signals = signals
         self._on_notification = on_notification
         self._on_repopulate = on_repopulate
+        self._has_role_presets = has_role_presets
         # Reset's last "layers after reset" choice, for this session.
         self._last_reset_layers = 0
+
+    def _repopulate_options(self) -> tuple[TimelinePresetRepopulate, ...]:
+        """Refill choices; clip roles only when the library tags any preset with a role."""
+        if self._has_role_presets is not None and self._has_role_presets():
+            return TIMELINE_PRESET_REPOPULATE_OPTIONS
+        return tuple(
+            option
+            for option in TIMELINE_PRESET_REPOPULATE_OPTIONS
+            if option != "cue roles"
+        )
 
     def prompt(self, duration_sec: float) -> None:
         tl = self.session.timeline
         if tl.locked:
             return
+        repopulate_options = self._repopulate_options()
+        repopulate_current = (
+            tl.timeline_preset_repopulate
+            if tl.timeline_preset_repopulate in repopulate_options
+            else DEFAULT_TIMELINE_PRESET_REPOPULATE
+        )
         self._modal.prompt_form(
             FormSpec(
                 title=_GENERATE_TITLE,
@@ -286,8 +306,8 @@ class TimelinePresetController:
                     _choice_field(
                         "repopulate",
                         "refill preset lists",
-                        TIMELINE_PRESET_REPOPULATE_OPTIONS,
-                        tl.timeline_preset_repopulate,
+                        repopulate_options,
+                        repopulate_current,
                         timeline_preset_repopulate_display,
                         help=_REPOPULATE_HELP,
                         option_help=_REPOPULATE_OPTION_HELP,
@@ -297,7 +317,7 @@ class TimelinePresetController:
                 ),
                 confirm_label="Generate",
                 on_confirm=lambda values: self._confirm_generate(
-                    values, duration_sec
+                    values, duration_sec, repopulate_options
                 ),
                 info=lambda _values: self._generate_info(duration_sec),
                 help=_GENERATE_HELP,
@@ -317,7 +337,12 @@ class TimelinePresetController:
             if slot in self.session.layers
         )
 
-    def _confirm_generate(self, values: FormValues, duration_sec: float) -> None:
+    def _confirm_generate(
+        self,
+        values: FormValues,
+        duration_sec: float,
+        repopulate_options: Sequence[TimelinePresetRepopulate],
+    ) -> None:
         tl = self.session.timeline
         tl.timeline_preset_kind = TIMELINE_PRESET_KIND_OPTIONS[values["character"]]
         tl.timeline_preset_density = TIMELINE_PRESET_DENSITY_OPTIONS[values["density"]]
@@ -330,9 +355,7 @@ class TimelinePresetController:
         tl.timeline_preset_timeline_cuts = TIMELINE_PRESET_TIMELINE_CUTS_OPTIONS[
             values["timeline_cuts"]
         ]
-        tl.timeline_preset_repopulate = TIMELINE_PRESET_REPOPULATE_OPTIONS[
-            values["repopulate"]
-        ]
+        tl.timeline_preset_repopulate = repopulate_options[values["repopulate"]]
         tl.timeline_preset_conductor = _CONDUCTOR_OPTIONS[values["conductor"]]
         tl.timeline_preset_mode = TIMELINE_PRESET_MODE_OPTIONS[values["mode"]]
         with self._history.recording("Generate timeline"):

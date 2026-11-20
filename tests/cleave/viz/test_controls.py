@@ -1654,6 +1654,20 @@ def test_generate_opens_a_form_seeded_from_the_session() -> None:
     assert all(row.indented for row in modal_view.form_rows)
 
 
+def test_generate_refill_omits_clip_roles_without_role_presets() -> None:
+    controls = make_controls(("layer_1",))
+    controls.session.timeline.timeline_preset_repopulate = "cue roles"
+    _focus_timeline_presets(controls)
+    assert _press_focused(controls, keydown(pygame.K_RETURN)) is True
+    modal_view = controls.modal_host.view_state()
+    assert modal_view is not None
+    refill = next(
+        row for row in modal_view.form_rows if row.label == "refill preset lists"
+    )
+    assert "clip roles" not in refill.options
+    assert refill.options[refill.value] == "no, keep the lists"
+
+
 def test_generate_names_the_cues_it_replaces_under_the_title() -> None:
     controls = make_controls(("layer_1",))
     controls.session.timeline.lanes["layer_1"] = TimelineLane(
@@ -5149,9 +5163,9 @@ def test_populate_modal_options_keyed_by_timeline_trigger() -> None:
     assert view is not None
     assert view.message == "Populate preset list"
     assert view.body == "Replaces the whole list with 1 preset."
+    # No preset in the library has a role, so clip roles is not offered.
     labels = list(view.form_rows[0].options)
     assert labels == [
-        "clip roles",
         "shuffled (current directory)",
         "in order (current directory)",
     ]

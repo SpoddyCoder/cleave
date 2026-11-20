@@ -49,6 +49,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - projectM is spelt with a lowercase p in Help > About Cleave and on the Project > projectM page.
 - Measuring latency no longer reports 0 ms when your taps land ahead of the beat.
 - Pressing Ctrl+C in the console to quit `cleave play` exits quietly instead of printing a traceback.
+- Populate list and Generate timeline's refill preset lists no longer offer clip roles when no preset in your library has a role. Before, choosing it left the preset list empty.
 - Stem separation uses the GPU straight after the Welcome to Cleave step downloads the CUDA Toolkit, instead of running on the CPU until Cleave is restarted.
 
 ## [0.4.0] - 2026-11-19

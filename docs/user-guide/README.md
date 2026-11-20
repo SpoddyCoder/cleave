@@ -276,7 +276,7 @@ Editing the list or the Preset Switching settings keeps the preview on screen. T
 The **Preset List** page holds the presets the layer cycles through, in order. It appears whenever switching is not off.
 
 - The **+** button on the Milkdrop Preset page's preset row, just left of its arrows (or P from any of the layer's rows), appends the preset you are looking at. The **Go to preset list** button, at the left of the icon line under the title of that page and of the Preset Switching page, opens the Preset List page.
-- **Populate list**, the button at the left of the page's icon line under its title, rebuilds the whole list. Under **pick from**, choose **shuffled (current directory)** or **in order (current directory)** to fill it from the layer's preset folder. With the timeline trigger you can also choose **clip roles**, which casts one preset for each of the layer's clips, picked by that clip's role.
+- **Populate list**, the button at the left of the page's icon line under its title, rebuilds the whole list. Under **pick from**, choose **shuffled (current directory)** or **in order (current directory)** to fill it from the layer's preset folder. With the timeline trigger, once at least one preset in your library has a role, you can also choose **clip roles**, which casts one preset for each of the layer's clips, picked by that clip's role.
 - **Enter** on an entry previews it; click the layer's pause icon, or **Resume switching**, to return to the schedule. Enter on the highlighted scheduled entry does not preview it, since it is already playing; during a preview it resumes switching.
 - **Drag** an entry's handle, or press M, to reorder it, and press **Delete** to remove it.
 
@@ -363,7 +363,7 @@ The fastest way to get started is to let Cleave build an arrangement. Choose **G
 - **density:** how busy the arrangement is.
 - **conductor:** optionally lets the stems' audio decide which layers lead each phrase and how bright each one is.
 - **snap** and **cut type:** how clip edges align to the beat grid and how layers transition.
-- **refill preset lists:** optionally rebuilds the preset list of each layer that switches on the timeline: by clip roles, or shuffled or in order from each layer's preset folder.
+- **refill preset lists:** optionally rebuilds the preset list of each layer that switches on the timeline: by clip roles (offered once at least one preset in your library has a role), or shuffled or in order from each layer's preset folder.
 
 Press H in the dialog for a full description of each option. You will get much better results if you [mark the song's structure](#song-markers) and [assign roles to your presets](#curating-your-presets) first.
 
