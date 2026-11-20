@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
+from cleave.viz.breadcrumbs import CRUMB_ELLIPSIS, CRUMB_SEPARATOR, fit_crumbs
 from cleave.viz.file_picker_surface import (
     draw_text,
     index_at,
@@ -38,7 +39,6 @@ Rect = tuple[int, int, int, int]
 
 PRESET_BROWSER_WINDOW = "##preset-browser"
 PRESET_BROWSER_LIST = "##preset-browser-list"
-CRUMB_SEPARATOR = " / "
 FILTER_LABEL = "Filter: "
 LOADING_LABEL = "Loading presets…"
 # Divider between the path and the filter, as a fraction of the text line.
@@ -66,73 +66,6 @@ def row_label(row: BrowserRow) -> str:
     if row.kind is BrowserRowKind.FOLDER:
         return f"{row.label}/"
     return row.label
-
-
-CRUMB_ELLIPSIS = "…"
-
-
-@dataclass(frozen=True)
-class CrumbSlot:
-    """One drawn breadcrumb: the crumb a click goes to, its text, and its span."""
-
-    index: int
-    text: str
-    x: int
-    width: int
-
-
-def _slots(
-    pieces: list[tuple[int, str]], text_width
-) -> tuple[CrumbSlot, ...]:
-    gap = text_width(CRUMB_SEPARATOR)
-    out: list[CrumbSlot] = []
-    x = 0
-    for position, (index, text) in enumerate(pieces):
-        if position:
-            x += gap
-        width = text_width(text)
-        out.append(CrumbSlot(index, text, x, width))
-        x += width
-    return tuple(out)
-
-
-def _span(slots: tuple[CrumbSlot, ...]) -> int:
-    return slots[-1].x + slots[-1].width if slots else 0
-
-
-def fit_crumbs(
-    labels: tuple[str, ...],
-    content_w: int,
-    text_width,
-    fit_label,
-) -> tuple[CrumbSlot, ...]:
-    """Breadcrumbs that fit *content_w*, dropping parents from the left.
-
-    Hidden parents become one :data:`CRUMB_ELLIPSIS` crumb that goes to the
-    nearest of them, so every crumb shown stays clickable. The current folder
-    is always last, shortened by *fit_label* (text, px) when even it alone
-    does not fit.
-    """
-    if not labels:
-        return ()
-    count = len(labels)
-    full = _slots(list(enumerate(labels)), text_width)
-    if _span(full) <= content_w:
-        return full
-    for start in range(1, count):
-        pieces = [(start - 1, CRUMB_ELLIPSIS), *((i, labels[i]) for i in range(start, count))]
-        slots = _slots(pieces, text_width)
-        if _span(slots) <= content_w:
-            return slots
-    last = count - 1
-    if count == 1:
-        return _slots([(0, fit_label(labels[0], content_w))], text_width)
-    lead = text_width(CRUMB_ELLIPSIS) + text_width(CRUMB_SEPARATOR)
-    room = max(0, content_w - lead)
-    return _slots(
-        [(last - 1, CRUMB_ELLIPSIS), (last, fit_label(labels[last], room))],
-        text_width,
-    )
 
 
 @functools.cache
@@ -309,8 +242,12 @@ class PresetBrowserSurface:
             text_width,
             lambda text, px: fit_text_to_width(measure, text, px),
         )
+        from cleave.viz.icon_button import text_box
+        from cleave.viz.imgui_icon_button import paint_hover
+
         lift = location_text_lift()
         text_y = y + lift
+        space_w = text_width(" ")
         pointer = _imgui().get_io().mouse_pos
         rects: list[Rect] = []
         indices: list[int] = []
@@ -326,9 +263,13 @@ class PresetBrowserSurface:
                 )
             current = slot.index == last and slot.text != CRUMB_ELLIPSIS
             if not current:
-                hit = outset_list_row((x + slot.x, text_y, slot.width, line_h))
+                # The same rollover as the inspector's path: a text button box.
+                box = text_box(
+                    x + slot.x - space_w / 2, slot.width, space_w, (text_y, text_y + line_h)
+                )
+                hit = (int(box[0]), int(box[1]), int(round(box[2])), int(round(box[3])))
                 if _contains(hit, pointer.x, pointer.y):
-                    paint_list_row(draw, hit, "HOVER")
+                    paint_hover(box)
                     request_hand()
                 rects.append(hit)
                 indices.append(slot.index)

@@ -191,6 +191,7 @@ def test_view_state_reflects_session_mutation_without_block_writes() -> None:
     assert {field.name for field in fields(TrackBlock)} == {
         "runtime",
         "preset_dir_label",
+        "preset_dir_crumbs",
         "preset_dir_position",
         "preset_dir_can_go_up",
         "preset_dir_can_go_down",

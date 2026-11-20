@@ -391,6 +391,43 @@ def _apply_preset_dir_action(controls: TuningControls, desc: RowDescriptor) -> N
     controls.layer_mutations.enter_directory(slot)
 
 
+def _apply_preset_dir_open_action(controls: TuningControls, desc: RowDescriptor) -> None:
+    """Enter or a double-click: the first subfolder, or the browser when there is none."""
+    slot = desc.slot
+    if slot is None:
+        return
+    if controls.layer_mutations.can_enter_directory(slot):
+        controls.layer_mutations.enter_directory(slot)
+    else:
+        controls.preset_browser.open(slot)
+
+
+# Tooltips name only mouse gestures: whoever reads one is using the mouse.
+PRESET_BROWSER_TOOLTIP = "Double-click to open the preset browser"
+
+
+def _preset_row_tooltip(_state: TuningViewState, _desc: RowDescriptor) -> str:
+    return PRESET_BROWSER_TOOLTIP
+
+
+def _preset_dir_row_tooltip(state: TuningViewState, desc: RowDescriptor) -> str:
+    if _preset_dir_can_go_down(state, desc):
+        return "Double-click to open the first subfolder"
+    return PRESET_BROWSER_TOOLTIP
+
+
+def _preset_dir_up_tooltip(state: TuningViewState, desc: RowDescriptor) -> str:
+    if _preset_dir_can_go_up(state, desc):
+        return "Up to the parent folder"
+    return "Already at the top of this pack"
+
+
+def _preset_dir_down_tooltip(state: TuningViewState, desc: RowDescriptor) -> str:
+    if _preset_dir_can_go_down(state, desc):
+        return "Open the first subfolder"
+    return "No subfolders here"
+
+
 def _apply_preset_browse_action(controls: TuningControls, desc: RowDescriptor) -> None:
     slot = desc.slot
     if slot is None:
@@ -550,20 +587,23 @@ SPECS: dict[RowKind, RowSpec] = {
                 ARROW_UPWARD_GLYPH,
                 _preset_dir_can_go_up,
                 _apply_preset_dir_parent_action,
+                tooltip=_preset_dir_up_tooltip,
             ),
             RowNavButton(
                 ARROW_DOWNWARD_GLYPH,
                 _preset_dir_can_go_down,
                 _apply_preset_dir_action,
+                tooltip=_preset_dir_down_tooltip,
             ),
         ),
+        tooltip=_preset_dir_row_tooltip,
         apply_horizontal=_apply_track_preset_dir,
-        apply_action=_apply_preset_dir_action,
+        apply_action=_apply_preset_dir_open_action,
         activate_on_double_click=True,
         fit_strategy=FitStrategy.NONE,
         help_title="Preset Directory",
         help_description=(
-            "The folder this layer browses for presets. The up arrow moves to the parent folder; the down arrow, or a double-click, opens the first subfolder.",
+            "The folder this layer browses for presets. Click a folder in the path to go back to it. The up arrow moves to the parent folder; the down arrow, Enter, or a double-click opens the first subfolder, and with no subfolders Enter or a double-click opens the preset browser.",
         ),
         repeatable=True,
         parent_group="track",
@@ -575,6 +615,7 @@ SPECS: dict[RowKind, RowSpec] = {
         format_value=_format_track_preset,
         format_position=_format_track_preset_position,
         format_markers=_format_track_preset_markers,
+        tooltip=_preset_row_tooltip,
         apply_horizontal=_apply_track_preset,
         apply_action=_apply_preset_browse_action,
         activate_on_double_click=True,

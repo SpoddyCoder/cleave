@@ -345,7 +345,7 @@ def test_shell_draws_the_open_browser_over_the_column(tree: Path) -> None:
 
 
 def _fit(labels: tuple[str, ...], width: int):
-    from cleave.viz.preset_browser_surface import fit_crumbs
+    from cleave.viz.breadcrumbs import fit_crumbs
 
     slots = fit_crumbs(labels, width, len, lambda text, px: text[: max(0, px - 1)] + "…")
     return [(slot.index, slot.text) for slot in slots]

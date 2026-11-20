@@ -218,6 +218,7 @@ def _draw_two_line_row_text(
     *,
     lead: str = "",
     icon: tuple[str, tuple[int, int, int]] | None = None,
+    draw_value: bool = True,
 ) -> None:
     """Markers after the label, stopping short of the arrows, and the value below.
 
@@ -248,6 +249,8 @@ def _draw_two_line_row_text(
         )
         if imgui.is_item_hovered():
             _marker_tooltip_at(markers, fitted, marker_x, origin_y)
+    if not draw_value:
+        return
     _draw_path_value(
         origin_x + lead_x,
         origin_y + imgui.get_text_line_height(),
@@ -366,6 +369,7 @@ class _RowItem:
     released: bool
     text_x: float
     span: tuple[float, float]
+    hovered: bool = False
 
 
 def _begin_inspector_rows() -> None:
@@ -556,6 +560,9 @@ class InspectorPanel:
                 stepped=inspector_row_stepped(state, desc),
             )
             item = self._draw_row_selectable(look)
+            if item.hovered and spec.tooltip is not None:
+                # Markers, buttons, and path crumbs drawn next override it.
+                show_tooltip(spec.tooltip(state, desc))
             if self._draw_row_value(state, look, item):
                 return
             self._apply_row_click(look, item)
@@ -595,6 +602,7 @@ class InspectorPanel:
                     released=imgui.is_item_deactivated(),
                     text_x=text_x,
                     span=span,
+                    hovered=imgui.is_item_hovered(),
                 )
                 if look.selected:
                     selected_id = self._ctx.controls.shell_focus.selected_id
@@ -702,6 +710,11 @@ class InspectorPanel:
         list_item = spec.present_style is RowPresentStyle.LIST_ITEM
         parts = value_parts(cluster, rgba(look.value_color), stepped=look.stepped)
         draw_aligned_parts(parts)
+        crumbs = (
+            state.tracks[desc.slot].preset_dir_crumbs
+            if desc.kind is RowKind.TRACK_PRESET_DIR and desc.slot in state.tracks
+            else ()
+        )
         if look.two_line:
             _draw_two_line_row_text(
                 look.label,
@@ -712,7 +725,19 @@ class InspectorPanel:
                 look.value_color,
                 lead=look.lead,
                 icon=icon,
+                draw_value=not crumbs,
             )
+            if crumbs:
+                self.values.handle_path_crumbs(
+                    row,
+                    desc,
+                    crumbs,
+                    look.value_color,
+                    icon,
+                    lead_x=imgui.calc_text_size(look.lead).x if look.lead else 0.0,
+                    enabled=look.stepped,
+                    activated=item.activated,
+                )
         if spec.nav_buttons and not list_item:
             self.values.handle_nav_buttons(
                 state,

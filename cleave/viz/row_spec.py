@@ -83,12 +83,13 @@ def row_choice_kind(kind: RowKind) -> ChoiceKind | None:
 class RowNavButton:
     """Icon button after a row label, or at the right edge of a list item.
 
-    Dims when *available* is false.
+    Dims when *available* is false. *tooltip* names what a press does.
     """
 
     glyph: str
     available: Callable[[TuningViewState, RowDescriptor], bool]
     action: ActionMutator
+    tooltip: Callable[[TuningViewState, RowDescriptor], str] | None = None
 
 
 @dataclass(frozen=True)
@@ -104,6 +105,8 @@ class RowSpec:
     format_position: Callable[[TuningViewState, RowDescriptor], str] | None = None
     format_markers: Callable[[TuningViewState, RowDescriptor], str] | None = None
     nav_buttons: tuple[RowNavButton, ...] = ()
+    # Hover text for the row (empty for none): a gesture its label does not show.
+    tooltip: Callable[[TuningViewState, RowDescriptor], str] | None = None
     apply_horizontal: FieldMutator | None = None
     apply_action: ActionMutator | None = None
     # Set on colour rows. The inspector paints a swatch that opens the picker.

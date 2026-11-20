@@ -19,6 +19,7 @@ from cleave.preset_playlist import (
     PresetPlaylist,
     is_top_level_browse_dir,
     playlist_at_collection,
+    playlist_at_dir,
     preset_browse_floor,
     scan_preset_playlist,
 )
@@ -112,6 +113,24 @@ class LayerMutations:
     def jump_to_collection(self, slot: str, collection: PresetCollection) -> None:
         if self.session.layers[slot].playlist.enter_collection(collection):
             self._publish_browse_preset(slot)
+
+    def can_enter_directory(self, slot: str) -> bool:
+        """True when the layer's folder has a subfolder holding presets."""
+        layer = self.session.layers[slot]
+        return layer.playlist.directory_display(
+            self.preset_root, browse_floor=layer.browse_floor
+        ).can_go_down
+
+    def browse_directory(self, slot: str, folder: Path) -> None:
+        """Browse *folder* (a path crumb), playing its first preset."""
+        layer = self.session.layers[slot]
+        playlist = layer.playlist
+        resolved = folder.resolve()
+        if playlist.collection is None and resolved == playlist.current_dir.resolve():
+            return
+        playlist.replace_with(playlist_at_dir(resolved, catalog=playlist.catalog))
+        layer.browse_floor = preset_browse_floor(resolved, self.preset_root)
+        self._publish_browse_preset(slot)
 
     def enter_directory(self, slot: str) -> None:
         layer = self.session.layers[slot]

@@ -228,8 +228,9 @@ def make_controls(
     project_dir: Path | None = None,
     duration_sec: float = 120.0,
     signals=None,
+    preset_root: Path | None = None,
 ) -> TuningControls:
-    preset_root = Path("/tmp/presets")
+    preset_root = preset_root if preset_root is not None else Path("/tmp/presets")
     cfg = make_test_cfg(slots, preset_root=preset_root, config_path=launch_config_path or DEFAULT_ACTIVE_CONFIG)
     session = TuningSession(
         layer_z_order=list(slots),

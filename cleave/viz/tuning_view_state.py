@@ -73,6 +73,7 @@ from cleave.config_schema.timeline import (
 )
 from cleave.preset_library import PresetLibrary
 from cleave.viz.timeline_clip_edits import selected_clip
+from cleave.viz.preset_browser import BrowserCrumb
 from cleave.preset_playlist import (
     PresetPlaylist,
     preset_filename_display,
@@ -113,11 +114,36 @@ _RO_POST_FX_DEFAULTS = default_render_post_fx_runtime_values()
 _RO_PATTERN_MASK_DEFAULTS = default_render_pattern_mask_runtime_values()
 
 
+def directory_crumbs(
+    playlist: PresetPlaylist, preset_root: Path, label: str
+) -> tuple[BrowserCrumb, ...]:
+    """Folders from the top-level pack down to *playlist*'s folder."""
+    if playlist.collection is not None:
+        return (BrowserCrumb(label),)
+    root = preset_root.resolve()
+    folder = playlist.current_dir.resolve()
+    try:
+        parts = folder.relative_to(root).parts
+    except ValueError:
+        return (BrowserCrumb(label),)
+    if not parts:
+        return (BrowserCrumb(label, folder),)
+    crumbs: list[BrowserCrumb] = []
+    path = root
+    for part in parts:
+        path = path / part
+        crumbs.append(BrowserCrumb(part, path))
+    return tuple(crumbs)
+
+
 @dataclass
 class TrackBlock:
     runtime: LayerRuntime
     preset_dir_label: str
     preset_label: str
+    # The directory row's path as folders a click can jump to; a collection
+    # or a folder outside the preset root is one crumb with no path.
+    preset_dir_crumbs: tuple[BrowserCrumb, ...] = ()
     preset_dir_position: str = ""
     preset_dir_can_go_up: bool = False
     preset_dir_can_go_down: bool = False
@@ -793,6 +819,9 @@ class TuningViewStateBuilder:
             tracks[slot] = TrackBlock(
                 runtime=layer,
                 preset_dir_label=directory.path,
+                preset_dir_crumbs=directory_crumbs(
+                    layer.playlist, self.preset_root, directory.path
+                ),
                 preset_dir_position=directory.position,
                 preset_dir_can_go_up=directory.can_go_up,
                 preset_dir_can_go_down=directory.can_go_down,

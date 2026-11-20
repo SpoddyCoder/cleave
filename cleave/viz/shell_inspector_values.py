@@ -20,8 +20,16 @@ from cleave.viz.choice_widgets import (
     draw_segments,
     paint_stepper_hover,
 )
-from cleave.viz.icon_button import box_index_at, icon_box, icon_gap, icon_row
-from cleave.viz.imgui_icon_button import paint_box
+from cleave.viz.breadcrumbs import CRUMB_ELLIPSIS, CRUMB_SEPARATOR, fit_crumbs
+from cleave.viz.icon_button import (
+    box_contains,
+    box_index_at,
+    icon_box,
+    icon_gap,
+    icon_row,
+    text_box,
+)
+from cleave.viz.imgui_icon_button import glyph_drop, paint_box, paint_hover
 from cleave.viz.imgui_theme import rgba
 from cleave.viz.inspector import InspectorRow
 from cleave.viz.pointer_cursor import PointerShape, request_pointer
@@ -44,7 +52,9 @@ from cleave.viz.shell_widgets import (
     value_drag_steps,
     VALUE_DRAG_THRESHOLD_PX,
 )
+from cleave.viz.text_fit import fit_text_to_width
 from cleave.viz.theme import palette, tuning_ui_metrics, ui_chrome_px
+from cleave.viz.tooltips import show_tooltip
 from cleave.viz.value_nudge import (
     centre_pad,
     nudge_arrow_rects,
@@ -54,6 +64,7 @@ from cleave.viz.value_nudge import (
 )
 
 if TYPE_CHECKING:
+    from cleave.viz.preset_browser import BrowserCrumb
     from cleave.viz.controls import TuningControls
     from cleave.viz.row_spec import RowSpec
     from cleave.viz.tuning_view_state import TuningViewState
@@ -247,6 +258,8 @@ class ValueControls:
         hit = None if blocked else box_index_at(boxes, mouse.x, mouse.y)
         hold_armed = self._ctx.controls.value_nudge.armed
         available = [button.available(state, desc) for button in buttons]
+        if hit is not None and buttons[hit].tooltip is not None:
+            show_tooltip(buttons[hit].tooltip(state, desc))
         for index, (button, box) in enumerate(zip(buttons, boxes)):
             lit = index == hit and available[index] and not hold_armed
             if lit:
@@ -262,6 +275,83 @@ class ValueControls:
         self._ctx.controls.inspector.focus_row(row)
         if available[hit]:
             apply_field_nav_button(self._ctx.controls, desc, hit)
+        self.clear_value_drag()
+        self.press_swallowed = True
+
+    def handle_path_crumbs(
+        self,
+        row: InspectorRow,
+        desc: RowDescriptor,
+        crumbs: tuple[BrowserCrumb, ...],
+        value_color: tuple[int, int, int],
+        icon: tuple[str, tuple[int, int, int]] | None,
+        *,
+        lead_x: float,
+        enabled: bool,
+        activated: bool,
+    ) -> None:
+        """The second line of a path row as folders a press jumps to.
+
+        Coloured as in the preset browser: parent folders in the label colour,
+        separators muted, the folder shown in the value colour. Parents that
+        do not fit fold into an ellipsis that goes to the nearest of them. A
+        press on a folder is swallowed, so it never opens a subfolder too.
+        """
+        origin_x, origin_y = selectable_label_origin()
+        line = imgui.get_text_line_height()
+        y = origin_y + line
+        x = origin_x + lead_x
+        right_x = imgui.get_item_rect_max().x - imgui.get_style().frame_padding.x
+        draw = imgui.get_window_draw_list()
+        dimmed = value_color in (palette().disabled, palette().locked)
+        if icon is not None:
+            glyph, accent = icon
+            draw.add_text(
+                imgui.ImVec2(x, y + glyph_drop(glyph)),
+                imgui.get_color_u32(rgba(value_color if dimmed else accent)),
+                glyph,
+            )
+            x += imgui.calc_text_size(f"{glyph} ").x
+        sizer = ImguiTextSizer()
+        labels = tuple(crumb.label for crumb in crumbs)
+        slots = fit_crumbs(
+            labels,
+            max(1, int(right_x - x)),
+            lambda text: int(imgui.calc_text_size(text).x),
+            lambda text, px: fit_text_to_width(sizer, text, px),
+        )
+        last = len(labels) - 1
+        separator_w = imgui.calc_text_size(CRUMB_SEPARATOR).x
+        space_w = imgui.calc_text_size(" ").x
+        band = (y, y + line)
+        blocked = not enabled or self._ctx.input_blocked()
+        mouse = imgui.get_mouse_pos()
+        hit: int | None = None
+        for position, slot in enumerate(slots):
+            slot_x = x + slot.x
+            if position:
+                draw.add_text(
+                    imgui.ImVec2(slot_x - separator_w, y),
+                    imgui.get_color_u32(rgba(value_color if dimmed else palette().muted)),
+                    CRUMB_SEPARATOR,
+                )
+            current = slot.index == last and slot.text != CRUMB_ELLIPSIS
+            target = crumbs[slot.index].path
+            if not current and target is not None and not blocked:
+                box = text_box(slot_x - space_w / 2, slot.width, space_w, band)
+                if box_contains(box, mouse.x, mouse.y):
+                    paint_hover(box)
+                    request_pointer(PointerShape.HAND)
+                    show_tooltip(f"Go to {crumbs[slot.index].label}")
+                    hit = slot.index
+            color = value_color if current or dimmed else palette().label
+            draw.add_text(imgui.ImVec2(slot_x, y), imgui.get_color_u32(rgba(color)), slot.text)
+        if not activated or hit is None or desc.slot is None:
+            return
+        self._ctx.controls.inspector.focus_row(row)
+        target = crumbs[hit].path
+        if target is not None:
+            self._ctx.controls.layer_mutations.browse_directory(desc.slot, target)
         self.clear_value_drag()
         self.press_swallowed = True
 

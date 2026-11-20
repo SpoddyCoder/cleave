@@ -305,3 +305,78 @@ def test_fast_typing_runs_one_listing_at_a_time_and_ends_on_the_last(tmp_path: P
     assert browser.filter_text == "b1"
     assert [row.path for row in browser.rows] == [rig.b1]
     assert browser.editing
+
+
+def test_directory_row_opens_the_browser_when_there_are_no_subfolders() -> None:
+    controls = make_controls(("layer_1",))
+    assert not controls.layer_mutations.can_enter_directory("layer_1")
+    apply_field_action(controls, RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1"))
+    assert controls.preset_browser.active
+
+
+def test_can_enter_directory_and_browse_directory(rig: _Rig) -> None:
+    pack = rig.root / "Pack"
+    rig.mutations.browse_directory("layer_1", pack)
+    assert rig.layer.playlist.current_dir == pack
+    assert rig.mutations.can_enter_directory("layer_1")
+    assert rig.loaded() == [None]
+
+    rig.mutations.browse_directory("layer_1", rig.b1.parent)
+    assert rig.layer.playlist.current == rig.b1
+    assert rig.layer.browse_floor == pack
+    assert not rig.mutations.can_enter_directory("layer_1")
+    rig.mutations.browse_directory("layer_1", rig.b1.parent)
+    assert rig.loaded() == [None, rig.b1]
+
+
+def test_directory_crumbs_run_from_the_pack_down(rig: _Rig) -> None:
+    from cleave.viz.tuning_view_state import directory_crumbs
+
+    crumbs = directory_crumbs(rig.layer.playlist, rig.root, "Pack/A/")
+    assert [(crumb.label, crumb.path) for crumb in crumbs] == [
+        ("Pack", rig.root / "Pack"),
+        ("A", rig.root / "Pack" / "A"),
+    ]
+    rig.layer.playlist.enter_collection("favourites")
+    assert [(c.label, c.path) for c in directory_crumbs(rig.layer.playlist, rig.root, "Favourites")] == [
+        ("Favourites", None)
+    ]
+
+
+def test_preset_and_directory_rows_explain_their_gestures() -> None:
+    from cleave.viz.row_spec import row_spec
+
+    controls = make_controls(("layer_1",))
+    view = controls.build_view_state(paused=False)
+    preset = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
+    directory = RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1")
+    assert "preset browser" in row_spec(RowKind.TRACK_PRESET).tooltip(view, preset)
+    assert "preset browser" in row_spec(RowKind.TRACK_PRESET_DIR).tooltip(view, directory)
+    up, down = row_spec(RowKind.TRACK_PRESET_DIR).nav_buttons
+    assert down.tooltip(view, directory) == "No subfolders here"
+    assert up.tooltip is not None and up.tooltip(view, directory)
+
+
+def test_milkdrop_preset_page_draws_the_directory_path_as_crumbs(tmp_path: Path) -> None:
+    from cleave.viz.navigator import LAYER_PAGE_MILKDROP_PRESET, layer_page_node_id
+    from cleave.viz.shell_inspector import InspectorPanel
+    from tests.support.shell import draw_shell, headless_shell_host
+
+    root = (tmp_path / "presets").resolve()
+    deep = _milk(root / "Pack" / "A" / "a1.milk")
+    controls = make_controls(("layer_1",), preset_root=root)
+    layer = controls.session.layers["layer_1"]
+    layer.playlist = scan_preset_playlist(deep)
+    layer.browse_floor = preset_browse_floor(deep, root)
+    controls.navigator.select(layer_page_node_id("layer_1", LAYER_PAGE_MILKDROP_PRESET))
+    with headless_shell_host() as host:
+        host.context.controls = controls
+        host.inspector.draw = lambda state: InspectorPanel.draw(host.inspector, state)
+        draw_shell(host)
+        draw_shell(host)
+        view = controls.build_view_state(paused=False)
+        assert [crumb.label for crumb in view.tracks["layer_1"].preset_dir_crumbs] == [
+            "Pack",
+            "A",
+        ]
+        assert RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1") in host.inspector.row_rects
