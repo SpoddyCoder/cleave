@@ -249,3 +249,31 @@ def test_shell_draws_the_open_browser_over_the_column(tree: Path) -> None:
         host.context.controls.preset_browser = SimpleNamespace(
             active=False, view_state=lambda: None
         )
+
+
+def _fit(labels: tuple[str, ...], width: int):
+    from cleave.viz.preset_browser_surface import fit_crumbs
+
+    slots = fit_crumbs(labels, width, len, lambda text, px: text[: max(0, px - 1)] + "…")
+    return [(slot.index, slot.text) for slot in slots]
+
+
+def test_crumbs_that_fit_are_all_shown() -> None:
+    labels = ("presets", "Pack A", "Geiss")
+    assert _fit(labels, 100) == [(0, "presets"), (1, "Pack A"), (2, "Geiss")]
+
+
+def test_narrow_crumbs_drop_parents_behind_a_clickable_ellipsis() -> None:
+    labels = ("presets", "Pack A", "Geiss", "Deep")
+    # "… / Geiss / Deep" is 16 characters wide.
+    assert _fit(labels, 16) == [(1, "…"), (2, "Geiss"), (3, "Deep")]
+    assert _fit(labels, 10) == [(2, "…"), (3, "Deep")]
+
+
+def test_a_current_folder_too_long_for_the_panel_is_shortened() -> None:
+    labels = ("presets", "A very long folder name")
+    slots = _fit(labels, 12)
+    assert slots[0] == (0, "…")
+    assert slots[1][0] == 1
+    assert len("… / " + slots[1][1]) <= 12
+    assert _fit(("presets",), 4) == [(0, "pre…")]

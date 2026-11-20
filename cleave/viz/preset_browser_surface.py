@@ -60,20 +60,71 @@ def row_label(row: BrowserRow) -> str:
     return row.label
 
 
-def crumb_layout(
-    labels: tuple[str, ...], text_width
-) -> tuple[tuple[int, int], ...]:
-    """``(x, width)`` of each crumb label, separated by :data:`CRUMB_SEPARATOR`."""
+CRUMB_ELLIPSIS = "…"
+
+
+@dataclass(frozen=True)
+class CrumbSlot:
+    """One drawn breadcrumb: the crumb a click goes to, its text, and its span."""
+
+    index: int
+    text: str
+    x: int
+    width: int
+
+
+def _slots(
+    pieces: list[tuple[int, str]], text_width
+) -> tuple[CrumbSlot, ...]:
     gap = text_width(CRUMB_SEPARATOR)
-    out: list[tuple[int, int]] = []
+    out: list[CrumbSlot] = []
     x = 0
-    for index, label in enumerate(labels):
-        if index:
+    for position, (index, text) in enumerate(pieces):
+        if position:
             x += gap
-        width = text_width(label)
-        out.append((x, width))
+        width = text_width(text)
+        out.append(CrumbSlot(index, text, x, width))
         x += width
     return tuple(out)
+
+
+def _span(slots: tuple[CrumbSlot, ...]) -> int:
+    return slots[-1].x + slots[-1].width if slots else 0
+
+
+def fit_crumbs(
+    labels: tuple[str, ...],
+    content_w: int,
+    text_width,
+    fit_label,
+) -> tuple[CrumbSlot, ...]:
+    """Breadcrumbs that fit *content_w*, dropping parents from the left.
+
+    Hidden parents become one :data:`CRUMB_ELLIPSIS` crumb that goes to the
+    nearest of them, so every crumb shown stays clickable. The current folder
+    is always last, shortened by *fit_label* (text, px) when even it alone
+    does not fit.
+    """
+    if not labels:
+        return ()
+    count = len(labels)
+    full = _slots(list(enumerate(labels)), text_width)
+    if _span(full) <= content_w:
+        return full
+    for start in range(1, count):
+        pieces = [(start - 1, CRUMB_ELLIPSIS), *((i, labels[i]) for i in range(start, count))]
+        slots = _slots(pieces, text_width)
+        if _span(slots) <= content_w:
+            return slots
+    last = count - 1
+    if count == 1:
+        return _slots([(0, fit_label(labels[0], content_w))], text_width)
+    lead = text_width(CRUMB_ELLIPSIS) + text_width(CRUMB_SEPARATOR)
+    room = max(0, content_w - lead)
+    return _slots(
+        [(last - 1, CRUMB_ELLIPSIS), (last, fit_label(labels[last], room))],
+        text_width,
+    )
 
 
 @functools.cache
@@ -104,6 +155,7 @@ class PresetBrowserSurface:
         self.row_rects: tuple[Rect, ...] = ()
         self.row_indices: tuple[int, ...] = ()
         self.crumb_rects: tuple[Rect, ...] = ()
+        self.crumb_indices: tuple[int, ...] = ()
         self.list_rect: Rect | None = None
 
     def row_at(self, x: float, y: float) -> int | None:
@@ -121,6 +173,7 @@ class PresetBrowserSurface:
         self.row_rects = ()
         self.row_indices = ()
         self.crumb_rects = ()
+        self.crumb_indices = ()
         draw_fixed_window(
             PRESET_BROWSER_WINDOW,
             rect,
@@ -194,32 +247,28 @@ class PresetBrowserSurface:
         from cleave.viz.theme import palette
 
         labels = tuple(crumb.label for crumb in self.view.crumbs)
-        layout = crumb_layout(labels, text_width)
-        total = layout[-1][0] + layout[-1][1] if layout else 0
-        if total > content_w:
-            # Too long: show the folder being browsed, nothing to click.
-            draw_text(
-                draw,
-                x,
-                y,
-                fit_text_to_width(measure, CRUMB_SEPARATOR.join(labels), content_w),
-                palette().value,
-            )
-            return
+        slots = fit_crumbs(
+            labels,
+            content_w,
+            text_width,
+            lambda text, px: fit_text_to_width(measure, text, px),
+        )
         pointer = _imgui().get_io().mouse_pos
         rects: list[Rect] = []
+        indices: list[int] = []
         last = len(labels) - 1
-        for index, (label, (cx, cw)) in enumerate(zip(labels, layout)):
-            if index:
+        for position, slot in enumerate(slots):
+            if position:
                 draw_text(
                     draw,
-                    x + cx - text_width(CRUMB_SEPARATOR),
+                    x + slot.x - text_width(CRUMB_SEPARATOR),
                     y,
                     CRUMB_SEPARATOR,
                     palette().muted,
                 )
-            hit = outset_list_row((x + cx, y, cw, line_h))
-            if index < last:
+            current = slot.index == last and slot.text != CRUMB_ELLIPSIS
+            if not current:
+                hit = outset_list_row((x + slot.x, y, slot.width, line_h))
                 hovered = (
                     hit[0] <= pointer.x < hit[0] + hit[2]
                     and hit[1] <= pointer.y < hit[1] + hit[3]
@@ -228,9 +277,11 @@ class PresetBrowserSurface:
                     paint_list_row(draw, hit, "HOVER")
                     request_hand()
                 rects.append(hit)
-            role = palette().value if index == last else palette().label
-            draw_text(draw, x + cx, y, label, role)
+                indices.append(slot.index)
+            role = palette().value if current else palette().label
+            draw_text(draw, x + slot.x, y, slot.text, role)
         self.crumb_rects = tuple(rects)
+        self.crumb_indices = tuple(indices)
 
     def _paint_filter(self, draw: Any, measure, x: int, y: int, content_w: int) -> None:
         from cleave.viz.theme import palette
@@ -432,4 +483,6 @@ class PresetBrowserSurface:
             return
         crumb = index_at(self.crumb_rects, x, y)
         if clicked and crumb is not None:
-            self.intent = BrowserPointerIntent(BrowserPointerKind.GOTO_CRUMB, crumb)
+            self.intent = BrowserPointerIntent(
+                BrowserPointerKind.GOTO_CRUMB, self.crumb_indices[crumb]
+            )
