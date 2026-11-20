@@ -508,6 +508,8 @@ def _reapply_on_seek(
 
 def _auto_preset_loaded_callback(layer: StemLayer) -> Callable[[Path], None]:
     def on_preset_loaded(path: Path) -> None:
+        # The playlist reports only a switch that loaded.
+        layer.pm.clear_preset_failure(path)
         _record_auto_preset(layer, path)
 
     return on_preset_loaded

@@ -151,6 +151,11 @@ class TrackBlock:
     preset_markers: str = ""
     preset_list_labels: list[str] = field(default_factory=list)
     preset_list_markers: list[str] = field(default_factory=list)
+    # Why the preset row's file, or each list entry's, cannot play (None: fine).
+    preset_problem: str | None = None
+    preset_list_problems: tuple[str | None, ...] = ()
+    # The driving stem has no sound in this project's audio.
+    stem_silent: bool = False
     preset_empty: bool = False
     visible: bool = True
     # Index into runtime.preset_list of the currently playing preset, when present.
@@ -707,6 +712,10 @@ class TuningViewStateBuilder:
                 stem.auto_preset_path = playing
             runtime.auto_preset_path = stem.auto_preset_path
             runtime.switching_paused = stem.switching_paused
+            revision = stem.pm.failure_revision
+            if runtime.failed_presets_revision != revision:
+                runtime.failed_presets = dict(stem.pm.failed_presets)
+                runtime.failed_presets_revision = revision
 
     def _preset_list_basenames(self, layer: LayerRuntime) -> frozenset[str]:
         """File names in *layer*'s preset list; list entries may be project copies."""
@@ -743,6 +752,14 @@ class TuningViewStateBuilder:
             and current.name in self._preset_list_basenames(layer)
         )
         return self._library.marker(current, in_preset_list=in_list).strip()
+
+    def _preset_problem(
+        self, layer: LayerRuntime, playlist: PresetPlaylist
+    ) -> str | None:
+        current = playlist.current
+        if current is None:
+            return None
+        return self.session.preset_health.file_problem(layer, current)
 
     def _preset_list_labels(self, paths: list[str]) -> list[str]:
         paths_key = tuple(paths)
@@ -832,6 +849,10 @@ class TuningViewStateBuilder:
                 visible=layer.enabled,
                 preset_list_labels=self._preset_list_labels(list(layer.preset_list)),
                 preset_list_markers=self._preset_list_markers(list(layer.preset_list)),
+                preset_problem=self._preset_problem(layer, display),
+                preset_list_problems=self.session.preset_health.list_problems(
+                    slot, layer
+                ),
                 active_preset_list_index=self._active_preset_list_index(layer),
             )
 
@@ -863,6 +884,11 @@ class TuningViewStateBuilder:
                 preset_markers=self._preset_markers(layer, display),
                 preset_list_labels=self._preset_list_labels(list(layer.preset_list)),
                 preset_list_markers=self._preset_list_markers(list(layer.preset_list)),
+                preset_problem=self._preset_problem(layer, display),
+                preset_list_problems=self.session.preset_health.list_problems(
+                    slot, layer
+                ),
+                stem_silent=layer.stem in self.session.silent_stems,
             )
         return tracks
 

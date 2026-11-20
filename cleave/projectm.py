@@ -72,6 +72,11 @@ class PresetLoadFailure:
     exhausted: bool = False
 
 
+def preset_failure_key(path: Path | str) -> str:
+    """Key for a preset in a failure record, so spellings of one path match."""
+    return os.path.normcase(os.path.normpath(os.fspath(path)))
+
+
 class ProjectMLibraryError(OSError):
     """libprojectM shared library not found or failed to load."""
 
@@ -410,6 +415,9 @@ class ProjectM:
         self._beat_sensitivity = DEFAULT_BEAT_SENSITIVITY
         self._pcm_channels = 1
         self._failure_queue: deque[PresetLoadFailure] = deque()
+        # Presets whose last load failed, by preset_failure_key, with the reason.
+        self._failed_presets: dict[str, str] = {}
+        self._failure_revision = 0
         self._log_queue: deque[str] = deque()
         self._switch_failed_callback: PresetSwitchFailedEvent | None = None
         self._preset_changed = False
@@ -455,6 +463,7 @@ class ProjectM:
 
     def load_preset(self, path: Path | str, smooth: bool = False) -> None:
         encoded = os.fspath(path).encode("utf-8")
+        self.clear_preset_failure(path)
         with self.owning_logs():
             _get_lib().projectm_load_preset_file(self._handle, encoded, smooth)
         self._preset_changed = True
@@ -582,6 +591,9 @@ class ProjectM:
         *,
         exhausted: bool = False,
     ) -> None:
+        if filename and not exhausted:
+            self._failed_presets[preset_failure_key(filename)] = message
+            self._failure_revision += 1
         self._failure_queue.append(
             PresetLoadFailure(
                 filename=filename,
@@ -617,6 +629,22 @@ class ProjectM:
                 self._handle, PresetSwitchFailedEvent(), c_void_p()
             )
         self._switch_failed_callback = None
+
+    @property
+    def failed_presets(self) -> dict[str, str]:
+        """Presets whose last load failed, by :func:`preset_failure_key`, with
+        libprojectM's reason (may be empty). A later successful load clears one."""
+        return self._failed_presets
+
+    @property
+    def failure_revision(self) -> int:
+        """Counts changes to :attr:`failed_presets`, so a copy can tell it is stale."""
+        return self._failure_revision
+
+    def clear_preset_failure(self, path: Path | str) -> None:
+        """Forget a failure for *path*, before loading it again or once it loaded."""
+        if self._failed_presets.pop(preset_failure_key(path), None) is not None:
+            self._failure_revision += 1
 
     def drain_preset_failures(self) -> list[PresetLoadFailure]:
         failures = list(self._failure_queue)

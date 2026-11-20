@@ -55,9 +55,13 @@ def _layer(
     locked: bool = False,
     enabled: bool = True,
 ) -> LayerRuntime:
+    # A preset file that exists, so the layer has no problem to flag.
+    preset = Path(__file__)
     return LayerRuntime(
-        playlist=PresetPlaylist(current_dir=Path("/tmp/presets"), paths=(), index=0),
-        browse_floor=Path("/tmp/presets"),
+        playlist=PresetPlaylist(
+            current_dir=preset.parent, paths=(preset,), index=0
+        ),
+        browse_floor=preset.parent,
         stem=stem,
         locked=locked,
         enabled=enabled,
@@ -692,6 +696,7 @@ def test_held_switching_adds_a_hold_toggle_to_the_layer() -> None:
     )
     layer = session.layers["layer_1"]
     layer.preset_switching = "on"
+    layer.preset_list = [str(Path(__file__))]
     node_id = layer_node_id("layer_1")
 
     def toggle_ids() -> tuple[str, ...]:

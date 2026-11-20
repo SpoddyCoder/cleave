@@ -26,6 +26,7 @@ from cleave.viz.material_icons import (
     DRAG_INDICATOR_GLYPH,
     FILE_GLYPH,
     FOLDER_GLYPH,
+    PROBLEM_GLYPH,
 )
 from cleave.viz.navigator import (
     page_status,
@@ -49,6 +50,7 @@ from cleave.viz.row_spec import (
     RowPresentStyle,
     section_lock_blocks_mutation,
 )
+from cleave.viz.row_specs.track import preset_row_problem
 from cleave.viz.scroll_follow import ScrollFollow
 from cleave.viz.shell_context import ShellContext, ShellFrame
 from cleave.viz.shell_focus import ShellRegion
@@ -575,7 +577,9 @@ class InspectorPanel:
                 and spec.tooltip is not None
                 and not self.values.control_hovered
             ):
-                show_tooltip(spec.tooltip(state, desc))
+                text = spec.tooltip(state, desc)
+                if text:
+                    show_tooltip(text)
             if owns_row:
                 return
             self._apply_row_click(look, item)
@@ -662,6 +666,8 @@ class InspectorPanel:
         elif look.stepped and cluster and not two_line:
             cluster = self.values.fixed_width_value(desc.kind, cluster)
         icon = path_row_icon(desc.kind)
+        if icon is not None and preset_row_problem(state, desc) is not None:
+            icon = PROBLEM_GLYPH, palette().error_notification
         if icon is not None and not two_line:
             origin_x, origin_y = selectable_label_origin()
             if look.label:

@@ -105,7 +105,8 @@ class RowSpec:
     format_position: Callable[[TuningViewState, RowDescriptor], str] | None = None
     format_markers: Callable[[TuningViewState, RowDescriptor], str] | None = None
     nav_buttons: tuple[RowNavButton, ...] = ()
-    # Hover text for the row (empty for none): a gesture its label does not show.
+    # Hover text for the row (empty for none): a gesture its label does not
+    # show, or why its preset file cannot play.
     tooltip: Callable[[TuningViewState, RowDescriptor], str] | None = None
     apply_horizontal: FieldMutator | None = None
     apply_action: ActionMutator | None = None

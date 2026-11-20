@@ -287,6 +287,7 @@ def test_builder_mirrors_switching_paused_into_inspector() -> None:
     layer.preset_switching = "on"
     layer.preset_switching_trigger = "timer"
     stem = MagicMock(spec=StemLayer)
+    stem.pm = MagicMock(failed_presets={}, failure_revision=0)
     stem.switching_paused = False
     stem.auto_preset_path = None
     stem.preset_rotation = None
@@ -400,6 +401,7 @@ def test_builder_syncs_playing_list_preset_from_projectm_position() -> None:
     layer.auto_preset_path = a
 
     stem = MagicMock(spec=StemLayer)
+    stem.pm = MagicMock(failed_presets={}, failure_revision=0)
     stem.switching_paused = False
     stem.auto_preset_path = a
     stem.preset_rotation = None

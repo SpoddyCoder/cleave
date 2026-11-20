@@ -84,6 +84,7 @@ from cleave.preset_playlist import PresetPlaylist, preset_browse_floor
 from cleave.projectm_health import PresetSkipNotifyTracker, ProjectMLogNotifyTracker
 from cleave.song_markers import SongMarker
 from cleave.timeline import ClipGrip, SlotCue, TimelineLane, copy_lane, empty_lane
+from cleave.viz.layer_problems import PresetHealth
 from cleave.viz.timeline_view import StripView
 from cleave.blend_modes import BlendMode
 from cleave.timeline_presets.characters import DEFAULT_TIMELINE_PRESET_KIND
@@ -469,6 +470,10 @@ class LayerRuntime:
     # Browse pause while switching is on; not persisted. Mirrored from
     # StemLayer.switching_paused while the live layer map is available.
     switching_paused: bool = False
+    # Presets whose last load failed on this layer, by preset_failure_key, with
+    # libprojectM's reason; not persisted. Mirrored from the live ProjectM.
+    failed_presets: dict[str, str] = field(default_factory=dict)
+    failed_presets_revision: int = 0
 
 
 @dataclass
@@ -498,6 +503,9 @@ class TuningSession:
     projectm_log_notify_tracker: ProjectMLogNotifyTracker = field(
         default_factory=ProjectMLogNotifyTracker
     )
+    # Stems with no sound in this project's audio; not persisted.
+    silent_stems: frozenset[StemSource] = frozenset()
+    preset_health: PresetHealth = field(default_factory=PresetHealth)
 
 
 def _card_runtime_from_cfg(card: Any) -> OverlayCardRuntime:

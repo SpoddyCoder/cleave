@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from cleave.stems import stem_overlay_header
 from cleave.config_schema.layers import MAX_LAYER_COUNT
 from cleave.viz.editor_mode_controls import curation_focus_slot, is_preset_curation_mode
+from cleave.viz.layer_problems import ProblemPage, layer_problems, layer_problems_tooltip
 from cleave.viz.theme import palette
 
 if TYPE_CHECKING:
@@ -35,6 +36,7 @@ TOGGLE_PREVIEW = "preview"
 TOGGLE_LOCK = "lock"
 TOGGLE_ADD = "add"
 TOGGLE_HOLD = "hold"
+TOGGLE_WARN = "warn"
 
 LAYER_PAGE_MILKDROP_PRESET = "milkdrop_preset"
 LAYER_PAGE_PRESET_SWITCHING = "preset_switching"
@@ -61,9 +63,11 @@ class NavToggle:
     """One clickable icon on a navigator row.
 
     ``id`` is ``TOGGLE_ENABLED``, ``TOGGLE_SOLO``, ``TOGGLE_PREVIEW``,
-    ``TOGGLE_LOCK``, ``TOGGLE_ADD``, or ``TOGGLE_HOLD``. ``active`` is on,
-    soloed, previewing, or locked. A hold toggle is present only while the
-    layer's preset switching is held, and is always active. ``blocked`` is true
+    ``TOGGLE_LOCK``, ``TOGGLE_ADD``, ``TOGGLE_HOLD``, or ``TOGGLE_WARN``.
+    ``active`` is on, soloed, previewing, or locked. A hold toggle is present
+    only while the layer's preset switching is held, and a warn toggle only
+    while the layer has a problem; both are always active, and a warn
+    toggle's ``detail`` is its tooltip, naming every problem. ``blocked`` is true
     while the section lock refuses the toggle, or Add has no room. ``inert``
     is true while a press is refused for another reason (the timeline owns
     layer visibility): the icon draws as usual and the pointer stays an arrow.
@@ -73,6 +77,7 @@ class NavToggle:
     active: bool
     blocked: bool = False
     inert: bool = False
+    detail: str = ""
 
 
 @dataclass(frozen=True)
@@ -349,6 +354,7 @@ def page_status(
 
 # Title-line icons, in the navigator's column order.
 _PAGE_TOGGLE_ORDER = (
+    TOGGLE_WARN,
     TOGGLE_HOLD,
     TOGGLE_ENABLED,
     TOGGLE_SOLO,
@@ -375,7 +381,7 @@ def page_toggles(
     node_id: str,
     nodes: Sequence[NavNode] | None = None,
 ) -> tuple[PageToggle, ...]:
-    """The held-switching, on/off, solo or preview, then lock icons that act
+    """The warning, held-switching, on/off, solo or preview, then lock icons that act
     for the inspector page *node_id*, in the navigator's column order.
 
     Each comes from the nearest node in the page's chain that has it, so a
@@ -552,10 +558,15 @@ def _layer_node(session: TuningSession, slot: str, *, expandable: bool) -> NavNo
 
 def _layer_toggles(session: TuningSession, slot: str) -> tuple[NavToggle, ...]:
     layer = session.layers[slot]
-    hold: tuple[NavToggle, ...] = ()
+    lead: list[NavToggle] = []
+    problems = layer_problems(session, slot)
+    if problems:
+        lead.append(
+            NavToggle(TOGGLE_WARN, True, detail=layer_problems_tooltip(problems))
+        )
     if switching_held(session, slot):
-        hold = (NavToggle(TOGGLE_HOLD, True, layer.locked),)
-    return hold + (
+        lead.append(NavToggle(TOGGLE_HOLD, True, layer.locked))
+    return tuple(lead) + (
         NavToggle(
             TOGGLE_ENABLED,
             layer.enabled,
@@ -565,6 +576,25 @@ def _layer_toggles(session: TuningSession, slot: str) -> tuple[NavToggle, ...]:
         NavToggle(TOGGLE_SOLO, session.solo_slot == slot),
         NavToggle(TOGGLE_LOCK, layer.locked),
     )
+
+
+_PROBLEM_PAGES = {
+    ProblemPage.MILKDROP_PRESET: LAYER_PAGE_MILKDROP_PRESET,
+    ProblemPage.PRESET_SWITCHING: LAYER_PAGE_PRESET_SWITCHING,
+    ProblemPage.PRESET_LIST: LAYER_PAGE_PRESET_LIST,
+    ProblemPage.COMPOSITING: LAYER_PAGE_COMPOSITING,
+}
+
+
+def first_problem_page_id(session: TuningSession, slot: str) -> str | None:
+    """Navigator id of the page that fixes the layer's first problem, if any."""
+    problems = layer_problems(session, slot)
+    if not problems:
+        return None
+    page = _PROBLEM_PAGES[problems[0].page]
+    if not _layer_page_visible(session, slot, page):
+        page = LAYER_PAGE_PRESET_SWITCHING
+    return layer_page_node_id(slot, page)
 
 
 def switching_held(session: TuningSession, slot: str) -> bool:

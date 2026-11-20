@@ -145,6 +145,7 @@ Many navigator rows carry icons on the right:
 - **Solo** isolates a layer so you can judge it on its own.
 - **Lock** protects settings from accidental edits. Locked settings turn red and stay fixed until you unlock them.
 - **Preview** (Overlay only) holds the credits cards on screen so you can style them without seeking.
+- **Problem** (a red exclamation mark, layers only) shows when the layer cannot do what it is set to do. See [When a layer has a problem](#when-a-layer-has-a-problem).
 
 The same icons, in the same order, also sit at the right of the icon line under the inspector title, so you can solo a layer from any of its pages or preview the cards from any Overlay page. When a page, or the part it belongs to, is off or locked, its settings dim, and hovering over the icon tells you which switch is responsible.
 
@@ -267,6 +268,20 @@ The **Preset List** page holds the presets the layer cycles through, in order. I
 All of these are also in the entry's context menu.
 
 ![Right-click menu on a preset list entry](images/preset-list-menu.png)
+
+### When a layer has a problem
+
+A red exclamation mark on a layer's navigator row, and in the icon line under the title of each of its pages, means the layer cannot do what you have set it to do. Hover over it to see every problem, and click it to go to the page where you fix the first one. It shows when:
+
+| Problem | Fix |
+| --- | --- |
+| Preset switching is on, but the preset list is empty. | Add presets to the list, or Populate it. |
+| None of the presets in the list can load. | Replace the entries marked in the list. |
+| Switching follows the timeline, but the timeline is off, or the layer has no clips on it. | Turn the timeline on, add clips to the layer, or pick another trigger. |
+| Switching is off, and the layer's preset is missing or failed to load. | Choose another preset. |
+| The layer's stem is silent in this song (for example, vocals on an instrumental). | Pick another stem on the Compositing page. |
+
+A preset file that is missing (moved, renamed, or left out of a restored project) or that failed to load shows a red exclamation mark in place of its file icon, on the preset row and on its preset list entry. Hover over the row to see why. Cleave looks for missing files when a project opens; a file that disappears while you work is marked once a layer tries to load it. A few bad entries in a list that still has presets it can play only mark those entries; the layer's icon lights once nothing in the list can play.
 
 ### Preset markers
 

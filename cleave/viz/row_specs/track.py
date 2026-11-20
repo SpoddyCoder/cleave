@@ -406,8 +406,38 @@ def _apply_preset_dir_open_action(controls: TuningControls, desc: RowDescriptor)
 PRESET_BROWSER_TOOLTIP = "Double-click to open the preset browser"
 
 
-def _preset_row_tooltip(_state: TuningViewState, _desc: RowDescriptor) -> str:
+def preset_row_problem(state: TuningViewState, desc: RowDescriptor) -> str | None:
+    """Why the preset file on a preset row or preset list entry cannot play."""
+    if desc.slot is None or desc.slot not in state.tracks:
+        return None
+    block = state.tracks[desc.slot]
+    if desc.kind is RowKind.TRACK_PRESET:
+        return block.preset_problem
+    if desc.kind is RowKind.TRACK_PRESET_LIST_ITEM and desc.preset_index is not None:
+        if desc.preset_index < len(block.preset_list_problems):
+            return block.preset_list_problems[desc.preset_index]
+    return None
+
+
+def _preset_row_tooltip(state: TuningViewState, desc: RowDescriptor) -> str:
+    problem = preset_row_problem(state, desc)
+    if problem is not None:
+        return f"{problem}\n{PRESET_BROWSER_TOOLTIP}"
     return PRESET_BROWSER_TOOLTIP
+
+
+def _stem_row_tooltip(state: TuningViewState, desc: RowDescriptor) -> str:
+    block = _track_block(state, desc)
+    if not block.stem_silent:
+        return ""
+    return (
+        f"The {stem_control_label(block.runtime.stem)} stem is silent in this "
+        "song, so this layer has no audio to react to"
+    )
+
+
+def _preset_list_item_tooltip(state: TuningViewState, desc: RowDescriptor) -> str:
+    return preset_row_problem(state, desc) or ""
 
 
 def _preset_dir_row_tooltip(state: TuningViewState, desc: RowDescriptor) -> str:
@@ -688,6 +718,7 @@ SPECS: dict[RowKind, RowSpec] = {
         format_value=_format_track_preset_list_item,
         format_position=_format_track_preset_list_item_position,
         format_markers=_format_track_preset_list_item_markers,
+        tooltip=_preset_list_item_tooltip,
         apply_action=_apply_preset_list_item_action,
         fit_strategy=FitStrategy.NONE,
         help_title="Preset List Entry",
@@ -836,6 +867,7 @@ SPECS: dict[RowKind, RowSpec] = {
         panel_label="driving stem",
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_track_stem,
+        tooltip=_stem_row_tooltip,
         apply_horizontal=_apply_track_stem,
         choice=options_choice(STEM_SOURCES, lambda s, d: _track_block(s, d).runtime.stem, stem_control_label, jump=_jump_track_stem),
         help_title="Stem",

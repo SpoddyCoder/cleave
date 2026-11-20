@@ -21,6 +21,7 @@ from cleave.viz.navigator import (
     PageToggle,
     TOGGLE_ENABLED,
     TOGGLE_HOLD,
+    TOGGLE_WARN,
     TOGGLE_PREVIEW,
     TOGGLE_SOLO,
     timeline_row_slot_of,
@@ -117,9 +118,11 @@ class TitleButton:
 
 
 def page_toggle_tooltip(item: PageToggle, status: PageStatus) -> str:
-    """Hover text for a page's held-switching, on/off, solo, preview, or lock button on the title's icon line."""
+    """Hover text for a page's warning, held-switching, on/off, solo, preview, or lock button on the title's icon line."""
     toggle = item.toggle
     name = item.owner_label
+    if toggle.id == TOGGLE_WARN:
+        return toggle.detail
     if toggle.blocked:
         return f"Locked: unlock {status.locked_by or name} to change"
     if toggle.inert:
@@ -151,7 +154,7 @@ def page_toggle_tooltip(item: PageToggle, status: PageStatus) -> str:
 def page_toggle_buttons(
     toggles: Sequence[PageToggle], status: PageStatus
 ) -> tuple[TitleButton, ...]:
-    """The page's held-switching, on/off, solo or preview, and lock icons as title buttons, drawn like the
+    """The page's warning, held-switching, on/off, solo or preview, and lock icons as title buttons, drawn like the
     navigator's. Each button's id is its toggle id.
 
     An on switch under a parent that is off draws its fill at half strength.

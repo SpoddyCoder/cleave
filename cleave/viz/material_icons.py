@@ -22,6 +22,8 @@ FILE_GLYPH = "\ue24d"
 SKIP_PREVIOUS_GLYPH = "\ue045"
 PLAY_GLYPH = "\ue037"
 PAUSE_GLYPH = "\ue034"
+# priority_high: a bare exclamation mark, for a layer or preset with a problem.
+PROBLEM_GLYPH = "\ue645"
 RECORD_GLYPH = "\ue061"
 REPLAY_GLYPH = "\ue042"
 SKIP_NEXT_GLYPH = "\ue044"

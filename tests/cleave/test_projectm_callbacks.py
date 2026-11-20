@@ -25,6 +25,8 @@ def test_switch_failed_handler_enqueues_and_drains() -> None:
     pm = ProjectM.__new__(ProjectM)
     pm._handle = MagicMock()
     pm._failure_queue = __import__("collections").deque()
+    pm._failed_presets = {}
+    pm._failure_revision = 0
     pm._switch_failed_callback = None
 
     with patch("cleave.projectm._get_lib", return_value=lib):
@@ -48,6 +50,7 @@ def test_clear_preset_switch_failed_handler() -> None:
     pm = ProjectM.__new__(ProjectM)
     pm._handle = MagicMock()
     pm._failure_queue = __import__("collections").deque()
+    pm._failed_presets = {}
     pm._switch_failed_callback = MagicMock()
 
     with patch("cleave.projectm._get_lib", return_value=lib):
@@ -77,6 +80,7 @@ def test_version_info_reads_components_and_strings() -> None:
 def test_enqueue_preset_failure_exhausted_flag() -> None:
     pm = ProjectM.__new__(ProjectM)
     pm._failure_queue = __import__("collections").deque()
+    pm._failed_presets = {}
     pm._enqueue_preset_failure("a.milk", "failed", exhausted=True)
     failures = pm.drain_preset_failures()
     assert failures[0].exhausted is True

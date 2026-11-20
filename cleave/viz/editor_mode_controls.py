@@ -91,6 +91,8 @@ def _merge_session_state(
     preserve_editor_mode = target.settings.editor_mode
     skip_tracker = target.preset_skip_notify_tracker
     log_tracker = target.projectm_log_notify_tracker
+    silent_stems = target.silent_stems
+    preset_health = target.preset_health
 
     target.layer_z_order = list(fresh.layer_z_order)
     target.layers = dict(fresh.layers)
@@ -113,6 +115,8 @@ def _merge_session_state(
     target.help_visible = preserve_help
     target.preset_skip_notify_tracker = skip_tracker
     target.projectm_log_notify_tracker = log_tracker
+    target.silent_stems = silent_stems
+    target.preset_health = preset_health
 
     if panel_open is not None:
         target.timeline.panel_open = panel_open
@@ -252,6 +256,7 @@ class EditorModeController:
             self._layer_manager.playlists.clear()
             self._layer_manager.playlists.update(playlists)
         self._sync_live_layers(playlists)
+        self.session.preset_health.check_on_disk(self.session)
         missing_anchor = missing_preset_anchor_notification(
             {
                 slot: layer.playlist.current

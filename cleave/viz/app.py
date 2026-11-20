@@ -142,6 +142,8 @@ def build_runtime_base(
 ) -> VisualizerSeed:
     pcm_bank = load_stem_pcm(project_dir)
     session = session_from_cfg(cfg, playlists)
+    session.silent_stems = pcm_bank.silent_stems()
+    session.preset_health.check_on_disk(session)
     session.song_markers.markers = list(load_manifest(project_dir).song_markers)
     content_w, content_h = project_resolution(cfg)
     return VisualizerSeed(

@@ -25,6 +25,7 @@ from cleave.viz.material_icons import (
     LOCK_GLYPH,
     LOCK_OPEN_GLYPH,
     PAUSE_GLYPH,
+    PROBLEM_GLYPH,
     POWER_GLYPH,
     PREVIEW_GLYPH,
     SOLO_GLYPH,
@@ -42,6 +43,7 @@ from cleave.viz.navigator import (
     TOGGLE_LOCK,
     TOGGLE_PREVIEW,
     TOGGLE_SOLO,
+    TOGGLE_WARN,
     TWISTY_COLLAPSED,
     TWISTY_EXPANDED,
 )
@@ -63,7 +65,13 @@ from cleave.viz.theme import palette
 _NAV_LOCK_MARK = "[lock]"
 HOLD_TOOLTIP = "Preset switching paused while you browse: click to resume"
 # Fixed columns, so a row without solo keeps its icons under the rows that have it.
-_NAV_TOGGLE_COLUMNS = (TOGGLE_HOLD, TOGGLE_ENABLED, TOGGLE_SOLO, TOGGLE_LOCK)
+_NAV_TOGGLE_COLUMNS = (
+    TOGGLE_WARN,
+    TOGGLE_HOLD,
+    TOGGLE_ENABLED,
+    TOGGLE_SOLO,
+    TOGGLE_LOCK,
+)
 
 
 def navigator_twisty(node: NavNode, expanded: Collection[str]) -> str | None:
@@ -86,6 +94,8 @@ def navigator_toggle_glyph(toggle: NavToggle) -> str:
         return ADD_GLYPH
     if toggle.id == TOGGLE_HOLD:
         return PAUSE_GLYPH
+    if toggle.id == TOGGLE_WARN:
+        return PROBLEM_GLYPH
     if toggle.id == TOGGLE_LOCK:
         return LOCK_GLYPH if toggle.active else LOCK_OPEN_GLYPH
     if toggle.id == TOGGLE_SOLO:
@@ -97,9 +107,12 @@ def navigator_toggle_glyph(toggle: NavToggle) -> str:
 
 def navigator_toggle_fill(toggle: NavToggle) -> tuple[int, int, int] | None:
     """Solid square behind a lit toggle: green on, red solo or preview, amber
-    lock, yellow held switching (a manual override, as on the timeline strip)."""
+    lock, yellow held switching (a manual override, as on the timeline strip),
+    red warning."""
     if toggle.id == TOGGLE_ADD or not toggle.active:
         return None
+    if toggle.id == TOGGLE_WARN:
+        return palette().button_danger_bg
     if toggle.id == TOGGLE_HOLD:
         return palette().override_bg
     if toggle.id == TOGGLE_LOCK:
@@ -117,6 +130,8 @@ def navigator_toggle_color(toggle: NavToggle) -> tuple[int, int, int]:
         return palette().locked if toggle.blocked else palette().muted
     if toggle.id == TOGGLE_HOLD:
         return palette().override_glyph
+    if toggle.id == TOGGLE_WARN:
+        return palette().on_danger
     return palette().nav_lock_glyph if toggle.id == TOGGLE_LOCK else palette().on_lit_icon
 
 
@@ -124,6 +139,8 @@ def navigator_toggle_tooltip(toggle: NavToggle) -> str:
     """Hover text naming the state and what a click does."""
     if toggle.id == TOGGLE_ADD:
         return "Layer limit reached" if toggle.blocked else "Add layer"
+    if toggle.id == TOGGLE_WARN:
+        return toggle.detail
     if toggle.blocked:
         return "Locked: unlock to change"
     if toggle.inert:
@@ -147,7 +164,8 @@ def navigator_toggle_xs(right_x: float, side: float, gap: float) -> dict[str, fl
     """Left edge of each toggle's column, ending flush at *right_x*.
 
     Columns are fixed, so a row without solo keeps its icons under the rows
-    that have it, and a held layer's pause icon sits left of its on/off. Add shares the lock column, and Overlay's preview the solo
+    that have it, a held layer's pause icon sits left of its on/off, and a
+    layer's warning icon left of that. Add shares the lock column, and Overlay's preview the solo
     column.
     """
     xs = dict(zip(_NAV_TOGGLE_COLUMNS, icon_columns(right_x, len(_NAV_TOGGLE_COLUMNS), side, gap)))

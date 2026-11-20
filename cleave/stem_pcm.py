@@ -12,6 +12,10 @@ from cleave.pcm_io import SAMPLE_RATE_HZ, load_wav_pcm_44k
 from cleave.project import mix_path
 
 
+# Peak below which a stem counts as silent (about -80 dBFS).
+SILENT_STEM_PEAK = 1e-4
+
+
 @dataclass
 class StemPcmBank:
     project_dir: Path
@@ -27,6 +31,19 @@ class StemPcmBank:
     def channels(self, stem: StemSource) -> int:
         """Channel count for *stem* (1 mono, 2 interleaved stereo)."""
         return self._channels[stem]
+
+    def silent_stems(self) -> frozenset[StemSource]:
+        """Sources whose peak never reaches ``SILENT_STEM_PEAK``.
+
+        Reads the highest and lowest sample in place: ``np.abs`` would copy
+        the whole song's PCM for each source.
+        """
+        return frozenset(
+            stem
+            for stem, pcm in self._pcm.items()
+            if pcm.size == 0
+            or max(float(pcm.max()), -float(pcm.min())) < SILENT_STEM_PEAK
+        )
 
     def slice_pcm(self, stem: StemSource, t_sec: float, n_samples: int) -> np.ndarray:
         """Return per-channel *n_samples* of float32 PCM from *t_sec*, zero-padded past end."""
