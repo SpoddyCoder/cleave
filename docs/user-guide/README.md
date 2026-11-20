@@ -276,7 +276,7 @@ Editing the list or the Preset Switching settings keeps the preview on screen. T
 The **Preset List** page holds the presets the layer cycles through, in order. It appears whenever switching is not off.
 
 - **Add to preset list** (or P from any of the layer's rows) appends the preset you are looking at.
-- **Populate** rebuilds the list from the current folder, shuffled or in order. With the timeline trigger it can also cast one preset for each time the layer comes in, picked by that cue's role.
+- **Populate** rebuilds the whole list. Under **pick from**, choose **shuffled (current directory)** or **in order (current directory)** to fill it from the layer's preset folder. With the timeline trigger you can also choose **cue roles**, which casts one preset for each time the layer comes in, picked by that cue's role.
 - **Enter** on an entry previews it; click the layer's pause icon, or **Resume switching**, to return to the schedule. Enter on the highlighted scheduled entry does not preview it, since it is already playing; during a preview it resumes switching.
 - **Drag** an entry's handle, or press M, to reorder it, and press **Delete** to remove it.
 
@@ -363,7 +363,7 @@ The fastest way to get started is to let Cleave build an arrangement. Choose **G
 - **density:** how busy the arrangement is.
 - **conductor:** optionally lets the stems' audio decide which layers lead each phrase and how bright each one is.
 - **snap** and **cut type:** how cues align to the beat grid and how layers transition.
-- **refill preset lists:** optionally rebuilds each layer's preset list to suit.
+- **refill preset lists:** optionally rebuilds the preset list of each layer that switches on the timeline: by cue roles, or shuffled or in order from each layer's preset folder.
 
 Press H in the dialog for a full description of each option. You will get much better results if you [mark the song's structure](#song-markers) and [assign roles to your presets](#curating-your-presets) first.
 

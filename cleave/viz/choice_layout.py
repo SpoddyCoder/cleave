@@ -22,6 +22,9 @@ COMBO_CARET = "▾"
 # belongs to the arrow's hit area.
 STEPPER_BACK = "< "
 STEPPER_FORWARD = " >"
+# A vertical list's radio buttons, then a space before the option.
+RADIO_ON = "● "
+RADIO_OFF = "○ "
 
 
 def segment_pad_x() -> int:
@@ -71,6 +74,12 @@ def stepper_width(measure: TextSizer, labels: Sequence[str]) -> int:
     """``< value >`` wide enough for the widest option."""
     widest = max((measure.size(label)[0] for label in labels), default=0)
     return measure.size(STEPPER_BACK)[0] + widest + measure.size(STEPPER_FORWARD)[0]
+
+
+def radio_width(measure: TextSizer, labels: Sequence[str]) -> int:
+    """A radio button and the widest option beside it."""
+    widest = max((measure.size(label)[0] for label in labels), default=0)
+    return measure.size(RADIO_OFF)[0] + widest
 
 
 def stepper_arrow_rects(measure: TextSizer, rect: Rect) -> tuple[Rect, Rect]:

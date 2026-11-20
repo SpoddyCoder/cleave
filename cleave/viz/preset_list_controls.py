@@ -204,14 +204,14 @@ class PresetListController:
         noun = "1 preset" if populate_count == 1 else f"{populate_count} presets"
         sources.append(
             (
-                "shuffled",
+                "shuffled (current directory)",
                 "directory_random",
                 "presets from the layer's preset directory, shuffled.",
             )
         )
         sources.append(
             (
-                "in order",
+                "in order (current directory)",
                 "directory_sequential",
                 "presets from the layer's preset directory, in directory order.",
             )
@@ -223,7 +223,7 @@ class PresetListController:
                 fields=(
                     FormField(
                         "source",
-                        "pick",
+                        "pick from",
                         tuple(label for label, _mode, _help in sources),
                         next(
                             (
@@ -233,8 +233,9 @@ class PresetListController:
                             ),
                             0,
                         ),
-                        help=("How the new presets are picked.",),
+                        help=("Where the new presets come from, and in what order.",),
                         option_help=tuple(help for _label, _mode, help in sources),
+                        vertical=True,
                     ),
                 ),
                 confirm_label="Populate",

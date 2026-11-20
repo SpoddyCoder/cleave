@@ -567,3 +567,65 @@ def test_closing_the_dialog_drops_a_held_step() -> None:
     assert modal.view_state().form_step_held is None
     _held_past_delay(modal)
     assert modal.view_state().form_rows[0].value == 0
+
+
+def _vertical_form(modal: ModalHost) -> None:
+    modal.prompt_form(
+        FormSpec(
+            title="Populate",
+            fields=(
+                FormField("source", "pick from", ("a", "b", "c"), 0, vertical=True),
+                FormField("after", "after", ("x", "y"), 0),
+            ),
+            confirm_label="Go",
+            on_confirm=lambda _values: None,
+        )
+    )
+
+
+def test_up_and_down_move_through_a_vertical_field_then_leave_it() -> None:
+    modal = ModalHost()
+    _vertical_form(modal)
+    modal.handle_keydown(keydown(pygame.K_DOWN))
+    modal.handle_keydown(keydown(pygame.K_DOWN))
+    rows = modal.view_state().form_rows
+    assert rows[0].vertical is True
+    assert rows[0].value == 2
+    assert rows[0].focused is True
+    modal.handle_keydown(keydown(pygame.K_DOWN))
+    rows = modal.view_state().form_rows
+    assert rows[1].focused is True
+    assert rows[0].value == 2
+    modal.handle_keydown(keydown(pygame.K_UP))
+    rows = modal.view_state().form_rows
+    assert rows[0].focused is True
+    assert rows[0].value == 2
+    modal.handle_keydown(keydown(pygame.K_UP))
+    assert modal.view_state().form_rows[0].value == 1
+
+
+def test_a_vertical_field_is_one_row_per_option() -> None:
+    modal = ModalHost()
+    _vertical_form(modal)
+    view = modal.view_state()
+    height = measure_panel(_Measure(), view, line_gap=2, screen_w=1920)[1]
+    modal.prompt_form(
+        FormSpec(
+            title="Populate",
+            fields=(
+                FormField("source", "pick from", ("a", "b", "c"), 0),
+                FormField("after", "after", ("x", "y"), 0),
+            ),
+            confirm_label="Go",
+            on_confirm=lambda _values: None,
+        )
+    )
+    flat = measure_panel(_Measure(), modal.view_state(), line_gap=2, screen_w=1920)[1]
+    assert height == flat + 2 * form_row_height(16)
+
+
+def test_a_vertical_field_has_no_list() -> None:
+    modal = ModalHost()
+    _vertical_form(modal)
+    modal.handle_keydown(keydown(pygame.K_SPACE))
+    assert modal.view_state().form_choice is None

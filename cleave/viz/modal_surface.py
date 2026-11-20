@@ -16,6 +16,7 @@ from cleave.viz.button_paint import ButtonState, ButtonTone, button_text_role, p
 from cleave.viz.choice_widgets import (
     draw_choice_list,
     draw_combo,
+    draw_radio_list,
     draw_segments,
     draw_stepper,
 )
@@ -43,6 +44,7 @@ from cleave.viz.modal_layout import (
     caret_index_at_point,
     focus_highlight_rect,
     form_control_width,
+    form_field_height,
     form_heading_height,
     form_row_height,
     form_row_pad_y,
@@ -416,6 +418,35 @@ def _draw_form_control(
     return [_FormHit(rect, ModalPointerKind.OPEN_FORM_CHOICE, index)]
 
 
+def _draw_form_radio_list(
+    draw: imgui.ImDrawList,
+    measure: TextMeasure,
+    row: FormRowView,
+    index: int,
+    *,
+    left: int,
+    right: int,
+    y: int,
+    line_h: int,
+    hover: bool,
+) -> list[_FormHit]:
+    """A vertical field's options, one radio button per line, the first beside its label."""
+    row_h = form_row_height(line_h)
+    # The hover band reaches past the glyph like the focus outline does.
+    band_left = left - _HIGHLIGHT_PAD - 1
+    rows = tuple(
+        (band_left, y + option * row_h, right - band_left, row_h)
+        for option in range(len(row.options))
+    )
+    draw_radio_list(
+        draw, measure, row.options, row.value, rows=rows, text_x=left, hover=hover
+    )
+    return [
+        _FormHit(rect, ModalPointerKind.SET_FORM_VALUE, index, option)
+        for option, rect in enumerate(rows)
+    ]
+
+
 def _draw_form_rows(
     draw: imgui.ImDrawList,
     view: ModalViewState,
@@ -444,7 +475,7 @@ def _draw_form_rows(
             heading_y = y + heading_h - form_row_height(line_h) + form_row_pad_y()
             _text(draw, left, heading_y, row.heading, palette().muted)
             y += heading_h
-        height = form_row_height(line_h)
+        height = form_field_height(line_h, row)
         row_left = left + (form_section_indent() if row.indented else 0)
         rect = (row_left, y, right - row_left, height)
         hits.append(_FormHit(rect, ModalPointerKind.FOCUS_FORM_ROW, index))
@@ -455,6 +486,23 @@ def _draw_form_rows(
         label_rgb = palette().value if row.focused else palette().label
         _text(draw, row_left, text_y, row.label, label_rgb)
         width = form_control_width(measure, row)
+        if row.vertical:
+            controls[index] = (right - width, y, width, height)
+            hits.extend(
+                _draw_form_radio_list(
+                    draw,
+                    measure,
+                    row,
+                    index,
+                    left=right - width,
+                    right=right,
+                    y=y,
+                    line_h=line_h,
+                    hover=open_row is None and held_row is None,
+                )
+            )
+            y += height
+            continue
         control = (right - width, text_y, width, line_h)
         controls[index] = control
         parts = _draw_form_control(

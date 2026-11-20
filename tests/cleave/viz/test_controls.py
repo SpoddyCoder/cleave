@@ -1637,7 +1637,7 @@ def test_generate_opens_a_form_seeded_from_the_session() -> None:
         ("snap to grid", "none"),
         ("snap to song markers", "none"),
         ("cut type", "by marker"),
-        ("refill preset lists", "no"),
+        ("refill preset lists", "no, keep the lists"),
     ]
     assert [row.heading for row in modal_view.form_rows] == [
         "Arrangement",
@@ -5114,8 +5114,8 @@ def test_populate_modal_options_keyed_by_timeline_trigger() -> None:
     labels = list(view.form_rows[0].options)
     assert labels == [
         "cue roles",
-        "shuffled",
-        "in order",
+        "shuffled (current directory)",
+        "in order (current directory)",
     ]
 
     controls.modal_host.cancel()
@@ -5127,8 +5127,8 @@ def test_populate_modal_options_keyed_by_timeline_trigger() -> None:
     assert view.body == "Replaces the whole list with 1 preset."
     labels = list(view.form_rows[0].options)
     assert labels == [
-        "shuffled",
-        "in order",
+        "shuffled (current directory)",
+        "in order (current directory)",
     ]
     assert "cue roles" not in labels
 

@@ -52,7 +52,9 @@ class FormField:
     """One parameter of a form. ``value`` is an index into ``options``.
 
     Up to three options show as segments, more as a combo (``choice_kind``).
-    A ``stepper`` field is a number shown as ``< value >`` instead; its options
+    A ``vertical`` field lists its options as radio buttons, one per line
+    right of its label; Up/Down move through them and leave the field at
+    either end. A ``stepper`` field is a number shown as ``< value >`` instead; its options
     run low to high, and PageUp/PageDown move ``large_step`` options at once.
     ``help`` and ``option_help`` (one line per option, or empty) fill the help
     column while the field is focused. ``section`` groups the field under a
@@ -69,6 +71,7 @@ class FormField:
     section: str | None = None
     stepper: bool = False
     large_step: int = 1
+    vertical: bool = False
 
 
 @dataclass(frozen=True)
@@ -125,6 +128,7 @@ class FormRowView:
     heading: str | None = None
     indented: bool = False
     stepper: bool = False
+    vertical: bool = False
 
 
 @dataclass
@@ -146,6 +150,13 @@ class FormState:
         self.info = None if info is None else info(self.values)
 
 
+def _form_field_kind(field: FormField) -> ChoiceKind | None:
+    """How a field draws: None for a stepper or a vertical list."""
+    if field.stepper or field.vertical:
+        return None
+    return choice_kind(len(field.options))
+
+
 def _form_row_views(form: FormState) -> tuple[FormRowView, ...]:
     rows: list[FormRowView] = []
     previous: str | None = None
@@ -161,6 +172,7 @@ def _form_row_views(form: FormState) -> tuple[FormRowView, ...]:
                 heading=section if section is not None and section != previous else None,
                 indented=section is not None,
                 stepper=field.stepper,
+                vertical=field.vertical,
             )
         )
         previous = section
@@ -648,7 +660,7 @@ class ModalHost:
             return
         state.field_index = row
         field = fields[row]
-        if field.stepper or choice_kind(len(field.options)) is not ChoiceKind.COMBO:
+        if _form_field_kind(field) is not ChoiceKind.COMBO:
             return
         self._form_choice = ChoiceListState(
             target=row,
@@ -701,12 +713,11 @@ class ModalHost:
             ("Up/Down", "move between settings"),
             ("Left/Right", "change the setting"),
         ]
+        if any(field.vertical for field in fields):
+            keys[0] = ("Up/Down", "move between settings and options")
         if any(field.large_step > 1 for field in fields):
             keys.append(("PgUp/PgDn", "large step"))
-        if any(
-            not field.stepper and choice_kind(len(field.options)) is ChoiceKind.COMBO
-            for field in fields
-        ):
+        if any(_form_field_kind(field) is ChoiceKind.COMBO for field in fields):
             keys.append(("Space", "open the setting's list"))
         keys.append(
             ("Enter", "press the focused button" if spec.destructive else confirm)
@@ -763,7 +774,9 @@ class ModalHost:
         elif key == pygame.K_TAB:
             self._move_form_focus(state, -1 if event.mod & pygame.KMOD_SHIFT else 1)
         elif key in (pygame.K_UP, pygame.K_DOWN):
-            self._move_form_focus(state, -1 if key == pygame.K_UP else 1)
+            delta = -1 if key == pygame.K_UP else 1
+            if not self._step_vertical_field(state, delta):
+                self._move_form_focus(state, delta)
         elif key in (pygame.K_LEFT, pygame.K_RIGHT) and state.field_index is None:
             delta = -1 if key == pygame.K_LEFT else 1
             self._focus_index = (self._focus_index + delta) % self._option_count()
@@ -776,6 +789,23 @@ class ModalHost:
                 )
         elif key in (pygame.K_RETURN, pygame.K_KP_ENTER):
             self._activate_form(state)
+        return True
+
+    def _step_vertical_field(self, state: FormState, delta: int) -> bool:
+        """Up/Down inside a vertical field: choose the next option.
+
+        False at either end, so the key moves on to the next field.
+        """
+        row = state.field_index
+        if row is None:
+            return False
+        field = state.visible_fields()[row]
+        if not field.vertical:
+            return False
+        value = state.values[field.id]
+        if not 0 <= value + delta < len(field.options):
+            return False
+        self.step_form_value(row, delta)
         return True
 
     def _step_focused_field(self, key: int) -> bool:

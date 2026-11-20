@@ -12,7 +12,7 @@ from cleave.viz.modal import (
     ModalLabeledLine,
     ModalViewState,
 )
-from cleave.viz.choice_layout import choice_width, stepper_width
+from cleave.viz.choice_layout import choice_width, radio_width, stepper_width
 from cleave.viz.progress_bar import progress_bar_height
 from cleave.viz.text_fit import TextSizer, fit_text_to_width, wrap_text_to_width
 from cleave.viz.theme import BORDER_WIDTH, tuning_ui_metrics, ui_px
@@ -218,8 +218,18 @@ def form_row_height(line_h: int) -> int:
     return line_h + form_row_pad_y() * 2
 
 
+def form_field_height(line_h: int, row: FormRowView) -> int:
+    """A field's rows: one, or one per option when vertical."""
+    count = max(1, len(row.options)) if row.vertical else 1
+    return form_row_height(line_h) * count
+
+
 def form_control_width(measure: TextMeasure, row: FormRowView) -> int:
-    """Width of a row's segments, combo, or stepper: it fits the widest option."""
+    """Width of a row's segments, combo, stepper, or radio list: it fits the
+    widest option.
+    """
+    if row.vertical:
+        return radio_width(measure, row.options)
     if row.stepper:
         return stepper_width(measure, row.options)
     return choice_width(measure, row.options)
@@ -242,7 +252,7 @@ def measure_form(
         indent = form_section_indent() if row.indented else 0
         row_w = indent + measure.size(row.label)[0] + form_label_gap()
         width = max(width, row_w + form_control_width(measure, row))
-        height += form_row_height(line_h)
+        height += form_field_height(line_h, row)
     return width, height
 
 

@@ -1,4 +1,5 @@
-"""Draw choice controls with ImGui: segments, a combo box, its open list, and a stepper.
+"""Draw choice controls with ImGui: segments, a combo box, its open list, a stepper,
+and a vertical radio list.
 
 Draw only. Callers turn the returned hit rects and ``ChoiceListPointer`` into
 their own mutations, so the inspector and form dialogs share the look.
@@ -15,6 +16,8 @@ from imgui_bundle import imgui
 from cleave.viz.choice_layout import (
     COMBO_CARET,
     FRect,
+    RADIO_OFF,
+    RADIO_ON,
     STEPPER_BACK,
     STEPPER_FORWARD,
     Rect,
@@ -223,6 +226,39 @@ def draw_combo(
     draw.add_text(
         _vec(x + w - combo_pad_x() - caret_w, text_y), _u32(caret_role), COMBO_CARET
     )
+
+
+def draw_radio_list(
+    draw: imgui.ImDrawList,
+    measure: TextSizer,
+    labels: Sequence[str],
+    chosen: int,
+    *,
+    rows: Sequence[Rect],
+    text_x: int,
+    hover: bool = True,
+) -> None:
+    """One radio button and option per row in *rows*, the chosen one filled.
+
+    An option under the pointer washes like a hovered row; the chosen one
+    keeps the arrow, since a press there changes nothing.
+    """
+    mx, my = _mouse()
+    for index, (label, rect) in enumerate(zip(labels, rows)):
+        is_chosen = index == chosen
+        hovered = hover and rect_contains(rect, mx, my)
+        if hovered and not is_chosen:
+            paint_row(draw, rect, RowState.HOVER)
+            request_pointer(PointerShape.HAND)
+        _x, y, _w, h = rect
+        text_y = y + (h - measure.size(label)[1]) // 2
+        glyph = RADIO_ON if is_chosen else RADIO_OFF
+        glyph_role = palette().value if is_chosen or hovered else palette().muted
+        draw.add_text(_vec(text_x, text_y), _u32(glyph_role), glyph)
+        role = palette().value if is_chosen or hovered else palette().label
+        draw.add_text(
+            _vec(text_x + measure.size(RADIO_OFF)[0], text_y), _u32(role), label
+        )
 
 
 def paint_stepper_hover(arrow: FRect, *, forward: bool) -> None:

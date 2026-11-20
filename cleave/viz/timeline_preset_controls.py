@@ -153,6 +153,7 @@ def _choice_field(
     option_help: Mapping[object, str] | None = None,
     section: str | None = None,
     visible: Callable[[FormValues], bool] | None = None,
+    vertical: bool = False,
 ) -> FormField:
     return FormField(
         field_id,
@@ -165,6 +166,7 @@ def _choice_field(
         else tuple(option_help[option] for option in options),
         section=section,
         visible=visible,
+        vertical=vertical,
     )
 
 
@@ -289,6 +291,7 @@ class TimelinePresetController:
                         help=_REPOPULATE_HELP,
                         option_help=_REPOPULATE_OPTION_HELP,
                         section=_PRESETS_SECTION,
+                        vertical=True,
                     ),
                 ),
                 confirm_label="Generate",

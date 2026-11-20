@@ -21,9 +21,16 @@ TIMELINE_PRESET_REPOPULATE_OPTIONS: tuple[TimelinePresetRepopulate, ...] = (
 )
 
 
+_DISPLAY: dict[TimelinePresetRepopulate, str] = {
+    "no": "no, keep the lists",
+    "cue roles": "cue roles",
+    "directory random": "shuffled (each layer's directory)",
+    "directory sequential": "in order (each layer's directory)",
+}
+
+
 def timeline_preset_repopulate_display(
     mode: TimelinePresetRepopulate,
 ) -> str:
-    if mode in TIMELINE_PRESET_REPOPULATE_OPTIONS:
-        return mode
-    return DEFAULT_TIMELINE_PRESET_REPOPULATE
+    """The dialog label for *mode*; an unknown mode shows the default's."""
+    return _DISPLAY.get(mode, _DISPLAY[DEFAULT_TIMELINE_PRESET_REPOPULATE])

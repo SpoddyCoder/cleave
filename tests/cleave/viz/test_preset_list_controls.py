@@ -227,8 +227,8 @@ def test_prompt_populate_timeline_trigger_includes_cue_roles() -> None:
         assert view.options == ("Populate", "Cancel")
         assert view.form_rows[0].options == (
             "cue roles",
-            "shuffled",
-            "in order",
+            "shuffled (current directory)",
+            "in order (current directory)",
         )
 
 
@@ -242,8 +242,8 @@ def test_prompt_populate_timer_omits_cue_roles() -> None:
         view = modal.view_state()
         assert view is not None
         assert view.form_rows[0].options == (
-            "shuffled",
-            "in order",
+            "shuffled (current directory)",
+            "in order (current directory)",
         )
 
 
@@ -511,7 +511,7 @@ def test_prompt_populate_opens_on_the_last_source() -> None:
         session.timeline.enabled = False
         controller.prompt_populate("layer_1")
         row = modal.view_state().form_rows[0]
-        assert row.options[row.value] == "in order"
+        assert row.options[row.value] == "in order (current directory)"
 
 
 def test_resume_moves_the_list_selection_to_the_scheduled_entry() -> None:
