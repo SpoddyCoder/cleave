@@ -135,7 +135,7 @@ Everything can also be driven from the keyboard:
 
 ### Back and Forward
 
-The arrows at the right of the inspector title step through your page history, as in a web browser. Alt+Left / Alt+Right, the mouse's back and forward buttons, and **View > Back** / **View > Forward** do the same.
+The arrows at the right of the icon line under the inspector title step through your page history, as in a web browser. Alt+Left / Alt+Right, the mouse's back and forward buttons, and **View > Back** / **View > Forward** do the same.
 
 ### On, solo, and lock icons
 
@@ -146,7 +146,7 @@ Many navigator rows carry icons on the right:
 - **Lock** protects settings from accidental edits. Locked settings turn red and stay fixed until you unlock them.
 - **Preview** (Overlay only) holds the credits cards on screen so you can style them without seeking.
 
-The same icons, in the same order, also sit at the right of the inspector title, so you can solo a layer from any of its pages or preview the cards from any Overlay page. When a page, or the part it belongs to, is off or locked, its settings dim, and hovering over the icon tells you which switch is responsible.
+The same icons, in the same order, also sit at the right of the icon line under the inspector title, so you can solo a layer from any of its pages or preview the cards from any Overlay page. When a page, or the part it belongs to, is off or locked, its settings dim, and hovering over the icon tells you which switch is responsible.
 
 ### Undo
 
@@ -251,7 +251,7 @@ The rest of the page controls how long each preset plays and how it transitions 
 
 ### When switching pauses
 
-Picking a preset yourself, in the preset browser or by playing a preset list entry, pauses that layer's switching so the preset stays while you look at it. While it is paused, a yellow pause icon shows on the layer's row in the navigator and on the title line of each of the layer's pages. Click it (or **Resume** on the Preset Switching page) to hand control back to the list.
+Picking a preset yourself, in the preset browser or by playing a preset list entry, pauses that layer's switching so the preset stays while you look at it. While it is paused, a yellow pause icon shows on the layer's row in the navigator and in the icon line under the title of each of the layer's pages. Click it (or **Resume** on the Preset Switching page) to hand control back to the list.
 
 Switching also resumes on its own when you populate the list, add or remove an entry, or change any Preset Switching setting.
 

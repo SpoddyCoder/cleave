@@ -1,4 +1,4 @@
-"""The inspector's title line: breadcrumb, accent swipe, page toggles, and page history arrows."""
+"""The inspector's title block: the breadcrumb with its accent swipe, then an icon line of page toggles and page history arrows."""
 
 from __future__ import annotations
 
@@ -84,23 +84,26 @@ def page_history_tooltip(
     return f"Back to {target_title} (Alt+Left)"
 
 
-def inspector_title_cluster(
-    avail: float, slot_count: int, side: float, gap: float, title_gap: float
-) -> tuple[float, tuple[float, ...]]:
-    """Title width and the x of each icon box at the title line's right.
-
-    Boxes sit flush right, in order, *gap* apart. The title and its accent
-    bar stop *title_gap* before the first box.
-    """
+def inspector_title_icon_xs(
+    avail: float, slot_count: int, side: float, gap: float
+) -> tuple[float, ...]:
+    """The x of each icon box on the icon line: flush right, in order, *gap* apart."""
     cluster_w = slot_count * side + max(0, slot_count - 1) * gap
-    slots = icon_columns(max(avail, cluster_w), slot_count, side, gap)
-    cluster_x = slots[0] if slots else avail
-    return max(0.0, cluster_x - title_gap), slots
+    return icon_columns(max(avail, cluster_w), slot_count, side, gap)
+
+
+def inspector_title_height() -> float:
+    """Layout height the title block reserves: one text line plus a row band.
+
+    With the item spacing after it, that leaves room for the icon line and
+    the title line, one row band each.
+    """
+    return imgui.get_text_line_height() + row_band_side()
 
 
 @dataclass(frozen=True)
 class TitleButton:
-    """An icon button on the inspector title line."""
+    """An icon button on the inspector title's icon line."""
 
     id: str
     glyph: str
@@ -115,7 +118,7 @@ class TitleButton:
 
 
 def page_toggle_tooltip(item: PageToggle, status: PageStatus) -> str:
-    """Hover text for a page's held-switching, on/off, solo, preview, or lock button on the title line."""
+    """Hover text for a page's held-switching, on/off, solo, preview, or lock button on the title's icon line."""
     toggle = item.toggle
     name = item.owner_label
     if toggle.blocked:
@@ -184,39 +187,40 @@ def draw_inspector_title(
     rule_y: float,
     buttons: Sequence[TitleButton] = (),
 ) -> str | None:
-    """Inspector page title, with the toast's accent swipe behind it.
+    """Inspector page title on two lines: the title with the toast's accent
+    swipe behind it, then an icon line.
 
-    *buttons* sit flush right on the title line. The bar is one padded row tall and centres
-    between the panel's top border and the divider rule on pixel row
-    *rule_y*, so the title and its icons do too. It starts inset from the
-    panel edge by the gap above it. It and the title stop a space short
-    of the icons. A title wider than its room waits, scrolls to its last
-    words, pauses, then snaps back to its start, cut at its right edge, as
-    the bar slides off. Returns the id of a pressed, enabled button.
+    *buttons* sit flush right on the icon line. Each line is one padded row
+    tall; together they centre between the panel's top border and the
+    divider rule on pixel row *rule_y*. The bar starts inset from the panel
+    edge by the gap above it and runs to the right edge of the
+    icons. A title wider than its room waits, scrolls to its last words,
+    pauses, then snaps back to its start, cut at its right edge, as the bar
+    slides off. Returns the id of a pressed, enabled button.
     """
     start = imgui.get_cursor_screen_pos()
     avail = max(0.0, imgui.get_content_region_avail().x)
     line_h = imgui.get_text_line_height()
     space_w = imgui.calc_text_size(" ").x
-    title_room, slot_xs = inspector_title_cluster(
-        avail, len(buttons), row_band_side(), icon_gap(), space_w
-    )
+    side = row_band_side()
+    slot_xs = inspector_title_icon_xs(avail, len(buttons), side, icon_gap())
+    # The title stops half a space short of the bar's end.
+    title_room = max(0.0, avail - space_w * 0.5)
     title_w = imgui.calc_text_size(title).x
-    imgui.dummy(imgui.ImVec2(title_room, line_h))
+    imgui.dummy(imgui.ImVec2(avail, inspector_title_height()))
     win_pos = imgui.get_window_pos()
     win_size = imgui.get_window_size()
-    # The bar is a row's highlight band, so the title's icons match the rows'.
-    # An odd spare pixel goes below it.
+    # Each line is a row's highlight band, so the icons match the rows'.
+    # An odd spare pixel goes below them.
     free_y = win_pos.y + PANEL_BORDER_PX
-    side = row_band_side()
-    bar_top = free_y + max(0.0, math.floor((rule_y - free_y - side) * 0.5))
-    text_y = bar_top + (side - line_h) * 0.5
-    band = row_band(text_y)
-    bar_y0, bar_y1 = band
+    block_top = free_y + max(0.0, math.floor((rule_y - free_y - 2.0 * side) * 0.5))
+    text_y = block_top + (side - line_h) * 0.5
+    bar_y0, bar_y1 = row_band(text_y)
+    icon_band = row_band(text_y + side)
     # The blank gap above the bar, inside the panel border, repeats at the
     # bar's left end.
     bar_x0 = win_pos.x + (bar_y0 - win_pos.y)
-    bar_x1 = start.x + title_room + space_w * 0.5
+    bar_x1 = start.x + avail
     overflow = title_w - title_room
     scroll_sec = attention_scroll_sec(overflow, space_w)
     attention = notification_attention(
@@ -272,7 +276,7 @@ def draw_inspector_title(
                 draw.pop_clip_rect()
     finally:
         draw.pop_clip_rect()
-    return _draw_title_buttons(buttons, start, slot_xs, band)
+    return _draw_title_buttons(buttons, start, slot_xs, icon_band)
 
 
 def _draw_title_buttons(
@@ -281,7 +285,7 @@ def _draw_title_buttons(
     slot_xs: Sequence[float],
     band: tuple[float, float],
 ) -> str | None:
-    """Icon buttons on the title line, like navigator toggles. A disabled
+    """Icon buttons on the title's icon line, like navigator toggles. A disabled
     button has no hover fill and keeps the arrow pointer."""
     pressed_id: str | None = None
     for button, slot_x in zip(buttons, slot_xs):

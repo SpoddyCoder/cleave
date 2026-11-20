@@ -55,6 +55,7 @@ from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.shell_inspector_values import ValueControls
 from cleave.viz.shell_inspector_title import (
     draw_inspector_title,
+    inspector_title_height,
     inspector_title,
     page_history_tooltip,
     page_title,
@@ -450,13 +451,13 @@ class InspectorPanel:
             if self._ctx.controls.cfg.editor.highlight_new_page
             else math.inf
         )
-        # The title line takes one text line, then the divider's space starts.
+        # The title block takes its reserved height, then the divider's space starts.
         title_y = imgui.get_cursor_screen_pos().y
         pressed = draw_inspector_title(
             title,
             elapsed,
             _divider_rule_y(
-                title_y + imgui.get_text_line_height() + imgui.get_style().item_spacing.y
+                title_y + inspector_title_height() + imgui.get_style().item_spacing.y
             ),
             page_toggle_buttons(toggles, self._page_status)
             + self._page_history_buttons(frame.command_ctx),
@@ -498,7 +499,7 @@ class InspectorPanel:
     def _page_history_buttons(
         self, ctx: CommandContext
     ) -> tuple[TitleButton, TitleButton]:
-        """Back and Forward arrows for the inspector title line."""
+        """Back and Forward arrows for the inspector title's icon line."""
         controls = self._ctx.controls
         back_id = ctx.page_back_id
         forward_id = ctx.page_forward_id

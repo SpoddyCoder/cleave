@@ -16,7 +16,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
-- While browsing has paused a layer's preset switching, a yellow pause icon shows on the layer's navigator row and on the title line of its pages; click it to resume. The pause notification now points to it.
+- While browsing has paused a layer's preset switching, a yellow pause icon shows on the layer's navigator row and in the icon line under its pages' titles; click it to resume. The pause notification now points to it.
+- The inspector's page title now sits on its own line above a line of the page's icons (on/off, solo, lock, pause, and back and forward), so a long title is no longer squeezed by the icons.
 - Audio latency and tap latency have their own page, Settings > Latency, with buttons for both tests. Applying a measurement opens the page on the value it set.
 - Settings > Measure audio latency is now a flash-and-beep test: the preview flashes on a beep each bar, and you step the audio latency until the two land together. Audio latency only delays the live preview; tapped markers and recordings use tap latency instead. The setting is stored under a new name, so measure it again after updating.
 - The Welcome to Cleave step lists the presets as separate projectM curated preset packs, one line each: Milkdrop Original and Milkdrop Textures (ticked by default), plus Cream of the Crop, projectM Classic, and En D (not ticked). projectM Classic and En D are new.

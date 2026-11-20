@@ -44,7 +44,7 @@ from cleave.viz.shell_inspector import (
 )
 from cleave.viz.shell_inspector_title import (
     inspector_title,
-    inspector_title_cluster,
+    inspector_title_icon_xs,
     page_history_tooltip,
     page_title,
     page_toggle_buttons,
@@ -618,13 +618,9 @@ def test_a_label_click_on_a_leaf_only_selects() -> None:
     assert outcome.select and not outcome.toggle
 
 
-def test_inspector_title_cluster_keeps_the_title_off_the_icons() -> None:
-    title_w, slots = inspector_title_cluster(200.0, 4, 20.0, 2.0, 8.0)
-    assert slots == (114.0, 136.0, 158.0, 180.0)
-    assert title_w == 106.0
-    title_w, slots = inspector_title_cluster(30.0, 2, 20.0, 2.0, 8.0)
-    assert title_w == 0.0
-    assert slots == (0.0, 22.0)
+def test_inspector_title_icons_sit_flush_right() -> None:
+    assert inspector_title_icon_xs(200.0, 4, 20.0, 2.0) == (114.0, 136.0, 158.0, 180.0)
+    assert inspector_title_icon_xs(30.0, 2, 20.0, 2.0) == (0.0, 22.0)
 
 
 def test_page_history_tooltips_name_the_target_and_key() -> None:
