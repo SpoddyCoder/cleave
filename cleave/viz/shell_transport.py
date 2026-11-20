@@ -13,6 +13,9 @@ from cleave.viz.imgui_host import PAUSE_GLYPH, PLAY_GLYPH
 from cleave.viz.imgui_icon_button import box_button, glyph_drop, paint_hover, text_top
 from cleave.viz.imgui_theme import rgba, row_band
 from cleave.viz.panel_notification import (
+    attention_scroll_hold_sec,
+    attention_scroll_offset,
+    attention_scroll_sec,
     notification_attention,
     PanelNotificationActive,
 )
@@ -145,15 +148,36 @@ def transport_content_pad_y(
     return float(max(0, math.floor(spare * 0.5)))
 
 
-def _draw_transport_notice(
-    notice: TransportNotice,
-) -> tuple[float, float, float, float] | None:
-    """Centered accent chip, as wide as the message plus one space each side.
+def transport_notice_span(
+    want_w: float, window_x: float, window_w: float, left: float, right: float
+) -> tuple[float, float]:
+    """Chip x and width: centred on the bar, kept between *left* and *right*.
 
-    The play, clock, bar, and frame-rate labels stay in place. Black text is
-    used only while the accent bar covers the message. Before the swipe
-    reaches it, and after the bar slides off, the text stays in the accent
-    colour. Returns the chip rect, or None when there is no message.
+    *left* and *right* are the screen x the chip may not cross (the end of
+    the play, clock, and bar labels and the start of the frame rate). A chip
+    narrower than that room stays centred on the bar where it can, and slides
+    toward the wider side when one edge would cross. A chip wider than the
+    room fills it.
+    """
+    room = max(0.0, right - left)
+    chip_w = min(want_w, room)
+    centred = window_x + (window_w - chip_w) * 0.5
+    chip_x = max(left, min(centred, right - chip_w))
+    return chip_x, chip_w
+
+
+def _draw_transport_notice(
+    notice: TransportNotice, left: float, right: float
+) -> tuple[float, float, float, float] | None:
+    """Accent chip, as wide as the message plus one space each side.
+
+    The chip sits between *left* and *right* so it does not cover the play,
+    clock, bar, and frame-rate labels. A message too long for that room
+    waits, scrolls to its last words, pauses, then snaps back to its start,
+    cut at the chip's edges; the accent bar holds for as long as that takes.
+    Black text is used only while the accent bar covers the message. Before
+    the swipe reaches it, and after the bar slides off, the text stays in the
+    accent colour. Returns the chip rect, or None when there is no message.
     """
     if not notice.text:
         return None
@@ -161,9 +185,15 @@ def _draw_transport_notice(
     size = imgui.get_window_size()
     text_size = imgui.calc_text_size(notice.text)
     space = imgui.calc_text_size(" ").x
-    chip_w = min(size.x, text_size.x + space * 2.0)
-    chip_x = origin.x + (size.x - chip_w) * 0.5
+    chip_x, chip_w = transport_notice_span(
+        text_size.x + space * 2.0, origin.x, size.x, left, right
+    )
+    if chip_w <= 0.0:
+        return None
     chip = (chip_x, origin.y, chip_w, size.y)
+    text_room = max(0.0, chip_w - space * 2.0)
+    overflow = text_size.x - text_room
+    scroll_sec = attention_scroll_sec(overflow, space)
     draw = imgui.get_window_draw_list()
     draw.push_clip_rect(
         imgui.ImVec2(origin.x, origin.y),
@@ -171,7 +201,9 @@ def _draw_transport_notice(
         False,
     )
     try:
-        attention = notification_attention(notice.elapsed_sec)
+        attention = notification_attention(
+            notice.elapsed_sec, hold_sec=attention_scroll_hold_sec(scroll_sec)
+        )
         fill = swipe_fill(
             chip_w,
             attention.fill_progress,
@@ -184,15 +216,27 @@ def _draw_transport_notice(
                 imgui.ImVec2(chip_x + fill_x + fill_w, origin.y + size.y),
                 packed_color(notice.accent),
             )
-        text_x = origin.x + (size.x - text_size.x) * 0.5
+        offset = attention_scroll_offset(notice.elapsed_sec, overflow, scroll_sec)
+        if overflow > 0.0:
+            text_x = chip_x + space - offset
+        else:
+            text_x = chip_x + (chip_w - text_size.x) * 0.5
         text_y = origin.y + (size.y - text_size.y) * 0.5
         role = notice.accent
         if attention.text_on_fill and fill is not None:
             fill_x, fill_w = fill
-            mid = text_x + text_size.x * 0.5
+            mid = chip_x + chip_w * 0.5
             if chip_x + fill_x <= mid < chip_x + fill_x + fill_w:
                 role = palette().notification_on_fill
-        draw.add_text(imgui.ImVec2(text_x, text_y), packed_color(role), notice.text)
+        draw.push_clip_rect(
+            imgui.ImVec2(chip_x + space, origin.y),
+            imgui.ImVec2(chip_x + space + text_room, origin.y + size.y),
+            True,
+        )
+        try:
+            draw.add_text(imgui.ImVec2(text_x, text_y), packed_color(role), notice.text)
+        finally:
+            draw.pop_clip_rect()
     finally:
         draw.pop_clip_rect()
     return chip
@@ -234,15 +278,18 @@ class TransportBar:
                 gap = ui_chrome_px(_TRANSPORT_GAP) if part.gap else 0.0
                 imgui.same_line(0.0, gap)
             self._draw_part(part)
+        gap = ui_chrome_px(_TRANSPORT_GAP)
+        notice_left = imgui.get_item_rect_max().x + gap
         fps = transport_fps_text(readout)
         width = imgui.calc_text_size(fps).x
         avail = imgui.get_window_width()
         pad = imgui.get_style().window_padding.x
         imgui.same_line(max(imgui.get_cursor_pos_x(), avail - width - pad))
         imgui.text_colored(rgba(palette().value), fps)
+        notice_right = imgui.get_item_rect_min().x - gap
         line = None if notice is None else transport_notice(notice)
         if line is not None:
-            chip = _draw_transport_notice(line)
+            chip = _draw_transport_notice(line, notice_left, notice_right)
             if line.timed and chip is not None:
                 if _transport_notice_hovered(chip):
                     request_pointer(PointerShape.HAND)

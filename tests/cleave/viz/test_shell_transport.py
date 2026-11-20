@@ -9,6 +9,7 @@ from cleave.viz.shell_transport import (
     transport_content_pad_y,
     transport_fps_text,
     transport_notice,
+    transport_notice_span,
     transport_parts,
 )
 from cleave.viz.shell_windows import panel_border_overlap_px
@@ -105,3 +106,17 @@ def test_transport_content_pad_centers_one_line_above_the_rule() -> None:
     assert transport_content_pad_y(25.0, 17.0, 2.0) == 3.0
     assert transport_content_pad_y(24.0, 17.0, 2.0) == 2.0
     assert transport_content_pad_y(10.0, 17.0, 2.0) == 0.0
+
+
+def test_transport_notice_span_centres_a_chip_that_fits() -> None:
+    assert transport_notice_span(100.0, 0.0, 1000.0, 300.0, 900.0) == (450.0, 100.0)
+
+
+def test_transport_notice_span_slides_off_centre_to_clear_the_labels() -> None:
+    # Centred would start at 350, inside the left labels ending at 400.
+    assert transport_notice_span(300.0, 0.0, 1000.0, 400.0, 900.0) == (400.0, 300.0)
+
+
+def test_transport_notice_span_fills_the_room_when_too_long() -> None:
+    assert transport_notice_span(2000.0, 0.0, 1000.0, 400.0, 900.0) == (400.0, 500.0)
+    assert transport_notice_span(100.0, 0.0, 1000.0, 600.0, 500.0) == (600.0, 0.0)
