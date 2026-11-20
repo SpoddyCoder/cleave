@@ -27,7 +27,6 @@ from cleave.viz.navigator import (
     timeline_row_title,
 )
 from cleave.viz.panel_notification import (
-    attention_scroll_hold_sec,
     attention_scroll_offset,
     attention_scroll_sec,
     notification_attention,
@@ -193,20 +192,16 @@ def draw_inspector_title(
     *buttons* sit flush right on the icon line. Each line is one padded row
     tall; together they centre between the panel's top border and the
     divider rule on pixel row *rule_y*. The bar starts inset from the panel
-    edge by the gap above it and runs to the right edge of the
-    icons. A title wider than its room waits, scrolls to its last words,
-    pauses, then snaps back to its start, cut at its right edge, as the bar
-    slides off. Returns the id of a pressed, enabled button.
+    edge by the gap above it at both ends, and the icons end where it
+    does. A title wider than its room waits, scrolls to its last words,
+    pauses, then snaps back to its start, cut at its right edge. The bar
+    stays once it has swiped in. Returns the id of a pressed, enabled button.
     """
     start = imgui.get_cursor_screen_pos()
     avail = max(0.0, imgui.get_content_region_avail().x)
     line_h = imgui.get_text_line_height()
     space_w = imgui.calc_text_size(" ").x
     side = row_band_side()
-    slot_xs = inspector_title_icon_xs(avail, len(buttons), side, icon_gap())
-    # The title stops half a space short of the bar's end.
-    title_room = max(0.0, avail - space_w * 0.5)
-    title_w = imgui.calc_text_size(title).x
     imgui.dummy(imgui.ImVec2(avail, inspector_title_height()))
     win_pos = imgui.get_window_pos()
     win_size = imgui.get_window_size()
@@ -217,27 +212,35 @@ def draw_inspector_title(
     text_y = block_top + (side - line_h) * 0.5
     bar_y0, bar_y1 = row_band(text_y)
     icon_band = row_band(text_y + side)
-    # The blank gap above the bar, inside the panel border, repeats at the
-    # bar's left end.
-    bar_x0 = win_pos.x + (bar_y0 - win_pos.y)
-    bar_x1 = start.x + avail
+    # The blank gap above the bar, inside the panel border, repeats at both
+    # of the bar's ends, and the icons end where the bar does.
+    inset = bar_y0 - win_pos.y
+    bar_x0 = win_pos.x + inset
+    bar_x1 = max(start.x, win_pos.x + win_size.x - inset)
+    reach = bar_x1 - start.x
+    slot_xs = inspector_title_icon_xs(reach, len(buttons), side, icon_gap())
+    # The title stops half a space short of the bar's end.
+    title_room = max(0.0, reach - space_w * 0.5)
+    title_w = imgui.calc_text_size(title).x
     overflow = title_w - title_room
     scroll_sec = attention_scroll_sec(overflow, space_w)
-    attention = notification_attention(
-        elapsed_sec, hold_sec=attention_scroll_hold_sec(scroll_sec)
+    # The bar swipes in and stays. An infinite elapsed (highlight off) draws no bar.
+    attention = notification_attention(elapsed_sec, hold_sec=math.inf)
+    # The bar, title, and icons run into the window padding, past the
+    # window's own clip rect, so only the window's edge clips them (and
+    # bounds the icons' hover).
+    imgui.push_clip_rect(
+        imgui.ImVec2(win_pos.x, win_pos.y),
+        imgui.ImVec2(win_pos.x + win_size.x, win_pos.y + win_size.y),
+        False,
     )
-    draw = imgui.get_window_draw_list()
-    fill = swipe_fill(
-        bar_x1 - bar_x0, attention.fill_progress, from_left=attention.fill_from_left
-    )
-    if fill is not None:
-        fill_x, fill_w = fill
-        draw.push_clip_rect(
-            imgui.ImVec2(win_pos.x, win_pos.y),
-            imgui.ImVec2(win_pos.x + win_size.x, win_pos.y + win_size.y),
-            False,
+    try:
+        draw = imgui.get_window_draw_list()
+        fill = swipe_fill(
+            bar_x1 - bar_x0, attention.fill_progress, from_left=attention.fill_from_left
         )
-        try:
+        if fill is not None:
+            fill_x, fill_w = fill
             # The accent gradient spans the whole bar, so the swipe reveals
             # it rather than stretching it.
             span_w = max(1.0, bar_x1 - bar_x0)
@@ -251,32 +254,32 @@ def draw_inspector_title(
                 right,
                 left,
             )
+        offset = attention_scroll_offset(elapsed_sec, overflow, scroll_sec)
+        draw.push_clip_rect(
+            imgui.ImVec2(start.x, bar_y0),
+            imgui.ImVec2(start.x + title_room, bar_y1),
+            True,
+        )
+        title_xy = imgui.ImVec2(start.x - offset, text_y)
+        try:
+            draw.add_text(title_xy, packed_color(palette().value), title)
+            if fill is not None:
+                # The part of the title over the swipe is in on_accent.
+                fill_x, fill_w = fill
+                draw.push_clip_rect(
+                    imgui.ImVec2(bar_x0 + fill_x, bar_y0),
+                    imgui.ImVec2(bar_x0 + fill_x + fill_w, bar_y1),
+                    True,
+                )
+                try:
+                    draw.add_text(title_xy, packed_color(palette().on_accent), title)
+                finally:
+                    draw.pop_clip_rect()
         finally:
             draw.pop_clip_rect()
-    offset = attention_scroll_offset(elapsed_sec, overflow, scroll_sec)
-    draw.push_clip_rect(
-        imgui.ImVec2(start.x, bar_y0),
-        imgui.ImVec2(start.x + title_room, bar_y1),
-        True,
-    )
-    title_xy = imgui.ImVec2(start.x - offset, text_y)
-    try:
-        draw.add_text(title_xy, packed_color(palette().value), title)
-        if fill is not None:
-            # The part of the title over the swipe is in on_accent.
-            fill_x, fill_w = fill
-            draw.push_clip_rect(
-                imgui.ImVec2(bar_x0 + fill_x, bar_y0),
-                imgui.ImVec2(bar_x0 + fill_x + fill_w, bar_y1),
-                True,
-            )
-            try:
-                draw.add_text(title_xy, packed_color(palette().on_accent), title)
-            finally:
-                draw.pop_clip_rect()
+        return _draw_title_buttons(buttons, start, slot_xs, icon_band)
     finally:
-        draw.pop_clip_rect()
-    return _draw_title_buttons(buttons, start, slot_xs, icon_band)
+        imgui.pop_clip_rect()
 
 
 def _draw_title_buttons(

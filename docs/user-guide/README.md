@@ -557,7 +557,7 @@ A **Render project** dialog tracks progress and tells you when the render is don
 The **Settings** menu holds preferences that apply to every project:
 
 - **Preview:** preview quality.
-- **UI:** the editor theme (Ultraviolet, Chocolate, Mint, or the light Daylight) and [custom themes](custom-themes.md), UI scale, panel sides, tooltips, notification timing, what a click on a navigator row with pages under it does (navigator expand), whether the inspector title flashes when a new page opens (highlight new page), and more.
+- **UI:** the editor theme (Ultraviolet, Chocolate, Mint, or the light Daylight) and [custom themes](custom-themes.md), UI scale, panel sides, tooltips, notification timing, what a click on a navigator row with pages under it does (navigator expand), whether a coloured bar swipes in behind the inspector title when a new page opens and stays there (highlight new page), and more.
 - **Latency:** audio latency and tap latency, with the tests that measure them. After a test, Cleave opens this page on the value it set.
 - **Measure audio latency:** see [The visuals are out of time with the music](#the-visuals-are-out-of-time-with-the-music).
 - **Calibrate tap timing:** see [Markers and recorded clips land late](#markers-and-recorded-clips-land-late).

@@ -317,7 +317,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Highlight New Page",
         help_entries=(("Left/Right", "off / on"),),
         help_description=(
-            "Flashes the inspector title when a new page opens, and scrolls titles too long for the column. Off keeps the title still.",
+            "Swipes a coloured bar in behind the inspector title when a new page opens and keeps it there, and scrolls titles too long for the column. Off shows the title plainly and keeps it still.",
         ),
         is_pinned=True,
         parent_group="settings_ui",
