@@ -192,8 +192,8 @@ def marker_token_spans(markers: str, fitted: str) -> list[tuple[int, int, str]]:
     return spans
 
 
-def _marker_tooltip_at(markers: str, fitted: str, x: float, y: float) -> None:
-    """Tooltip for the marker token under the mouse, on a row the mouse is over."""
+def _marker_tooltip_at(markers: str, fitted: str, x: float, y: float) -> bool:
+    """Tooltip for the marker token under the mouse; True when one is under it."""
     height = imgui.get_text_line_height()
     for start, end, token in marker_token_spans(markers, fitted):
         token_x = x + imgui.calc_text_size(fitted[:start]).x
@@ -205,7 +205,8 @@ def _marker_tooltip_at(markers: str, fitted: str, x: float, y: float) -> None:
         text = marker_tooltip(token)
         if text is not None:
             show_tooltip(text)
-        return
+        return True
+    return False
 
 
 def _draw_two_line_row_text(
@@ -219,8 +220,10 @@ def _draw_two_line_row_text(
     lead: str = "",
     icon: tuple[str, tuple[int, int, int]] | None = None,
     draw_value: bool = True,
-) -> None:
+) -> bool:
     """Markers after the label, stopping short of the arrows, and the value below.
+
+    True when the pointer is over a marker token, which shows its own tooltip.
 
     Markers are painted, not part of the selectable label: ImGui hashes the
     visible label into the id, and a press must survive the markers changing.
@@ -232,6 +235,7 @@ def _draw_two_line_row_text(
     pad = imgui.get_style().frame_padding.x
     sizer = ImguiTextSizer()
     draw = imgui.get_window_draw_list()
+    on_marker = False
     if markers:
         marker_x = origin_x + imgui.calc_text_size(f"{lead}{label} ").x
         cluster_x = nudge_cluster_origin_x(
@@ -248,9 +252,9 @@ def _draw_two_line_row_text(
             fitted,
         )
         if imgui.is_item_hovered():
-            _marker_tooltip_at(markers, fitted, marker_x, origin_y)
+            on_marker = _marker_tooltip_at(markers, fitted, marker_x, origin_y)
     if not draw_value:
-        return
+        return on_marker
     _draw_path_value(
         origin_x + lead_x,
         origin_y + imgui.get_text_line_height(),
@@ -259,6 +263,7 @@ def _draw_two_line_row_text(
         value_color,
         icon,
     )
+    return on_marker
 
 
 def inspector_row_click_outcome(
@@ -560,10 +565,17 @@ class InspectorPanel:
                 stepped=inspector_row_stepped(state, desc),
             )
             item = self._draw_row_selectable(look)
-            if item.hovered and spec.tooltip is not None:
-                # Markers, buttons, and path crumbs drawn next override it.
+            self.values.control_hovered = False
+            owns_row = self._draw_row_value(state, look, item)
+            # The row's own tooltip only while no control on it has the pointer:
+            # arrows, icon buttons, path folders, and markers name themselves.
+            if (
+                item.hovered
+                and spec.tooltip is not None
+                and not self.values.control_hovered
+            ):
                 show_tooltip(spec.tooltip(state, desc))
-            if self._draw_row_value(state, look, item):
+            if owns_row:
                 return
             self._apply_row_click(look, item)
         finally:
@@ -716,7 +728,7 @@ class InspectorPanel:
             else ()
         )
         if look.two_line:
-            _draw_two_line_row_text(
+            on_marker = _draw_two_line_row_text(
                 look.label,
                 format_row_markers(state, desc),
                 value,
@@ -727,6 +739,8 @@ class InspectorPanel:
                 icon=icon,
                 draw_value=not crumbs,
             )
+            if on_marker:
+                self.values.control_hovered = True
             if crumbs:
                 self.values.handle_path_crumbs(
                     row,

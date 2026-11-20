@@ -138,6 +138,9 @@ class ValueControls:
         self.value_drag_accum = 0.0
         self.value_drag_crossed = False
         self.press_swallowed = False
+        # True once a control on the row being drawn has the pointer, so the
+        # row's own tooltip stays out of the way.
+        self.control_hovered = False
         self._picker_pos = imgui.ImVec2(0.0, 0.0)
         # Widest value each stepped row has shown, in characters, so its arrows
         # hold still as the number changes. The shell font is monospace.
@@ -258,8 +261,10 @@ class ValueControls:
         hit = None if blocked else box_index_at(boxes, mouse.x, mouse.y)
         hold_armed = self._ctx.controls.value_nudge.armed
         available = [button.available(state, desc) for button in buttons]
-        if hit is not None and buttons[hit].tooltip is not None:
-            show_tooltip(buttons[hit].tooltip(state, desc))
+        if hit is not None:
+            self.control_hovered = True
+            if buttons[hit].tooltip is not None:
+                show_tooltip(buttons[hit].tooltip(state, desc))
         for index, (button, box) in enumerate(zip(buttons, boxes)):
             lit = index == hit and available[index] and not hold_armed
             if lit:
@@ -340,6 +345,7 @@ class ValueControls:
             if not current and target is not None and not blocked:
                 box = text_box(slot_x - space_w / 2, slot.width, space_w, band)
                 if box_contains(box, mouse.x, mouse.y):
+                    self.control_hovered = True
                     paint_hover(box)
                     request_pointer(PointerShape.HAND)
                     show_tooltip(f"Go to {crumbs[slot.index].label}")
@@ -403,6 +409,7 @@ class ValueControls:
         elif hit is not None and not hold.armed:
             hover_forward = hit.forward
         if hover_forward is not None:
+            self.control_hovered = True
             if hand:
                 request_pointer(PointerShape.HAND)
             self._paint_nudge_hover(
