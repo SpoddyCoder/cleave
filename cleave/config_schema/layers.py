@@ -14,7 +14,7 @@ from cleave.config_schema.editor import clamp_beat_sensitivity
 from cleave.config_schema.validators import parse_blend_mode
 from cleave.effects.constants import clamp_effect_pct
 from cleave.effects.registry import validate_effect_entry
-from cleave.paths import config_relative_path
+from cleave.paths import config_anchor_path, config_relative_path
 from cleave.stems import STEM_SOURCES, StemSource
 
 PresetSwitchingMode = Literal["off", "on"]
@@ -39,7 +39,7 @@ PRESET_SWITCHING_TRIGGER_HELP_ENTRIES: tuple[
     ),
     (
         "projectm",
-        "projectM plays the list with its own timing and hard cuts.",
+        "projectM plays the list with its own timing and hard cuts on strong beats. It is live: each play, and each render, can switch at different moments, so the preview will not match a render exactly.",
     ),
     (
         "timeline",
@@ -384,7 +384,11 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
     for slot in ctx.session.layer_z_order:
         runtime = ctx.session.layers[slot]
         stem = runtime.stem
-        preset = runtime.playlist.config_preset_path(preset_root)
+        if runtime.preset_switching == "on" and runtime.layer_preset is not None:
+            # Browsing with switching on is a preview; the layer's preset stays.
+            preset = config_anchor_path(runtime.layer_preset, preset_root)
+        else:
+            preset = runtime.playlist.config_preset_path(preset_root)
         opacity = runtime.opacity_pct / 100.0
         enabled = runtime.enabled
         blend_mode = runtime.blend_mode

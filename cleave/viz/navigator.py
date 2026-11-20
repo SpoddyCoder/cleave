@@ -68,7 +68,8 @@ class NavToggle:
     ``active`` is on, soloed, previewing, or locked. A hold toggle is present
     only while the layer's preset switching is held, and a warn toggle only
     while the layer has a problem; both are always active, and a warn
-    toggle's ``detail`` is its tooltip, naming every problem. ``blocked`` is true
+    toggle's ``detail`` is its tooltip, naming every problem; a hold toggle's
+    names the layer. ``blocked`` is true
     while the section lock refuses the toggle, or Add has no room. ``inert``
     is true while a press is refused for another reason (the timeline owns
     layer visibility): the icon draws as usual and the pointer stays an arrow.
@@ -557,6 +558,11 @@ def _layer_node(session: TuningSession, slot: str, *, expandable: bool) -> NavNo
     )
 
 
+def preset_preview_tooltip(owner: str) -> str:
+    """Hover text for the pause icon while *owner* (such as "1 DRUMS") previews."""
+    return f"{owner} is previewing presets: click to resume preset switching."
+
+
 def _layer_toggles(session: TuningSession, slot: str) -> tuple[NavToggle, ...]:
     layer = session.layers[slot]
     lead: list[NavToggle] = []
@@ -566,7 +572,14 @@ def _layer_toggles(session: TuningSession, slot: str) -> tuple[NavToggle, ...]:
             NavToggle(TOGGLE_WARN, True, detail=layer_problems_tooltip(problems))
         )
     if switching_held(session, slot):
-        lead.append(NavToggle(TOGGLE_HOLD, True, layer.locked))
+        owner = (
+            f"{session.layer_z_order.index(slot) + 1} {stem_overlay_header(layer.stem)}"
+        )
+        lead.append(
+            NavToggle(
+                TOGGLE_HOLD, True, layer.locked, detail=preset_preview_tooltip(owner)
+            )
+        )
     return tuple(lead) + (
         NavToggle(
             TOGGLE_ENABLED,

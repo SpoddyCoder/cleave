@@ -16,6 +16,7 @@ from cleave.viz.imgui_theme import row_band, row_band_side
 from cleave.viz.navigator import (
     ancestor_ids,
     build_navigator,
+    preset_preview_tooltip,
     NavNode,
     PageStatus,
     PageToggle,
@@ -128,7 +129,7 @@ def page_toggle_tooltip(item: PageToggle, status: PageStatus) -> str:
     if toggle.inert:
         return "Timeline controls layer visibility"
     if toggle.id == TOGGLE_HOLD:
-        return f"{name} preset switching is paused while you browse: click to resume"
+        return preset_preview_tooltip(name)
     if toggle.id == TOGGLE_ENABLED:
         if not toggle.active:
             return f"{name} is off: these settings have no effect. Click to turn on"

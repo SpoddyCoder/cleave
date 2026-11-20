@@ -225,6 +225,10 @@ class LayerMutations:
         layer.preset_switching = preset_switching_mode_for_trigger(
             layer.preset_switching_trigger
         )
+        if previous == "off":
+            # The preset chosen with switching off stays the layer's preset;
+            # browsing from now on only previews.
+            layer.layer_preset = layer.playlist.anchor
         if not self._warn_if_timeline_trigger_disabled(slot):
             if (
                 previous != "off"
@@ -241,6 +245,12 @@ class LayerMutations:
         bindings = self._bindings()
         if bindings is not None:
             bindings.on_preset_switching_change(slot)
+        if trigger == "off" and layer.layer_preset is not None:
+            # Switching off: the layer plays its own preset again.
+            layer.playlist = scan_preset_playlist(
+                layer.layer_preset, catalog=layer.playlist.catalog
+            )
+            self._publish_browse_preset(slot)
 
     def step_preset_duration(
         self, slot: str, *, forward: bool, large: bool = False

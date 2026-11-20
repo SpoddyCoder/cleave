@@ -350,7 +350,31 @@ def test_apply_clears_switching_paused() -> None:
     apply_preset_switching(
         layer, mode="on", trigger="timer", preset_list=_LIST
     )
+    assert layer.switching_paused is True
+    apply_preset_switching(
+        layer, mode="on", trigger="timer", preset_list=_LIST, resume=True
+    )
     assert layer.switching_paused is False
+
+
+def test_list_edit_while_previewing_rebuilds_without_loading() -> None:
+    layer = _stem_layer()
+    apply_preset_switching(layer, mode="on", trigger="timer", preset_list=_LIST)
+    layer.list_switch_index = 2
+    layer.switching_paused = True
+    layer.pm.load_preset.reset_mock()
+    apply_preset_switching(
+        layer, mode="on", trigger="timer", preset_list=_LIST[:2]
+    )
+    layer.pm.load_preset.assert_not_called()
+    assert layer.preset_rotation is not None
+    assert layer.preset_rotation.paths == _MILK[:2]
+    assert switching_list_index(layer) == 0
+
+    apply_preset_switching(
+        layer, mode="on", trigger="timer", preset_list=_LIST[:2], resume=True
+    )
+    layer.pm.load_preset.assert_called_once_with(_MILK[0], smooth=False)
 
 
 def test_advance_while_paused_moves_index_without_loading() -> None:

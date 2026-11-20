@@ -555,7 +555,7 @@ def test_paused_switching_button_moves_below_preset_fields() -> None:
         ("layers.resume_switching",),
     ]
     assert rows[-3].divider
-    assert rows[-1].status == "Switching paused"
+    assert rows[-1].status == "Previewing presets"
 
 
 

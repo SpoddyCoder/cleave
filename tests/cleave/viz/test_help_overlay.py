@@ -551,7 +551,7 @@ def test_preset_list_add_and_resume_switching_help() -> None:
     resume_keyboard = _keyboard_section(resume_sections)
     assert resume_description is not None
     assert resume_description.title == "Resume Switching"
-    assert _says(resume_description.lines, 'hands control back')
+    assert _says(resume_description.lines, 'ends the preview')
     assert dict(resume_keyboard.entries) == {"Enter": "resume switching"}
 
 

@@ -218,3 +218,21 @@ def test_view_state_reflects_session_mutation_without_block_writes() -> None:
         view,
         RowDescriptor(RowKind.OVERLAY_CARD_POSITION, card="opening_card"),
     ) == "top-right"
+
+
+def test_browsing_with_switching_on_does_not_change_the_saved_preset() -> None:
+    cfg = make_test_cfg(("layer_1",))
+    session = session_from_cfg(cfg, _playlists_for_cfg(cfg))
+    runtime = session.layers["layer_1"]
+    saved = persisted_session_payload(cfg, session)["layers"]["layer_1"]["preset"]
+
+    runtime.preset_switching = "on"
+    runtime.preset_switching_trigger = "timer"
+    runtime.playlist.next()
+    assert persisted_session_payload(cfg, session)["layers"]["layer_1"]["preset"] == saved
+
+    runtime.preset_switching = "off"
+    runtime.preset_switching_trigger = "off"
+    browsed = persisted_session_payload(cfg, session)["layers"]["layer_1"]["preset"]
+    assert browsed != saved
+    assert browsed.endswith("preset-1.milk")

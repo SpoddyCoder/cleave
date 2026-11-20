@@ -168,15 +168,13 @@ def test_browse_while_switching_on_pauses_and_toasts_once() -> None:
         layer.pm.set_hard_cut_enabled.assert_called_with(False)
         mock_apply.assert_not_called()
         assert seen == [
-            "Browsing presets, switching paused - "
-            "click the pause icon on the layer to resume."
+            "Layer 1: Previewing presets - preset switching is paused. Use the button to resume it."
         ]
         playlist.next()
         factory.on_preset_change("layer_1", playlist)
     assert layer.switching_paused is True
     assert seen == [
-        "Browsing presets, switching paused - "
-        "click the pause icon on the layer to resume."
+        "Layer 1: Previewing presets - preset switching is paused. Use the button to resume it."
     ]
 
 
@@ -239,9 +237,10 @@ def test_on_switching_resume_reapplies_switching() -> None:
     with patch(f"{_FACTORY}.apply_preset_switching") as mock_apply:
         factory.on_switching_resume("layer_1")
     mock_apply.assert_called_once()
+    assert mock_apply.call_args.kwargs["resume"] is True
     assert mock_apply.call_args.kwargs["mode"] == "on"
     assert mock_apply.call_args.kwargs["trigger"] == "projectm"
-    assert seen == []
+    assert seen == ["Layer 1: Preset switching resumed from previous position."]
 
 
 def test_on_preset_change_clears_auto_when_directory_has_no_presets() -> None:
@@ -354,7 +353,7 @@ def test_resume_returns_to_list_item_playing_at_pause(
 
 
 @patch("cleave.viz.preset_switching.ProjectMPlaylist")
-def test_list_audition_while_paused_moves_resume_point(
+def test_previewing_a_list_entry_then_editing_keeps_the_preview_and_schedule(
     mock_playlist_cls: MagicMock,
 ) -> None:
     from cleave.viz.preset_switching import switching_list_index
@@ -365,12 +364,35 @@ def test_list_audition_while_paused_moves_resume_point(
     _ctx, factory, layer = _make_factory(preset_list=[str(p) for p in _THREE])
     _stub_projectm_timing(layer)
     factory.on_preset_switching_change("layer_1")
+    layer.projectm_playlist.set_position(2)
     item = PresetPlaylist(
-        current_dir=Path("/tmp/presets/layer_1"), paths=_THREE, index=1
+        current_dir=Path("/tmp/presets/layer_1"), paths=_THREE, index=0
     )
-    factory.on_preset_list_audition("layer_1", 1, item)
+    factory.on_preset_change("layer_1", item)
+    layer.pm.load_preset.reset_mock()
+
+    factory.on_preset_switching_change("layer_1")
     assert layer.switching_paused is True
-    assert switching_list_index(layer) == 1
+    assert layer.projectm_playlist is None
+    layer.pm.load_preset.assert_not_called()
+    assert switching_list_index(layer) == 2
 
     factory.on_switching_resume("layer_1")
-    assert switching_list_index(layer) == 1
+    assert layer.switching_paused is False
+    assert switching_list_index(layer) == 2
+
+
+def test_reload_ends_the_preview_and_starts_the_list_afresh() -> None:
+    _ctx, factory, layer = _make_factory()
+    layer.switching_paused = True
+    layer.resume_list_index = 1
+    playlist = PresetPlaylist(
+        current_dir=Path("/tmp/presets/layer_1"), paths=_MILK, index=1
+    )
+    with patch(f"{_FACTORY}.apply_preset_switching") as mock_apply:
+        factory.on_preset_reload("layer_1", playlist)
+    assert layer.switching_paused is False
+    assert layer.resume_list_index is None
+    assert layer.playlist is playlist
+    mock_apply.assert_called_once()
+    assert mock_apply.call_args.kwargs["resume"] is False

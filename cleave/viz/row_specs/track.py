@@ -402,6 +402,15 @@ def _apply_preset_dir_open_action(controls: TuningControls, desc: RowDescriptor)
         controls.preset_browser.open(slot)
 
 
+def _track_preset_label(state: TuningViewState, desc: RowDescriptor) -> str:
+    """"previewing" while a picked preset holds the layer's switching."""
+    if desc.slot is not None and desc.slot in state.tracks:
+        runtime = state.tracks[desc.slot].runtime
+        if runtime.switching_paused and runtime.preset_switching == "on":
+            return "previewing"
+    return "preset"
+
+
 # Tooltips name only mouse gestures: whoever reads one is using the mouse.
 PRESET_BROWSER_TOOLTIP = "Double-click to open the preset browser"
 
@@ -641,6 +650,7 @@ SPECS: dict[RowKind, RowSpec] = {
     RowKind.TRACK_PRESET: RowSpec(
         affordance=RowAffordance.PATH_PRESET,
         panel_label="preset",
+        format_label=_track_preset_label,
         present_style=RowPresentStyle.PATH_ICON,
         format_value=_format_track_preset,
         format_position=_format_track_preset_position,
@@ -671,14 +681,14 @@ SPECS: dict[RowKind, RowSpec] = {
     ),
     RowKind.TRACK_PRESET_SWITCHING_RESUME: RowSpec(
         affordance=RowAffordance.COMMAND,
-        panel_label="Resume",
+        panel_label="Resume switching",
         present_style=RowPresentStyle.FULL_LINE,
         apply_horizontal=noop_horizontal,
         apply_action=_apply_preset_switching_resume_action,
         fit_strategy=FitStrategy.NONE,
         help_title="Resume Switching",
         help_description=(
-            "Browsing presets by hand pauses automatic switching. This hands control back to the list, at the highlighted preset list entry.",
+            "Picking a preset yourself, in the preset browser or the preset list, previews it and holds switching. This ends the preview: the layer jumps to the list entry scheduled for this point in the song (highlighted in the list), as if you had never previewed.",
         ),
         parent_group="track",
         blocked_by_section_lock=True,
@@ -723,7 +733,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Preset List Entry",
         help_description=(
-            "A preset in this layer's switching list. The highlighted entry is the one playing, or, while switching is paused, the one it picks up from. Tags after the name mark its curation status and role; hover over one for a reminder:",
+            "A preset in this layer's switching list. The highlighted entry is the one scheduled for this point in the song; while you preview another preset, it is where switching goes back to. Enter previews this entry. Tags after the name mark its curation status and role; hover over one for a reminder:",
         ),
         help_mode_entries=_PRESET_LIST_MARKER_HELP_ENTRIES,
         can_enter_move_mode=True,
@@ -739,7 +749,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Add To Preset List",
         help_description=(
-            "Appends the current preset to the list; if switching is paused, that is the one you browsed to. The preset file is copied into the project so it travels with it. P does the same from any row of the layer.",
+            "Appends the current preset to the list; while previewing, that is the one you are previewing. The preset file is copied into the project so it travels with it. P does the same from any row of the layer.",
         ),
         parent_group="track",
         blocked_by_section_lock=True,

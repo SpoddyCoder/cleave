@@ -178,7 +178,7 @@ def stub_playback_state() -> PlaybackState:
 def noop_layer_bindings(**overrides: Callable) -> LiveLayerBindings:
     base = LiveLayerBindings(
         on_preset_change=lambda _slot, _playlist: None,
-        on_preset_list_audition=lambda _slot, _index, _playlist: None,
+        on_preset_reload=lambda _slot, _playlist: None,
         on_preset_switching_change=lambda _slot: None,
         on_switching_resume=lambda _slot: None,
         lock_preset_for_modal=lambda _slot: None,

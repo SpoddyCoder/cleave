@@ -24,6 +24,7 @@ from cleave.viz.mix_player import MixPlayer
 from cleave.viz.playback import PlaybackState, current_sec, seek
 from cleave.viz.preset_switching import (
     BROWSING_PAUSED_NOTIFICATION,
+    SWITCHING_RESUMED_NOTIFICATION,
     EMPTY_PRESET_LIST_NOTIFICATION,
     apply_preset_switching,
     layer_notification,
@@ -74,7 +75,7 @@ class LiveLayerBindingsFactory:
     def layer_bindings(self) -> LiveLayerBindings:
         return LiveLayerBindings(
             on_preset_change=self.on_preset_change,
-            on_preset_list_audition=self.on_preset_list_audition,
+            on_preset_reload=self.on_preset_reload,
             on_preset_switching_change=self.on_preset_switching_change,
             on_switching_resume=self.on_switching_resume,
             lock_preset_for_modal=self.lock_preset_for_modal,
@@ -122,26 +123,34 @@ class LiveLayerBindingsFactory:
             layer.pm.lock_preset(True)
             layer.pm.set_hard_cut_enabled(False)
             if entered_pause:
-                self._notify_browsing_paused()
+                self._notify_layer(slot, BROWSING_PAUSED_NOTIFICATION)
             return
         layer.pm.lock_preset(True)
         layer.switching_paused = False
 
-    def on_preset_list_audition(
-        self, slot: str, index: int, playlist: PresetPlaylist
-    ) -> None:
-        """Preview list item *index*; switching resumes from it."""
-        self.on_preset_change(slot, playlist)
+    def on_preset_reload(self, slot: str, playlist: PresetPlaylist) -> None:
+        """Start the layer afresh from a reloaded config: no preview, list
+        switching from its start, or the layer's preset when switching is off."""
         layer = self.ctx.layers_by_slot[slot]
-        if layer.switching_paused:
-            layer.resume_list_index = index
+        layer.playlist = playlist
+        layer.switching_paused = False
+        layer.resume_list_index = None
+        _clear_switching_schedule(layer)
+        if self._effective_preset_switching(slot) != "on":
+            load_manual_preset_clean(
+                layer,
+                preset_start_clean=self.ctx.session.layers[slot].preset_start_clean,
+            )
+        self._apply_preset_switching(slot)
 
     def on_preset_switching_change(self, slot: str) -> None:
         self._apply_preset_switching(slot)
 
     def on_switching_resume(self, slot: str) -> None:
-        # apply_preset_switching clears the pause and resumes the list.
-        self._apply_preset_switching(slot)
+        previewing = self.ctx.layers_by_slot[slot].switching_paused
+        self._apply_preset_switching(slot, resume=True)
+        if previewing:
+            self._notify_layer(slot, SWITCHING_RESUMED_NOTIFICATION)
 
     def lock_preset_for_modal(self, slot: str) -> None:
         self.ctx.layers_by_slot[slot].pm.lock_preset(True)
@@ -300,13 +309,13 @@ class LiveLayerBindingsFactory:
                 )
             )
 
-    def _notify_browsing_paused(self) -> None:
+    def _notify_layer(self, slot: str, message: str) -> None:
         notify = self.ctx.notification_sink
         if notify is None:
             return
-        notify(BROWSING_PAUSED_NOTIFICATION)
+        notify(layer_notification(self.ctx.session.layer_z_order, slot, message))
 
-    def _apply_preset_switching(self, slot: str) -> None:
+    def _apply_preset_switching(self, slot: str, *, resume: bool = False) -> None:
         ctx = self.ctx
         layer = ctx.layers_by_slot[slot]
         runtime = ctx.session.layers[slot]
@@ -324,6 +333,7 @@ class LiveLayerBindingsFactory:
             hard_cut_sensitivity=runtime.hard_cut_sensitivity,
             on_empty=lambda: self._notify_empty_preset_list(slot),
             session=ctx.session,
+            resume=resume,
         )
 
     def _apply_effect_modifiers(self) -> None:
@@ -347,3 +357,12 @@ class LiveLayerBindingsFactory:
             sorted(presets_dir.glob("*.milk")) if presets_dir.is_dir() else []
         )
         sync_project_textures(ctx.project_dir, milk_paths, ctx.cfg.paths.texture_paths)
+
+
+def _clear_switching_schedule(layer: StemLayer) -> None:
+    """Drop the running list schedule, so switching next starts from entry 1."""
+    if layer.projectm_playlist is not None:
+        layer.projectm_playlist.destroy()
+        layer.projectm_playlist = None
+    layer.preset_rotation = None
+    layer.list_switch_index = 0

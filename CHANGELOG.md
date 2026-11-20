@@ -18,7 +18,10 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
-- While browsing has paused a layer's preset switching, a yellow pause icon shows on the layer's navigator row and in the icon line under its pages' titles; click it to resume. The pause notification now points to it.
+- Picking a preset while a layer's switching is on is now a preview. The preset row reads "previewing", a yellow pause icon shows on the layer's navigator row and in the icon line under its pages' titles, and the notification points to it. Click the icon, or Resume switching (previously Resume), to end the preview: the layer jumps straight to the list entry scheduled for that point in the song (for the projectm trigger, the entry playing when the preview started), and a notification says switching has resumed. Before, it carried on from the preset you had been looking at.
+- Editing the preset list or the Preset Switching settings while previewing keeps the preview, instead of resuming switching.
+- With switching on, browsing presets no longer changes the layer's saved preset or marks the project as changed. Turning switching off brings back the preset you chose with it off.
+- The help for the projectm trigger now says it is live, so the editor and a render can switch at different moments.
 - The inspector's page title now sits on its own line above a line of the page's icons (on/off, solo, lock, pause, and back and forward), so a long title is no longer squeezed by the icons.
 - The coloured bar that swipes in behind the inspector title when a new page opens now stays there instead of sliding away.
 - Audio latency and tap latency have their own page, Settings > Latency, with buttons for both tests. Applying a measurement opens the page on the value it set.
@@ -31,7 +34,6 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 - Preset switching always starts at the first preset in the list, live and in renders. Before, it started from whichever preset the layer was last browsed to before saving, so looking at a list entry and saving could move where the song's presets began.
 - Playing a preset list entry whose file is missing now shows that file's name on the preset row with the red missing mark, and tries to load it so the failure is reported. Before, the row read "All presets blacklisted" and nothing said what was wrong.
-- Resuming preset switching after browsing goes back to the list entry that was playing when you started browsing, or to the entry you last played from the list, instead of jumping to the preset you browsed to. While switching is paused, the list keeps that entry highlighted. With the timer and timeline triggers it highlights the entry for the current song position, which is where switching picks up again.
 - A long warning or error message in the transport bar no longer covers the play, time, and bar controls or the frame rate. It stays between them and scrolls to show the rest of the message, like a long inspector title.
 - Changing a layer's preset while the song is paused (in the preset browser, the preset list, or any other way) now shows the new preset in the preview straight away, instead of only once playback resumes.
 - projectM is spelt with a lowercase p in Help > About Cleave and on the Project > projectM page.

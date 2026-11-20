@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from cleave.config import CleaveConfig
-from cleave.paths import config_relative_path
+from cleave.paths import config_anchor_path, config_relative_path
 from cleave.preset_library import (
     COLLECTION_LABEL,
     UNFILTERED_CATALOG,
@@ -483,12 +483,15 @@ class PresetPlaylist:
             return
         pm.load_preset(self.current, smooth=smooth)
 
+    @property
+    def anchor(self) -> Path:
+        """The real preset file, or the folder when there is none; never a collection."""
+        return self.current if self.current is not None else self.current_dir
+
     def config_preset_path(self, preset_root: Path) -> str:
         """Persisted anchor: the real preset file, never the collection."""
-        if self.current is not None:
-            return config_relative_path(self.current, preset_root)
-        rel = config_relative_path(self.current_dir, preset_root)
-        return rel if rel.endswith("/") else f"{rel}/"
+        return config_anchor_path(self.anchor, preset_root)
+
 
 
 def scan_single_layer(

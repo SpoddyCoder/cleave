@@ -708,7 +708,12 @@ def test_held_switching_adds_a_hold_toggle_to_the_layer() -> None:
     assert toggle_ids() == (TOGGLE_HOLD, TOGGLE_ENABLED, TOGGLE_SOLO, TOGGLE_LOCK)
     compositing = layer_page_node_id("layer_1", "compositing")
     first = page_toggles(session, compositing)[0]
-    assert first.toggle == NavToggle(TOGGLE_HOLD, True, False)
+    assert first.toggle == NavToggle(
+        TOGGLE_HOLD,
+        True,
+        False,
+        detail="1 DRUMS is previewing presets: click to resume preset switching.",
+    )
     assert first.owner_id == node_id
 
     layer.locked = True

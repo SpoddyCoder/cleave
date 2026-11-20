@@ -464,6 +464,10 @@ class LayerRuntime:
     easter_egg: float = DEFAULT_EASTER_EGG
     preset_start_clean: bool = DEFAULT_PRESET_START_CLEAN
     preset_list: list[str] = field(default_factory=list)  # absolute paths
+    # The layer's own preset (file or folder), saved as ``preset:``. Browsing
+    # sets it only while switching is off; with switching on, browsing is a
+    # preview and leaves it alone. None means "follow the browse playlist".
+    layer_preset: Path | None = None
     # Playing auto-switch preset (panel display); not persisted. Mirrored from
     # StemLayer.auto_preset_path while the live layer map is available.
     auto_preset_path: Path | None = None
@@ -733,6 +737,7 @@ def session_from_cfg(
         layers={
             slot: LayerRuntime(
                 playlist=playlists[slot],
+                layer_preset=playlists[slot].anchor,
                 browse_floor=preset_browse_floor(
                     cfg.layers[slot].preset, preset_root
                 ),
@@ -785,6 +790,7 @@ def new_layer_runtime(
     preset = playlist.current if playlist.current is not None else preset_root
     return LayerRuntime(
         playlist=playlist,
+        layer_preset=playlist.anchor,
         browse_floor=preset_browse_floor(preset, preset_root),
         stem=DEFAULT_NEW_LAYER_STEM,
         beat_sensitivity=beat_sensitivity,

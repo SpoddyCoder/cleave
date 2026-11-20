@@ -30,9 +30,9 @@ from cleave.viz.layer import StemLayer
 
 EMPTY_PRESET_LIST_NOTIFICATION = "No presets in switching list"
 BROWSING_PAUSED_NOTIFICATION = (
-    "Browsing presets, switching paused - "
-    "click the pause icon on the layer to resume."
+    "Previewing presets - preset switching is paused. Use the button to resume it."
 )
+SWITCHING_RESUMED_NOTIFICATION = "Preset switching resumed from previous position."
 
 
 def panel_layer_number(layer_z_order: Sequence[str], slot: str) -> int:
@@ -149,38 +149,46 @@ def apply_preset_switching(
     hard_cut_sensitivity: float = DEFAULT_HARD_CUT_SENSITIVITY,
     on_empty: Callable[[], None] | None = None,
     session=None,
+    resume: bool = False,
 ) -> None:
-    resuming = layer.switching_paused
+    """Set the layer's switching up from its list and settings.
+
+    While the layer is previewing a preset (``switching_paused``), the
+    schedule is rebuilt without loading anything, so list and setting edits
+    keep the preview on screen. *resume* ends the preview and loads the
+    scheduled entry: the song-time entry for timer and timeline, or the entry
+    that was playing when the preview started for the projectM trigger.
+    """
+    previewing = layer.switching_paused
     resume_index = layer.resume_list_index
-    layer.switching_paused = False
-    layer.resume_list_index = None
+    keep_preview = previewing and not resume
     pm = layer.pm
 
     # A running list edit keeps the playing item; a fresh start begins at
-    # item 1; a resume returns to the item that was playing at the pause.
-    keep_playing = layer.projectm_playlist is not None and not resuming
+    # item 1; a resume returns to the item that was playing at the preview.
+    keep_playing = layer.projectm_playlist is not None and not previewing
     if layer.projectm_playlist is not None:
         layer.projectm_playlist.destroy()
         layer.projectm_playlist = None
 
-    if mode != "on" or trigger == "off":
-        _clear_list_rotation(layer)
-        layer.auto_preset_path = None
-        pm.lock_preset(True)
-        pm.set_hard_cut_enabled(False)
-        return
-
     del session
-
     paths = _preset_paths(preset_list)
-    if not paths:
+    if mode != "on" or trigger == "off" or not paths:
+        layer.switching_paused = False
+        layer.resume_list_index = None
         _clear_list_rotation(layer)
         layer.auto_preset_path = None
         pm.lock_preset(True)
         pm.set_hard_cut_enabled(False)
-        if on_empty is not None:
+        if mode == "on" and trigger != "off" and on_empty is not None:
             on_empty()
         return
+
+    if keep_preview:
+        _rebuild_schedule_for_preview(layer, paths=paths, trigger=trigger)
+        return
+    layer.switching_paused = False
+    layer.resume_list_index = None
 
     if trigger in ("timer", "timeline"):
         # Timer and timeline index the list from song time (timer by
@@ -219,7 +227,7 @@ def apply_preset_switching(
     playlist.add_presets(paths, allow_duplicates=True)
     playlist.set_shuffle(False)
     layer.projectm_playlist = playlist
-    if resuming:
+    if previewing:
         start = 0 if resume_index is None else resume_index
     elif keep_playing:
         start = _list_index_of(playlist, layer.auto_preset_path)
@@ -227,6 +235,26 @@ def apply_preset_switching(
         start = 0
     _start_projectm_playlist_at(layer, start)
     restart_projectm_preset_timer(layer)
+
+
+def _rebuild_schedule_for_preview(
+    layer: StemLayer,
+    *,
+    paths: Sequence[Path],
+    trigger: PresetSwitchingTrigger,
+) -> None:
+    """Rebuild the schedule behind a preview without loading a preset."""
+    layer.pm.lock_preset(True)
+    layer.pm.set_hard_cut_enabled(False)
+    if trigger in ("timer", "timeline"):
+        index = layer.list_switch_index if layer.preset_rotation is not None else 0
+        layer.preset_rotation = PresetRotation(paths=tuple(paths))
+        layer.list_switch_index = index
+        layer.resume_list_index = None
+        return
+    _clear_list_rotation(layer)
+    if layer.resume_list_index is not None:
+        layer.resume_list_index = min(layer.resume_list_index, len(paths) - 1)
 
 
 def _apply_indexed_list_switching(

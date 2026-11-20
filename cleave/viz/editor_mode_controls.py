@@ -275,12 +275,11 @@ class EditorModeController:
             layer = self.session.layers[slot]
             playlist = playlists.get(slot, layer.playlist)
             layer.playlist = playlist
-            bindings.on_preset_change(slot, playlist)
+            bindings.on_preset_reload(slot, playlist)
             bindings.on_stem_change(slot, layer.stem)
             bindings.on_opacity_change(slot, layer.opacity_pct)
             bindings.on_layer_enabled_change(slot, layer.enabled)
             bindings.on_beat_change(slot, layer.beat_sensitivity)
-            bindings.on_preset_switching_change(slot)
         bindings.on_solo_change()
         bindings.on_timeline_enabled_change()
         if self._layer_manager is not None:

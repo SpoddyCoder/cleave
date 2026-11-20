@@ -551,7 +551,7 @@ _POPULATE_PRESETS = Command(
 )
 _RESUME_SWITCHING = Command(
     id="layers.resume_switching",
-    label="Resume",
+    label="Resume switching",
     kind="command",
     enabled=_preset_list_enabled,
     run=_when_enabled(_preset_list_enabled, _run_resume_switching),

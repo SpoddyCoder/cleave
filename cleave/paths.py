@@ -287,6 +287,14 @@ def config_relative_path(path: Path, base: Path) -> str:
     return _relative_path(path.resolve(), base.resolve())
 
 
+def config_anchor_path(anchor: Path, preset_root: Path) -> str:
+    """``preset:`` text for *anchor*: a ``.milk`` file, or a folder ending in ``/``."""
+    rel = config_relative_path(anchor, preset_root)
+    if anchor.suffix.lower() == ".milk":
+        return rel
+    return rel if rel.endswith("/") else f"{rel}/"
+
+
 def _relative_path(resolved: Path, resolved_base: Path) -> str:
     try:
         return resolved.relative_to(resolved_base).as_posix()

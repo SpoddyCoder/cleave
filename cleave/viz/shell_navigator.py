@@ -63,7 +63,6 @@ from cleave.viz.shell_widgets import (
 from cleave.viz.theme import palette
 
 _NAV_LOCK_MARK = "[lock]"
-HOLD_TOOLTIP = "Preset switching paused while you browse: click to resume"
 # Fixed columns, so a row without solo keeps its icons under the rows that have it.
 _NAV_TOGGLE_COLUMNS = (
     TOGGLE_WARN,
@@ -146,7 +145,7 @@ def navigator_toggle_tooltip(toggle: NavToggle) -> str:
     if toggle.inert:
         return "Timeline controls layer visibility"
     if toggle.id == TOGGLE_HOLD:
-        return HOLD_TOOLTIP
+        return toggle.detail
     if toggle.id == TOGGLE_LOCK:
         return "Locked: click to unlock" if toggle.active else "Unlocked: click to lock"
     if toggle.id == TOGGLE_SOLO:

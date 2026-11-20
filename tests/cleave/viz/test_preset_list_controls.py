@@ -445,8 +445,7 @@ def test_audition_pauses_switching_and_resume_clears_it() -> None:
         assert session.layers["layer_1"].playlist is stem.playlist
         pm.load_preset.assert_called_with(other.resolve(), smooth=False)
         assert seen == [
-            "Browsing presets, switching paused - "
-            "click the pause icon on the layer to resume."
+            "Layer 1: Previewing presets - preset switching is paused. Use the button to resume it."
         ]
 
         controller.audition("layer_1", 0)
@@ -454,10 +453,10 @@ def test_audition_pauses_switching_and_resume_clears_it() -> None:
 
         controller.resume("layer_1")
         assert stem.switching_paused is False
-        assert len(seen) == 1
+        assert seen[1:] == ["Layer 1: Preset switching resumed from previous position."]
 
 
-def test_populate_resumes_held_switching() -> None:
+def test_populate_keeps_the_preview() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp) / "packs"
         project = Path(tmp) / "project"
@@ -473,10 +472,10 @@ def test_populate_resumes_held_switching() -> None:
         assert stem.switching_paused is True
         controller.confirm_populate("layer_1", "directory_random")
         assert session.layers["layer_1"].preset_list
-        assert stem.switching_paused is False
+        assert stem.switching_paused is True
 
 
-def test_preset_list_edits_resume_held_switching() -> None:
+def test_preset_list_edits_keep_the_preview() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp) / "packs"
         project = Path(tmp) / "project"
@@ -493,12 +492,10 @@ def test_preset_list_edits_resume_held_switching() -> None:
         controller.audition("layer_1", 0)
         assert stem.switching_paused is True
         controller.confirm_delete("layer_1", 1)
-        assert stem.switching_paused is False
-
-        controller.audition("layer_1", 0)
         assert stem.switching_paused is True
+
         controller.add_current("layer_1")
-        assert stem.switching_paused is False
+        assert stem.switching_paused is True
 
 
 def test_prompt_populate_opens_on_the_last_source() -> None:

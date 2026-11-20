@@ -282,7 +282,7 @@ _PRESET_LIST_ADD_SECTION = HelpSection(
 )
 
 _PRESET_SWITCHING_RESUME_SECTION = HelpSection(
-    "Switching Paused - Enter To Resume",
+    "Previewing - Enter To Resume Switching",
     (("Enter", "resume switching"),),
 )
 

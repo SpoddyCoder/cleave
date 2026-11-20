@@ -5260,3 +5260,29 @@ def test_applying_a_measured_latency_opens_the_latency_page_on_it(
         assert controls.shell_focus.region is ShellRegion.INSPECTOR
         assert controls.shell_focus.inspector_cursor == RowDescriptor(kind)
         assert controls.shell_focus.inspector_command_id is None
+
+
+def test_switching_on_keeps_the_layer_preset_and_off_restores_it(
+    tmp_path: Path,
+) -> None:
+    from cleave.preset_playlist import scan_preset_playlist
+
+    pack = tmp_path / "pack"
+    pack.mkdir()
+    for name in ("a.milk", "b.milk"):
+        (pack / name).write_text("milk")
+    controls = make_controls(("layer_1",), preset_root=tmp_path)
+    layer = controls.session.layers["layer_1"]
+    layer.playlist = scan_preset_playlist(pack / "a.milk")
+    layer.preset_switching = "off"
+    layer.preset_switching_trigger = "off"
+
+    controls.layer_mutations.step_preset_switching_trigger("layer_1", delta=1)
+    assert layer.preset_switching_trigger == "timer"
+    assert layer.layer_preset == (pack / "a.milk").resolve()
+
+    layer.playlist.next()
+    assert layer.playlist.current == (pack / "b.milk").resolve()
+    controls.layer_mutations.step_preset_switching_trigger("layer_1", delta=-1)
+    assert layer.preset_switching_trigger == "off"
+    assert layer.playlist.current == (pack / "a.milk").resolve()

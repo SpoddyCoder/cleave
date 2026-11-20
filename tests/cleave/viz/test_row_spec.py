@@ -956,7 +956,7 @@ def test_resume_switching_row_only_while_paused() -> None:
 
     spec = row_spec(RowKind.TRACK_PRESET_SWITCHING_RESUME)
     assert spec.affordance == RowAffordance.COMMAND
-    assert spec.panel_label == "Resume"
+    assert spec.panel_label == "Resume switching"
     assert spec.blocked_by_section_lock is True
     assert spec.parent_group == "track"
 
@@ -993,7 +993,7 @@ def test_resume_switching_row_only_while_paused() -> None:
     shown = kinds(paused=True)
     index = resume_index(shown)
     assert index is not None
-    assert shown[index].status == "Switching paused"
+    assert shown[index].status == "Previewing presets"
     assert shown[index - 1].command_ids == ("layers.add_current_preset",)
 
 
@@ -1300,3 +1300,16 @@ def test_navigator_expand_click_steps_and_writes_user_config(tmp_path) -> None:
     press_main_row(controls, keydown(pygame.K_RIGHT))
     press_main_row(controls, keydown(pygame.K_RIGHT))
     assert controls.cfg.editor.navigator_expand_click == "button-only"
+
+
+def test_preset_row_reads_previewing_while_switching_is_held() -> None:
+    from cleave.viz.row_spec import row_label as format_row_label
+    from tests.support.viz import make_controls
+
+    controls = make_controls(("layer_1",))
+    layer = controls.session.layers["layer_1"]
+    desc = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
+    layer.preset_switching = "on"
+    assert format_row_label(controls.build_view_state(paused=False), desc) == "preset"
+    layer.switching_paused = True
+    assert format_row_label(controls.build_view_state(paused=False), desc) == "previewing"

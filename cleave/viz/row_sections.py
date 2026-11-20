@@ -582,7 +582,7 @@ PRESET_SWITCHING_PAUSED = ConditionalRowsDef(
     children=(
         SectionNode(
             commands=("layers.resume_switching",),
-            status="Switching paused",
+            status="Previewing presets",
         ),
     ),
 )

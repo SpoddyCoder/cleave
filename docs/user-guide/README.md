@@ -249,23 +249,27 @@ A layer can move through presets on its own. On the **Preset Switching** page, t
 | --- | --- |
 | off | No switching; the current preset stays. |
 | timer | The next preset starts after a fixed number of seconds. |
-| projectm | projectM plays the list on its own schedule, including hard cuts on strong beats. |
+| projectm | projectM plays the list on its own schedule, including hard cuts on strong beats. It is live: each play and each render can switch at different moments, so the editor will not match a render exactly. Use timer or timeline when the order and timing must be the same every time. |
 | timeline | The next preset starts each time the timeline brings the layer in. |
 
 The rest of the page controls how long each preset plays and how it transitions into the next; the help column describes each setting.
 
-Switching always starts at the first preset in the list when the song starts, in the editor and in renders. The preset you browsed to last does not change where the list starts. On the Preset List page, the entry that is playing is highlighted.
+Switching always starts at the first preset in the list when the song starts, in the editor and in renders. On the Preset List page, the entry scheduled for the current point in the song is highlighted.
 
-### When switching pauses
+The layer's **preset** row is the layer's own preset while switching is off. Once switching is on, the list decides what plays, and the preset you chose with switching off is kept: browsing only previews (see below) and does not change what the project saves. Turning switching off again brings that preset back.
 
-Picking a preset yourself, in the preset browser or by playing a preset list entry, pauses that layer's switching so the preset stays while you look at it. While it is paused, a yellow pause icon shows on the layer's row in the navigator and in the icon line under the title of each of the layer's pages. Click it (or **Resume** on the Preset Switching page) to hand control back to the list.
+### Previewing presets while switching is on
 
-While switching is paused, the preset list keeps the entry where switching will pick up again highlighted, not the preset you are looking at:
+Picking a preset yourself while switching is on, in the preset browser or with Enter on a preset list entry, starts a **preview**: the layer shows that preset and switching waits. While you preview:
 
-- **projectm trigger:** the entry that was playing when you started browsing. Playing a list entry yourself moves the highlight to that entry, so switching carries on from there.
-- **timer and timeline triggers:** the entry for the current song position, which keeps moving as the song plays.
+- the preset row's label reads **previewing**;
+- a yellow pause icon shows on the layer's row in the navigator and in the icon line under the title of each of the layer's pages;
+- the preset list keeps highlighting the entry scheduled for this point in the song, not the one you are looking at.
 
-Switching also resumes on its own when you populate the list, add or remove an entry, or change any Preset Switching setting.
+Editing the list or the Preset Switching settings keeps the preview on screen. To end it, click the pause icon (or **Resume switching** on the Preset Switching page). The layer jumps straight to the entry it would be showing had you never previewed, and a notification confirms that switching has resumed:
+
+- **timer and timeline triggers:** the entry for the current song position, so your clips play their chosen presets in order.
+- **projectm trigger:** the entry that was playing when the preview started, since projectM's own timing can't be worked out ahead of time.
 
 ### The preset list
 
@@ -273,7 +277,7 @@ The **Preset List** page holds the presets the layer cycles through, in order. I
 
 - **Add to preset list** (or P from any of the layer's rows) appends the preset you are looking at.
 - **Populate** rebuilds the list from the current folder, shuffled or in order. With the timeline trigger it can also cast one preset for each time the layer comes in, picked by that cue's role.
-- **Enter** on an entry plays it immediately and pauses switching; click the layer's pause icon, or **Resume**, to hand control back to the list.
+- **Enter** on an entry previews it; click the layer's pause icon, or **Resume switching**, to return to the schedule.
 - **Drag** an entry's handle, or press M, to reorder it, and press **Delete** to remove it.
 
 All of these are also in the entry's context menu.

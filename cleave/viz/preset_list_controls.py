@@ -321,7 +321,7 @@ class PresetListController:
         )
         layer.playlist = playlist
         if self._layer_bindings is not None:
-            self._layer_bindings.on_preset_list_audition(slot, index, playlist)
+            self._layer_bindings.on_preset_change(slot, playlist)
 
     def add_current(self, slot: str) -> None:
         src_path = self.current_preset_path(slot)
