@@ -440,7 +440,7 @@ Sometimes you want to see a layer the timeline has switched off. Click the row's
 
 ### Song markers
 
-**Song markers** map the structure of the song: the drop, the chorus, the breakdown. Press **Ctrl+Enter** to drop one at the playhead, or right-click the time ruler and drop one there. Markers dropped while the song plays allow for your tap latency (see [Markers and recorded clips land late](#markers-and-recorded-clips-land-late)).
+**Song markers** map the structure of the song: the drop, the chorus, the breakdown. Press **Ctrl+Enter** to drop one at the playhead, or right-click the time ruler or anywhere on a timeline row, clip or gap, and choose **Drop song marker here**. Markers dropped while the song plays allow for your tap latency (see [Markers and recorded clips land late](#markers-and-recorded-clips-land-late)).
 
 Markers pay off in three ways: clips snap to them, you can jump between them, and Generate timeline builds its arrangement around them.
 

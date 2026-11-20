@@ -5,7 +5,7 @@ from __future__ import annotations
 import pygame
 
 from cleave.timeline import SlotCue, TimelineLane
-from cleave.viz.context_menu import ContextMenuItem, ContextSubmenu
+from cleave.viz.context_menu import CONTEXT_SEPARATOR, ContextMenuItem, ContextSubmenu
 from cleave.viz.timeline_context_menu import timeline_row_menu, timeline_row_menu_entries
 from tests.support.viz import keydown
 from tests.support.timeline import make_timeline_controls
@@ -276,3 +276,18 @@ def test_add_clip_here_is_greyed_out_while_recording() -> None:
     item = _entries_by_id(controls, session, 0, add_clip_t=20.0)["timeline.clip.add"]
     assert item.enabled is False
     assert item.hint == "Stop recording to edit clips"
+
+
+def test_selected_clip_is_followed_by_the_clicked_time_items() -> None:
+    controls, session, _, _, _, _ = _clip_controls()
+    session.timeline.selected_clip_t["layer_1"] = 4.0
+    drop = ContextMenuItem(id="time.drop_marker", label="Drop", run=lambda: None)
+    entries = timeline_row_menu_entries(
+        controls, session, 0, split_t=6.0, time_entries=lambda: (drop,)
+    )
+    ids = [getattr(entry, "id", None) for entry in entries]
+    at = ids.index("time.drop_marker")
+    assert ids[0] == "timeline.clip.go_to"
+    assert entries[at - 1] is CONTEXT_SEPARATOR
+    assert entries[at + 1] is CONTEXT_SEPARATOR
+    assert ids[at + 2] == "timeline.row.override"

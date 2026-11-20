@@ -647,6 +647,32 @@ def test_row_on_a_cue_has_no_time_items() -> None:
     assert time_menu.calls == []
 
 
+def test_row_on_a_clip_keeps_the_clicked_time_items(monkeypatch) -> None:
+    import cleave.viz.timeline_pointer as timeline_pointer
+
+    captured: dict = {}
+
+    def fake_row_menu(actions, session, row, **kwargs):
+        captured.update(kwargs)
+        return lambda: ()
+
+    monkeypatch.setattr(timeline_pointer, "timeline_row_menu", fake_row_menu)
+    time_menu = _TimeMenu()
+    actions = _row_slot_actions(clip_hit=True)
+    TimelinePointer(
+        _MenuGeometry(StripHit(0, 30.0, 0.2, marker_index=0)),
+        actions,
+        _menu_session(),
+        time_menu=time_menu,
+    ).context_menu_at(0, 0)
+    assert captured["clip"] is True
+    assert captured["add_clip_t"] is None
+    captured["time_entries"]()
+    assert time_menu.calls == [(30.0, 0.2, False, 0)]
+    # The clip keeps the selection over a marker, as on a press.
+    assert ("marker", 0) not in actions.calls
+
+
 def test_ruler_press_on_a_marker_selects_it_and_seeks_to_it() -> None:
     actions = _Actions()
     pointer = TimelinePointer(

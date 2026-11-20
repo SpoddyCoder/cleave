@@ -18,9 +18,10 @@ solo solos the layer, the eye toggles visibility as the number key does
 take), and back to timeline releases an override. A right-click on a row focuses it and
 returns that row's context menu (``timeline_context_menu``), selecting a
 clip under the pointer first so the menu can edit it. In a gap the row
-menu leads with Add clip here; there, and on the ruler, the menu has the
-clicked time's items (``timeline_time_menu``), or a song marker's items
-when one is under the pointer, selected first.
+menu leads with Add clip here. On a row, clip or gap, and on the ruler, the
+menu has the clicked time's items (``timeline_time_menu``), or a song
+marker's items when one is under the pointer, selected first unless a clip
+is.
 
 The wheel zooms the visible window about the time under the pointer, and
 Shift+wheel or a sideways wheel pans it. While zoomed, a left drag on a gap
@@ -258,11 +259,12 @@ class TimelinePointer:
         )
         add_clip_t = hit.t_sec if not on_clip else None
         time_entries: Callable[[], tuple[ContextMenuEntry, ...]] | None = None
-        if not on_clip and hit.t_sec is not None and time_menu is not None:
+        if hit.t_sec is not None and time_menu is not None:
             row_t = hit.t_sec
             row_tolerance = hit.tolerance_sec
             row_marker = hit.marker_index
-            if row_marker is not None:
+            # A clip under the pointer keeps the selection, as on a press.
+            if row_marker is not None and not on_clip:
                 self._actions.select_song_marker(row_marker)
             time_entries = lambda: time_menu.entries(  # noqa: E731
                 row_t, row_tolerance, commands=False, marker_index=row_marker

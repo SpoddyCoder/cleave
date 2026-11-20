@@ -4,8 +4,8 @@ Override the row's visibility, release every override, arm it for
 recording, and solo its layer. Each item calls the same ``TimelineControls``
 path as its key, and a disabled item says why in its hint. With a clip
 selected on the row, the menu opens with that clip's items
-(``clip_context_menu``). A right-click in a gap opens with Add clip here and
-the clicked time's items instead (``timeline_time_menu``).
+(``clip_context_menu``); a right-click in a gap opens with Add clip here
+instead. Either way the clicked time's items follow (``timeline_time_menu``).
 """
 
 from __future__ import annotations
@@ -166,10 +166,10 @@ def timeline_row_menu_entries(
             add_clip_entry(actions.clip_editor, slot, add_clip_t, actions.add_clip_at),
         )
     timed = time_entries() if time_entries is not None else ()
+    edit_entries = (*clip_entries, *add_entries)
     lead = (
-        *clip_entries,
-        *add_entries,
-        *((CONTEXT_SEPARATOR,) if add_entries and timed else ()),
+        *edit_entries,
+        *((CONTEXT_SEPARATOR,) if edit_entries and timed else ()),
         *timed,
     )
     return (
