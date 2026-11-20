@@ -26,7 +26,7 @@ def _milk(path: Path) -> Path:
 
 
 class _Rig:
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, *, synchronous: bool = True) -> None:
         self.root = root.resolve()
         self.a1 = _milk(root / "Pack" / "A" / "a1.milk")
         self.a2 = _milk(root / "Pack" / "A" / "a2.milk")
@@ -63,6 +63,7 @@ class _Rig:
             start_text_input=self.text_input.start,
             stop_text_input=self.text_input.stop,
             text_input_shared=lambda: self.shared,
+            synchronous=synchronous,
         )
 
     def loaded(self) -> list[Path | None]:
@@ -71,20 +72,29 @@ class _Rig:
     def key(self, key: int, *, mod: int = 0) -> bool:
         return self.controls.handle_keydown(keydown(key, mod=mod))
 
+    def search(self, text: str) -> None:
+        """Up to the filter, Enter, type, Enter."""
+        browser = self.controls.browser
+        assert browser is not None
+        browser.focus_filter()
+        self.key(pygame.K_RETURN)
+        self.controls.handle_text_input(text)
+        self.key(pygame.K_RETURN)
+
 
 @pytest.fixture
 def rig(tmp_path: Path) -> _Rig:
     return _Rig(tmp_path / "presets")
 
 
-def test_open_starts_on_the_playing_preset_and_text_input(rig: _Rig) -> None:
+def test_open_starts_on_the_playing_preset(rig: _Rig) -> None:
     rig.controls.open("layer_1")
     assert rig.controls.active
     browser = rig.controls.browser
     assert browser is not None
     assert browser.selected_preset() == rig.a1
     assert browser.title == "Browse presets: Layer 1"
-    rig.text_input.start.assert_called_once()
+    rig.text_input.start.assert_not_called()
 
 
 def test_preview_waits_for_the_delay(rig: _Rig) -> None:
@@ -112,7 +122,7 @@ def test_fast_moves_preview_only_where_the_selection_rests(rig: _Rig) -> None:
 def test_enter_keeps_the_preset_in_its_own_folder(rig: _Rig) -> None:
     rig.controls.open("layer_1")
     rig.controls.apply_pointer(BrowserPointerIntent(BrowserPointerKind.GOTO_CRUMB, 0))
-    rig.controls.handle_text_input("b1")
+    rig.search("b1")
     rig.key(pygame.K_RETURN)
     assert not rig.controls.active
     assert rig.loaded() == [rig.b1]
@@ -147,7 +157,8 @@ def test_escape_without_a_preview_leaves_the_layer_alone(rig: _Rig) -> None:
 
 def test_escape_clears_a_filter_before_closing(rig: _Rig) -> None:
     rig.controls.open("layer_1")
-    rig.controls.handle_text_input("a2")
+    rig.search("a2")
+    assert rig.controls.browser.filter_text == "a2"
     rig.key(pygame.K_ESCAPE)
     assert rig.controls.active
     assert rig.controls.browser.filter_text == ""
@@ -155,12 +166,44 @@ def test_escape_clears_a_filter_before_closing(rig: _Rig) -> None:
 
 def test_letters_are_swallowed_and_shortcuts_pass_through(rig: _Rig) -> None:
     rig.controls.open("layer_1")
-    assert rig.key(pygame.K_h)
+    assert rig.key(pygame.K_l)
+    assert not rig.key(pygame.K_h)
     assert not rig.key(pygame.K_s, mod=pygame.KMOD_LCTRL)
     assert not rig.key(pygame.K_F11)
     assert not rig.key(pygame.K_SPACE)
-    rig.controls.handle_text_input("a")
+    assert not rig.controls.handle_text_input("a")
+
+
+def test_editing_the_filter_takes_space_and_h_and_text_input(rig: _Rig) -> None:
+    rig.controls.open("layer_1")
+    rig.key(pygame.K_HOME)
+    rig.key(pygame.K_UP)
+    rig.key(pygame.K_RETURN)
+    browser = rig.controls.browser
+    assert browser.editing
+    rig.text_input.start.assert_called_once()
     assert rig.key(pygame.K_SPACE)
+    assert rig.key(pygame.K_h)
+    assert not rig.key(pygame.K_s, mod=pygame.KMOD_LCTRL)
+    assert rig.controls.handle_text_input("a")
+    rig.key(pygame.K_BACKSPACE)
+    assert browser.draft == ""
+    rig.key(pygame.K_ESCAPE)
+    assert not browser.editing
+    assert rig.controls.active
+    rig.text_input.stop.assert_called_once()
+
+
+def test_click_on_the_filter_edits_and_a_click_away_searches(rig: _Rig) -> None:
+    rig.controls.open("layer_1")
+    rig.controls.apply_pointer(BrowserPointerIntent(BrowserPointerKind.EDIT_FILTER))
+    browser = rig.controls.browser
+    assert browser.editing
+    rig.controls.handle_text_input("a2")
+    rig.controls.apply_pointer(BrowserPointerIntent(BrowserPointerKind.SELECT_ROW, 0))
+    assert not browser.editing
+    assert browser.filter_text == "a2"
+    assert browser.selected_preset() == rig.a2
 
 
 def test_closed_browser_takes_no_keys(rig: _Rig) -> None:
@@ -170,6 +213,7 @@ def test_closed_browser_takes_no_keys(rig: _Rig) -> None:
 
 def test_text_input_stays_on_when_a_dialog_owns_it(rig: _Rig) -> None:
     rig.controls.open("layer_1")
+    rig.controls.apply_pointer(BrowserPointerIntent(BrowserPointerKind.EDIT_FILTER))
     rig.shared = True
     rig.controls.cancel()
     rig.text_input.stop.assert_not_called()
@@ -205,6 +249,26 @@ def test_removed_layer_closes_the_browser(rig: _Rig) -> None:
     assert not rig.controls.active
 
 
+def test_listings_build_on_a_worker_and_preview_once_shown(tmp_path: Path) -> None:
+    rig = _Rig(tmp_path / "presets", synchronous=False)
+    rig.controls.open("layer_1")
+    browser = rig.controls.browser
+    rig.controls.wait_for_listing()
+    assert not browser.loading
+    assert browser.selected_preset() == rig.a1
+
+    rig.key(pygame.K_LEFT)
+    rig.controls.wait_for_listing()
+    assert browser.selected_row.path == rig.a1.parent
+    rig.key(pygame.K_RIGHT)
+    rig.controls.wait_for_listing()
+    rig.controls.tick(PREVIEW_DELAY_SEC)
+    assert rig.loaded() == []
+    rig.key(pygame.K_DOWN)
+    rig.controls.tick(PREVIEW_DELAY_SEC)
+    assert rig.loaded() == [rig.a2]
+
+
 def test_enter_on_the_preset_row_opens_the_browser() -> None:
     controls = make_controls(("layer_1",))
     apply_field_action(controls, RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1"))
@@ -225,3 +289,19 @@ def test_project_picker_closes_the_browser() -> None:
     controls.project_switch.prompt_open()
     controls.tick(0.0)
     assert not controls.preset_browser.active
+
+
+def test_fast_typing_runs_one_listing_at_a_time_and_ends_on_the_last(tmp_path: Path) -> None:
+    rig = _Rig(tmp_path / "presets", synchronous=False)
+    rig.controls.open("layer_1")
+    rig.controls.wait_for_listing()
+    rig.controls.apply_pointer(BrowserPointerIntent(BrowserPointerKind.GOTO_CRUMB, 0))
+    rig.controls.apply_pointer(BrowserPointerIntent(BrowserPointerKind.EDIT_FILTER))
+    for letter in "b1":
+        rig.controls.handle_text_input(letter)
+        assert len(rig.controls._jobs) <= 1
+    rig.controls.wait_for_listing()
+    browser = rig.controls.browser
+    assert browser.filter_text == "b1"
+    assert [row.path for row in browser.rows] == [rig.b1]
+    assert browser.editing

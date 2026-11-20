@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pygame
 import pytest
 
 from cleave.preset_library import UNFILTERED_CATALOG, PresetLibrary
 from cleave.viz import preset_browser
 from cleave.viz.preset_browser import (
     BrowserAction,
+    BrowserFocus,
     BrowserOutcome,
     BrowserRowKind,
     PresetBrowser,
@@ -114,24 +116,24 @@ def test_open_on_a_preset_commits(tree: Path) -> None:
 
 def test_filter_matches_every_term_below_the_folder(tree: Path) -> None:
     browser = PresetBrowser(preset_root=tree, catalog=_indexed(tree))
-    browser.type_text("SWIRL")
+    browser.set_filter("SWIRL")
     assert [row.label for row in browser.rows] == [
         "Pack A/Geiss/geiss - swirl.milk",
         "Pack A/Other/flexi - swirl.milk",
     ]
-    browser.type_text(" geiss")
+    browser.set_filter("SWIRL geiss")
     assert [row.label for row in browser.rows] == ["Pack A/Geiss/geiss - swirl.milk"]
 
     browser = PresetBrowser(
         preset_root=tree, catalog=_indexed(tree), folder=tree / "Pack A" / "Other"
     )
-    browser.type_text("swirl")
+    browser.set_filter("swirl")
     assert [row.label for row in browser.rows] == ["flexi - swirl.milk"]
 
 
 def test_filter_without_matches_shows_a_note(tree: Path) -> None:
     browser = PresetBrowser(preset_root=tree, catalog=_indexed(tree))
-    browser.type_text("nothing like this")
+    browser.set_filter("nothing like this")
     assert _kinds(browser) == [(BrowserRowKind.NOTE, "No presets match", "")]
     assert browser.selected_preset() is None
     assert browser.handle(BrowserAction.OPEN) is BrowserOutcome.NONE
@@ -141,7 +143,7 @@ def test_filter_hides_blacklisted(tree: Path) -> None:
     library = _indexed(tree)
     library.set_blacklisted(tree / "Pack A" / "Geiss" / "geiss - swirl.milk", True)
     browser = PresetBrowser(preset_root=tree, catalog=library)
-    browser.type_text("swirl")
+    browser.set_filter("swirl")
     assert [row.label for row in browser.rows] == ["Pack A/Other/flexi - swirl.milk"]
     browser.set_filter("")
     folders = {row.label: row.detail for row in browser.rows if row.kind is BrowserRowKind.FOLDER}
@@ -151,7 +153,7 @@ def test_filter_hides_blacklisted(tree: Path) -> None:
 def test_filter_caps_rows(tree: Path, monkeypatch) -> None:
     monkeypatch.setattr(preset_browser, "MAX_ROWS", 2)
     browser = PresetBrowser(preset_root=tree, catalog=_indexed(tree))
-    browser.type_text(".milk")
+    browser.set_filter(".milk")
     assert [row.kind for row in browser.rows] == [
         BrowserRowKind.PRESET,
         BrowserRowKind.PRESET,
@@ -160,23 +162,114 @@ def test_filter_caps_rows(tree: Path, monkeypatch) -> None:
     assert browser.rows[-1].label == "Showing the first 2 of 5 matches"
 
 
-def test_backspace_and_escape_clear_the_filter_first(tree: Path) -> None:
+def test_escape_clears_an_applied_filter_before_closing(tree: Path) -> None:
     browser = PresetBrowser(preset_root=tree, catalog=_indexed(tree), folder=tree / "Pack A")
-    browser.type_text("ge")
-    assert browser.handle(BrowserAction.BACKSPACE) is BrowserOutcome.NONE
-    assert browser.filter_text == "g"
-    assert browser.folder == tree / "Pack A"
+    browser.set_filter("ge")
     assert browser.handle(BrowserAction.CANCEL) is BrowserOutcome.NONE
     assert browser.filter_text == ""
+    assert browser.folder == tree / "Pack A"
     browser.handle(BrowserAction.BACKSPACE)
     assert browser.at_top
     assert browser.handle(BrowserAction.CANCEL) is BrowserOutcome.CANCEL
 
 
-def test_leading_space_is_not_a_filter(tree: Path) -> None:
+def test_up_from_the_first_row_highlights_the_filter(tree: Path) -> None:
+    browser = PresetBrowser(preset_root=tree, catalog=_indexed(tree), folder=tree / "Pack A")
+    browser.handle(BrowserAction.HOME)
+    browser.handle(BrowserAction.MOVE_UP)
+    assert browser.focus is BrowserFocus.FILTER
+    assert not browser.editing
+    assert browser.selected_preset() is None
+    browser.handle(BrowserAction.MOVE_DOWN)
+    assert browser.focus is BrowserFocus.LIST
+
+
+def test_typing_only_reaches_the_filter_while_editing(tree: Path) -> None:
     browser = PresetBrowser(preset_root=tree, catalog=_indexed(tree))
-    browser.type_text(" ")
-    assert browser.filter_text == ""
+    browser.type_text("swirl")
+    assert browser.draft == ""
+
+    browser.focus_filter()
+    assert browser.handle(BrowserAction.OPEN) is BrowserOutcome.NONE
+    assert browser.editing
+    browser.type_text("swirl")
+    assert browser.view_state().caret_visible
+    browser.commit_edit()
+    assert not browser.editing
+    assert browser.focus is BrowserFocus.LIST
+    assert browser.filter_text == "swirl"
+    assert len(browser.rows) == 2
+
+
+def test_results_follow_each_change_while_editing(tree: Path) -> None:
+    browser = PresetBrowser(preset_root=tree, catalog=_indexed(tree))
+    browser.begin_edit()
+    browser.type_text("swirl")
+    assert browser.filter_text == "swirl"
+    assert len(browser.rows) == 2
+    browser.type_text(" geiss")
+    assert [row.label for row in browser.rows] == ["Pack A/Geiss/geiss - swirl.milk"]
+    browser.edit_key(pygame.K_BACKSPACE)
+    assert browser.filter_text == "swirl geis"
+    assert len(browser.rows) == 1
+
+    browser.commit_edit()
+    browser.type_text("x")
+    assert browser.filter_text == "swirl geis"
+    assert len(browser.rows) == 1
+
+
+def test_cancelling_an_edit_restores_the_filter_from_before(tree: Path) -> None:
+    browser = PresetBrowser(preset_root=tree, catalog=_indexed(tree))
+    browser.set_filter("swirl")
+    browser.begin_edit()
+    assert browser.draft == "swirl"
+    browser.type_text(" geiss")
+    assert len(browser.rows) == 1
+    browser.cancel_edit()
+    assert browser.filter_text == "swirl"
+    assert len(browser.rows) == 2
+
+
+def test_caret_blinks_while_editing(tree: Path) -> None:
+    browser = PresetBrowser(preset_root=tree, catalog=_indexed(tree))
+    assert not browser.view_state().caret_visible
+    browser.begin_edit()
+    assert browser.view_state().caret_visible
+    browser.tick(0.6)
+    assert not browser.view_state().caret_visible
+    browser.tick(0.5)
+    assert browser.view_state().caret_visible
+
+
+def test_an_async_browser_waits_for_its_rows(tree: Path) -> None:
+    browser = PresetBrowser(
+        preset_root=tree, catalog=_indexed(tree), folder=tree / "Pack B", synchronous=False
+    )
+    assert browser.loading
+    assert browser.rows == ()
+    first = browser.take_request()
+    assert first is not None
+    assert browser.take_request() is None
+
+    browser.goto_crumb(0)
+    second = browser.take_request()
+    assert not browser.deliver(first, browser.build(first))
+    assert browser.loading
+    assert browser.deliver(second, browser.build(second))
+    assert not browser.loading
+    assert browser.selected_row.path == tree / "Pack B"
+
+
+def test_list_moves_wait_while_loading(tree: Path) -> None:
+    browser = PresetBrowser(
+        preset_root=tree, catalog=_indexed(tree), folder=tree / "Pack A", synchronous=False
+    )
+    assert browser.handle(BrowserAction.OPEN) is BrowserOutcome.NONE
+    assert browser.handle(BrowserAction.MOVE_DOWN) is BrowserOutcome.NONE
+    assert browser.selected_preset() is None
+    browser.handle(BrowserAction.MOVE_UP)
+    assert browser.focus is BrowserFocus.FILTER
 
 
 def test_collection_lists_members_and_parent_returns_to_top(tree: Path) -> None:

@@ -1,13 +1,19 @@
-"""The preset browser for one layer: keys, typed filter, live preview, keep or revert.
+"""The preset browser for one layer: keys, the filter field, live preview, keep or revert.
 
 Opening takes a snapshot of the layer's browse position. Moving the selection
 onto a preset plays it on the layer after :data:`PREVIEW_DELAY_SEC`, through
 the same path as stepping the preset row. Enter keeps the preset; Esc puts the
 snapshot back.
+
+Listings build on a worker thread so the panel can show its spinner while a
+large folder or a library-wide search is read. One listing runs at a time;
+while it does, newer requests (each letter typed into the filter) wait, and
+only the newest is built next.
 """
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Callable
 from pathlib import Path
 
@@ -20,7 +26,10 @@ from cleave.viz.layer_mutations import BrowseSnapshot, LayerMutations
 from cleave.viz.preset_browser import (
     BrowserAction,
     BrowserOutcome,
+    BrowserRow,
+    BrowserRowKind,
     BrowserViewState,
+    ListingRequest,
     PresetBrowser,
 )
 from cleave.viz.preset_browser_surface import BrowserPointerIntent, BrowserPointerKind
@@ -49,31 +58,54 @@ _REPEAT_ACTIONS = frozenset(
         BrowserAction.MOVE_DOWN,
         BrowserAction.PAGE_UP,
         BrowserAction.PAGE_DOWN,
-        BrowserAction.BACKSPACE,
     }
 )
-
-
+_EDIT_KEYS = frozenset({pygame.K_BACKSPACE, pygame.K_LEFT, pygame.K_RIGHT})
 _FUNCTION_KEYS = frozenset(
     getattr(pygame, f"K_F{number}") for number in range(1, 16)
 )
+# Global keys the browser leaves alone while the filter is not being edited.
+_GLOBAL_KEYS = frozenset({pygame.K_SPACE, pygame.K_h})
 
 
 def browser_action_for(key: int) -> BrowserAction | None:
     return _KEY_ACTIONS.get(key)
 
 
-def _passes_through(event: pygame.event.Event, filter_text: str) -> bool:
-    """Keys the browser leaves to the editor: shortcuts, F-keys, idle Space."""
+def _passes_through(event: pygame.event.Event, *, editing: bool) -> bool:
+    """Keys the browser leaves to the editor: shortcuts, F-keys, Space, H."""
     if mod_ctrl(event.mod) or mod_alt(event.mod):
         return True
     if event.key in _FUNCTION_KEYS:
         return True
-    return event.key == pygame.K_SPACE and not filter_text
+    return not editing and event.key in _GLOBAL_KEYS
+
+
+class _ListingJob:
+    """One listing built on a worker thread."""
+
+    def __init__(self, browser: PresetBrowser, request: ListingRequest) -> None:
+        self.browser = browser
+        self.request = request
+        self.rows: tuple[BrowserRow, ...] = ()
+        self.done = threading.Event()
+        threading.Thread(
+            target=self._run, name="preset-browser-listing", daemon=True
+        ).start()
+
+    def _run(self) -> None:
+        try:
+            self.rows = self.browser.build(self.request)
+        except Exception as exc:  # noqa: BLE001 - shown in the list, not raised
+            self.rows = (
+                BrowserRow(BrowserRowKind.NOTE, f"Could not list presets: {exc}"),
+            )
+        finally:
+            self.done.set()
 
 
 class PresetBrowserControls:
-    """Owns the open browser, its snapshot, and the pending preview."""
+    """Owns the open browser, its snapshot, listings, and the pending preview."""
 
     def __init__(
         self,
@@ -85,6 +117,7 @@ class PresetBrowserControls:
         start_text_input: Callable[[], None],
         stop_text_input: Callable[[], None],
         text_input_shared: Callable[[], bool],
+        synchronous: bool = False,
     ) -> None:
         self._session = session
         self._preset_root = preset_root
@@ -93,6 +126,7 @@ class PresetBrowserControls:
         self._start_text_input = start_text_input
         self._stop_text_input = stop_text_input
         self._text_input_shared = text_input_shared
+        self._synchronous = synchronous
         self._repeat = KeyRepeatController()
         self._browser: PresetBrowser | None = None
         self._slot: str | None = None
@@ -102,6 +136,8 @@ class PresetBrowserControls:
         self._pending_sec = 0.0
         self._previewed = False
         self._revision = -1
+        self._jobs: list[_ListingJob] = []
+        self._text_input_on = False
 
     # -- state -------------------------------------------------------------
 
@@ -157,6 +193,7 @@ class PresetBrowserControls:
             collection=playlist.collection,
             select=playlist.current,
             marker=self._marker(slot),
+            synchronous=self._synchronous,
         )
         self._slot = slot
         self._snapshot = self._mutations.browse_snapshot(slot)
@@ -166,7 +203,7 @@ class PresetBrowserControls:
         self._previewed = False
         self._revision = self._library.revision
         self._repeat.disarm()
-        self._start_text_input()
+        self._pump()
 
     def cancel(self) -> None:
         """Close and put back the folder and preset the layer had on opening."""
@@ -195,10 +232,47 @@ class PresetBrowserControls:
         self._slot = None
         self._snapshot = None
         self._pending = None
+        self._jobs.clear()
         self._repeat.disarm()
-        # A dialog opened over the browser owns text input now.
-        if not self._text_input_shared():
-            self._stop_text_input()
+        self._sync_text_input()
+
+    def _sync_text_input(self) -> None:
+        """Text input is on only while the filter field is being edited."""
+        editing = self._browser is not None and self._browser.editing
+        if editing and not self._text_input_on:
+            self._text_input_on = True
+            self._start_text_input()
+        elif not editing and self._text_input_on:
+            self._text_input_on = False
+            # A dialog opened over the browser owns text input now.
+            if not self._text_input_shared():
+                self._stop_text_input()
+
+    # -- listings ------------------------------------------------------------
+
+    def _pump(self) -> None:
+        """Start the browser's queued listing, and show any that finished."""
+        browser = self._browser
+        if browser is None:
+            return
+        delivered = False
+        for job in [job for job in self._jobs if job.done.is_set()]:
+            self._jobs.remove(job)
+            if job.browser is browser and browser.deliver(job.request, job.rows):
+                delivered = True
+        if not self._jobs:
+            request = browser.take_request()
+            if request is not None:
+                self._jobs.append(_ListingJob(browser, request))
+        if delivered:
+            self._after_change()
+
+    def wait_for_listing(self, timeout_sec: float = 5.0) -> None:
+        """Block until every queued listing is built and shown (tests)."""
+        while self._jobs:
+            for job in list(self._jobs):
+                job.done.wait(timeout_sec)
+            self._pump()
 
     # -- preview -----------------------------------------------------------
 
@@ -227,29 +301,51 @@ class PresetBrowserControls:
     def _apply(self, outcome: BrowserOutcome) -> None:
         if outcome is BrowserOutcome.COMMIT:
             self.commit()
-        elif outcome is BrowserOutcome.CANCEL:
+            return
+        if outcome is BrowserOutcome.CANCEL:
             self.cancel()
-        else:
-            self._after_change()
+            return
+        self._sync_text_input()
+        self._pump()
+        self._after_change()
 
     # -- input -------------------------------------------------------------
 
     def handle_keydown(self, event: pygame.event.Event) -> bool:
-        """Apply one key. False leaves it to the editor (shortcuts, idle Space)."""
+        """Apply one key. False leaves it to the editor (shortcuts, Space, H)."""
         browser = self._browser
         if browser is None or event.type != pygame.KEYDOWN:
             return False
-        if _passes_through(event, browser.filter_text):
+        if _passes_through(event, editing=browser.editing):
             return False
+        if browser.editing:
+            self._edit_keydown(browser, event)
+            return True
         action = browser_action_for(event.key)
         if action is None:
-            # Letters and digits arrive as text input; the key is swallowed so
-            # editor hotkeys do not fire while typing a filter.
             return True
         self._apply(browser.handle(action))
         if self._browser is not None and action in _REPEAT_ACTIONS:
             self._repeat.on_keydown(event.key, event.mod, on_repeat=self._on_repeat)
         return True
+
+    def _edit_keydown(self, browser: PresetBrowser, event: pygame.event.Event) -> None:
+        key = event.key
+        if key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_DOWN):
+            browser.commit_edit()
+        elif key == pygame.K_ESCAPE:
+            browser.cancel_edit()
+        elif key in (pygame.K_HOME, pygame.K_END):
+            browser.caret_home(end=key == pygame.K_END)
+        elif key in _EDIT_KEYS:
+            browser.edit_key(key)
+            self._pump()
+            self._repeat.on_keydown(key, event.mod, on_repeat=self._on_edit_repeat)
+            return
+        else:
+            # Characters arrive as text input; the key itself does nothing.
+            return
+        self._apply(BrowserOutcome.NONE)
 
     def handle_keyup(self, event: pygame.event.Event) -> None:
         if event.type == pygame.KEYUP:
@@ -257,33 +353,48 @@ class PresetBrowserControls:
 
     def handle_text_input(self, text: str) -> bool:
         browser = self._browser
-        if browser is None:
+        if browser is None or not browser.editing:
             return False
         browser.type_text(text)
-        self._after_change()
+        self._pump()
         return True
 
     def _on_repeat(self, key: int, _mod: int) -> None:
         browser = self._browser
         action = browser_action_for(key)
-        if browser is None or action not in _REPEAT_ACTIONS:
+        if browser is None or browser.editing or action not in _REPEAT_ACTIONS:
             return
         self._apply(browser.handle(action))
+
+    def _on_edit_repeat(self, key: int, _mod: int) -> None:
+        browser = self._browser
+        if browser is not None and browser.editing:
+            browser.edit_key(key)
+            self._pump()
 
     def apply_pointer(self, intent: BrowserPointerIntent | None) -> None:
         browser = self._browser
         if browser is None or intent is None:
             return
         kind = intent.kind
+        if kind is BrowserPointerKind.EDIT_FILTER:
+            if not browser.editing:
+                browser.begin_edit()
+            self._apply(BrowserOutcome.NONE)
+            return
+        # A click away from the field searches for what was typed.
+        browser.commit_edit()
         if kind is BrowserPointerKind.SELECT_ROW and intent.index is not None:
             browser.select_row(intent.index)
-            self._after_change()
+            self._apply(BrowserOutcome.NONE)
         elif kind is BrowserPointerKind.OPEN_ROW and intent.index is not None:
             browser.select_row(intent.index)
             self._apply(browser.open_selected())
         elif kind is BrowserPointerKind.GOTO_CRUMB and intent.index is not None:
             browser.goto_crumb(intent.index)
-            self._after_change()
+            self._apply(BrowserOutcome.NONE)
+        else:
+            self._apply(BrowserOutcome.NONE)
 
     # -- per frame ---------------------------------------------------------
 
@@ -294,13 +405,14 @@ class PresetBrowserControls:
         if self._slot not in self._session.layers:
             self._close()
             return
+        browser.tick(dt_sec)
         self._repeat.tick(dt_sec)
         if self._browser is None:
             return
         if self._library.revision != self._revision:
             self._revision = self._library.revision
             browser.refresh()
-            self._after_change()
+        self._pump()
         pending = self._pending
         if pending is None:
             return

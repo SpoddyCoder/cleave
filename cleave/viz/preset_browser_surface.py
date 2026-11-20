@@ -8,6 +8,7 @@ loads on draw, not at import, so the controller and tests import this freely.
 from __future__ import annotations
 
 import functools
+import math
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
@@ -23,8 +24,10 @@ from cleave.viz.file_picker_surface import (
     visible_row_range,
     wheel_scroll_px,
 )
+from cleave.viz.material_icons import FOLDER_GLYPH
 from cleave.viz.preset_browser import (
     FILTER_PLACEHOLDER,
+    BrowserFocus,
     BrowserRow,
     BrowserRowKind,
     BrowserViewState,
@@ -37,7 +40,11 @@ PRESET_BROWSER_WINDOW = "##preset-browser"
 PRESET_BROWSER_LIST = "##preset-browser-list"
 CRUMB_SEPARATOR = " / "
 FILTER_LABEL = "Filter: "
-_CARET = "_"
+LOADING_LABEL = "Loading presets…"
+# Divider between the path and the filter, as a fraction of the text line.
+DIVIDER_LINES = 0.5
+SPINNER_TURNS_PER_SEC = 1.2
+SPINNER_ARC = math.pi * 1.5
 _LEGEND_SEPARATOR = "   "
 
 
@@ -45,6 +52,7 @@ class BrowserPointerKind(Enum):
     SELECT_ROW = "select-row"
     OPEN_ROW = "open-row"
     GOTO_CRUMB = "goto-crumb"
+    EDIT_FILTER = "edit-filter"
 
 
 @dataclass(frozen=True)
@@ -134,6 +142,11 @@ def _imgui():
     return imgui_mod
 
 
+def _contains(rect: Rect, x: float, y: float) -> bool:
+    rx, ry, rw, rh = rect
+    return rx <= x < rx + rw and ry <= y < ry + rh
+
+
 def _row_role(row: BrowserRow):
     from cleave.viz.theme import palette
 
@@ -156,6 +169,7 @@ class PresetBrowserSurface:
         self.row_indices: tuple[int, ...] = ()
         self.crumb_rects: tuple[Rect, ...] = ()
         self.crumb_indices: tuple[int, ...] = ()
+        self.filter_rect: Rect | None = None
         self.list_rect: Rect | None = None
 
     def row_at(self, x: float, y: float) -> int | None:
@@ -174,6 +188,8 @@ class PresetBrowserSurface:
         self.row_indices = ()
         self.crumb_rects = ()
         self.crumb_indices = ()
+        self.filter_rect = None
+        self.list_rect = None
         draw_fixed_window(
             PRESET_BROWSER_WINDOW,
             rect,
@@ -188,6 +204,7 @@ class PresetBrowserSurface:
     def _body(self) -> None:
         from cleave.viz.modal_layout import form_row_height, form_row_pad_y
         from cleave.viz.modal_surface import ImGuiTextMeasure
+        from cleave.viz.shell_widgets import stroke_h_rule
         from cleave.viz.theme import palette, tuning_ui_metrics
         from cleave.viz.title_bar import paint_title_bar
 
@@ -222,9 +239,30 @@ class PresetBrowserSurface:
         )
         y = bar_bottom + metrics.line_gap + form_row_pad_y()
 
-        self._paint_crumbs(draw, measure, text_width, content_x, y, content_w, line_h)
+        # The folder mark, then the path, as in the file picker.
+        draw_text(draw, content_x, y, FOLDER_GLYPH, palette().preset_icon)
+        icon_w = measure.size(FOLDER_GLYPH)[0] + metrics.icon_label_gap
+        self._paint_crumbs(
+            draw,
+            measure,
+            text_width,
+            content_x + icon_w,
+            y,
+            max(1, content_w - icon_w),
+            line_h,
+        )
         y += step
-        self._paint_filter(draw, measure, content_x, y, content_w)
+
+        divider_h = max(1, int(line_h * DIVIDER_LINES))
+        stroke_h_rule(
+            float(content_x),
+            float(content_x + content_w),
+            float(y + divider_h // 2),
+            palette().inspector_divider,
+        )
+        y += divider_h + form_row_pad_y()
+
+        self._paint_filter(draw, measure, content_x, y, content_w, line_h)
         y += step + form_row_pad_y()
 
         legend_y = oy + height - pad_y - line_h
@@ -239,11 +277,14 @@ class PresetBrowserSurface:
             form_row_height(line_h),
             metrics.scrollbar_width,
         )
+        if view.loading:
+            self._paint_spinner(draw, measure, content_x, y, content_w, list_h)
         self._paint_legend(draw, measure, content_x, legend_y, content_w)
 
     def _paint_crumbs(
         self, draw: Any, measure, text_width, x: int, y: int, content_w: int, line_h: int
     ) -> None:
+        from cleave.viz.file_picker_surface import location_text_lift
         from cleave.viz.theme import palette
 
         labels = tuple(crumb.label for crumb in self.view.crumbs)
@@ -253,6 +294,8 @@ class PresetBrowserSurface:
             text_width,
             lambda text, px: fit_text_to_width(measure, text, px),
         )
+        lift = location_text_lift()
+        text_y = y + lift
         pointer = _imgui().get_io().mouse_pos
         rects: list[Rect] = []
         indices: list[int] = []
@@ -262,51 +305,102 @@ class PresetBrowserSurface:
                 draw_text(
                     draw,
                     x + slot.x - text_width(CRUMB_SEPARATOR),
-                    y,
+                    text_y,
                     CRUMB_SEPARATOR,
                     palette().muted,
                 )
             current = slot.index == last and slot.text != CRUMB_ELLIPSIS
             if not current:
-                hit = outset_list_row((x + slot.x, y, slot.width, line_h))
-                hovered = (
-                    hit[0] <= pointer.x < hit[0] + hit[2]
-                    and hit[1] <= pointer.y < hit[1] + hit[3]
-                )
-                if hovered:
+                hit = outset_list_row((x + slot.x, text_y, slot.width, line_h))
+                if _contains(hit, pointer.x, pointer.y):
                     paint_list_row(draw, hit, "HOVER")
                     request_hand()
                 rects.append(hit)
                 indices.append(slot.index)
             role = palette().value if current else palette().label
-            draw_text(draw, x + slot.x, y, slot.text, role)
+            draw_text(draw, x + slot.x, text_y, slot.text, role)
         self.crumb_rects = tuple(rects)
         self.crumb_indices = tuple(indices)
 
-    def _paint_filter(self, draw: Any, measure, x: int, y: int, content_w: int) -> None:
+    def _paint_filter(
+        self, draw: Any, measure, x: int, y: int, content_w: int, line_h: int
+    ) -> None:
+        from cleave.viz.inline_edit import InlineTextView
+        from cleave.viz.pointer_cursor import PointerShape, request_pointer
+        from cleave.viz.shell_widgets import InlineField
         from cleave.viz.theme import palette
 
-        draw_text(draw, x, y, FILTER_LABEL, palette().label)
+        imgui = _imgui()
+        view = self.view
+        row = outset_list_row((x, y, content_w, line_h))
+        self.filter_rect = row
+        pointer = imgui.get_io().mouse_pos
+        hovered = _contains(row, pointer.x, pointer.y)
+        if hovered:
+            request_pointer(PointerShape.TEXT)
         label_w = measure.size(FILTER_LABEL)[0]
-        room = max(1, content_w - label_w - measure.size(_CARET)[0])
-        text = self.view.filter_text
-        if not text:
-            draw_text(draw, x + label_w, y, _CARET, palette().highlight)
+        if view.editing:
+            draw_text(draw, x, y, FILTER_LABEL, palette().label)
+            field_min = imgui.ImVec2(float(x + label_w), float(row[1]))
+            field_max = imgui.ImVec2(float(row[0] + row[2]), float(row[1] + row[3]))
+            InlineField().paint(
+                field_min,
+                field_max,
+                InlineTextView(view.draft, view.caret_index, view.caret_visible, None),
+                text_y=float(y),
+            )
+            return
+        if view.focus is BrowserFocus.FILTER:
+            paint_list_row(draw, row, "FOCUSED")
+        elif hovered:
+            paint_list_row(draw, row, "HOVER")
+        draw_text(draw, x, y, FILTER_LABEL, palette().label)
+        room = max(1, content_w - label_w)
+        if view.filter_text:
             draw_text(
                 draw,
-                x + label_w + measure.size(_CARET)[0],
+                x + label_w,
+                y,
+                fit_text_to_width(measure, view.filter_text, room),
+                palette().value,
+            )
+        else:
+            draw_text(
+                draw,
+                x + label_w,
                 y,
                 fit_text_to_width(measure, FILTER_PLACEHOLDER, room),
                 palette().muted,
             )
-            return
-        # Keep the end of a long filter, where typing happens.
-        shown = text
-        while len(shown) > 1 and measure.size(shown)[0] > room:
-            shown = shown[1:]
-        draw_text(draw, x + label_w, y, shown, palette().value)
+
+    def _paint_spinner(
+        self, draw: Any, measure, x: int, top: int, width: int, height: int
+    ) -> None:
+        """A turning arc over the list while a listing loads."""
+        from cleave.viz.imgui_theme import rgba
+        from cleave.viz.theme import palette
+
+        imgui = _imgui()
+        line_h = measure.get_linesize()
+        radius = max(4.0, line_h * 0.7)
+        centre_y = top + min(height / 2.0, line_h * 4.0)
+        centre = imgui.ImVec2(x + width / 2.0, centre_y)
+        start = (imgui.get_time() * SPINNER_TURNS_PER_SEC * 2.0 * math.pi) % (
+            2.0 * math.pi
+        )
+        draw.path_clear()
+        draw.path_arc_to(centre, radius, start, start + SPINNER_ARC, 24)
+        draw.path_stroke(
+            imgui.get_color_u32(rgba(palette().highlight)),
+            thickness=max(2.0, line_h / 6.0),
+        )
+        label_w = measure.size(LOADING_LABEL)[0]
         draw_text(
-            draw, x + label_w + measure.size(shown)[0], y, _CARET, palette().highlight
+            draw,
+            int(x + (width - label_w) / 2),
+            int(centre_y + radius + line_h / 2),
+            LOADING_LABEL,
+            palette().muted,
         )
 
     def _paint_legend(self, draw: Any, measure, x: int, y: int, content_w: int) -> None:
@@ -387,7 +481,13 @@ class PresetBrowserSurface:
                 if selected or hovered:
                     push_list_highlight_clip(draw)
                     try:
-                        paint_list_row(draw, rect, "FOCUSED" if selected else "HOVER")
+                        if not selected:
+                            paint_list_row(draw, rect, "HOVER")
+                        elif view.focus is BrowserFocus.LIST and not view.loading:
+                            paint_list_row(draw, rect, "FOCUSED")
+                        else:
+                            # The filter holds the keys; the row stays chosen.
+                            paint_list_row(draw, rect, "SELECTED")
                     finally:
                         draw.pop_clip_rect()
                 self._paint_row(draw, measure, row, left, text_y, row_w, selected)
@@ -417,7 +517,10 @@ class PresetBrowserSurface:
         gap = measure.size("  ")[0] if detail else 0
         label_room = max(1, width - detail_w - gap)
         label = fit_text_to_width(measure, row_label(row), label_room)
-        role = palette().value if selected else _row_role(row)
+        if self.view.loading:
+            role = palette().disabled
+        else:
+            role = palette().value if selected else _row_role(row)
         draw_text(draw, x, y, label, role)
         if detail:
             detail_role = palette().muted if row.kind is BrowserRowKind.FOLDER else palette().highlight
@@ -480,6 +583,13 @@ class PresetBrowserSurface:
             return
         if clicked and row is not None:
             self.intent = BrowserPointerIntent(BrowserPointerKind.SELECT_ROW, row)
+            return
+        if (
+            clicked
+            and self.filter_rect is not None
+            and _contains(self.filter_rect, x, y)
+        ):
+            self.intent = BrowserPointerIntent(BrowserPointerKind.EDIT_FILTER)
             return
         crumb = index_at(self.crumb_rects, x, y)
         if clicked and crumb is not None:

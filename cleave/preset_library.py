@@ -11,6 +11,7 @@ import itertools
 import json
 import os
 import sqlite3
+import threading
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -292,6 +293,9 @@ class PresetLibrary:
 
     def __init__(self, conn: sqlite3.Connection, database_uri: str) -> None:
         self._conn = conn
+        # The preset browser's listing worker hashes presets missing from the
+        # index through this connection; one transaction at a time.
+        self._db_lock = threading.RLock()
         self.database_uri = database_uri
         self._root: Path | None = None
         self._path_hash: dict[str, str] = {}
@@ -310,7 +314,7 @@ class PresetLibrary:
     def in_memory(cls) -> PresetLibrary:
         """Empty, unpersisted library (offline render and tests)."""
         uri = f"file:cleave-presets-{next(_memory_names)}?mode=memory&cache=shared"
-        conn = sqlite3.connect(uri, uri=True)
+        conn = sqlite3.connect(uri, uri=True, check_same_thread=False)
         conn.executescript(_SCHEMA)
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         return cls(conn, uri)
@@ -318,7 +322,9 @@ class PresetLibrary:
     @classmethod
     def open(cls, db_path: Path) -> PresetLibrary:
         db_path.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(str(db_path))
+        # Serialized SQLite: the preset browser's listing worker reads hashes
+        # through this connection while the editor writes curation.
+        conn = sqlite3.connect(str(db_path), check_same_thread=False)
         version = conn.execute("PRAGMA user_version").fetchone()[0]
         if version == 0:
             has_tables = conn.execute(
@@ -422,22 +428,24 @@ class PresetLibrary:
             stat = resolved.stat()
         except OSError:
             return None
-        row = self._conn.execute(
-            "SELECT size, mtime_ns, hash FROM files WHERE path = ?", (str(resolved),)
-        ).fetchone()
-        if row is not None and row[0] == stat.st_size and row[1] == stat.st_mtime_ns:
-            digest = row[2]
-        else:
-            try:
-                digest = preset_hash(resolved)
-            except OSError:
-                return None
-            with self._conn:
-                self._conn.execute(
-                    "INSERT OR REPLACE INTO files (path, size, mtime_ns, hash) "
-                    "VALUES (?, ?, ?, ?)",
-                    (str(resolved), stat.st_size, stat.st_mtime_ns, digest),
-                )
+        with self._db_lock:
+            row = self._conn.execute(
+                "SELECT size, mtime_ns, hash FROM files WHERE path = ?",
+                (str(resolved),),
+            ).fetchone()
+            if row is not None and row[0] == stat.st_size and row[1] == stat.st_mtime_ns:
+                digest = row[2]
+            else:
+                try:
+                    digest = preset_hash(resolved)
+                except OSError:
+                    return None
+                with self._conn:
+                    self._conn.execute(
+                        "INSERT OR REPLACE INTO files (path, size, mtime_ns, hash) "
+                        "VALUES (?, ?, ?, ?)",
+                        (str(resolved), stat.st_size, stat.st_mtime_ns, digest),
+                    )
         self._alias_hash[path] = digest
         self._alias_hash[resolved] = digest
         return digest
@@ -458,7 +466,7 @@ class PresetLibrary:
         digest = self.hash_of(path)
         if digest is None:
             return
-        with self._conn:
+        with self._db_lock, self._conn:
             if on:
                 self._conn.execute(
                     f"INSERT OR REPLACE INTO {table} (hash, name) VALUES (?, ?)",
@@ -480,7 +488,7 @@ class PresetLibrary:
         digest = self.hash_of(path)
         if digest is None:
             return
-        with self._conn:
+        with self._db_lock, self._conn:
             if role is None:
                 self._conn.execute("DELETE FROM roles WHERE hash = ?", (digest,))
                 self._roles.pop(digest, None)
