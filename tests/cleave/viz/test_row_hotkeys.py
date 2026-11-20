@@ -14,7 +14,7 @@ from cleave.viz.menu_bar import MenuBarState
 from cleave.viz.navigator import layer_node_id, layer_page_node_id
 import cleave.viz.row_hotkeys as row_hotkeys
 from cleave.viz.row_kinds import RowDescriptor, RowKind
-from cleave.viz.row_spec import apply_field_horizontal
+from cleave.viz.row_spec import apply_field_horizontal, apply_field_nav_button
 from cleave.viz.shell_focus import ShellRegion
 from tests.support.viz import (
     keydown,
@@ -247,19 +247,20 @@ def test_section_lock_inspector_refuses_edits_and_delete_still_prompts() -> None
 
     view = controls.build_view_state(paused=False)
     built = build_inspector_rows(
-        view, layer_page_node_id("layer_1", "milkdrop_preset")
+        view, layer_page_node_id("layer_1", "preset_list")
     )
-    add_row = next(
-        row for row in built if "layers.add_current_preset" in row.command_ids
+    populate_row = next(
+        row for row in built if "layers.populate_presets" in row.command_ids
     )
-    assert add_row.navigable
-    controls.shell_focus.selected_id = layer_page_node_id(
-        "layer_1", "milkdrop_preset"
-    )
-    controls.inspector.focus_command(add_row, "layers.add_current_preset")
+    assert populate_row.navigable
+    controls.shell_focus.selected_id = layer_page_node_id("layer_1", "preset_list")
+    controls.inspector.focus_command(populate_row, "layers.populate_presets")
     assert dispatch_keydown(keydown(pygame.K_LEFT), runtime) is True
     assert dispatch_keydown(keydown(pygame.K_RETURN), runtime) is True
     assert controls.modal_host.view_state() is None
+    preset_row = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
+    assert apply_field_nav_button(controls, preset_row, 0) is False
+    assert layer.preset_list == ["/tmp/presets/a.milk", "/tmp/presets/b.milk"]
 
     item = RowDescriptor(
         RowKind.TRACK_PRESET_LIST_ITEM, slot="layer_1", preset_index=0

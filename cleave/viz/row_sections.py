@@ -598,11 +598,11 @@ PRESET_SWITCHING_ACTIVE = ConditionalRowsDef(
     ),
 )
 
-PRESET_SWITCHING_ADD_TO_LIST = ConditionalRowsDef(
-    name="preset_switching_add_to_list",
+PRESET_SWITCHING_GO_TO_LIST = ConditionalRowsDef(
+    name="preset_switching_go_to_list",
     predicate=_preset_switching_active,
     children=(
-        SectionNode(commands=("layers.add_current_preset",)),
+        SectionNode(commands=("layers.go_to_preset_list",)),
     ),
 )
 
@@ -614,7 +614,7 @@ TRACK_MILKDROP_PRESET_SECTION = SectionDef(
         SectionNode(leaf_kind=RowKind.TRACK_PRESET),
         SectionNode(divider=True),
         SectionNode(leaf_kind=RowKind.TRACK_BEAT),
-        SectionNode(conditional=PRESET_SWITCHING_ADD_TO_LIST),
+        SectionNode(conditional=PRESET_SWITCHING_GO_TO_LIST),
         SectionNode(conditional=PRESET_SWITCHING_PAUSED),
     ),
 )

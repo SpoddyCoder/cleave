@@ -231,11 +231,13 @@ class ValueControls:
         stepped: bool,
         activated: bool,
         two_line: bool,
+        end_x: float | None = None,
     ) -> None:
         """Paint the icon buttons, and take hover and press.
 
-        The buttons follow *label*, or sit at the row's right edge when
-        *label* is None. On a two-line row they cover the first line only.
+        The buttons follow *label*, or end at *end_x* (the row's right edge
+        when that is None) when *label* is None. On a two-line row they cover
+        the first line only.
         A press on a dimmed button is swallowed. Otherwise a double-click on
         it would reach the row and open a child directory.
         """
@@ -247,12 +249,12 @@ class ValueControls:
         side = band[1] - band[0]
         gap = icon_gap()
         if label is None:
-            start_x = (
-                rect_max.x
-                - imgui.get_style().frame_padding.x
-                - len(buttons) * (side + gap)
-                + gap
+            right_x = (
+                rect_max.x - imgui.get_style().frame_padding.x
+                if end_x is None
+                else end_x
             )
+            start_x = right_x - len(buttons) * (side + gap) + gap
         else:
             start_x = origin_x + imgui.calc_text_size(f"{label} ").x
         boxes = row_icon_boxes(start_x, band, len(buttons))

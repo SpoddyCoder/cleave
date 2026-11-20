@@ -538,13 +538,13 @@ def test_preset_list_entry_help() -> None:
     }
 
 
-def test_preset_list_add_and_resume_switching_help() -> None:
-    add_sections = sections_for(RowKind.TRACK_PRESET_LIST_ADD)
-    add_description = _description_section(add_sections)
-    add_keyboard = _keyboard_section(add_sections)
-    assert add_description is not None
-    assert _says(add_description.lines, 'appends the current preset', 'copied into the project')
-    assert dict(add_keyboard.entries) == {"Enter": "add current preset"}
+def test_preset_list_goto_and_resume_switching_help() -> None:
+    goto_sections = sections_for(RowKind.TRACK_PRESET_LIST_GOTO)
+    goto_description = _description_section(goto_sections)
+    goto_keyboard = _keyboard_section(goto_sections)
+    assert goto_description is not None
+    assert _says(goto_description.lines, 'preset list page')
+    assert dict(goto_keyboard.entries) == {"Enter": "open the preset list"}
 
     resume_sections = sections_for(RowKind.TRACK_PRESET_SWITCHING_RESUME)
     resume_description = _description_section(resume_sections)

@@ -105,6 +105,8 @@ class RowSpec:
     format_position: Callable[[TuningViewState, RowDescriptor], str] | None = None
     format_markers: Callable[[TuningViewState, RowDescriptor], str] | None = None
     nav_buttons: tuple[RowNavButton, ...] = ()
+    # Icon buttons sit just left of the right-aligned value cluster, not after the label.
+    nav_buttons_before_value: bool = False
     # Hover text for the row (empty for none): a gesture its label does not
     # show, or why its preset file cannot play.
     tooltip: Callable[[TuningViewState, RowDescriptor], str] | None = None

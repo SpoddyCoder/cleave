@@ -21,6 +21,7 @@ from cleave.config_schema.editor import (
 )
 from cleave.config_schema.layers import hard_cut_enabled_display
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
+from cleave.viz.material_icons import ADD_GLYPH
 from cleave.viz.theme import (
     set_ui_scale_percent,
     ui_scale_generation,
@@ -359,7 +360,7 @@ def test_track_sub_row_kinds() -> None:
             RowKind.TRACK_PRESET_SWITCHING_RESUME,
             RowKind.TRACK_PRESET_LIST,
             RowKind.TRACK_PRESET_LIST_ITEM,
-            RowKind.TRACK_PRESET_LIST_ADD,
+            RowKind.TRACK_PRESET_LIST_GOTO,
             RowKind.TRACK_PRESET_LIST_POPULATE,
             RowKind.TRACK_PRESET_DURATION,
             RowKind.TRACK_SOFT_CUT_DURATION,
@@ -419,7 +420,6 @@ def test_track_value_rows_blocked_by_section_lock() -> None:
             RowKind.TRACK_BEAT,
             RowKind.TRACK_EFFECT,
             RowKind.TRACK_PRESET_LIST_ITEM,
-            RowKind.TRACK_PRESET_LIST_ADD,
             RowKind.TRACK_PRESET_LIST_POPULATE,
             RowKind.TRACK_PRESET_SWITCHING_RESUME,
         }
@@ -446,7 +446,7 @@ def test_only_effects_header_navigable_when_section_locked() -> None:
 def test_preset_list_actions_are_action_rows() -> None:
     for kind in (
         RowKind.TRACK_PRESET_LIST_POPULATE,
-        RowKind.TRACK_PRESET_LIST_ADD,
+        RowKind.TRACK_PRESET_LIST_GOTO,
         RowKind.TRACK_PRESET_SWITCHING_RESUME,
     ):
         assert row_spec(kind).affordance == RowAffordance.COMMAND
@@ -945,9 +945,38 @@ def test_preset_list_populate_is_full_line_action() -> None:
     field = row_spec(RowKind.TRACK_PRESET_LIST_POPULATE)
     assert field.present_style == RowPresentStyle.FULL_LINE
     assert field.panel_label == "Populate…"
-    add_field = row_spec(RowKind.TRACK_PRESET_LIST_ADD)
-    assert add_field.present_style == RowPresentStyle.FULL_LINE
-    assert add_field.panel_label == "Add to preset list"
+    goto_field = row_spec(RowKind.TRACK_PRESET_LIST_GOTO)
+    assert goto_field.present_style == RowPresentStyle.FULL_LINE
+    assert goto_field.panel_label == "Go to preset list"
+    assert row_blocked_by_section_lock(RowKind.TRACK_PRESET_LIST_GOTO) is False
+
+
+def test_preset_row_add_button_sits_before_arrows() -> None:
+    spec = row_spec(RowKind.TRACK_PRESET)
+    assert spec.nav_buttons_before_value is True
+    assert [button.glyph for button in spec.nav_buttons] == [ADD_GLYPH]
+
+
+def test_preset_row_add_button_appends_current_preset() -> None:
+    controls = make_controls(("layer_1",))
+    desc = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
+    calls: list[str] = []
+    controls.preset_list.add_current = calls.append
+    assert apply_field_nav_button(controls, desc, 0) is True
+    assert calls == ["layer_1"]
+
+
+def test_go_to_preset_list_opens_the_page() -> None:
+    from cleave.viz.commands import command_by_id
+    from cleave.viz.navigator import LAYER_PAGE_PRESET_LIST, layer_page_node_id
+
+    controls = make_controls(("layer_1",))
+    controls.session.layers["layer_1"].preset_switching_trigger = "duration"
+    controls.navigator.select(layer_page_node_id("layer_1", "milkdrop_preset"))
+    command_by_id("layers.go_to_preset_list").run(controls)
+    assert controls.shell_focus.selected_id == layer_page_node_id(
+        "layer_1", LAYER_PAGE_PRESET_LIST
+    )
 
 
 def test_resume_switching_row_only_while_paused() -> None:
@@ -994,7 +1023,7 @@ def test_resume_switching_row_only_while_paused() -> None:
     index = resume_index(shown)
     assert index is not None
     assert shown[index].status == "Previewing presets"
-    assert shown[index - 1].command_ids == ("layers.add_current_preset",)
+    assert shown[index - 1].command_ids == ("layers.go_to_preset_list",)
 
 
 def test_apply_field_horizontal_track_header_solo_and_expand() -> None:

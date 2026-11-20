@@ -225,6 +225,7 @@ def _draw_two_line_row_text(
     icon: tuple[str, tuple[int, int, int]] | None = None,
     draw_value: bool = True,
     problem: str | None = None,
+    cluster_reserve: float = 0.0,
 ) -> bool:
     """Markers after the label, stopping short of the arrows, and the value below.
 
@@ -237,6 +238,8 @@ def _draw_two_line_row_text(
     Markers are painted, not part of the selectable label: ImGui hashes the
     visible label into the id, and a press must survive the markers changing.
     *lead* is the drag-handle prefix of the label; the value lines up after it.
+    *cluster_reserve* is the width of icon buttons drawn just left of the
+    value cluster; the problem sign and markers stop short of them.
     """
     origin_x, origin_y = selectable_label_origin()
     lead_x = imgui.calc_text_size(lead).x if lead else 0.0
@@ -249,7 +252,7 @@ def _draw_two_line_row_text(
         right_x,
         [imgui.calc_text_size(text).x for text, _color in parts],
         pad,
-    )
+    ) - cluster_reserve
     if problem is not None:
         line = imgui.get_text_line_height()
         band = (imgui.get_item_rect_min().y, imgui.get_item_rect_max().y - line)
@@ -750,6 +753,18 @@ class InspectorPanel:
         list_item = spec.present_style is RowPresentStyle.LIST_ITEM
         parts = value_parts(cluster, rgba(look.value_color), stepped=look.stepped)
         draw_aligned_parts(parts)
+        buttons_end_x: float | None = None
+        buttons_reserve = 0.0
+        if spec.nav_buttons and spec.nav_buttons_before_value:
+            rect_min, rect_max = imgui.get_item_rect_min(), imgui.get_item_rect_max()
+            line = imgui.get_text_line_height()
+            side = rect_max.y - rect_min.y - (line if look.two_line else 0.0)
+            buttons_end_x = nudge_cluster_origin_x(
+                rect_max.x,
+                [imgui.calc_text_size(text).x for text, _color in parts],
+                imgui.get_style().frame_padding.x,
+            ) - icon_gap()
+            buttons_reserve = len(spec.nav_buttons) * (side + icon_gap())
         crumbs = (
             state.tracks[desc.slot].preset_dir_crumbs
             if desc.kind is RowKind.TRACK_PRESET_DIR and desc.slot in state.tracks
@@ -767,6 +782,7 @@ class InspectorPanel:
                 icon=icon,
                 draw_value=not crumbs,
                 problem=preset_row_problem(state, desc),
+                cluster_reserve=buttons_reserve,
             )
             if on_marker:
                 self.values.control_hovered = True
@@ -786,12 +802,13 @@ class InspectorPanel:
                 state,
                 row,
                 desc,
-                look.label,
+                None if spec.nav_buttons_before_value else look.label,
                 spec.nav_buttons,
                 rgba(look.value_color),
                 stepped=look.stepped,
                 activated=item.activated,
                 two_line=look.two_line,
+                end_x=buttons_end_x,
             )
         if self.values.handle_colour_swatch(state, row, desc, spec, parts, item.clicked):
             return True

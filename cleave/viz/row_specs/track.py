@@ -16,7 +16,7 @@ from cleave.cue_roles import CUE_ROLE_MARKER_HELP_ENTRIES
 from cleave.preset_library import PRESET_FLAG_MARKERS
 from cleave.stems import stem_control_label
 from cleave.viz.commands import command_by_id
-from cleave.viz.material_icons import ARROW_DOWNWARD_GLYPH, ARROW_UPWARD_GLYPH
+from cleave.viz.material_icons import ADD_GLYPH, ARROW_DOWNWARD_GLYPH, ARROW_UPWARD_GLYPH
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_spec import FitStrategy, RowNavButton, RowPresentStyle, RowSpec
@@ -483,13 +483,32 @@ def _apply_preset_dir_parent_action(
     controls.layer_mutations.parent_directory(slot)
 
 
-def _apply_preset_list_add_action(
+def _apply_preset_list_goto_action(
+    controls: TuningControls, _desc: RowDescriptor
+) -> None:
+    command_by_id("layers.go_to_preset_list").run(controls)
+
+
+def _apply_preset_add_to_list_action(
     controls: TuningControls, desc: RowDescriptor
 ) -> None:
     slot = desc.slot
     if slot is None:
         return
     controls.preset_list.add_current(slot)
+
+
+def _preset_can_add_to_list(state: TuningViewState, desc: RowDescriptor) -> bool:
+    return (
+        not is_preset_curation_mode(state.settings.editor_mode)
+        and _track_block(state, desc).runtime.preset_switching_trigger != "off"
+    )
+
+
+def _preset_add_to_list_tooltip(state: TuningViewState, desc: RowDescriptor) -> str:
+    if _preset_can_add_to_list(state, desc):
+        return "Add to preset list (P)"
+    return "Turn on preset switching to keep a preset list"
 
 
 def _apply_preset_list_item_action(
@@ -655,6 +674,15 @@ SPECS: dict[RowKind, RowSpec] = {
         format_value=_format_track_preset,
         format_position=_format_track_preset_position,
         format_markers=_format_track_preset_markers,
+        nav_buttons=(
+            RowNavButton(
+                ADD_GLYPH,
+                _preset_can_add_to_list,
+                _apply_preset_add_to_list_action,
+                tooltip=_preset_add_to_list_tooltip,
+            ),
+        ),
+        nav_buttons_before_value=True,
         tooltip=_preset_row_tooltip,
         apply_horizontal=_apply_track_preset,
         apply_action=_apply_preset_browse_action,
@@ -662,7 +690,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Milkdrop Preset File",
         help_description=(
-            "The Milkdrop preset this layer is rendering. Enter or a double-click opens the preset browser, to see every folder and preset and filter them by name. Tags after the name mark its curation status and role; hover over one for a reminder:",
+            "The Milkdrop preset this layer is rendering. Enter or a double-click opens the preset browser, to see every folder and preset and filter them by name. While preset switching is on, the + button left of the arrows adds this preset to the layer's preset list (P does the same from any row of the layer); while previewing, that is the one you are previewing, and the file is copied into the project so it travels with it. Tags after the name mark its curation status and role; hover over one for a reminder:",
         ),
         help_mode_entries=_PRESET_MARKER_HELP_ENTRIES,
         repeatable=True,
@@ -740,19 +768,18 @@ SPECS: dict[RowKind, RowSpec] = {
         drag_reorder=True,
         parent_group="track",
     ),
-    RowKind.TRACK_PRESET_LIST_ADD: RowSpec(
+    RowKind.TRACK_PRESET_LIST_GOTO: RowSpec(
         affordance=RowAffordance.COMMAND,
-        panel_label="Add to preset list",
+        panel_label="Go to preset list",
         present_style=RowPresentStyle.FULL_LINE,
         apply_horizontal=noop_horizontal,
-        apply_action=_apply_preset_list_add_action,
+        apply_action=_apply_preset_list_goto_action,
         fit_strategy=FitStrategy.NONE,
-        help_title="Add To Preset List",
+        help_title="Go To Preset List",
         help_description=(
-            "Appends the current preset to the list; while previewing, that is the one you are previewing. The preset file is copied into the project so it travels with it. P does the same from any row of the layer.",
+            "Opens this layer's Preset List page, under Preset Switching.",
         ),
         parent_group="track",
-        blocked_by_section_lock=True,
     ),
     RowKind.TRACK_PRESET_LIST_POPULATE: RowSpec(
         affordance=RowAffordance.COMMAND,

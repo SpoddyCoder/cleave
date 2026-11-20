@@ -551,7 +551,7 @@ def test_paused_switching_button_moves_below_preset_fields() -> None:
         state, layer_page_node_id(slot, LAYER_PAGE_MILKDROP_PRESET)
     )
     assert [row.command_ids for row in rows[-2:]] == [
-        ("layers.add_current_preset",),
+        ("layers.go_to_preset_list",),
         ("layers.resume_switching",),
     ]
     assert rows[-3].divider

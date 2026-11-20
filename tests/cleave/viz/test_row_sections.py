@@ -68,10 +68,10 @@ def test_milkdrop_preset_page_holds_dir_preset_and_beat() -> None:
         minimal_view_state(tracks={"layer_1": _track_block()}),
         layer_page_node_id("layer_1", "milkdrop_preset"),
     )
-    assert rows[-1].command_ids == ("layers.add_current_preset",)
+    assert rows[-1].command_ids == ("layers.go_to_preset_list",)
 
 
-def test_add_to_preset_list_hides_while_switching_is_off() -> None:
+def test_go_to_preset_list_hides_while_switching_is_off() -> None:
     rows = build_inspector_rows(
         minimal_view_state(
             tracks={
@@ -83,7 +83,7 @@ def test_add_to_preset_list_hides_while_switching_is_off() -> None:
         layer_page_node_id("layer_1", "milkdrop_preset"),
     )
     assert all(
-        "layers.add_current_preset" not in row.command_ids for row in rows
+        "layers.go_to_preset_list" not in row.command_ids for row in rows
     )
 
 

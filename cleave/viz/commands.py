@@ -19,7 +19,12 @@ from cleave.viz.config_pages import CONFIG_PAGES, ConfigPage
 from cleave.viz.context_menu import ContextMenuItem
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.key_repeat import mod_alt, mod_ctrl
-from cleave.viz.navigator import layer_node_id, layer_slot_of
+from cleave.viz.navigator import (
+    LAYER_PAGE_PRESET_LIST,
+    layer_node_id,
+    layer_page_node_id,
+    layer_slot_of,
+)
 from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.theme import palette
 
@@ -332,8 +337,14 @@ def _selected_slot(controls: TuningControls) -> str:
     return command_context(controls).selected_slot
 
 
-def _run_add_current_preset(controls: TuningControls) -> None:
-    controls.preset_list.add_current(_selected_slot(controls))
+def _go_to_preset_list_enabled(ctx: CommandContext) -> bool:
+    return ctx.selected_slot is not None
+
+
+def _run_go_to_preset_list(controls: TuningControls) -> None:
+    page_id = layer_page_node_id(_selected_slot(controls), LAYER_PAGE_PRESET_LIST)
+    controls.navigator.select(page_id)
+    controls.navigator.activate()
 
 
 def _run_populate_presets(controls: TuningControls) -> None:
@@ -533,13 +544,12 @@ _DELETE = Command(
     enabled=_delete_enabled,
     run=_when_enabled(_delete_enabled, _run_delete),
 )
-_ADD_CURRENT_PRESET = Command(
-    id="layers.add_current_preset",
-    label="Add to preset list",
+_GO_TO_PRESET_LIST = Command(
+    id="layers.go_to_preset_list",
+    label="Go to preset list",
     kind="command",
-    enabled=_preset_list_enabled,
-    run=_when_enabled(_preset_list_enabled, _run_add_current_preset),
-    locked=_layer_locked,
+    enabled=_go_to_preset_list_enabled,
+    run=_when_enabled(_go_to_preset_list_enabled, _run_go_to_preset_list),
 )
 _POPULATE_PRESETS = Command(
     id="layers.populate_presets",
@@ -918,7 +928,7 @@ _INSPECTOR_COMMANDS: tuple[Command, ...] = (
     _SNAP,
     _SET_CUT_TYPE,
     _SNAP_TO_MARKERS,
-    _ADD_CURRENT_PRESET,
+    _GO_TO_PRESET_LIST,
     _POPULATE_PRESETS,
     _RESUME_SWITCHING,
     _OPEN_CRASH_LOG_FOLDER,
