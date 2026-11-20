@@ -38,6 +38,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - The Welcome to Cleave step lists the presets as separate projectM curated preset packs, one line each: Milkdrop Original and Milkdrop Textures (ticked by default), plus Cream of the Crop, projectM Classic, and En D (not ticked). projectM Classic and En D are new.
 - Browsing to a preset folder that only holds subfolders no longer shows NO PRESETS FOUND. The preset row says how many subfolders lie below and how many presets they hold, so you know to go deeper; a folder whose presets are all blacklisted says so.
 - Calibrate tap timing no longer needs an unbroken streak of matching taps. It averages your recent taps, ignores a stray one instead of starting over, and reports a value once at least six taps agree to within a few milliseconds, or after 16 taps however loose they are. The progress box shows how many taps it has kept and how settled the estimate is.
+- Double-clicking a timeline row now always moves the playhead, the same on a clip or in a gap; it no longer adds a clip in a gap. Right-click a gap and choose Add clip here to add one.
 
 ### Fixed
 

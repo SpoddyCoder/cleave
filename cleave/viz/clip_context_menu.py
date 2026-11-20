@@ -146,14 +146,13 @@ def add_clip_entry(
     t_sec: float,
     add_clip_at: Callable[[str, float], None],
 ) -> ContextMenuItem:
-    """Item that adds a clip on *slot* from *t_sec*, as a double-click there does."""
+    """Item that adds a clip on *slot* from *t_sec*."""
     edit_hint = _edit_hint(editor.session)
     return ContextMenuItem(
         id="timeline.clip.add",
         label="Add clip here",
         run=lambda: add_clip_at(slot, t_sec),
         enabled=edit_hint is None,
-        shortcut="Double-click",
         hint=edit_hint,
     )
 

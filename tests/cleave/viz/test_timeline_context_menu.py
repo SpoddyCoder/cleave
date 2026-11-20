@@ -259,7 +259,7 @@ def test_add_clip_here_item_adds_a_clip_at_the_clicked_time() -> None:
     assert (item.id, item.label, item.shortcut) == (
         "timeline.clip.add",
         "Add clip here",
-        "Double-click",
+        None,
     )
     item.run()
     # With no bar grid a new clip is two seconds long.

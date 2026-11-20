@@ -9,9 +9,7 @@ the boundary rolls it (both clips change) and just inside either clip trims
 only that clip, opening a gap (``ClipGrip``, ``ClipEditor.begin_drag`` /
 ``update_drag``). Release keeps the
 result as one undo step; Esc puts the clip back. A
-double-click in a gap adds a clip there (``TimelineControls.add_clip_at``);
-on a clip, or while clips cannot be edited, it seeks, and holding the second
-press scrubs. A press on a song marker selects it and shows it on the Song
+double-click on a row seeks, and holding the second press scrubs. A press on a song marker selects it and shows it on the Song
 Markers page: on the ruler it also seeks to the marker, and on a row a
 clip under the pointer wins. A press on a row's label (layer number and
 stem) focuses it. Its header buttons act on one press: arm toggles arming,
@@ -348,12 +346,7 @@ class TimelinePointer:
         on_clip = slot is not None and self._actions.select_clip_at(slot, clip_t)
         if double:
             self._last_row_press = None
-            # In a gap a double-click adds a clip; on a clip, or where clips
-            # cannot be edited, it seeks.
-            if slot is not None and not on_clip and clip_edits_allowed(self._session):
-                self._actions.add_clip_at(slot, hit.t_sec)
-            else:
-                self._start_scrub(hit.t_sec)
+            self._start_scrub(hit.t_sec)
             return True
         self._last_row_press = (now, x, y, hit.row, hit.target)
         if not on_clip and hit.marker_index is not None:

@@ -384,7 +384,7 @@ Play and REC buttons sit in the top-left corner.
 
 To move around the strip:
 
-- **Click or drag the time ruler** to move the playhead.
+- **Click or drag the time ruler**, or **double-click a row**, to move the playhead. Hold the second click and drag to scrub.
 - **Scroll** to zoom. When zoomed in, drag a row sideways, use Shift+wheel, or drag the scrollbar to pan.
 - **Drag the strip's top edge** to make it taller, and double-click the edge to fit it to its rows again.
 - **Esc** returns focus to the navigator and leaves the strip open.
@@ -395,7 +395,7 @@ Click a clip to select it and edit its details in the inspector.
 
 | To do this | Do this |
 | --- | --- |
-| Add a clip | Double-click a gap, or right-click it and choose Add clip here. |
+| Add a clip | Right-click a gap and choose Add clip here. |
 | Move a clip | Drag it. |
 | Trim a clip | Drag either end. |
 | Roll the edit point between two touching clips | Drag the centre of the join; one clip grows as the other shrinks. |

@@ -164,7 +164,7 @@ def test_slow_far_or_other_row_second_press_is_not_a_double_click() -> None:
     assert all(call[0] != "seek" for call in actions.calls)
 
 
-def test_double_click_in_a_gap_adds_a_clip() -> None:
+def test_double_click_in_a_gap_seeks_and_does_not_add_a_clip() -> None:
     clock = _Clock()
     actions = _Actions()
     pointer = TimelinePointer(
@@ -174,41 +174,9 @@ def test_double_click_in_a_gap_adds_a_clip() -> None:
     pointer.release()
     clock.now += 0.2
     pointer.press(12, 11)
-    assert actions.calls[-1] == ("add", "layer_2", 5.0)
-    assert all(call[0] != "seek" for call in actions.calls)
-    assert not pointer.scrubbing
-
-
-@pytest.mark.parametrize("field", ["locked", "recording"])
-def test_double_click_seeks_where_clips_cannot_be_edited(field: str) -> None:
-    clock = _Clock()
-    actions = _Actions()
-    session = _session()
-    setattr(session.timeline, field, True)
-    pointer = TimelinePointer(
-        _Geometry(StripHit(0, 5.0, 0.2)), actions, session, clock=clock
-    )
-    pointer.press(10, 10)
-    pointer.release()
-    clock.now += 0.2
-    pointer.press(12, 11)
     assert actions.calls[-1] == ("seek", 5.0)
     assert all(call[0] != "add" for call in actions.calls)
-
-
-def test_triple_click_does_not_add_twice() -> None:
-    clock = _Clock()
-    actions = _Actions()
-    pointer = TimelinePointer(
-        _Geometry(StripHit(0, 5.0, 0.2)), actions, _session(), clock=clock
-    )
-    for _ in range(3):
-        pointer.press(10, 10)
-        pointer.release()
-        clock.now += 0.1
-    assert [call for call in actions.calls if call[0] == "add"] == [
-        ("add", "layer_1", 5.0)
-    ]
+    assert pointer.scrubbing
 
 
 def test_ruler_press_drags_and_scrubs_once_per_tick() -> None:
