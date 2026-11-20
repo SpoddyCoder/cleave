@@ -48,6 +48,7 @@ class PresetListController:
         on_notification: Callable[[str], None] | None = None,
         get_active_config_path: Callable[[], Path | None] | None = None,
         on_focus_preset_item: Callable[[str, int], None] | None = None,
+        on_clear_preset_item_focus: Callable[[str], None] | None = None,
         layers_by_slot: dict[str, StemLayer] | None = None,
         catalog: PresetCatalog = UNFILTERED_CATALOG,
     ) -> None:
@@ -63,6 +64,7 @@ class PresetListController:
         self._on_notification = on_notification
         self._get_active_config_path = get_active_config_path
         self._on_focus_preset_item = on_focus_preset_item
+        self._on_clear_preset_item_focus = on_clear_preset_item_focus
         self._layers_by_slot = layers_by_slot
         self.move_mode_preset: tuple[str, int] | None = None
         self._move_mode_original_preset_list: list[str] | None = None
@@ -308,9 +310,13 @@ class PresetListController:
             self._unlock_preset_after_modal(slot)
 
     def resume(self, slot: str) -> None:
+        """End the layer's preview; the list's selection goes, since the
+        highlighted scheduled entry is now what plays."""
         if self._layer_bindings is None:
             return
         self._layer_bindings.on_switching_resume(slot)
+        if self._on_clear_preset_item_focus is not None:
+            self._on_clear_preset_item_focus(slot)
 
     def audition(self, slot: str, index: int) -> None:
         layer = self.session.layers[slot]

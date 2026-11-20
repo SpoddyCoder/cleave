@@ -266,7 +266,7 @@ Picking a preset yourself while switching is on, in the preset browser or with E
 - a yellow pause icon shows on the layer's row in the navigator and in the icon line under the title of each of the layer's pages;
 - the preset list keeps highlighting the entry scheduled for this point in the song, not the one you are looking at.
 
-Editing the list or the Preset Switching settings keeps the preview on screen. To end it, click the pause icon (or **Resume switching** on the Preset Switching page). The layer jumps straight to the entry it would be showing had you never previewed, and a notification confirms that switching has resumed:
+Editing the list or the Preset Switching settings keeps the preview on screen. To end it, click the pause icon (or **Resume switching** on the Preset Switching page). The layer jumps straight to the entry it would be showing had you never previewed, and a notification confirms that switching has resumed. Any list entry you had selected is deselected, so only the scheduled entry stays highlighted:
 
 - **timer and timeline triggers:** the entry for the current song position, so your clips play their chosen presets in order.
 - **projectm trigger:** the entry that was playing when the preview started, since projectM's own timing can't be worked out ahead of time.

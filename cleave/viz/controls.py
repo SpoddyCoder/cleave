@@ -213,6 +213,7 @@ class TuningControls:
             on_notification=self.show_notification,
             get_active_config_path=lambda: self._config_save.active_config_path,
             on_focus_preset_item=self._focus_preset_list_item,
+            on_clear_preset_item_focus=self._clear_preset_list_item_focus,
             layers_by_slot=layers_by_slot,
             catalog=self.library,
         )
@@ -855,6 +856,18 @@ class TuningControls:
         focus = self.shell_focus
         focus.inspector_cursor = descriptor
         focus.inspector_command_id = None
+
+    def _clear_preset_list_item_focus(self, slot: str) -> None:
+        """Drop the inspector selection from *slot*'s preset list entries."""
+        focus = self.shell_focus
+        cursor = focus.inspector_cursor
+        if (
+            cursor is not None
+            and cursor.kind is RowKind.TRACK_PRESET_LIST_ITEM
+            and cursor.slot == slot
+        ):
+            focus.inspector_cursor = None
+            focus.inspector_command_id = None
 
     def select_song_marker(self, index: int) -> None:
         """Select song marker *index* and show it on the Song Markers page."""

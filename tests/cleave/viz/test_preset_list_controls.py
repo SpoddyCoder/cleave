@@ -512,3 +512,22 @@ def test_prompt_populate_opens_on_the_last_source() -> None:
         controller.prompt_populate("layer_1")
         row = modal.view_state().form_rows[0]
         assert row.options[row.value] == "in order"
+
+
+def test_resume_clears_the_list_entry_selection() -> None:
+    from cleave.viz.row_kinds import RowDescriptor, RowKind
+    from tests.support.viz import make_controls, noop_layer_bindings
+
+    controls = make_controls(("layer_1",))
+    controls.preset_list._layer_bindings = noop_layer_bindings()
+    focus = controls.shell_focus
+    focus.inspector_cursor = RowDescriptor(
+        RowKind.TRACK_PRESET_LIST_ITEM, slot="layer_1", preset_index=2
+    )
+    controls.preset_list.resume("layer_1")
+    assert focus.inspector_cursor is None
+
+    other = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
+    focus.inspector_cursor = other
+    controls.preset_list.resume("layer_1")
+    assert focus.inspector_cursor == other
