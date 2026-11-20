@@ -429,3 +429,13 @@ def test_layer_switch_rows_step_their_flags_and_respect_the_lock() -> None:
     apply_field_horizontal(controls, locked, False, False)
     assert layer.locked is False
 
+
+
+def test_hold_toggle_resumes_the_layer_switching() -> None:
+    from cleave.viz.navigator import TOGGLE_HOLD
+
+    controls = SimpleNamespace(preset_list=MagicMock())
+    row_hotkeys.activate_header_toggle(
+        controls, TOGGLE_HOLD, RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
+    )
+    controls.preset_list.resume.assert_called_once_with("layer_1")

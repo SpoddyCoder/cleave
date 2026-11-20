@@ -249,13 +249,19 @@ A layer can move through presets on its own. On the **Preset Switching** page, t
 
 The rest of the page controls how long each preset plays and how it transitions into the next; the help column describes each setting.
 
+### When switching pauses
+
+Picking a preset yourself, in the preset browser or by playing a preset list entry, pauses that layer's switching so the preset stays while you look at it. While it is paused, a yellow pause icon shows on the layer's row in the navigator and on the title line of each of the layer's pages. Click it (or **Resume** on the Preset Switching page) to hand control back to the list.
+
+Switching also resumes on its own when you populate the list, add or remove an entry, or change any Preset Switching setting.
+
 ### The preset list
 
 The **Preset List** page holds the presets the layer cycles through, in order. It appears whenever switching is not off.
 
 - **Add to preset list** (or P from any of the layer's rows) appends the preset you are looking at.
 - **Populate** rebuilds the list from the current folder, shuffled or in order. With the timeline trigger it can also cast one preset for each time the layer comes in, picked by that cue's role.
-- **Enter** on an entry plays it immediately and pauses switching; **Resume** hands control back to the list.
+- **Enter** on an entry plays it immediately and pauses switching; click the layer's pause icon, or **Resume**, to hand control back to the list.
 - **Drag** an entry's handle, or press M, to reorder it, and press **Delete** to remove it.
 
 All of these are also in the entry's context menu.

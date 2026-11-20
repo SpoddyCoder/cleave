@@ -681,3 +681,34 @@ def test_post_fx_child_toggles_follow_their_switches() -> None:
     )
     # The limiter ignores the Post-FX lock.
     assert nodes["post_fx.limiter"].toggles == (NavToggle(TOGGLE_ENABLED, True),)
+
+
+def test_held_switching_adds_a_hold_toggle_to_the_layer() -> None:
+    from cleave.viz.navigator import TOGGLE_HOLD
+
+    session = TuningSession(
+        layer_z_order=["layer_1"],
+        layers={"layer_1": _layer("drums")},
+    )
+    layer = session.layers["layer_1"]
+    layer.preset_switching = "on"
+    node_id = layer_node_id("layer_1")
+
+    def toggle_ids() -> tuple[str, ...]:
+        nodes = {node.id: node for node in build_navigator(session, {"layers"})}
+        return tuple(_toggles(nodes[node_id]))
+
+    assert TOGGLE_HOLD not in toggle_ids()
+    layer.switching_paused = True
+    assert toggle_ids() == (TOGGLE_HOLD, TOGGLE_ENABLED, TOGGLE_SOLO, TOGGLE_LOCK)
+    compositing = layer_page_node_id("layer_1", "compositing")
+    first = page_toggles(session, compositing)[0]
+    assert first.toggle == NavToggle(TOGGLE_HOLD, True, False)
+    assert first.owner_id == node_id
+
+    layer.locked = True
+    nodes = {node.id: node for node in build_navigator(session, {"layers"})}
+    assert _toggles(nodes[node_id])[TOGGLE_HOLD].blocked is True
+
+    layer.preset_switching = "off"
+    assert TOGGLE_HOLD not in toggle_ids()

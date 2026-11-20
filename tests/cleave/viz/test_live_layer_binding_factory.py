@@ -169,14 +169,14 @@ def test_browse_while_switching_on_pauses_and_toasts_once() -> None:
         mock_apply.assert_not_called()
         assert seen == [
             "Browsing presets, switching paused - "
-            "use the resume button to continue."
+            "click the pause icon on the layer to resume."
         ]
         playlist.next()
         factory.on_preset_change("layer_1", playlist)
     assert layer.switching_paused is True
     assert seen == [
         "Browsing presets, switching paused - "
-        "use the resume button to continue."
+        "click the pause icon on the layer to resume."
     ]
 
 

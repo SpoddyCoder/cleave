@@ -19,6 +19,7 @@ from cleave.viz.navigator import (
     LAYER_PAGE_PRESET_LIST,
     LAYER_PAGE_PRESET_SWITCHING,
     TOGGLE_ENABLED,
+    TOGGLE_HOLD,
     TOGGLE_LOCK,
     TOGGLE_PREVIEW,
     TOGGLE_SOLO,
@@ -154,6 +155,10 @@ def activate_header_toggle(
     controls: TuningControls, toggle_id: str, desc: RowDescriptor
 ) -> None:
     """Run the header mutation for a navigator icon click."""
+    if toggle_id == TOGGLE_HOLD:
+        if desc.kind == RowKind.TRACK_HEADER and desc.slot is not None:
+            controls.preset_list.resume(desc.slot)
+        return
     if toggle_id == TOGGLE_ENABLED:
         apply_field_toggle_enabled(controls, desc)
         return

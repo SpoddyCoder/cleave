@@ -30,7 +30,8 @@ from cleave.viz.layer import StemLayer
 
 EMPTY_PRESET_LIST_NOTIFICATION = "No presets in switching list"
 BROWSING_PAUSED_NOTIFICATION = (
-    "Browsing presets, switching paused - use the resume button to continue."
+    "Browsing presets, switching paused - "
+    "click the pause icon on the layer to resume."
 )
 
 

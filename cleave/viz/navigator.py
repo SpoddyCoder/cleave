@@ -34,6 +34,7 @@ TOGGLE_SOLO = "solo"
 TOGGLE_PREVIEW = "preview"
 TOGGLE_LOCK = "lock"
 TOGGLE_ADD = "add"
+TOGGLE_HOLD = "hold"
 
 LAYER_PAGE_MILKDROP_PRESET = "milkdrop_preset"
 LAYER_PAGE_PRESET_SWITCHING = "preset_switching"
@@ -60,8 +61,9 @@ class NavToggle:
     """One clickable icon on a navigator row.
 
     ``id`` is ``TOGGLE_ENABLED``, ``TOGGLE_SOLO``, ``TOGGLE_PREVIEW``,
-    ``TOGGLE_LOCK``, or ``TOGGLE_ADD``. ``active`` is on, soloed, previewing,
-    or locked. ``blocked`` is true
+    ``TOGGLE_LOCK``, ``TOGGLE_ADD``, or ``TOGGLE_HOLD``. ``active`` is on,
+    soloed, previewing, or locked. A hold toggle is present only while the
+    layer's preset switching is held, and is always active. ``blocked`` is true
     while the section lock refuses the toggle, or Add has no room. ``inert``
     is true while a press is refused for another reason (the timeline owns
     layer visibility): the icon draws as usual and the pointer stays an arrow.
@@ -346,7 +348,13 @@ def page_status(
 
 
 # Title-line icons, in the navigator's column order.
-_PAGE_TOGGLE_ORDER = (TOGGLE_ENABLED, TOGGLE_SOLO, TOGGLE_PREVIEW, TOGGLE_LOCK)
+_PAGE_TOGGLE_ORDER = (
+    TOGGLE_HOLD,
+    TOGGLE_ENABLED,
+    TOGGLE_SOLO,
+    TOGGLE_PREVIEW,
+    TOGGLE_LOCK,
+)
 
 
 @dataclass(frozen=True)
@@ -367,8 +375,8 @@ def page_toggles(
     node_id: str,
     nodes: Sequence[NavNode] | None = None,
 ) -> tuple[PageToggle, ...]:
-    """The on/off, solo or preview, then lock icons that act for the
-    inspector page *node_id*, in the navigator's column order.
+    """The held-switching, on/off, solo or preview, then lock icons that act
+    for the inspector page *node_id*, in the navigator's column order.
 
     Each comes from the nearest node in the page's chain that has it, so a
     Post-FX child page acts on Post-FX, a layer page solos its layer, and a
@@ -544,7 +552,10 @@ def _layer_node(session: TuningSession, slot: str, *, expandable: bool) -> NavNo
 
 def _layer_toggles(session: TuningSession, slot: str) -> tuple[NavToggle, ...]:
     layer = session.layers[slot]
-    return (
+    hold: tuple[NavToggle, ...] = ()
+    if switching_held(session, slot):
+        hold = (NavToggle(TOGGLE_HOLD, True, layer.locked),)
+    return hold + (
         NavToggle(
             TOGGLE_ENABLED,
             layer.enabled,
@@ -554,6 +565,12 @@ def _layer_toggles(session: TuningSession, slot: str) -> tuple[NavToggle, ...]:
         NavToggle(TOGGLE_SOLO, session.solo_slot == slot),
         NavToggle(TOGGLE_LOCK, layer.locked),
     )
+
+
+def switching_held(session: TuningSession, slot: str) -> bool:
+    """True while browsing has paused the layer's preset switching."""
+    layer = session.layers[slot]
+    return layer.switching_paused and layer.preset_switching == "on"
 
 
 def _layer_page_visible(session: TuningSession, slot: str, page: str) -> bool:
