@@ -76,8 +76,10 @@ class SectionDef:
     children: tuple[SectionNode, ...] = ()
     append_dynamic_children: AppendDynamicChildrenFn | None = None
     card: str | None = None
-    # A command drawn as a button on the left of the page title's icon line.
+    # A command drawn as a button on the left of the page title's icon line,
+    # shown while *title_command_when* (if set) holds for the page's slot.
     title_command: str | None = None
+    title_command_when: PredicateFn | None = None
     # False: the page's buttons join its last group of rows instead of
     # sitting under a divider of their own.
     commands_divider: bool = True
@@ -599,14 +601,6 @@ PRESET_SWITCHING_ACTIVE = ConditionalRowsDef(
     ),
 )
 
-PRESET_SWITCHING_GO_TO_LIST = ConditionalRowsDef(
-    name="preset_switching_go_to_list",
-    predicate=_preset_switching_active,
-    children=(
-        SectionNode(commands=("layers.go_to_preset_list",)),
-    ),
-)
-
 TRACK_MILKDROP_PRESET_SECTION = SectionDef(
     header_kind=RowKind.TRACK_MILKDROP_PRESET_HEADER,
     context="per_slot",
@@ -615,9 +609,10 @@ TRACK_MILKDROP_PRESET_SECTION = SectionDef(
         SectionNode(leaf_kind=RowKind.TRACK_PRESET),
         SectionNode(divider=True),
         SectionNode(leaf_kind=RowKind.TRACK_BEAT),
-        SectionNode(conditional=PRESET_SWITCHING_GO_TO_LIST),
         SectionNode(conditional=PRESET_SWITCHING_PAUSED),
     ),
+    title_command="layers.go_to_preset_list",
+    title_command_when=_preset_switching_active,
 )
 
 TRACK_PRESET_SWITCHING_SECTION = SectionDef(

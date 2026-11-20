@@ -538,14 +538,7 @@ def test_preset_list_entry_help() -> None:
     }
 
 
-def test_preset_list_goto_and_resume_switching_help() -> None:
-    goto_sections = sections_for(RowKind.TRACK_PRESET_LIST_GOTO)
-    goto_description = _description_section(goto_sections)
-    goto_keyboard = _keyboard_section(goto_sections)
-    assert goto_description is not None
-    assert _says(goto_description.lines, 'preset list page')
-    assert dict(goto_keyboard.entries) == {"Enter": "open the preset list"}
-
+def test_resume_switching_help() -> None:
     resume_sections = sections_for(RowKind.TRACK_PRESET_SWITCHING_RESUME)
     resume_description = _description_section(resume_sections)
     resume_keyboard = _keyboard_section(resume_sections)

@@ -197,7 +197,6 @@ _ENTER_AFFORDANCES = frozenset(
 _INSPECTOR_COMMAND_KINDS = {
     "layers.add": RowKind.LAYER_MANAGEMENT_ADD,
     "layers.delete": RowKind.LAYER_MANAGEMENT_DELETE,
-    "layers.go_to_preset_list": RowKind.TRACK_PRESET_LIST_GOTO,
     "layers.resume_switching": RowKind.TRACK_PRESET_SWITCHING_RESUME,
     "timeline.generate": RowKind.TIMELINE_GENERATE,
     "timeline.reset": RowKind.TIMELINE_RESET,
@@ -273,11 +272,6 @@ _PRESET_LIST_ITEM_SECTION = HelpSection(
         ("Delete", "remove preset"),
         *_PRESET_CURATION_SHORTCUTS,
     ),
-)
-
-_PRESET_LIST_GOTO_SECTION = HelpSection(
-    "Go To Preset List",
-    (("Enter", "open the preset list"),),
 )
 
 _PRESET_SWITCHING_RESUME_SECTION = HelpSection(
@@ -500,8 +494,6 @@ def sections_for(
         primary = _value_step_section(row_kind)
     elif row_kind == RowKind.TRACK_PRESET_LIST_ITEM:
         primary = _PRESET_LIST_ITEM_SECTION
-    elif row_kind == RowKind.TRACK_PRESET_LIST_GOTO:
-        primary = _PRESET_LIST_GOTO_SECTION
     elif row_kind == RowKind.TRACK_PRESET_SWITCHING_RESUME:
         primary = _PRESET_SWITCHING_RESUME_SECTION
     elif behavior.affordance == RowAffordance.PATH_DIR:

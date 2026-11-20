@@ -360,7 +360,6 @@ def test_track_sub_row_kinds() -> None:
             RowKind.TRACK_PRESET_SWITCHING_RESUME,
             RowKind.TRACK_PRESET_LIST,
             RowKind.TRACK_PRESET_LIST_ITEM,
-            RowKind.TRACK_PRESET_LIST_GOTO,
             RowKind.TRACK_PRESET_DURATION,
             RowKind.TRACK_SOFT_CUT_DURATION,
             RowKind.TRACK_EASTER_EGG,
@@ -443,7 +442,6 @@ def test_only_effects_header_navigable_when_section_locked() -> None:
 
 def test_preset_list_actions_are_action_rows() -> None:
     for kind in (
-        RowKind.TRACK_PRESET_LIST_GOTO,
         RowKind.TRACK_PRESET_SWITCHING_RESUME,
     ):
         assert row_spec(kind).affordance == RowAffordance.COMMAND
@@ -937,13 +935,6 @@ def test_format_row_value_timeline_cuts() -> None:
     )
 
 
-def test_go_to_preset_list_is_full_line_action() -> None:
-    goto_field = row_spec(RowKind.TRACK_PRESET_LIST_GOTO)
-    assert goto_field.present_style == RowPresentStyle.FULL_LINE
-    assert goto_field.panel_label == "Go to preset list"
-    assert row_blocked_by_section_lock(RowKind.TRACK_PRESET_LIST_GOTO) is False
-
-
 def test_preset_row_add_button_sits_before_arrows() -> None:
     spec = row_spec(RowKind.TRACK_PRESET)
     assert spec.nav_buttons_before_value is True
@@ -1016,7 +1007,6 @@ def test_resume_switching_row_only_while_paused() -> None:
     index = resume_index(shown)
     assert index is not None
     assert shown[index].status == "Previewing presets"
-    assert shown[index - 1].command_ids == ("layers.go_to_preset_list",)
 
 
 def test_apply_field_horizontal_track_header_solo_and_expand() -> None:

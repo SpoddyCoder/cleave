@@ -23,7 +23,6 @@ class RowKind(Enum):
     TRACK_PRESET_SWITCHING_RESUME = auto()
     TRACK_PRESET_LIST = auto()
     TRACK_PRESET_LIST_ITEM = auto()
-    TRACK_PRESET_LIST_GOTO = auto()
     TRACK_PRESET_DURATION = auto()
     TRACK_SOFT_CUT_DURATION = auto()
     TRACK_EASTER_EGG = auto()

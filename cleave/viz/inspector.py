@@ -137,7 +137,17 @@ def page_section(state: TuningViewState, node_id: str) -> SectionDef | None:
 def page_title_command(state: TuningViewState, node_id: str) -> str | None:
     """Command id for the button on the left of the page title's icon line, if any."""
     section = page_section(state, node_id)
-    return None if section is None else section.title_command
+    if section is None or section.title_command is None:
+        return None
+    if section.title_command_when is None:
+        return section.title_command
+    slot = layer_slot_of(node_id) or timeline_row_slot_of(node_id)
+    if slot is not None and slot not in state.tracks:
+        return None
+    probe = RowDescriptor(RowKind.TRACK_HEADER, slot=slot, card=section.card)
+    if not section.title_command_when(state, probe):
+        return None
+    return section.title_command
 
 
 def build_inspector_rows(

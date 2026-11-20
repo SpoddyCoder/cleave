@@ -288,7 +288,6 @@ _MILKDROP_PRESET_PAGE_KINDS = frozenset(
         RowKind.TRACK_PRESET_DIR,
         RowKind.TRACK_PRESET,
         RowKind.TRACK_BEAT,
-        RowKind.TRACK_PRESET_LIST_GOTO,
     }
 )
 _COMPOSITING_PAGE_KINDS = frozenset({RowKind.TRACK_BLEND, RowKind.TRACK_OPACITY})

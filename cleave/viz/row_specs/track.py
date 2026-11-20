@@ -483,12 +483,6 @@ def _apply_preset_dir_parent_action(
     controls.layer_mutations.parent_directory(slot)
 
 
-def _apply_preset_list_goto_action(
-    controls: TuningControls, _desc: RowDescriptor
-) -> None:
-    command_by_id("layers.go_to_preset_list").run(controls)
-
-
 def _apply_preset_add_to_list_action(
     controls: TuningControls, desc: RowDescriptor
 ) -> None:
@@ -757,19 +751,6 @@ SPECS: dict[RowKind, RowSpec] = {
         help_mode_entries=_PRESET_LIST_MARKER_HELP_ENTRIES,
         can_enter_move_mode=True,
         drag_reorder=True,
-        parent_group="track",
-    ),
-    RowKind.TRACK_PRESET_LIST_GOTO: RowSpec(
-        affordance=RowAffordance.COMMAND,
-        panel_label="Go to preset list",
-        present_style=RowPresentStyle.FULL_LINE,
-        apply_horizontal=noop_horizontal,
-        apply_action=_apply_preset_list_goto_action,
-        fit_strategy=FitStrategy.NONE,
-        help_title="Go To Preset List",
-        help_description=(
-            "Opens this layer's Preset List page, under Preset Switching.",
-        ),
         parent_group="track",
     ),
     RowKind.TRACK_PRESET_DURATION: RowSpec(

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from cleave.effects.registry import effect_roster
-from cleave.viz.inspector import build_inspector_rows
+from cleave.viz.inspector import build_inspector_rows, page_title_command
 from cleave.viz.navigator import layer_node_id, layer_page_node_id
 from cleave.viz.row_kinds import RowKind
 from cleave.viz.row_sections import (
@@ -64,27 +64,22 @@ def test_milkdrop_preset_page_holds_dir_preset_and_beat() -> None:
         RowKind.TRACK_PRESET,
         RowKind.TRACK_BEAT,
     ]
-    rows = build_inspector_rows(
-        minimal_view_state(tracks={"layer_1": _track_block()}),
-        layer_page_node_id("layer_1", "milkdrop_preset"),
-    )
-    assert rows[-1].command_ids == ("layers.go_to_preset_list",)
+    page_id = layer_page_node_id("layer_1", "milkdrop_preset")
+    state = minimal_view_state(tracks={"layer_1": _track_block()})
+    assert all(not row.command_ids for row in build_inspector_rows(state, page_id))
+    assert page_title_command(state, page_id) == "layers.go_to_preset_list"
 
 
 def test_go_to_preset_list_hides_while_switching_is_off() -> None:
-    rows = build_inspector_rows(
-        minimal_view_state(
-            tracks={
-                "layer_1": _track_block(
-                    preset_switching="off", preset_switching_trigger="off"
-                )
-            }
-        ),
-        layer_page_node_id("layer_1", "milkdrop_preset"),
+    state = minimal_view_state(
+        tracks={
+            "layer_1": _track_block(
+                preset_switching="off", preset_switching_trigger="off"
+            )
+        }
     )
-    assert all(
-        "layers.go_to_preset_list" not in row.command_ids for row in rows
-    )
+    page_id = layer_page_node_id("layer_1", "milkdrop_preset")
+    assert page_title_command(state, page_id) is None
 
 
 def test_preset_switching_trigger_off_hides_switching_rows() -> None:

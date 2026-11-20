@@ -275,7 +275,7 @@ Editing the list or the Preset Switching settings keeps the preview on screen. T
 
 The **Preset List** page holds the presets the layer cycles through, in order. It appears whenever switching is not off.
 
-- The **+** button on the Milkdrop Preset page's preset row, just left of its arrows (or P from any of the layer's rows), appends the preset you are looking at. That page's **Go to preset list** button opens the Preset List page.
+- The **+** button on the Milkdrop Preset page's preset row, just left of its arrows (or P from any of the layer's rows), appends the preset you are looking at. That page's **Go to preset list** button, at the left of the icon line under its title, opens the Preset List page.
 - **Populate list**, the button at the left of the page's icon line under its title, rebuilds the whole list. Under **pick from**, choose **shuffled (current directory)** or **in order (current directory)** to fill it from the layer's preset folder. With the timeline trigger you can also choose **clip roles**, which casts one preset for each of the layer's clips, picked by that clip's role.
 - **Enter** on an entry previews it; click the layer's pause icon, or **Resume switching**, to return to the schedule. Enter on the highlighted scheduled entry does not preview it, since it is already playing; during a preview it resumes switching.
 - **Drag** an entry's handle, or press M, to reorder it, and press **Delete** to remove it.
