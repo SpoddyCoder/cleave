@@ -131,6 +131,7 @@ rows apply these roles, including intentional exceptions.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 from cleave.config_schema.editor import DEFAULT_UI_SCALE, clamp_ui_scale
@@ -193,6 +194,26 @@ def ui_px(value: float) -> int:
 def ui_chrome_px(value: float) -> float:
     """A shell pixel value tuned at a factor of 1.0, at the live UI scale."""
     return value * shell_scale()
+
+
+# Dear ImGui's default ItemSpacing.y, before the shell scale.
+IMGUI_ITEM_SPACING_Y = 4.0
+# Extra space above and below each navigator, inspector, menu, and dialog
+# row's highlight, so it clears the text and a focused row's outline clears
+# its segments, combo box, or buttons.
+ROW_PAD_Y = 2.0
+
+
+def row_half_pad_px() -> int:
+    """Space above and below a padded row's text line, in whole pixels.
+
+    Half the item spacing plus ROW_PAD_Y. Shell rows and dialog rows share it,
+    so a row and its square icon buttons are the same height everywhere. The
+    item spacing is truncated the way ImGui's ``ScaleAllSizes`` truncates it.
+    """
+    scale = shell_scale()
+    spacing = math.trunc(IMGUI_ITEM_SPACING_Y * scale) + 2.0 * ROW_PAD_Y * scale
+    return math.floor(spacing * 0.5 + 0.5)
 
 
 @dataclass(frozen=True)

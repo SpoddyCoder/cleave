@@ -2433,7 +2433,7 @@ def test_set_cut_type_opens_one_form_with_a_live_count() -> None:
     assert [row.label for row in modal_view.form_rows] == ["cut type", "applies to"]
     assert modal_view.form_rows[0].options == ("hard", "soft", "none")
     assert modal_view.form_info == "(changes 2 of 2 clip edges)"
-    _set_form_field(controls, "applies to", "markers only")
+    _set_form_field(controls, "applies to", "song markers only")
     assert controls.modal_host.view_state().form_info == "(changes 1 of 2 clip edges)"
     assert controls.session.timeline.lanes == before
 
@@ -2443,11 +2443,11 @@ def test_set_cut_type_remembers_its_values() -> None:
     controls.session.timeline.lanes = {"layer_1": _lane(None, (4.0, True))}
     _focus_timeline_set_cut_type(controls)
     _press_focused(controls, keydown(pygame.K_RETURN))
-    _set_cut_type(controls, "hard", "except markers")
+    _set_cut_type(controls, "hard", "except song markers")
     _press_focused(controls, keydown(pygame.K_RETURN))
     cut, scope = controls.modal_host.view_state().form_rows
     assert cut.options[cut.value] == "hard"
-    assert scope.options[scope.value] == "except markers"
+    assert scope.options[scope.value] == "except song markers"
 
 
 def test_set_cut_type_hard_on_markers_only() -> None:
@@ -2464,7 +2464,7 @@ def test_set_cut_type_hard_on_markers_only() -> None:
     }
     _focus_timeline_set_cut_type(controls)
     _press_focused(controls, keydown(pygame.K_RETURN))
-    _set_cut_type(controls, "hard", "markers only")
+    _set_cut_type(controls, "hard", "song markers only")
     assert not controls.modal_host.active
     assert controls.session.timeline.lanes["layer_1"].cues == [
         SlotCue(t=4.0, level=1.0, cut="soft"),
@@ -2510,7 +2510,7 @@ def test_set_cut_type_soft_except_markers() -> None:
     }
     _focus_timeline_set_cut_type(controls)
     _press_focused(controls, keydown(pygame.K_RETURN))
-    _set_cut_type(controls, "soft", "except markers")
+    _set_cut_type(controls, "soft", "except song markers")
     assert controls.session.timeline.lanes["layer_1"].cues == [
         SlotCue(t=4.0, level=1.0, cut="soft"),
         SlotCue(t=10.0, level=0.0),
@@ -2531,7 +2531,7 @@ def test_set_cut_type_none_on_markers_only() -> None:
     }
     _focus_timeline_set_cut_type(controls)
     _press_focused(controls, keydown(pygame.K_RETURN))
-    _set_cut_type(controls, "none", "markers only")
+    _set_cut_type(controls, "none", "song markers only")
     assert not controls.modal_host.active
     assert controls.session.timeline.lanes["layer_1"].cues == [
         SlotCue(t=4.0, level=1.0, cut="hard"),

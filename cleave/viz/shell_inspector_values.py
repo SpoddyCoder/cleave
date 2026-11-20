@@ -18,7 +18,6 @@ from cleave.viz.choice_widgets import (
     draw_choice_list,
     draw_combo,
     draw_segments,
-    paint_stepper_hover,
 )
 from cleave.viz.breadcrumbs import CRUMB_ELLIPSIS, CRUMB_SEPARATOR, fit_crumbs
 from cleave.viz.icon_button import (
@@ -45,6 +44,7 @@ from cleave.viz.row_spec import (
 )
 from cleave.viz.shell_context import ShellContext
 from cleave.viz.shell_widgets import (
+    cluster_widths,
     draw_button,
     ImguiTextSizer,
     row_text_y,
@@ -57,6 +57,7 @@ from cleave.viz.theme import palette, tuning_ui_metrics, ui_chrome_px
 from cleave.viz.tooltips import show_tooltip
 from cleave.viz.value_nudge import (
     centre_pad,
+    nudge_arrow_box,
     nudge_arrow_rects,
     nudge_hit_at,
     nudge_press_skips_row,
@@ -163,7 +164,7 @@ class ValueControls:
         rect_min = imgui.get_item_rect_min()
         rect_max = imgui.get_item_rect_max()
         pad = imgui.get_style().frame_padding.x
-        text_w = sum(imgui.calc_text_size(text).x for text, _color in parts)
+        text_w = sum(cluster_widths(parts))
         right = rect_max.x - pad - text_w - ui_chrome_px(_SWATCH_GAP)
         y = row_text_y(rect_min.y)
         swatch_min = imgui.ImVec2(right - line * _SWATCH_ASPECT, y)
@@ -383,7 +384,7 @@ class ValueControls:
             return
         rect_min = imgui.get_item_rect_min()
         rect_max = imgui.get_item_rect_max()
-        widths = [imgui.calc_text_size(text).x for text, _color in parts]
+        widths = cluster_widths(parts)
         pad = imgui.get_style().frame_padding.x
         arrows_max_y = rect_max.y
         if two_line:
@@ -436,9 +437,11 @@ class ValueControls:
         rect: NudgeRect,
         forward: bool,
     ) -> None:
-        paint_stepper_hover(
-            (rect.min_x, rect.min_y, rect.max_x - rect.min_x, rect.max_y - rect.min_y),
-            forward=forward,
+        paint_box(
+            nudge_arrow_box(rect, forward=forward),
+            ">" if forward else "<",
+            color=palette().disabled,
+            hovered=True,
         )
 
     def fixed_width_value(self, kind: RowKind, text: str) -> str:

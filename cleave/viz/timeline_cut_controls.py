@@ -26,7 +26,7 @@ ApplyCutScope = Literal["all", "except_markers", "markers_only"]
 
 _CUT_OPTIONS: tuple[CutType, ...] = ("hard", "soft", "none")
 _SCOPE_OPTIONS: tuple[ApplyCutScope, ...] = ("all", "except_markers", "markers_only")
-_SCOPE_LABELS = ("all clips", "except markers", "markers only")
+_SCOPE_LABELS = ("all clips", "except song markers", "song markers only")
 _DEFAULT_CUT_INDEX = 1
 
 _SET_CUT_HELP = (
@@ -151,6 +151,7 @@ class TimelineCutController:
                         self._last_values["scope"],
                         help=_SCOPE_HELP,
                         option_help=_SCOPE_OPTION_HELP,
+                        vertical=True,
                     ),
                 ),
                 confirm_label="Set cut type",

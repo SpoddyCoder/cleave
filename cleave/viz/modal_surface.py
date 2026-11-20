@@ -48,6 +48,7 @@ from cleave.viz.modal_layout import (
     form_heading_height,
     form_row_height,
     form_row_pad_y,
+    form_value_offset,
     form_section_indent,
     lines_block_height,
     measure_button_row,
@@ -469,6 +470,7 @@ def _draw_form_rows(
     held_row, held_step = view.form_step_held or (None, None)
     left = ox + panel_pad_x()
     right = ox + panel_w - panel_pad_x()
+    value_x = left + form_value_offset(measure, view.form_rows)
     for index, row in enumerate(view.form_rows):
         if row.heading is not None:
             heading_h = form_heading_height(line_h, first=index == 0)
@@ -487,14 +489,14 @@ def _draw_form_rows(
         _text(draw, row_left, text_y, row.label, label_rgb)
         width = form_control_width(measure, row)
         if row.vertical:
-            controls[index] = (right - width, y, width, height)
+            controls[index] = (value_x, y, width, height)
             hits.extend(
                 _draw_form_radio_list(
                     draw,
                     measure,
                     row,
                     index,
-                    left=right - width,
+                    left=value_x,
                     right=right,
                     y=y,
                     line_h=line_h,
@@ -503,7 +505,12 @@ def _draw_form_rows(
             )
             y += height
             continue
-        control = (right - width, text_y, width, line_h)
+        # A stepper's arrows are square buttons the row tall, like the
+        # inspector's. Segments and combos sit on the text line.
+        if row.stepper:
+            control = (value_x, y, width, height)
+        else:
+            control = (value_x, text_y, width, line_h)
         controls[index] = control
         parts = _draw_form_control(
             draw,

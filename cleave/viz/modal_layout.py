@@ -15,7 +15,7 @@ from cleave.viz.modal import (
 from cleave.viz.choice_layout import choice_width, radio_width, stepper_width
 from cleave.viz.progress_bar import progress_bar_height
 from cleave.viz.text_fit import TextSizer, fit_text_to_width, wrap_text_to_width
-from cleave.viz.theme import BORDER_WIDTH, tuning_ui_metrics, ui_px
+from cleave.viz.theme import BORDER_WIDTH, row_half_pad_px, tuning_ui_metrics, ui_px
 
 # Message wrap width and text-panel height cap, as a fraction of the viewport.
 MESSAGE_MAX_SCREEN_FRACTION = 0.5
@@ -71,7 +71,8 @@ def button_pad_y() -> int:
 
 
 def form_row_pad_y() -> int:
-    return ui_px(3)
+    """Space above and below a row's text: the same as an inspector row."""
+    return row_half_pad_px()
 
 
 def form_label_gap() -> int:
@@ -231,8 +232,25 @@ def form_control_width(measure: TextMeasure, row: FormRowView) -> int:
     if row.vertical:
         return radio_width(measure, row.options)
     if row.stepper:
-        return stepper_width(measure, row.options)
+        return stepper_width(
+            measure, row.options, side=form_row_height(measure.get_linesize())
+        )
     return choice_width(measure, row.options)
+
+
+def form_value_offset(measure: TextMeasure, rows: tuple[FormRowView, ...]) -> int:
+    """Where every field's control starts, from the form's left edge: a gap
+    past the widest label (with its section indent), so the values line up in
+    one column.
+    """
+    widest = max(
+        (
+            (form_section_indent() if row.indented else 0) + measure.size(row.label)[0]
+            for row in rows
+        ),
+        default=0,
+    )
+    return widest + form_label_gap()
 
 
 def measure_form(
@@ -243,15 +261,14 @@ def measure_form(
 ) -> tuple[int, int]:
     """Width and height of the field rows."""
     line_h = measure.get_linesize()
+    value_x = form_value_offset(measure, state.form_rows)
     width = 0
     height = 0
     for index, row in enumerate(state.form_rows):
         if row.heading is not None:
             width = max(width, measure.size(row.heading)[0])
             height += form_heading_height(line_h, first=index == 0)
-        indent = form_section_indent() if row.indented else 0
-        row_w = indent + measure.size(row.label)[0] + form_label_gap()
-        width = max(width, row_w + form_control_width(measure, row))
+        width = max(width, value_x + form_control_width(measure, row))
         height += form_field_height(line_h, row)
     return width, height
 

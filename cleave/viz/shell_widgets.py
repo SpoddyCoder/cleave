@@ -9,15 +9,20 @@ from imgui_bundle import imgui
 
 from cleave.viz.button_paint import ButtonState, ButtonTone, button_text_role, paint_button
 from cleave.viz.drag_reorder import DRAG_PRESET, RowDragGesture
-from cleave.viz.icon_button import text_box
+from cleave.viz.icon_button import icon_gap, text_box
 from cleave.viz.imgui_icon_button import box_button, paint_box
-from cleave.viz.imgui_theme import rgba
+from cleave.viz.imgui_theme import rgba, row_band_side
 from cleave.viz.material_icons import DRAG_INDICATOR_GLYPH
 from cleave.viz.pointer_cursor import PointerShape, request_pointer
 from cleave.viz.shell_context import ShellContext
 from cleave.viz.theme import palette
 from cleave.viz.tooltips import show_tooltip
-from cleave.viz.value_nudge import nudge_cluster_origin_x, selectable_text_y
+from cleave.viz.value_nudge import (
+    STEPPER_GLYPHS,
+    cluster_part_widths,
+    nudge_cluster_origin_x,
+    selectable_text_y,
+)
 
 if TYPE_CHECKING:
     from cleave.viz.inline_edit import InlineTextView
@@ -96,19 +101,40 @@ def space_lead(text: str) -> str:
     return " " * math.ceil(imgui.calc_text_size(text).x / space)
 
 
+def cluster_widths(parts: list[tuple[str, imgui.ImVec4]]) -> list[float]:
+    """Painted width of each value part; stepper arrows are square slots."""
+    return cluster_part_widths(
+        [text for text, _color in parts],
+        lambda text: imgui.calc_text_size(text).x,
+        row_band_side(),
+        icon_gap(),
+    )
+
+
 def draw_aligned_parts(parts: list[tuple[str, imgui.ImVec4]]) -> None:
+    """Paint the value parts right-aligned on the row's first line.
+
+    A stepper arrow paints as a square box on the outer edge of its slot.
+    """
     if not parts:
         return
-    widths = [imgui.calc_text_size(text).x for text, _color in parts]
+    widths = cluster_widths(parts)
     rect_min = imgui.get_item_rect_min()
     rect_max = imgui.get_item_rect_max()
     pad = imgui.get_style().frame_padding.x
     x = nudge_cluster_origin_x(rect_max.x, widths, pad)
     # Same line as the selectable label. Navigator badges use this too.
     y = row_text_y(rect_min.y)
+    side = row_band_side()
+    gap = icon_gap()
     draw = imgui.get_window_draw_list()
     for (text, color), width in zip(parts, widths):
-        draw.add_text(imgui.ImVec2(x, y), imgui.get_color_u32(color), text)
+        glyph = STEPPER_GLYPHS.get(text)
+        if glyph is None:
+            draw.add_text(imgui.ImVec2(x, y), imgui.get_color_u32(color), text)
+        else:
+            box_x = x + gap if glyph == ">" else x
+            paint_box((box_x, rect_min.y, side, side), glyph, color=color)
         x += width
 
 

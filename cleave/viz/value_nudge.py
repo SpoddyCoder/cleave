@@ -1,13 +1,14 @@
 """Side arrows on an adjustable inspector value.
 
-The glyphs are draw-list text. Hit tests use the painted glyph widths, and a
+Each arrow is a square box the first line tall, like the row's icon buttons,
+with an icon gap between it and the value. Hit tests use those slots, and a
 hold repeats with the same clock as Left/Right.
 """
 
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -37,6 +38,26 @@ def value_parts(
         (STEPPER_BACK, bracket),
         (value, color),
         (STEPPER_FORWARD, bracket),
+    ]
+
+
+# The arrow each stepper part paints in its square box.
+STEPPER_GLYPHS = {STEPPER_BACK: "<", STEPPER_FORWARD: ">"}
+
+
+def cluster_part_widths(
+    texts: Sequence[str],
+    text_width: Callable[[str], float],
+    side: float,
+    gap: float,
+) -> list[float]:
+    """Painted width of each value part.
+
+    A stepper arrow takes a square of *side* plus the *gap* before the value.
+    Any other part is its text width.
+    """
+    return [
+        side + gap if text in STEPPER_GLYPHS else text_width(text) for text in texts
     ]
 
 
@@ -108,8 +129,8 @@ def nudge_arrow_rects(
 ) -> tuple[NudgeRect, NudgeRect]:
     """Left and right glyph hit rects.
 
-    *part_widths* is the painted cluster: back glyph, value, forward glyph.
-    Glyph width includes the gap space. Height is the row item rect. The
+    *part_widths* is the painted cluster: back slot, value, forward slot.
+    Slot width includes the gap before the value. Height is the row item rect. The
     value string is the span between the two rects and is not a hit.
     """
     back_w, value_w, forward_w = part_widths
@@ -122,6 +143,18 @@ def nudge_arrow_rects(
         forward_x, row_min_y, forward_x + forward_w, row_max_y
     )
     return back, forward
+
+
+def nudge_arrow_box(
+    rect: NudgeRect, *, forward: bool
+) -> tuple[float, float, float, float]:
+    """The square button in an arrow's slot, on its outer edge.
+
+    The slot's height is the side. The gap to the value is left unpainted.
+    """
+    side = rect.max_y - rect.min_y
+    x = rect.max_x - side if forward else rect.min_x
+    return x, rect.min_y, side, side
 
 
 @dataclass(frozen=True)

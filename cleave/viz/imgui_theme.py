@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import math
 from collections.abc import Iterator
 from contextlib import contextmanager
 
 from imgui_bundle import imgui
 
-from cleave.viz.theme import palette, ui_chrome_px
+from cleave.viz.theme import palette, row_half_pad_px
 
 
 def imgui_color_roles() -> dict[imgui.Col_, tuple[tuple[int, int, int], float]]:
@@ -128,22 +127,18 @@ _STYLE_SIZE_FIELDS = (
 )
 
 
-# Extra space above and below each navigator, inspector, and menu row's
-# highlight, so it clears the text and a focused row's outline clears its
-# segments, combo box, or buttons.
-ROW_PAD_Y = 2.0
-
 
 def padded_row_spacing_y() -> float:
     """Item spacing between padded rows.
 
-    Selectables grow by half the item spacing above and below, so this adds
-    ROW_PAD_Y to each side of every row's highlight. Whole pixels keep the
-    measured navigator height the same from frame to frame, and an even count
-    splits evenly above and below, so the text stays centred in its fill.
+    Selectables grow by half the item spacing above and below, so this puts
+    ``row_half_pad_px`` above and below every row's text. Whole pixels keep
+    the measured navigator height the same from frame to frame, and an even
+    count splits evenly above and below, so the text stays centred in its
+    fill. It does not read the live style, so it holds inside
+    ``padded_rows``.
     """
-    spacing = imgui.get_style().item_spacing.y + 2.0 * ui_chrome_px(ROW_PAD_Y)
-    return 2.0 * math.floor(spacing * 0.5 + 0.5)
+    return 2.0 * row_half_pad_px()
 
 
 def row_band(text_top_y: float) -> tuple[float, float]:

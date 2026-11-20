@@ -5,13 +5,17 @@ from __future__ import annotations
 from dataclasses import replace
 
 from cleave.viz.brand import Logo
-from cleave.viz.modal import ModalKind, ModalLabeledLine, ModalViewState, TextFocusRegion
+from cleave.choice import ChoiceKind
+from cleave.viz.modal import FormRowView, ModalKind, ModalLabeledLine, ModalViewState, TextFocusRegion
 from cleave.viz.modal_layout import (
     BANNER_HEIGHT_LINES,
     CARET_WIDTH,
     banner_size,
     MESSAGE_MAX_SCREEN_FRACTION,
     caret_index_at_point,
+    form_label_gap,
+    form_section_indent,
+    form_value_offset,
     measure_labeled_lines,
     measure_panel,
     measure_text_panel,
@@ -237,3 +241,16 @@ def test_progress_banner_fits_the_fixed_panel() -> None:
     size = banner_size(view, 200, screen_w=800)
     assert size is not None
     assert size[0] <= progress_content_width(800)
+
+
+def test_form_values_start_in_one_column_past_the_widest_label() -> None:
+    measure = _FixedMeasure()
+    rows = (
+        FormRowView("cut type", ChoiceKind.SEGMENT, ("hard", "soft"), 0, False),
+        FormRowView(
+            "applies to", ChoiceKind.SEGMENT, ("all", "some"), 0, False, vertical=True
+        ),
+        FormRowView("fps", ChoiceKind.SEGMENT, ("30", "60"), 0, False, indented=True),
+    )
+    widest = max(100, form_section_indent() + 30)
+    assert form_value_offset(measure, rows) == widest + form_label_gap()

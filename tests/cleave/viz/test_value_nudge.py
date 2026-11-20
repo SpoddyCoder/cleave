@@ -15,8 +15,11 @@ from cleave.viz.key_repeat import (
 )
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_spec import apply_field_horizontal, row_spec
+from cleave.viz.choice_layout import STEPPER_BACK, STEPPER_FORWARD
 from cleave.viz.value_nudge import (
     NudgeRect,
+    cluster_part_widths,
+    nudge_arrow_box,
     ValueNudgeHold,
     nudge_arrow_rects,
     nudge_hit_at,
@@ -246,3 +249,20 @@ def test_tick_releases_when_the_button_is_up_or_a_modal_is_open() -> None:
         controls.tick(INITIAL_DELAY_SEC)
     assert _opacity(controls) == start + 3
     assert controls.value_nudge_armed is False
+
+
+def test_stepper_arrows_take_square_slots_plus_gap() -> None:
+    widths = cluster_part_widths(
+        [STEPPER_BACK, "  50%", STEPPER_FORWARD], lambda text: 7.0 * len(text), 20.0, 2.0
+    )
+    assert widths == [22.0, 35.0, 22.0]
+
+
+def test_plain_value_keeps_its_text_width() -> None:
+    assert cluster_part_widths(["On"], lambda text: 7.0 * len(text), 20.0, 2.0) == [14.0]
+
+
+def test_arrow_box_is_square_on_the_slot_outer_edge() -> None:
+    slot = NudgeRect(100.0, 10.0, 122.0, 30.0)
+    assert nudge_arrow_box(slot, forward=False) == (100.0, 10.0, 20.0, 20.0)
+    assert nudge_arrow_box(slot, forward=True) == (102.0, 10.0, 20.0, 20.0)

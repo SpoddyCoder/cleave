@@ -70,6 +70,7 @@ from cleave.viz.shell_inspector_title import (
 from cleave.viz.row_paint import RowState, row_band
 from cleave.viz.row_hotkeys import activate_header_toggle, node_control_descriptor
 from cleave.viz.shell_widgets import (
+    cluster_widths,
     PANEL_BORDER_PX,
     drag_handle_lead,
     draw_aligned_parts,
@@ -250,7 +251,7 @@ def _draw_two_line_row_text(
     on_marker = False
     cluster_x = nudge_cluster_origin_x(
         right_x,
-        [imgui.calc_text_size(text).x for text, _color in parts],
+        cluster_widths(parts),
         pad,
     ) - cluster_reserve
     if problem is not None:
@@ -761,7 +762,7 @@ class InspectorPanel:
             side = rect_max.y - rect_min.y - (line if look.two_line else 0.0)
             buttons_end_x = nudge_cluster_origin_x(
                 rect_max.x,
-                [imgui.calc_text_size(text).x for text, _color in parts],
+                cluster_widths(parts),
                 imgui.get_style().frame_padding.x,
             ) - icon_gap()
             buttons_reserve = len(spec.nav_buttons) * (side + icon_gap())

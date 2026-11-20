@@ -15,11 +15,8 @@ from imgui_bundle import imgui
 
 from cleave.viz.choice_layout import (
     COMBO_CARET,
-    FRect,
     RADIO_OFF,
     RADIO_ON,
-    STEPPER_BACK,
-    STEPPER_FORWARD,
     Rect,
     choice_list_pad_y,
     choice_list_rects,
@@ -27,6 +24,7 @@ from cleave.viz.choice_layout import (
     rect_contains,
     rect_index_at,
     segment_rects,
+    stepper_arrow_box,
     stepper_arrow_rects,
 )
 from cleave.viz.button_paint import (
@@ -36,7 +34,6 @@ from cleave.viz.button_paint import (
     paint_button,
 )
 from cleave.viz.choice_list import CHOICE_LIST_MAX_VISIBLE, ChoiceListView
-from cleave.viz.icon_button import text_box
 from cleave.viz.imgui_icon_button import paint_box
 from cleave.viz.imgui_theme import floating_surface, rgba
 from cleave.viz.pointer_cursor import PointerShape, request_pointer
@@ -261,29 +258,6 @@ def draw_radio_list(
         )
 
 
-def paint_stepper_hover(arrow: FRect, *, forward: bool) -> None:
-    """Light one stepper arrow: the hover wash, then its glyph in the hover colour.
-
-    ``arrow`` covers the painted glyph and its gap space, and is the band
-    tall. The lit box is the arrow character plus a space, centred on the
-    character. The inspector and form dialogs share this, so a stepper looks
-    the same in both.
-    """
-    x, y, _w, h = arrow
-    char = ">" if forward else "<"
-    char_w = imgui.calc_text_size(char).x
-    space_w = imgui.calc_text_size(" ").x
-    # The gap space sits before ">" and after "<"; centre the box on the char.
-    left = x + (space_w if forward else 0.0) - space_w * 0.5
-    paint_box(
-        text_box(left, char_w, space_w, (y, y + h)),
-        char,
-        color=palette().disabled,
-        hovered=True,
-        icon=False,
-    )
-
-
 def draw_stepper(
     draw: imgui.ImDrawList,
     measure: TextSizer,
@@ -297,17 +271,13 @@ def draw_stepper(
 ) -> tuple[Rect, Rect]:
     """``< value >`` with the value centred. Returns the back and forward arrows.
 
-    Drawn like an inspector stepper: dim arrows, and the arrow under the
-    pointer lit. ``held`` names an arrow being held (True for forward), which
-    stays lit while the pointer wanders. An arrow at its end of the range does
-    not light and keeps the arrow pointer.
+    Dim arrows in square boxes the row tall, like icon buttons, and the arrow
+    under the pointer lit. ``held`` names an arrow being held (True for
+    forward), which stays lit while the pointer wanders. An arrow at its end
+    of the range does not light and keeps the arrow pointer.
     """
-    back, forward = stepper_arrow_rects(measure, rect)
-    x, y, w, h = rect
-    text_y = y + (h - measure.size(text)[1]) // 2
+    back, forward = stepper_arrow_rects(rect)
     _centred_text(draw, measure, rect, text, palette().value)
-    draw.add_text(_vec(back[0], text_y), _u32(palette().disabled), STEPPER_BACK)
-    draw.add_text(_vec(forward[0], text_y), _u32(palette().disabled), STEPPER_FORWARD)
     mx, my = _mouse()
     lit: bool | None = held
     if lit is None and hover:
@@ -317,8 +287,12 @@ def draw_stepper(
             lit = True
     if lit is not None:
         request_pointer(PointerShape.HAND)
-        paint_stepper_hover(
-            tuple(float(v) for v in (forward if lit else back)), forward=lit
+    for slot, is_forward in ((back, False), (forward, True)):
+        paint_box(
+            tuple(float(v) for v in stepper_arrow_box(slot, forward=is_forward)),
+            ">" if is_forward else "<",
+            color=palette().disabled,
+            hovered=lit is is_forward,
         )
     return back, forward
 

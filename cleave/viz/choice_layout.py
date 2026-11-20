@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from cleave.choice import ChoiceKind, choice_kind
+from cleave.viz.icon_button import icon_gap
 from cleave.viz.text_fit import TextSizer
 from cleave.viz.theme import ui_px
 
@@ -18,8 +19,8 @@ FRect = tuple[float, float, float, float]
 
 # In the shell glyph ranges (the navigator's open twisty).
 COMBO_CARET = "▾"
-# A stepper's arrows. The space sits between each arrow and the value, and
-# belongs to the arrow's hit area.
+# A stepper's arrows as inspector value parts. Each paints as a square box
+# the row tall, with an icon gap to the value that belongs to its hit area.
 STEPPER_BACK = "< "
 STEPPER_FORWARD = " >"
 # A vertical list's radio buttons, then a space before the option.
@@ -70,10 +71,15 @@ def choice_width(
     return combo_width(measure, labels)
 
 
-def stepper_width(measure: TextSizer, labels: Sequence[str]) -> int:
-    """``< value >`` wide enough for the widest option."""
+def stepper_slot_width(side: int) -> int:
+    """An arrow's square box of *side*, and the gap before the value."""
+    return side + round(icon_gap())
+
+
+def stepper_width(measure: TextSizer, labels: Sequence[str], *, side: int) -> int:
+    """``< value >`` wide enough for the widest option, with arrows *side* square."""
     widest = max((measure.size(label)[0] for label in labels), default=0)
-    return measure.size(STEPPER_BACK)[0] + widest + measure.size(STEPPER_FORWARD)[0]
+    return stepper_slot_width(side) * 2 + widest
 
 
 def radio_width(measure: TextSizer, labels: Sequence[str]) -> int:
@@ -82,12 +88,20 @@ def radio_width(measure: TextSizer, labels: Sequence[str]) -> int:
     return measure.size(RADIO_OFF)[0] + widest
 
 
-def stepper_arrow_rects(measure: TextSizer, rect: Rect) -> tuple[Rect, Rect]:
-    """The back and forward arrows at either end of a stepper ``rect``."""
+def stepper_arrow_rects(rect: Rect) -> tuple[Rect, Rect]:
+    """The back and forward arrow slots at either end of a stepper ``rect``.
+
+    Each is a square box ``rect`` tall plus the gap before the value.
+    """
     x, y, w, h = rect
-    back = measure.size(STEPPER_BACK)[0]
-    forward = measure.size(STEPPER_FORWARD)[0]
-    return (x, y, back, h), (x + w - forward, y, forward, h)
+    slot = stepper_slot_width(h)
+    return (x, y, slot, h), (x + w - slot, y, slot, h)
+
+
+def stepper_arrow_box(slot: Rect, *, forward: bool) -> Rect:
+    """The square box painted on the outer edge of an arrow ``slot``."""
+    x, y, w, h = slot
+    return (x + w - h if forward else x), y, h, h
 
 
 def choice_list_rects(
