@@ -1,7 +1,10 @@
-"""Problems that stop a layer doing what it is set to do, and bad preset files.
+"""Layer problems and notices, and bad preset files.
 
-A layer problem lights the layer's warning icon on its navigator row and its
-pages' title line; the tooltip lists every one. A preset file problem marks
+A layer problem stops the layer doing what it is set to do; a layer notice is
+something the user should know that does not stop it working. A problem
+lights the layer's red warning icon on its navigator row and its pages' title
+line; with only notices the icon is amber. The tooltip lists every problem,
+then every notice. A preset file problem marks
 that file's row (the preset row, or a preset list entry). It lights the layer
 icon too while the layer would play that file: the preset while switching is
 off, or any preset list entry while switching is on.
@@ -78,7 +81,7 @@ class PresetHealth:
 
 
 class ProblemPage(Enum):
-    """The layer page where a problem is fixed."""
+    """The layer page where a problem or notice is dealt with."""
 
     MILKDROP_PRESET = auto()
     PRESET_SWITCHING = auto()
@@ -89,6 +92,17 @@ class ProblemPage(Enum):
 @dataclass(frozen=True)
 class LayerProblem:
     """A problem, the page that fixes it, and the row on that page to focus."""
+
+    message: str
+    page: ProblemPage
+    row: RowKind | None = None
+    preset_index: int | None = None
+
+
+@dataclass(frozen=True)
+class LayerNotice:
+    """A notice that does not stop the layer working, the page that deals
+    with it, and the row on that page to focus."""
 
     message: str
     page: ProblemPage
@@ -136,7 +150,8 @@ def layer_problems(session: TuningSession, slot: str) -> tuple[LayerProblem, ...
                     )
                 )
         if layer.preset_switching_trigger == "timeline":
-            lane = session.timeline.lanes.get(slot)
+            from cleave.viz.preset_list_populate import on_segment_count
+
             if not session.timeline.enabled:
                 problems.append(
                     LayerProblem(
@@ -145,7 +160,7 @@ def layer_problems(session: TuningSession, slot: str) -> tuple[LayerProblem, ...
                         RowKind.TRACK_PRESET_SWITCHING_TRIGGER,
                     )
                 )
-            elif lane is None or not lane.cues:
+            elif on_segment_count(session, slot) == 0:
                 problems.append(
                     LayerProblem(
                         "Switching follows the timeline, but this layer has no clips on it",
@@ -185,8 +200,44 @@ def layer_problems(session: TuningSession, slot: str) -> tuple[LayerProblem, ...
     return tuple(problems)
 
 
-def layer_problems_tooltip(problems: tuple[LayerProblem, ...]) -> str:
-    """Hover text for the warning icon: one problem per line, then the click."""
+def layer_notices(session: TuningSession, slot: str) -> tuple[LayerNotice, ...]:
+    """What the user should know about the layer at *slot* that does not stop it working."""
+    layer = session.layers[slot]
+    notices: list[LayerNotice] = []
+    if (
+        layer.preset_switching == "on"
+        and layer.preset_switching_trigger == "timeline"
+        and session.timeline.enabled
+    ):
+        from cleave.viz.preset_list_populate import on_segment_count
+
+        clips = on_segment_count(session, slot)
+        extra = len(layer.preset_list) - clips
+        if clips and extra > 0:
+            clip_noun = "clip" if clips == 1 else "clips"
+            unused = "the last one never plays" if extra == 1 else f"the last {extra} never play"
+            notices.append(
+                LayerNotice(
+                    "Preset switching is on, following the timeline\n"
+                    f"{len(layer.preset_list)} presets in the list but only {clips} "
+                    f"{clip_noun} on the timeline: {unused}",
+                    ProblemPage.PRESET_LIST,
+                    RowKind.TRACK_PRESET_LIST_ITEM,
+                    clips,
+                )
+            )
+    return tuple(notices)
+
+
+def layer_issues_tooltip(
+    problems: tuple[LayerProblem, ...], notices: tuple[LayerNotice, ...]
+) -> str:
+    """Hover text for the warning icon: one problem per line, then one notice
+    per line, then the click."""
     lines = [problem.message for problem in problems]
-    lines.append("Click to go to the first problem")
+    lines.extend(notice.message for notice in notices)
+    if problems:
+        lines.append("Click to go to the first problem")
+    else:
+        lines.append("Click to go to the first notice")
     return "\n".join(lines)

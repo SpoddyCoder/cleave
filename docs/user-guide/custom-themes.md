@@ -50,7 +50,7 @@ Every key a theme can set, grouped by where it appears:
 | Window and panels | `background`, `background_alpha`, `modal_scrim`, `modal_scrim_alpha`, `transport_rule`, `panel_edge`, `panel_focus_edge`, `navigator_tree_line`, `inspector_divider` |
 | Text | `label`, `value`, `disabled`, `off_control_text`, `off_control_muted`, `muted`, `highlight`, `error_notification`, `notification_on_fill` |
 | Text on fills | `on_hover`, `on_hover_muted`, `on_primary`, `on_danger`, `on_accent`, `on_lit_icon` |
-| Icons and modes | `preset_icon`, `preset_file_icon`, `move_mode`, `lock_icon`, `locked`, `locked_muted`, `solo_bg`, `override_bg`, `nav_on_bg`, `nav_lock_bg`, `nav_lock_glyph`, `config_dirty`, `armed_bg`, `override_glyph`, `override_glyph_off`, `rec_bg` |
+| Icons and modes | `preset_icon`, `preset_file_icon`, `move_mode`, `lock_icon`, `locked`, `locked_muted`, `solo_bg`, `override_bg`, `nav_on_bg`, `nav_lock_bg`, `nav_lock_glyph`, `notice_bg`, `on_notice`, `config_dirty`, `armed_bg`, `override_glyph`, `override_glyph_off`, `rec_bg` |
 | Buttons | `button_bg`, `button_border`, `button_hover_bg`, `button_hover_border`, `button_active_bg`, `button_primary_bg`, `button_primary_border`, `button_primary_hover_bg`, `button_primary_hover_border`, `button_primary_active_bg`, `button_off_bg`, `button_off_border`, `button_off_chosen_bg`, `button_off_chosen_border`, `button_danger_bg`, `button_danger_border`, `button_danger_hover_bg`, `button_danger_hover_border`, `button_danger_active_bg`, `button_sheen`, `button_shade`, `button_glow_alpha` |
 | Menus, dialogs, and progress bars | `surface_bg`, `surface_edge`, `surface_text`, `accent_from`, `accent_to` |
 | Rows | `hover`, `hover_bg_alpha`, `row_select_tint`, `row_selected_alpha`, `row_selected_bar`, `row_focused_alpha`, `row_focused_bar`, `row_focus_edge` |
@@ -109,6 +109,8 @@ override_bg: "#ffc83c"
 nav_on_bg: "#288c4b"
 nav_lock_bg: "#e18c28"
 nav_lock_glyph: "#000000"
+notice_bg: "#f5aa14"
+on_notice: "#000000"
 config_dirty: "#ffff00"
 armed_bg: "#c82828"
 override_glyph: "#000000"

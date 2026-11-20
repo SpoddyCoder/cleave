@@ -280,6 +280,31 @@ def test_advance_timeline_uses_on_transition_count() -> None:
     assert layer.auto_preset_path == _MILK[2].resolve()
 
 
+def test_advance_timeline_counts_an_opening_clip_as_the_first() -> None:
+    layer = _stem_layer()
+    session = _session(trigger="timeline", timeline_enabled=True)
+    session.timeline.lanes["layer_1"] = TimelineLane(
+        baseline=1.0,
+        cues=(SlotCue(t=2.0, level=0.0), SlotCue(t=3.0, level=1.0)),
+    )
+    apply_preset_switching(
+        layer,
+        mode="on",
+        trigger="timeline",
+        preset_list=_LIST,
+        session=session,
+    )
+    layer.pm.load_preset.reset_mock()
+    advance_preset_switching(session, {"layer_1": layer}, 1.0)
+    layer.pm.load_preset.assert_not_called()
+    assert layer.list_switch_index == 0
+    # The clip after the opening one plays list[1], not list[0] again.
+    advance_preset_switching(session, {"layer_1": layer}, 3.5)
+    layer.pm.load_preset.assert_called_once()
+    assert layer.list_switch_index == 1
+    assert layer.auto_preset_path == _MILK[1].resolve()
+
+
 def test_advance_timeline_skips_when_timeline_disabled() -> None:
     layer = _stem_layer()
     session = _session(trigger="timeline", timeline_enabled=False)

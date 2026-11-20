@@ -31,8 +31,8 @@ never value, so a light panel can carry dark text and a strong fill light text:
   on_danger - a destructive dialog's confirm button
   on_accent - a heading on the accent gradient (title bars, the inspector title)
   on_lit_icon - a glyph on a lit nav_on_bg, solo_bg, armed_bg, or rec_bg fill
-  notification_on_fill, nav_lock_glyph, override_glyph - glyphs and text on the
-    notification, lock, and override fills
+  notification_on_fill, nav_lock_glyph, override_glyph, on_notice - glyphs and
+    text on the notification, lock, override, and notice fills
 
 Accent colors for modes and icons (not label/value roles):
   highlight, error_notification, notification_on_fill, move_mode, lock_icon,
@@ -62,6 +62,8 @@ vertical gradient, border, and (primary and danger) an outer glow:
     LIT row look and its chosen tick is highlight
   nav_on_bg, solo_bg, nav_lock_bg - lit navigator on, solo, and lock icons
     (nav_lock_glyph is the dark lock icon on its amber fill)
+  notice_bg - the lit amber icon of a layer with notices but no problem (a
+    problem lights it in button_danger_bg)
 
 Colour language. Violet is the pointer (button hover, icon hover, row hover, a
 lit menu or list row). Blue is the selection and the keyboard (a selected
@@ -334,6 +336,8 @@ class Palette:
     nav_on_bg: RGB
     nav_lock_bg: RGB
     nav_lock_glyph: RGB
+    notice_bg: RGB
+    on_notice: RGB
     config_dirty: RGB
     armed_bg: RGB
     override_glyph: RGB
@@ -465,6 +469,8 @@ def _ultraviolet() -> Palette:
         nav_on_bg=(40, 140, 75),
         nav_lock_bg=(225, 140, 40),
         nav_lock_glyph=(0, 0, 0),
+        notice_bg=(245, 170, 20),
+        on_notice=(0, 0, 0),
         config_dirty=(255, 255, 0),
         armed_bg=solo,
         override_glyph=(0, 0, 0),
@@ -577,6 +583,8 @@ def _chocolate() -> Palette:
         nav_on_bg=(47, 140, 78),
         nav_lock_bg=(226, 134, 42),
         nav_lock_glyph=(0, 0, 0),
+        notice_bg=(240, 168, 30),
+        on_notice=(0, 0, 0),
         config_dirty=(255, 238, 48),
         armed_bg=(196, 42, 40),
         override_glyph=(0, 0, 0),
@@ -691,6 +699,8 @@ def _mint() -> Palette:
         nav_on_bg=(74, 132, 20),
         nav_lock_bg=(225, 140, 40),
         nav_lock_glyph=(0, 0, 0),
+        notice_bg=(245, 170, 20),
+        on_notice=(0, 0, 0),
         config_dirty=(255, 255, 0),
         armed_bg=(200, 40, 40),
         override_glyph=(0, 0, 0),
@@ -814,6 +824,8 @@ def _daylight() -> Palette:
         nav_on_bg=(30, 130, 65),
         nav_lock_bg=(225, 140, 40),
         nav_lock_glyph=(0, 0, 0),
+        notice_bg=(220, 150, 0),
+        on_notice=(0, 0, 0),
         config_dirty=(200, 150, 0),
         armed_bg=solo,
         override_glyph=(0, 0, 0),

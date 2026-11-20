@@ -12,7 +12,12 @@ from typing import TYPE_CHECKING
 from cleave.stems import stem_overlay_header
 from cleave.config_schema.layers import MAX_LAYER_COUNT
 from cleave.viz.editor_mode_controls import curation_focus_slot, is_preset_curation_mode
-from cleave.viz.layer_problems import ProblemPage, layer_problems, layer_problems_tooltip
+from cleave.viz.layer_problems import (
+    ProblemPage,
+    layer_issues_tooltip,
+    layer_notices,
+    layer_problems,
+)
 from cleave.viz.row_kinds import RowDescriptor
 from cleave.viz.theme import palette
 
@@ -38,6 +43,7 @@ TOGGLE_LOCK = "lock"
 TOGGLE_ADD = "add"
 TOGGLE_HOLD = "hold"
 TOGGLE_WARN = "warn"
+TOGGLE_NOTICE = "notice"
 
 LAYER_PAGE_MILKDROP_PRESET = "milkdrop_preset"
 LAYER_PAGE_PRESET_SWITCHING = "preset_switching"
@@ -64,11 +70,13 @@ class NavToggle:
     """One clickable icon on a navigator row.
 
     ``id`` is ``TOGGLE_ENABLED``, ``TOGGLE_SOLO``, ``TOGGLE_PREVIEW``,
-    ``TOGGLE_LOCK``, ``TOGGLE_ADD``, ``TOGGLE_HOLD``, or ``TOGGLE_WARN``.
-    ``active`` is on, soloed, previewing, or locked. A hold toggle is present
-    only while the layer's preset switching is held, and a warn toggle only
-    while the layer has a problem; both are always active, and a warn
-    toggle's ``detail`` is its tooltip, naming every problem; a hold toggle's
+    ``TOGGLE_LOCK``, ``TOGGLE_ADD``, ``TOGGLE_HOLD``, ``TOGGLE_WARN``, or
+    ``TOGGLE_NOTICE``. ``active`` is on, soloed, previewing, or locked. A hold
+    toggle is present only while the layer's preset switching is held, a warn
+    toggle only while the layer has a problem, and a notice toggle only while
+    it has notices and no problem; all are always active, and a warn or
+    notice toggle's ``detail`` is its tooltip, naming every problem and
+    notice; a hold toggle's
     names the layer. ``blocked`` is true
     while the section lock refuses the toggle, or Add has no room. ``inert``
     is true while a press is refused for another reason (the timeline owns
@@ -357,6 +365,7 @@ def page_status(
 # Title-line icons, in the navigator's column order.
 _PAGE_TOGGLE_ORDER = (
     TOGGLE_WARN,
+    TOGGLE_NOTICE,
     TOGGLE_HOLD,
     TOGGLE_ENABLED,
     TOGGLE_SOLO,
@@ -567,9 +576,14 @@ def _layer_toggles(session: TuningSession, slot: str) -> tuple[NavToggle, ...]:
     layer = session.layers[slot]
     lead: list[NavToggle] = []
     problems = layer_problems(session, slot)
-    if problems:
+    notices = layer_notices(session, slot)
+    if problems or notices:
         lead.append(
-            NavToggle(TOGGLE_WARN, True, detail=layer_problems_tooltip(problems))
+            NavToggle(
+                TOGGLE_WARN if problems else TOGGLE_NOTICE,
+                True,
+                detail=layer_issues_tooltip(problems, notices),
+            )
         )
     if switching_held(session, slot):
         owner = (
@@ -602,22 +616,23 @@ _PROBLEM_PAGES = {
 
 @dataclass(frozen=True)
 class ProblemTarget:
-    """Where the layer's first problem is fixed: a page, and a row on it."""
+    """Where the layer's first problem, or first notice, is dealt with: a page, and a row on it."""
 
     page_id: str
     row: RowDescriptor | None = None
 
 
 def first_problem_target(session: TuningSession, slot: str) -> ProblemTarget | None:
-    """Page, and row on it, that fixes the layer's first problem, if any.
+    """Page, and row on it, for the layer's first problem, or its first
+    notice when it has no problem, if any.
 
     When that page is hidden the target falls back to Preset Switching with
     no row, since the problem's row is not on it.
     """
-    problems = layer_problems(session, slot)
-    if not problems:
+    issues = layer_problems(session, slot) or layer_notices(session, slot)
+    if not issues:
         return None
-    problem = problems[0]
+    problem = issues[0]
     page = _PROBLEM_PAGES[problem.page]
     if not _layer_page_visible(session, slot, page):
         return ProblemTarget(layer_page_node_id(slot, LAYER_PAGE_PRESET_SWITCHING))

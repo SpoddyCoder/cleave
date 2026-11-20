@@ -73,9 +73,9 @@ def _clear_list_rotation(layer: StemLayer) -> None:
 def _timeline_list_index(on_transition_count: int) -> int:
     """0-based list index for timeline switching.
 
-    ``lane_on_transition_count`` is how many on-transitions have fired
-    (1 after the first section starts). Populate builds one preset per
-    on-segment, so the first section maps to index 0.
+    ``lane_on_transition_count`` is how many clip switches have fired
+    (1 once the first clip starts, from ``0.0`` when the lane opens on).
+    Populate builds one preset per clip, so the first clip maps to index 0.
     """
     return max(0, int(on_transition_count) - 1)
 

@@ -419,9 +419,11 @@ def lane_on_transition_cues(
     hard_cut_fades: TimelineFadeGroup,
     soft_cut_fades: TimelineFadeGroup,
 ) -> list[tuple[float, SlotCue]]:
-    """Preset-switch ``(trigger_t, cue)`` pairs for rises and recasts.
+    """Preset-switch ``(trigger_t, cue)`` pairs: one per clip that switches.
 
-    Fires when ``previous <= LEVEL_EPS < cue.level``, with ``previous`` from
+    A lane whose ``baseline`` is on opens with a clip from ``0.0``; it fires
+    at ``0.0`` with a stand-in cue at that level, unless a cue sits at or
+    before ``0.0``. Then it fires when ``previous <= LEVEL_EPS < cue.level``, with ``previous`` from
     ``baseline`` or ``0.0`` when baseline is None. Also fires when
     ``cue.recast`` and the slot is already on (``previous > LEVEL_EPS`` and
     ``cue.level > LEVEL_EPS``). A same-level ``anchor`` hold does not fire.
@@ -433,6 +435,8 @@ def lane_on_transition_cues(
     """
     results: list[tuple[float, SlotCue]] = []
     previous = 0.0 if lane.baseline is None else float(lane.baseline)
+    if previous > LEVEL_EPS and not (lane.cues and lane.cues[0].t <= 0.0):
+        results.append((0.0, SlotCue(t=0.0, level=previous)))
     for cue in lane.cues:
         rise = previous <= LEVEL_EPS < cue.level
         recast_on = (

@@ -1,4 +1,4 @@
-"""Layer problems: the navigator warning icon and bad preset file marks."""
+"""Layer problems and notices: the navigator warning icon and bad preset file marks."""
 
 from __future__ import annotations
 
@@ -16,11 +16,13 @@ from cleave.viz import row_hotkeys
 from cleave.viz.layer_problems import (
     PRESET_FILE_MISSING,
     ProblemPage,
+    layer_issues_tooltip,
+    layer_notices,
     layer_problems,
-    layer_problems_tooltip,
 )
 from cleave.viz.navigator import (
     TOGGLE_ENABLED,
+    TOGGLE_NOTICE,
     TOGGLE_WARN,
     build_navigator,
     ProblemTarget,
@@ -139,6 +141,84 @@ def test_timeline_trigger_needs_the_timeline_on_and_clips_on_the_layer() -> None
         baseline=0.0, cues=[SlotCue(t=1.0, level=1.0)]
     )
     assert layer_problems(session, "layer_1") == ()
+    # A layer that is on from the start is one clip for the whole song.
+    session.timeline.lanes["layer_1"] = TimelineLane(baseline=1.0, cues=[])
+    assert layer_problems(session, "layer_1") == ()
+
+
+def _timeline_layer(clip_starts: tuple[float, ...], presets: int) -> TuningSession:
+    layer = _layer()
+    layer.preset_switching = "on"
+    layer.preset_switching_trigger = "timeline"
+    layer.preset_list = [str(GOOD)] * presets
+    session = _session(layer)
+    session.timeline.enabled = True
+    cues = []
+    for start in clip_starts:
+        cues += [SlotCue(t=start, level=1.0), SlotCue(t=start + 1.0, level=0.0)]
+    session.timeline.lanes["layer_1"] = TimelineLane(baseline=0.0, cues=cues)
+    return session
+
+
+def test_more_presets_than_timeline_clips_is_a_notice_not_a_problem() -> None:
+    session = _timeline_layer((1.0,), presets=3)
+    assert layer_problems(session, "layer_1") == ()
+    (notice,) = layer_notices(session, "layer_1")
+    assert notice.page is ProblemPage.PRESET_LIST
+    assert notice.message == (
+        "Preset switching is on, following the timeline\n"
+        "3 presets in the list but only 1 clip on the timeline: the last 2 never play"
+    )
+    assert notice.preset_index == 1
+    two = _timeline_layer((1.0, 4.0), presets=3)
+    (notice,) = layer_notices(two, "layer_1")
+    assert notice.message.endswith("3 presets in the list but only 2 clips on the timeline: the last one never plays")
+
+
+def test_a_whole_song_clip_with_a_long_list_is_a_notice() -> None:
+    session = _timeline_layer((), presets=14)
+    session.timeline.lanes["layer_1"] = TimelineLane(baseline=1.0, cues=[])
+    assert layer_problems(session, "layer_1") == ()
+    (notice,) = layer_notices(session, "layer_1")
+    assert notice.message.endswith("14 presets in the list but only 1 clip on the timeline: the last 13 never play")
+
+
+def test_no_notice_when_every_preset_gets_a_clip_or_switching_is_not_timeline() -> None:
+    assert layer_notices(_timeline_layer((1.0, 4.0), presets=2), "layer_1") == ()
+    assert layer_notices(_timeline_layer((1.0,), presets=1), "layer_1") == ()
+    session = _timeline_layer((1.0,), presets=3)
+    session.layers["layer_1"].preset_switching_trigger = "timer"
+    assert layer_notices(session, "layer_1") == ()
+    session.layers["layer_1"].preset_switching_trigger = "timeline"
+    session.timeline.enabled = False
+    assert layer_notices(session, "layer_1") == ()
+
+
+def test_a_notice_lights_an_amber_icon_that_a_problem_replaces() -> None:
+    session = _timeline_layer((1.0,), presets=3)
+    toggles = {
+        node.id: node for node in build_navigator(session, {"layers"})
+    }[layer_node_id("layer_1")].toggles
+    assert toggles[0].id == TOGGLE_NOTICE
+    assert toggles[0].detail.split("\n")[-1] == "Click to go to the first notice"
+    page = layer_page_node_id("layer_1", "preset_list")
+    assert page_toggles(session, page)[0].toggle.id == TOGGLE_NOTICE
+    assert first_problem_target(session, "layer_1") == ProblemTarget(
+        page,
+        RowDescriptor(RowKind.TRACK_PRESET_LIST_ITEM, slot="layer_1", preset_index=1),
+    )
+    session.silent_stems = frozenset({"drums"})
+    toggles = {
+        node.id: node for node in build_navigator(session, {"layers"})
+    }[layer_node_id("layer_1")].toggles
+    assert toggles[0].id == TOGGLE_WARN
+    lines = toggles[0].detail.split("\n")
+    assert "drums stem is silent" in lines[0]
+    assert lines[1:3] == [
+        "Preset switching is on, following the timeline",
+        "3 presets in the list but only 1 clip on the timeline: the last 2 never play",
+    ]
+    assert lines[-1] == "Click to go to the first problem"
 
 
 def test_a_silent_driving_stem_is_a_problem() -> None:
@@ -181,7 +261,7 @@ def test_tooltip_lists_every_problem_then_the_click() -> None:
     layer = _layer(MISSING)
     session = _session(layer)
     session.silent_stems = frozenset({"drums"})
-    lines = layer_problems_tooltip(layer_problems(session, "layer_1")).split("\n")
+    lines = layer_issues_tooltip(layer_problems(session, "layer_1"), ()).split("\n")
     assert len(lines) == 3
     assert lines[-1] == "Click to go to the first problem"
 

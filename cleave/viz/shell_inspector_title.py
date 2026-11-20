@@ -22,6 +22,7 @@ from cleave.viz.navigator import (
     PageToggle,
     TOGGLE_ENABLED,
     TOGGLE_HOLD,
+    TOGGLE_NOTICE,
     TOGGLE_WARN,
     TOGGLE_PREVIEW,
     TOGGLE_SOLO,
@@ -119,10 +120,10 @@ class TitleButton:
 
 
 def page_toggle_tooltip(item: PageToggle, status: PageStatus) -> str:
-    """Hover text for a page's warning, held-switching, on/off, solo, preview, or lock button on the title's icon line."""
+    """Hover text for a page's warning or notice, held-switching, on/off, solo, preview, or lock button on the title's icon line."""
     toggle = item.toggle
     name = item.owner_label
-    if toggle.id == TOGGLE_WARN:
+    if toggle.id in (TOGGLE_WARN, TOGGLE_NOTICE):
         return toggle.detail
     if toggle.blocked:
         return f"Locked: unlock {status.locked_by or name} to change"

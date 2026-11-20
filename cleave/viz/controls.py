@@ -454,7 +454,7 @@ class TuningControls:
         self._show_latency_row(RowKind.SETTINGS_TAP_LATENCY_MS)
 
     def show_first_problem(self, slot: str) -> None:
-        """Open the page that fixes the layer's first problem, on its row."""
+        """Open the page for the layer's first problem (or first notice), on its row."""
         target = first_problem_target(self.session, slot)
         if target is None:
             return

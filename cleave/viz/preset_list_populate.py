@@ -55,7 +55,8 @@ def _fade_groups(session: TuningSession) -> tuple[TimelineFadeGroup, TimelineFad
     return hard, soft
 
 
-def _on_segment_count(session: TuningSession, slot: str) -> int:
+def on_segment_count(session: TuningSession, slot: str) -> int:
+    """How many times the layer at ``slot`` turns on along the timeline."""
     hard, soft = _fade_groups(session)
     lane = session.timeline.lanes.get(slot) or empty_lane()
     return len(lane_on_transition_cues(lane, hard_cut_fades=hard, soft_cut_fades=soft))
@@ -63,7 +64,7 @@ def _on_segment_count(session: TuningSession, slot: str) -> int:
 
 def on_segment_populate_count(session: TuningSession, slot: str) -> int:
     """How many presets timeline populate modes add for ``slot``."""
-    return max(1, _on_segment_count(session, slot))
+    return max(1, on_segment_count(session, slot))
 
 
 def _on_segment_roles(session: TuningSession, slot: str) -> list[CueRole | None]:

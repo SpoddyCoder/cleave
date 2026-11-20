@@ -207,6 +207,7 @@ def _text_pairs(p: Palette) -> list[tuple[str, str, float]]:
         ("on_lit_icon", "solo_bg", fill),
         ("on_lit_icon", "rec_bg", fill),
         ("nav_lock_glyph", "nav_lock_bg", fill),
+        ("on_notice", "notice_bg", fill),
         ("override_glyph", "override_bg", fill),
         ("off_control_text", "button_off_bg", body),
     ]

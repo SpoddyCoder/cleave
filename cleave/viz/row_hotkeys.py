@@ -21,6 +21,7 @@ from cleave.viz.navigator import (
     TOGGLE_ENABLED,
     TOGGLE_HOLD,
     TOGGLE_LOCK,
+    TOGGLE_NOTICE,
     TOGGLE_PREVIEW,
     TOGGLE_SOLO,
     TOGGLE_WARN,
@@ -156,7 +157,7 @@ def activate_header_toggle(
     controls: TuningControls, toggle_id: str, desc: RowDescriptor
 ) -> None:
     """Run the header mutation for a navigator icon click."""
-    if toggle_id == TOGGLE_WARN:
+    if toggle_id in (TOGGLE_WARN, TOGGLE_NOTICE):
         if desc.kind == RowKind.TRACK_HEADER and desc.slot is not None:
             controls.show_first_problem(desc.slot)
         return

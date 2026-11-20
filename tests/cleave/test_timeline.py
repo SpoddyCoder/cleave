@@ -442,6 +442,7 @@ def test_lane_on_transition_cues_counts_recast_while_on_not_anchor() -> None:
         soft_cut_fades=_OFF,
     )
     assert [(t, cue.t, cue.recast, cue.anchor) for t, cue in pairs] == [
+        (0.0, 0.0, False, False),
         (10.0, 10.0, True, False),
         (40.0, 40.0, False, False),
     ]
@@ -912,14 +913,28 @@ def test_on_transition_triggers_crossfade_lead_by_half_ramp() -> None:
 
 
 def test_on_transition_triggers_ignores_non_zero_rise() -> None:
-    """Ignores 0.25 to 0.75; fires on 0 to 0.5 at t - fade_in * 0.5."""
+    """Fires on the opening clip, ignores 0.25 to 0.75, and fires on 0 to 0.5 at t - fade_in * 0.5."""
     lane = _lane(0.25, (10.0, 0.75), (20.0, 0.0), (30.0, 0.5), cut="soft")
     triggers = lane_on_transition_trigger_times(
         lane,
         hard_cut_fades=_OFF,
         soft_cut_fades=_std(fade_in=2.0, fade_out=2.0),
     )
-    assert triggers == [30.0 - 2.0 * 0.5]
+    assert triggers == [0.0, 30.0 - 2.0 * 0.5]
+
+
+def test_a_lane_that_opens_on_switches_at_the_song_start() -> None:
+    kwargs = {"hard_cut_fades": _OFF, "soft_cut_fades": _OFF}
+    whole_song = TimelineLane(baseline=1.0, cues=[])
+    assert lane_on_transition_trigger_times(whole_song, **kwargs) == [0.0]
+    assert lane_on_transition_count(whole_song, 0.0, **kwargs) == 1
+    reenters = TimelineLane(
+        baseline=1.0, cues=[SlotCue(t=5.0, level=0.0), SlotCue(t=9.0, level=1.0)]
+    )
+    assert lane_on_transition_trigger_times(reenters, **kwargs) == [0.0, 9.0]
+    cue_at_zero = TimelineLane(baseline=1.0, cues=[SlotCue(t=0.0, level=0.0)])
+    assert lane_on_transition_trigger_times(cue_at_zero, **kwargs) == []
+    assert lane_on_transition_trigger_times(empty_lane(), **kwargs) == []
 
 
 def test_on_transition_triggers_hard_cut_vs_soft_cut() -> None:
