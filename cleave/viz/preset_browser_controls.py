@@ -377,6 +377,9 @@ class PresetBrowserControls:
         if browser is None or intent is None:
             return
         kind = intent.kind
+        if kind is BrowserPointerKind.CLOSE:
+            self.commit()
+            return
         if kind is BrowserPointerKind.EDIT_FILTER:
             if not browser.editing:
                 browser.begin_edit()

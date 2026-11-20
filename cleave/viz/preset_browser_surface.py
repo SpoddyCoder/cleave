@@ -41,6 +41,7 @@ PRESET_BROWSER_WINDOW = "##preset-browser"
 PRESET_BROWSER_LIST = "##preset-browser-list"
 FILTER_LABEL = "Filter: "
 LOADING_LABEL = "Loading presets…"
+BACK_TOOLTIP = "Back to the inspector"
 # Divider between the path and the filter, as a fraction of the text line.
 DIVIDER_LINES = 0.5
 SPINNER_TURNS_PER_SEC = 1.2
@@ -53,6 +54,7 @@ class BrowserPointerKind(Enum):
     OPEN_ROW = "open-row"
     GOTO_CRUMB = "goto-crumb"
     EDIT_FILTER = "edit-filter"
+    CLOSE = "close"
 
 
 @dataclass(frozen=True)
@@ -149,8 +151,9 @@ class PresetBrowserSurface:
 
     def _body(self) -> None:
         from cleave.viz.modal_layout import form_row_height, form_row_pad_y
+        from cleave.viz.icon_button import icon_gap
         from cleave.viz.modal_surface import ImGuiTextMeasure
-        from cleave.viz.shell_widgets import stroke_h_rule
+        from cleave.viz.shell_widgets import PANEL_BORDER_PX, stroke_h_rule
         from cleave.viz.theme import palette, tuning_ui_metrics
         from cleave.viz.title_bar import paint_title_bar
 
@@ -173,14 +176,29 @@ class PresetBrowserSurface:
 
         y = oy + pad_y
         bar_bottom = y + line_h + metrics.line_gap
+        # The Back arrow sits off the accent bar, on the panel, as the
+        # inspector title's arrows do; a gap keeps the two apart.
+        # The panel border is filled over the window's edge after this body,
+        # so the button's box starts on the first row below it, level with
+        # the visible top of the accent bar.
+        back_x = self._paint_back_button(
+            content_x + content_w,
+            (float(oy + PANEL_BORDER_PX), float(bar_bottom)),
+        )
         paint_title_bar(
-            draw, float(ox + 1), float(oy + 1), float(ox + width - 1), float(bar_bottom)
+            draw,
+            float(ox + 1),
+            float(oy + 1),
+            float(back_x - icon_gap()),
+            float(bar_bottom),
         )
         draw_text(
             draw,
             content_x,
             y,
-            fit_text_to_width(measure, view.title, content_w),
+            fit_text_to_width(
+                measure, view.title, max(1, int(back_x - 2 * icon_gap()) - content_x)
+            ),
             palette().on_accent,
         )
         y = bar_bottom + metrics.line_gap + form_row_pad_y()
@@ -228,6 +246,25 @@ class PresetBrowserSurface:
         if view.loading:
             self._paint_spinner(draw, measure, content_x, y, content_w, list_h)
         self._paint_legend(draw, measure, content_x, legend_y, content_w)
+
+    def _paint_back_button(self, right: int, band: tuple[float, float]) -> float:
+        """The Back arrow flush right on the title bar; returns its left edge."""
+        from cleave.viz.imgui_icon_button import icon_button
+        from cleave.viz.material_icons import ARROW_BACK_GLYPH
+        from cleave.viz.theme import palette
+
+        side = band[1] - band[0]
+        x = float(right) - side
+        if icon_button(
+            "##preset-browser-back",
+            ARROW_BACK_GLYPH,
+            x,
+            band,
+            color=palette().value,
+            tooltip=BACK_TOOLTIP,
+        ).pressed:
+            self.intent = BrowserPointerIntent(BrowserPointerKind.CLOSE)
+        return x
 
     def _paint_crumbs(
         self, draw: Any, measure, text_width, x: int, y: int, content_w: int, line_h: int
@@ -528,6 +565,8 @@ class PresetBrowserSurface:
     # -- pointer -------------------------------------------------------------
 
     def _record_pointer(self) -> None:
+        if self.intent is not None:
+            return
         imgui = _imgui()
         io = imgui.get_io()
         x, y = float(io.mouse_pos.x), float(io.mouse_pos.y)

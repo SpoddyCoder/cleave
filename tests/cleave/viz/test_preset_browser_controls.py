@@ -380,3 +380,13 @@ def test_milkdrop_preset_page_draws_the_directory_path_as_crumbs(tmp_path: Path)
             "A",
         ]
         assert RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1") in host.inspector.row_rects
+
+
+def test_back_button_closes_and_keeps_the_previewed_preset(rig: _Rig) -> None:
+    rig.controls.open("layer_1")
+    rig.key(pygame.K_DOWN)
+    rig.controls.tick(PREVIEW_DELAY_SEC)
+    rig.controls.apply_pointer(BrowserPointerIntent(BrowserPointerKind.CLOSE))
+    assert not rig.controls.active
+    assert rig.layer.playlist.current == rig.a2
+    assert rig.loaded() == [rig.a2]

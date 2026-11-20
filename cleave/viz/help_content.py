@@ -152,6 +152,7 @@ PRESET_BROWSER_SECTIONS: tuple[HelpContent, ...] = (
             ("Left/Backspace", "parent folder"),
             ("Esc", "clear the filter, or go back and close"),
             ("Click the filter", "edit it; Enter keeps the results, Esc cancels"),
+            ("Back arrow", "close, keeping the preset that is playing"),
             ("Double-click", "open folder / keep preset"),
             ("Right-click preset", "favourite, blacklist, role"),
         ),
