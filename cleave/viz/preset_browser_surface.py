@@ -142,6 +142,19 @@ def _imgui():
     return imgui_mod
 
 
+def centred_line_y(top: float, bottom: float, ink_top: float, ink_bottom: float) -> int:
+    """Line top that puts a glyph's ink (offsets from the line top) midway."""
+    return int(round((top + bottom) / 2.0 - (ink_top + ink_bottom) / 2.0))
+
+
+def folder_glyph_ink() -> tuple[float, float]:
+    """Top and bottom of the folder mark's ink, from the top of its line."""
+    imgui = _imgui()
+    font = imgui.get_io().font_default.get_font_baked(imgui.get_style().font_size_base)
+    glyph = font.find_glyph(ord(FOLDER_GLYPH))
+    return float(glyph.y0), float(glyph.y1)
+
+
 def _contains(rect: Rect, x: float, y: float) -> bool:
     rx, ry, rw, rh = rect
     return rx <= x < rx + rw and ry <= y < ry + rh
@@ -238,29 +251,31 @@ class PresetBrowserSurface:
             palette().on_accent,
         )
         y = bar_bottom + metrics.line_gap + form_row_pad_y()
+        divider_h = max(1, int(line_h * DIVIDER_LINES))
+        rule_y = y + step + divider_h // 2
 
-        # The folder mark, then the path, as in the file picker.
-        draw_text(draw, content_x, y, FOLDER_GLYPH, palette().preset_icon)
+        # The folder mark, then the path, as in the file picker, with the
+        # mark's ink centred between the title bar and the divider.
+        path_y = centred_line_y(bar_bottom, rule_y, *folder_glyph_ink())
+        draw_text(draw, content_x, path_y, FOLDER_GLYPH, palette().preset_icon)
         icon_w = measure.size(FOLDER_GLYPH)[0] + metrics.icon_label_gap
         self._paint_crumbs(
             draw,
             measure,
             text_width,
             content_x + icon_w,
-            y,
+            path_y,
             max(1, content_w - icon_w),
             line_h,
         )
-        y += step
 
-        divider_h = max(1, int(line_h * DIVIDER_LINES))
         stroke_h_rule(
             float(content_x),
             float(content_x + content_w),
-            float(y + divider_h // 2),
+            float(rule_y),
             palette().inspector_divider,
         )
-        y += divider_h + form_row_pad_y()
+        y += step + divider_h + form_row_pad_y()
 
         self._paint_filter(draw, measure, content_x, y, content_w, line_h)
         y += step + form_row_pad_y()

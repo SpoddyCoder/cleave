@@ -370,3 +370,11 @@ def test_a_current_folder_too_long_for_the_panel_is_shortened() -> None:
     assert slots[1][0] == 1
     assert len("… / " + slots[1][1]) <= 12
     assert _fit(("presets",), 4) == [(0, "pre…")]
+
+
+def test_centred_line_puts_the_ink_midway() -> None:
+    from cleave.viz.preset_browser_surface import centred_line_y
+
+    # Ink 4..16 below the line top; 100..140 has its middle at 120.
+    y = centred_line_y(100, 140, 4, 16)
+    assert y + 4 - 100 == 140 - (y + 16)
