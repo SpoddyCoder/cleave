@@ -8,7 +8,11 @@ from unittest.mock import MagicMock, patch
 
 from cleave.preset_playlist import PresetPlaylist
 from cleave.viz.layer import StemLayer
-from cleave.viz.layer_pipeline import LayerFramePipeline
+from cleave.viz.layer_pipeline import (
+    PAUSED_PRESET_WARMUP_FRAMES,
+    LayerFramePipeline,
+    paused_preset_pending,
+)
 from cleave.config import project_resolution
 from cleave.viz.layer_preview_resolution import (
     preview_layer_size,
@@ -24,9 +28,11 @@ def _stem_layer(slot: str, *, width: int = 1280, height: int = 720) -> StemLayer
     fbo = MagicMock()
     fbo.width = width
     fbo.height = height
+    pm = MagicMock()
+    pm.consume_preset_changed.return_value = False
     return StemLayer(
         slot=slot,
-        pm=MagicMock(),
+        pm=pm,
         fbo=fbo,
         playlist=PresetPlaylist(
             current_dir=current_dir,
@@ -398,6 +404,71 @@ def test_render_frame_paused_per_layer_uses_frozen_rolloff_source() -> None:
     compositor.copy_layer_to_rolloff_source.assert_not_called()
     post_process.apply_highlight_rolloff.assert_called_once()
     assert post_process.apply_highlight_rolloff.call_args.kwargs["source_texture_id"] == 22
+
+
+def _plain_modifiers(*slots: str) -> MagicMock:
+    effect_runtime = MagicMock()
+    effect_runtime.modifiers.return_value = {
+        slot: MagicMock(
+            opacity=1.0, flash_alpha=0.0, bloom_strength=0.0, hue_rgb=(1, 1, 1),
+            hue_mix=0.0, grit_strength=0.0, aberration_px=0.0,
+        )
+        for slot in slots
+    }
+    return effect_runtime
+
+
+def test_render_frame_paused_warms_up_only_a_layer_whose_preset_changed() -> None:
+    changed = _stem_layer("layer_1")
+    held = _stem_layer("layer_2")
+    for layer in (changed, held):
+        layer.fbo.enabled = True
+        layer.fbo.bloom_strength = 0.0
+        layer.fbo.grit_strength = 0.0
+    changed.pm.consume_preset_changed.return_value = True
+    session = _session(("layer_1", "layer_2"))
+    session.post_fx = post_fx_runtime_all_off()
+    pcm_bank = MagicMock()
+    pcm_bank.channels.return_value = 2
+
+    with (
+        patch("cleave.viz.layer_pipeline._render_layer_fbo") as render_fbo,
+        patch(
+            "cleave.viz.layer_pipeline.pcm_max_samples_per_channel",
+            return_value=0,
+        ),
+    ):
+        LayerFramePipeline.render_frame(
+            session,
+            [changed, held],
+            {"layer_1": changed, "layer_2": held},
+            pcm_bank,
+            512,
+            MagicMock(),
+            _plain_modifiers("layer_1", "layer_2"),
+            None,
+            30.0,
+            paused=True,
+            pm_time_sec=5.0,
+        )
+
+    assert render_fbo.call_count == PAUSED_PRESET_WARMUP_FRAMES
+    assert {call.args[0].slot for call in render_fbo.call_args_list} == {"layer_1"}
+    times = [call.args[0] for call in changed.pm.set_frame_time.call_args_list]
+    assert times == sorted(times)
+    assert times[-1] == 5.0
+    assert pcm_bank.slice_pcm.call_args_list[-1].args[1] == 30.0
+    held.pm.set_frame_time.assert_not_called()
+    held.pm.feed_pcm.assert_not_called()
+
+
+def test_paused_preset_pending_reads_each_layer_flag() -> None:
+    layers = [_stem_layer("layer_1"), _stem_layer("layer_2")]
+    for layer in layers:
+        layer.pm.preset_changed = False
+    assert paused_preset_pending(layers) is False
+    layers[1].pm.preset_changed = True
+    assert paused_preset_pending(layers) is True
 
 
 def test_render_frame_applies_per_layer_chroma_boost_when_playing() -> None:

@@ -27,6 +27,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Changing a layer's preset while the song is paused (in the preset browser, the preset list, or any other way) now shows the new preset in the preview straight away, instead of only once playback resumes.
 - projectM is spelt with a lowercase p in Help > About Cleave and on the Project > projectM page.
 - Measuring latency no longer reports 0 ms when your taps land ahead of the beat.
 - Pressing Ctrl+C in the console to quit `cleave play` exits quietly instead of printing a traceback.

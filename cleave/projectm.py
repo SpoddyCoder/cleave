@@ -412,6 +412,7 @@ class ProjectM:
         self._failure_queue: deque[PresetLoadFailure] = deque()
         self._log_queue: deque[str] = deque()
         self._switch_failed_callback: PresetSwitchFailedEvent | None = None
+        self._preset_changed = False
         self.set_preset_switch_failed_handler(self._enqueue_preset_failure)
 
     @property
@@ -456,6 +457,22 @@ class ProjectM:
         encoded = os.fspath(path).encode("utf-8")
         with self.owning_logs():
             _get_lib().projectm_load_preset_file(self._handle, encoded, smooth)
+        self._preset_changed = True
+
+    def note_preset_changed(self) -> None:
+        """Record a preset switch made outside `load_preset` (a playlist)."""
+        self._preset_changed = True
+
+    @property
+    def preset_changed(self) -> bool:
+        """True when a preset loaded since the last `consume_preset_changed`."""
+        return self._preset_changed
+
+    def consume_preset_changed(self) -> bool:
+        """Return and clear whether a preset loaded since the last call."""
+        changed = self._preset_changed
+        self._preset_changed = False
+        return changed
 
     def lock_preset(self, locked: bool = True) -> None:
         _get_lib().projectm_set_preset_locked(self._handle, locked)

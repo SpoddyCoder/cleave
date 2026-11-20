@@ -21,7 +21,12 @@ from cleave.projectm_health import (
     drain_stem_layers_preset_failures,
 )
 from cleave.signals import Signals
-from cleave.stem_pcm import StemPcmBank, fold_pcm_to_max_samples
+from cleave.stem_pcm import (
+    LIVE_PROJECTM_FPS,
+    StemPcmBank,
+    fold_pcm_to_max_samples,
+    samples_per_frame,
+)
 from cleave.viz.layer import StemLayer
 from cleave.viz.layer_preview_resolution import (
     preview_layer_size,
@@ -141,6 +146,60 @@ def _slot_should_render(
     if live_by_slot is None:
         return False
     return bool(live_by_slot.get(layer.slot, False))
+
+
+PAUSED_PRESET_WARMUP_FRAMES = 20
+"""projectM frames drawn at once when a preset loads while paused.
+
+Most Milkdrop presets build their look over a few frames of feedback, so a
+single frame would hold a near-black still.
+"""
+
+PAUSED_PRESET_WARMUP_SEC = PAUSED_PRESET_WARMUP_FRAMES / LIVE_PROJECTM_FPS
+"""projectM time the paused warm-up spans; the frame clock skips it first."""
+
+
+def paused_preset_pending(layers: list[StemLayer]) -> bool:
+    """True when a layer loaded a preset that a paused frame has not drawn."""
+    return any(layer.pm.preset_changed for layer in layers)
+
+
+def _feed_layer_pcm(
+    layer: StemLayer,
+    session: TuningSession,
+    pcm_bank: StemPcmBank,
+    t_sec: float,
+    n_pcm: int,
+) -> None:
+    stem = session.layers[layer.slot].stem
+    pcm = pcm_bank.slice_pcm(stem, t_sec, n_pcm)
+    ch = pcm_bank.channels(stem)
+    max_pcm = pcm_max_samples_per_channel()
+    if max_pcm > 0:
+        pcm = fold_pcm_to_max_samples(pcm, channels=ch, max_samples=max_pcm)
+    layer.pm.feed_pcm(pcm, channels=ch)
+
+
+def _warm_up_paused_layer(
+    layer: StemLayer,
+    session: TuningSession,
+    pcm_bank: StemPcmBank,
+    t_sec: float,
+    pm_time_sec: float,
+) -> None:
+    """Draw a newly loaded preset up to the held playhead, ending at `pm_time_sec`.
+
+    The audio and projectM time both run up to the held frame, one projectM
+    frame apart, so the still shows the preset as it would look there.
+    """
+    step = 1.0 / LIVE_PROJECTM_FPS
+    n_pcm = samples_per_frame(LIVE_PROJECTM_FPS)
+    for k in range(PAUSED_PRESET_WARMUP_FRAMES):
+        back = (PAUSED_PRESET_WARMUP_FRAMES - 1 - k) * step
+        _feed_layer_pcm(layer, session, pcm_bank, max(0.0, t_sec - back), n_pcm)
+        layer.pm.set_frame_time(pm_time_sec - back)
+        _render_layer_fbo(layer, layer.pm)
+    layer.pm.flush_pcm()
 
 
 def _render_layer_fbo(layer: StemLayer, pm: ProjectM) -> None:
@@ -446,19 +505,14 @@ class LayerFramePipeline:
             session, layers_by_slot, masked_compositor, t_sec
         )
 
+        preset_changed = {
+            layer.slot for layer in layers if layer.pm.consume_preset_changed()
+        }
         if not paused:
             for layer in layers:
                 if not _slot_should_render(layer, live_by_slot):
                     continue
-                stem = session.layers[layer.slot].stem
-                pcm = pcm_bank.slice_pcm(stem, t_sec, n_pcm)
-                ch = pcm_bank.channels(stem)
-                max_pcm = pcm_max_samples_per_channel()
-                if max_pcm > 0:
-                    pcm = fold_pcm_to_max_samples(
-                        pcm, channels=ch, max_samples=max_pcm
-                    )
-                layer.pm.feed_pcm(pcm, channels=ch)
+                _feed_layer_pcm(layer, session, pcm_bank, t_sec, n_pcm)
                 layer.pm.set_frame_time(pm_time_sec)
 
         apply_effect_modifiers(
@@ -490,19 +544,30 @@ class LayerFramePipeline:
         rendered = [
             layer for layer in layers if _slot_should_render(layer, live_by_slot)
         ]
-        if not paused:
-            # projectM draws every layer before any post pass, so the passes
-            # run back to back in one GL state batch. Layers are independent
-            # textures, so the order between them does not change the result.
-            for layer in rendered:
+        # Paused frames hold each layer's last image, except a layer whose
+        # preset just changed, which warms up its new preset.
+        drawn = {
+            layer.slot
+            for layer in rendered
+            if not paused or layer.slot in preset_changed
+        }
+        # projectM draws every layer before any post pass, so the passes
+        # run back to back in one GL state batch. Layers are independent
+        # textures, so the order between them does not change the result.
+        for layer in rendered:
+            if layer.slot not in drawn:
+                continue
+            if paused:
+                _warm_up_paused_layer(layer, session, pcm_bank, t_sec, pm_time_sec)
+            else:
                 _render_layer_fbo(layer, layer.pm)
         with post_process.batch():
             for layer in rendered:
-                if not paused:
+                if layer.slot in drawn:
                     _apply_layer_bloom(layer, post_process, output_width)
                     _apply_layer_grit(layer, post_process, output_width)
                 if per_layer_rolloff:
-                    if not paused:
+                    if layer.slot in drawn:
                         compositor.copy_layer_to_rolloff_source(
                             post_process,
                             layer.slot,
@@ -514,7 +579,7 @@ class LayerFramePipeline:
                         layer, post_process, compositor, hr
                     )
                 if per_layer_chroma:
-                    if not paused:
+                    if layer.slot in drawn:
                         compositor.copy_layer_to_chroma_source(
                             post_process,
                             layer.slot,

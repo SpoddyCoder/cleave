@@ -22,9 +22,11 @@ def _stem_layer(slot: str) -> StemLayer:
     fbo.width = 1280
     fbo.height = 720
     fbo.enabled = True
+    pm = MagicMock()
+    pm.consume_preset_changed.return_value = False
     return StemLayer(
         slot=slot,
-        pm=MagicMock(),
+        pm=pm,
         fbo=fbo,
         playlist=PresetPlaylist(
             current_dir=current_dir,
@@ -87,6 +89,21 @@ def test_clock_does_not_start_while_paused() -> None:
     assert clock.started is False
     assert clock.advance(0.1, paused=False) == 0.0
     assert clock.started is True
+
+
+def test_clock_skip_moves_forward_while_paused() -> None:
+    clock = ProjectMFrameClock()
+    clock.advance(0.0, paused=False)
+    clock.advance(0.5, paused=False)
+    clock.skip(0.25)
+    assert clock.advance(0.1, paused=True) == pytest.approx(0.75)
+    assert clock.advance(0.1, paused=False) == pytest.approx(0.85)
+
+
+def test_clock_skip_waits_for_first_frame() -> None:
+    clock = ProjectMFrameClock()
+    clock.skip(0.25)
+    assert clock.advance(0.1, paused=False) == 0.0
 
 
 def test_render_frame_feeds_pm_time_not_song_time() -> None:

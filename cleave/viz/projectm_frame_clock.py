@@ -28,3 +28,13 @@ class ProjectMFrameClock:
         if dt_sec > 0.0:
             self.seconds += dt_sec
         return self.seconds
+
+    def skip(self, seconds: float) -> None:
+        """Move the clock forward by `seconds`, paused or not.
+
+        A paused frame that warms up a newly loaded preset renders projectM
+        frames ahead of the held time; skipping keeps every layer's next
+        frame time at or after them.
+        """
+        if self.started and seconds > 0.0:
+            self.seconds += seconds

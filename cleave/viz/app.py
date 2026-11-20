@@ -37,7 +37,11 @@ from cleave.viz.controls import TuningControls
 from cleave.viz.session import TuningSession, session_from_cfg
 from cleave.viz.mix_player import MixPlayer
 from cleave.viz.layer import StemLayer
-from cleave.viz.layer_pipeline import LayerFramePipeline
+from cleave.viz.layer_pipeline import (
+    PAUSED_PRESET_WARMUP_SEC,
+    LayerFramePipeline,
+    paused_preset_pending,
+)
 from cleave.viz.layer_visibility import apply_layer_visibility, build_timeline_view_state
 from cleave.viz.preset_switching import advance_timeline_preset_switching
 from cleave.viz.modal import ModalHost
@@ -609,11 +613,19 @@ class VisualizerApp:
         draw_overlay: bool = True,
         layout: ShellLayout | None = None,
     ) -> None:
-        pm_time_sec = self._pm_clock.advance(dt_sec, paused=paused)
+        runtime = self._runtime
         blank_visualizers = (
-            isinstance(self._runtime, LiveVisualizerRuntime)
-            and self._runtime.controls.calibrating
+            isinstance(runtime, LiveVisualizerRuntime)
+            and runtime.controls.calibrating
         )
+        if (
+            paused
+            and not blank_visualizers
+            and isinstance(runtime, VisualizerCore)
+            and paused_preset_pending(runtime.layers)
+        ):
+            self._pm_clock.skip(PAUSED_PRESET_WARMUP_SEC)
+        pm_time_sec = self._pm_clock.advance(dt_sec, paused=paused)
         self._was_paused = tick_frame_core(
             self._runtime,
             t_sec,

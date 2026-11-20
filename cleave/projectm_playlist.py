@@ -335,6 +335,7 @@ class ProjectMPlaylist:
             def _on_preset_switched(
                 _is_hard_cut: bool, index: int, _user_data: c_void_p
             ) -> None:
+                pm.note_preset_changed()
                 item = playlist.item(index)
                 if item is not None:
                     playlist._notify_preset_loaded(item)
