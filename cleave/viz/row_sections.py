@@ -76,7 +76,8 @@ class SectionDef:
     children: tuple[SectionNode, ...] = ()
     append_dynamic_children: AppendDynamicChildrenFn | None = None
     card: str | None = None
-    trailing_commands: tuple[str, ...] = ()
+    # A command drawn as a button on the left of the page title's icon line.
+    title_command: str | None = None
     # False: the page's buttons join its last group of rows instead of
     # sitting under a divider of their own.
     commands_divider: bool = True
@@ -553,7 +554,7 @@ TRACK_PRESET_LIST_SECTION = SectionDef(
     context="per_slot",
     children=(),
     append_dynamic_children=_append_preset_list_rows,
-    trailing_commands=("layers.populate_presets",),
+    title_command="layers.populate_presets",
 )
 
 PRESET_SWITCHING_USES_DURATION = ConditionalRowsDef(

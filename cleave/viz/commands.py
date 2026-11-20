@@ -553,7 +553,7 @@ _GO_TO_PRESET_LIST = Command(
 )
 _POPULATE_PRESETS = Command(
     id="layers.populate_presets",
-    label="Populate…",
+    label="Populate list…",
     kind="command",
     enabled=_preset_list_enabled,
     run=_when_enabled(_preset_list_enabled, _run_populate_presets),

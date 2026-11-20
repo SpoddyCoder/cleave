@@ -134,6 +134,12 @@ def page_section(state: TuningViewState, node_id: str) -> SectionDef | None:
     return TRACK_SECTION
 
 
+def page_title_command(state: TuningViewState, node_id: str) -> str | None:
+    """Command id for the button on the left of the page title's icon line, if any."""
+    section = page_section(state, node_id)
+    return None if section is None else section.title_command
+
+
 def build_inspector_rows(
     state: TuningViewState,
     node_id: str,
@@ -237,8 +243,6 @@ def _append_section_children(
                 navigable=row_spec(desc.kind).navigable,
             )
         )
-    if section.trailing_commands:
-        rows.append(_command_row(section.trailing_commands, depth))
 
 
 def _append_subsection(

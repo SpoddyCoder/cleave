@@ -196,7 +196,7 @@ def _list_fill_items(
         _add_item(controls, desc, slot, label="Add current preset"),
         ContextMenuItem(
             id="preset.populate",
-            label="Populate…",
+            label="Populate list…",
             run=lambda: controls.preset_list.prompt_populate(slot),
             enabled=hint is None,
             hint=hint,

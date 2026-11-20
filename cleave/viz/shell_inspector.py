@@ -16,10 +16,11 @@ from cleave.viz.drag_reorder import DRAG_PRESET
 from cleave.viz.icon_button import box_contains, icon_box, icon_gap
 from cleave.viz.imgui_icon_button import glyph_drop, paint_box
 from cleave.viz.imgui_theme import padded_row_spacing_y, padded_rows, rgba
-from cleave.viz.inspector import build_inspector_rows, InspectorRow
+from cleave.viz.inspector import build_inspector_rows, InspectorRow, page_title_command
 from cleave.viz.inspector_controls import (
     inspector_command_enabled,
     inspector_command_locked,
+    run_inspector_command,
 )
 from cleave.viz.material_icons import (
     ARROW_BACK_GLYPH,
@@ -59,6 +60,7 @@ from cleave.viz.shell_inspector_values import ValueControls
 from cleave.viz.shell_inspector_title import (
     draw_inspector_title,
     inspector_title_height,
+    inspector_title_line_gap,
     inspector_title,
     page_history_tooltip,
     page_title,
@@ -66,6 +68,7 @@ from cleave.viz.shell_inspector_title import (
     TITLE_BACK,
     TITLE_FORWARD,
     TitleButton,
+    TitleCommand,
 )
 from cleave.viz.row_paint import RowState, row_band
 from cleave.viz.row_hotkeys import activate_header_toggle, node_control_descriptor
@@ -482,14 +485,19 @@ class InspectorPanel:
         )
         # The title block takes its reserved height, then the divider's space starts.
         title_y = imgui.get_cursor_screen_pos().y
+        rule_y = _divider_rule_y(
+            title_y + inspector_title_height() + imgui.get_style().item_spacing.y
+        )
+        # The gap under the title bar pushes the divider down by as much.
+        line_gap = inspector_title_line_gap(rule_y)
         pressed = draw_inspector_title(
             title,
             elapsed,
-            _divider_rule_y(
-                title_y + inspector_title_height() + imgui.get_style().item_spacing.y
-            ),
+            rule_y + line_gap,
             page_toggle_buttons(toggles, self._page_status)
             + self._page_history_buttons(frame.command_ctx),
+            self._title_command(frame, focus.selected_id),
+            line_gap,
         )
         toggle = next((item for item in toggles if item.toggle.id == pressed), None)
         if toggle is not None:
@@ -502,6 +510,8 @@ class InspectorPanel:
             self._ctx.controls.navigator.go_back()
         elif pressed == TITLE_FORWARD:
             self._ctx.controls.navigator.go_forward()
+        elif pressed is not None and pressed == page_title_command(state, focus.selected_id):
+            run_inspector_command(self._ctx.controls, pressed)
         _draw_inspector_divider()
         cursor = imgui.get_cursor_screen_pos()
         imgui.set_cursor_screen_pos(
@@ -524,6 +534,26 @@ class InspectorPanel:
             imgui.end_child()
         self.values.draw_colour_picker()
         self.values.draw_choice_list_window()
+
+    def _title_command(self, frame: ShellFrame, page_id: str) -> TitleCommand | None:
+        """The page's title-line command button, coloured like the page's buttons."""
+        command_id = page_title_command(frame.view_state, page_id)
+        if command_id is None:
+            return None
+        ctx = frame.command_ctx
+        enabled = inspector_command_enabled(ctx, command_id)
+        locked = (
+            inspector_command_locked(ctx, command_id)
+            or self._page_status.locked_by is not None
+        )
+        page_off = self._page_status.off_by is not None
+        return TitleCommand(
+            command_id,
+            command_by_id(command_id).label,
+            enabled,
+            _button_text_role(enabled, locked, page_off=page_off),
+            off=_button_off(enabled, locked, page_off=page_off),
+        )
 
     def _page_history_buttons(
         self, ctx: CommandContext

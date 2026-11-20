@@ -198,7 +198,6 @@ _INSPECTOR_COMMAND_KINDS = {
     "layers.add": RowKind.LAYER_MANAGEMENT_ADD,
     "layers.delete": RowKind.LAYER_MANAGEMENT_DELETE,
     "layers.go_to_preset_list": RowKind.TRACK_PRESET_LIST_GOTO,
-    "layers.populate_presets": RowKind.TRACK_PRESET_LIST_POPULATE,
     "layers.resume_switching": RowKind.TRACK_PRESET_SWITCHING_RESUME,
     "timeline.generate": RowKind.TIMELINE_GENERATE,
     "timeline.reset": RowKind.TIMELINE_RESET,

@@ -6,7 +6,7 @@ import pytest
 
 from cleave.effects.registry import effect_roster
 from cleave.viz.focus_nav import MainFocus
-from cleave.viz.inspector import build_inspector_rows
+from cleave.viz.inspector import build_inspector_rows, page_title_command
 from cleave.timeline import TimelineClip
 from cleave.viz.navigator import (
     LAYER_PAGE_MILKDROP_PRESET,
@@ -452,7 +452,10 @@ def test_dynamic_effect_and_preset_rows_keep_slot_identity() -> None:
         ("layer_1", 0),
         ("layer_1", 1),
     ]
-    assert rows[-1].command_ids == ("layers.populate_presets",)
+    assert all(not row.command_ids for row in rows)
+    page_id = layer_page_node_id("layer_1", "preset_list")
+    assert page_title_command(state, page_id) == "layers.populate_presets"
+    assert page_title_command(state, layer_node_id("layer_1")) is None
 
 
 def test_section_lock_inspector_field_colors() -> None:

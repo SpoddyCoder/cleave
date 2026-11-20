@@ -10,6 +10,7 @@ import pygame
 from cleave.viz.focus_nav import MainFocus
 from cleave.viz.input_dispatch import dispatch_keydown
 from cleave.viz.inspector import InspectorRow, build_inspector_rows
+from cleave.viz.inspector_controls import run_inspector_command
 from cleave.viz.menu_bar import MenuBarState
 from cleave.viz.navigator import layer_node_id, layer_page_node_id
 import cleave.viz.row_hotkeys as row_hotkeys
@@ -245,18 +246,8 @@ def test_section_lock_inspector_refuses_edits_and_delete_still_prompts() -> None
     assert dispatch_keydown(keydown(pygame.K_LEFT), runtime) is True
     assert layer.opacity_pct == before
 
-    view = controls.build_view_state(paused=False)
-    built = build_inspector_rows(
-        view, layer_page_node_id("layer_1", "preset_list")
-    )
-    populate_row = next(
-        row for row in built if "layers.populate_presets" in row.command_ids
-    )
-    assert populate_row.navigable
     controls.shell_focus.selected_id = layer_page_node_id("layer_1", "preset_list")
-    controls.inspector.focus_command(populate_row, "layers.populate_presets")
-    assert dispatch_keydown(keydown(pygame.K_LEFT), runtime) is True
-    assert dispatch_keydown(keydown(pygame.K_RETURN), runtime) is True
+    run_inspector_command(controls, "layers.populate_presets")
     assert controls.modal_host.view_state() is None
     preset_row = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
     assert apply_field_nav_button(controls, preset_row, 0) is False
@@ -288,6 +279,9 @@ def test_section_lock_inspector_refuses_edits_and_delete_still_prompts() -> None
             found_delete = True
             break
     assert found_delete
+
+    # Enter clears a timed toast (the lock refusals) before it acts.
+    controls.dismiss_notification()
 
     assert dispatch_keydown(keydown(pygame.K_RETURN), runtime) is True
     modal = controls.modal_host.view_state()

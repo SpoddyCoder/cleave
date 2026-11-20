@@ -1,4 +1,4 @@
-"""The inspector's title block: the breadcrumb with its accent swipe, then an icon line of page toggles and page history arrows."""
+"""The inspector's title block: the breadcrumb with its accent swipe, then an icon line with an optional page command button on the left and page toggles and page history arrows on the right."""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ from cleave.viz.shell_navigator import (
     navigator_toggle_fill,
     navigator_toggle_glyph,
 )
-from cleave.viz.shell_widgets import packed_color, PANEL_BORDER_PX, swipe_fill
+from cleave.viz.shell_widgets import draw_button, packed_color, PANEL_BORDER_PX, swipe_fill
 from cleave.viz.theme import palette
 
 if TYPE_CHECKING:
@@ -94,6 +94,19 @@ def inspector_title_icon_xs(
     return icon_columns(max(avail, cluster_w), slot_count, side, gap)
 
 
+def inspector_title_line_gap(rule_y: float) -> float:
+    """Gap between the title bar and the icon line: the margin a title block
+    with no gap would leave above the bar and below the icon line, between
+    the panel's top border and the divider rule on pixel row *rule_y*.
+
+    Call inside the inspector window. Reserve it on top of
+    ``inspector_title_height`` and move the rule down by it, so all three
+    gaps match.
+    """
+    free_y = imgui.get_window_pos().y + PANEL_BORDER_PX
+    return float(max(0, math.floor((rule_y - free_y - 2.0 * row_band_side()) * 0.5)))
+
+
 def inspector_title_height() -> float:
     """Layout height the title block reserves: one text line plus a row band.
 
@@ -117,6 +130,18 @@ class TitleButton:
     fill_alpha: float = 1.0
     # Refuses a press for a reason other than being disabled; draws as usual.
     inert: bool = False
+
+
+@dataclass(frozen=True)
+class TitleCommand:
+    """A labelled button on the left of the inspector title's icon line."""
+
+    id: str
+    label: str
+    enabled: bool
+    text_role: tuple[int, int, int]
+    # Rests in the darker OFF tone (locked, switched-off page, or not enabled).
+    off: bool = False
 
 
 def page_toggle_tooltip(item: PageToggle, status: PageStatus) -> str:
@@ -190,33 +215,40 @@ def draw_inspector_title(
     elapsed_sec: float,
     rule_y: float,
     buttons: Sequence[TitleButton] = (),
+    command: TitleCommand | None = None,
+    line_gap: float = 0.0,
 ) -> str | None:
     """Inspector page title on two lines: the title with the toast's accent
     swipe behind it, then an icon line.
 
-    *buttons* sit flush right on the icon line. Each line is one padded row
+    *buttons* sit flush right on the icon line; *command*, if any, sits at
+    its left, a framed button one row band tall. *line_gap*
+    (``inspector_title_line_gap``) separates the bar from the icon line. Each line is one padded row
     tall; together they centre between the panel's top border and the
     divider rule on pixel row *rule_y*. The bar starts inset from the panel
     edge by the gap above it at both ends, and the icons end where it
     does. A title wider than its room waits, scrolls to its last words,
     pauses, then snaps back to its start, cut at its right edge. The bar
-    stays once it has swiped in. Returns the id of a pressed, enabled button.
+    stays once it has swiped in. Returns the id of a pressed, enabled button
+    or command.
     """
     start = imgui.get_cursor_screen_pos()
     avail = max(0.0, imgui.get_content_region_avail().x)
     line_h = imgui.get_text_line_height()
     space_w = imgui.calc_text_size(" ").x
     side = row_band_side()
-    imgui.dummy(imgui.ImVec2(avail, inspector_title_height()))
+    imgui.dummy(imgui.ImVec2(avail, inspector_title_height() + line_gap))
     win_pos = imgui.get_window_pos()
     win_size = imgui.get_window_size()
     # Each line is a row's highlight band, so the icons match the rows'.
     # An odd spare pixel goes below them.
     free_y = win_pos.y + PANEL_BORDER_PX
-    block_top = free_y + max(0.0, math.floor((rule_y - free_y - 2.0 * side) * 0.5))
+    block_top = free_y + max(
+        0.0, math.floor((rule_y - free_y - 2.0 * side - line_gap) * 0.5)
+    )
     text_y = block_top + (side - line_h) * 0.5
     bar_y0, bar_y1 = row_band(text_y)
-    icon_band = row_band(text_y + side)
+    icon_band = row_band(text_y + side + line_gap)
     # The blank gap above the bar, inside the panel border, repeats at both
     # of the bar's ends, and the icons end where the bar does.
     inset = bar_y0 - win_pos.y
@@ -282,7 +314,10 @@ def draw_inspector_title(
                     draw.pop_clip_rect()
         finally:
             draw.pop_clip_rect()
-        return _draw_title_buttons(buttons, start, slot_xs, icon_band)
+        pressed = _draw_title_buttons(buttons, start, slot_xs, icon_band)
+        if command is not None and _draw_title_command(command, bar_x0, icon_band):
+            pressed = command.id
+        return pressed
     finally:
         imgui.pop_clip_rect()
 
@@ -312,3 +347,29 @@ def _draw_title_buttons(
         if pressed and button.enabled and not button.inert:
             pressed_id = button.id
     return pressed_id
+
+
+def _draw_title_command(
+    command: TitleCommand, left_x: float, band: tuple[float, float]
+) -> bool:
+    """The command button at *left_x*, the title bar's left end, filling the icon line's row band.
+    Returns whether it was clicked while enabled. The cursor is put back after."""
+    cursor = imgui.get_cursor_screen_pos()
+    band_top, band_bottom = band
+    pad_y = max(0.0, (band_bottom - band_top - imgui.get_text_line_height()) * 0.5)
+    imgui.set_cursor_screen_pos(imgui.ImVec2(left_x, band_top))
+    imgui.push_style_var(
+        imgui.StyleVar_.frame_padding,
+        imgui.ImVec2(imgui.get_style().frame_padding.x, pad_y),
+    )
+    try:
+        clicked = draw_button(
+            f"{command.label}##inspector-title-cmd-{command.id}",
+            text_role=command.text_role,
+            enabled=command.enabled,
+            off=command.off,
+        )
+    finally:
+        imgui.pop_style_var()
+        imgui.set_cursor_screen_pos(cursor)
+    return clicked and command.enabled

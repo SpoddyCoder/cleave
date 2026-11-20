@@ -88,19 +88,6 @@ def test_display_row_uses_label_color() -> None:
     assert row_value_color_for(state, desc) == palette().label
 
 
-def test_preset_list_populate_uses_action_color() -> None:
-    state = minimal_view_state(
-        tracks={
-            "layer_1": _track(
-                preset_switching="on",
-                preset_switching_trigger="timer",
-            )
-        },
-    )
-    populate_row = RowDescriptor(RowKind.TRACK_PRESET_LIST_POPULATE, slot="layer_1")
-    assert row_value_color_for(state, populate_row) == palette().value
-
-
 def _inspector_kinds(state, node_id: str) -> list[RowKind]:
     rows = build_inspector_rows(state, node_id)
     return [row.descriptor.kind for row in rows if row.descriptor is not None]

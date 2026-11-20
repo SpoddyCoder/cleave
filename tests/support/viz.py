@@ -281,7 +281,6 @@ _PRESET_LIST_PAGE_KINDS = frozenset(
     {
         RowKind.TRACK_PRESET_LIST,
         RowKind.TRACK_PRESET_LIST_ITEM,
-        RowKind.TRACK_PRESET_LIST_POPULATE,
     }
 )
 _MILKDROP_PRESET_PAGE_KINDS = frozenset(

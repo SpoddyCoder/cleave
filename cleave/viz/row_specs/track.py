@@ -530,15 +530,6 @@ def _apply_preset_switching_resume_action(
     controls.preset_list.resume(slot)
 
 
-def _apply_preset_list_populate_action(
-    controls: TuningControls, desc: RowDescriptor
-) -> None:
-    slot = desc.slot
-    if slot is None:
-        return
-    controls.preset_list.prompt_populate(slot)
-
-
 def _apply_layer_add_action(controls: TuningControls, _desc: RowDescriptor) -> None:
     if is_preset_curation_mode(controls.session.settings.editor_mode):
         return
@@ -780,21 +771,6 @@ SPECS: dict[RowKind, RowSpec] = {
             "Opens this layer's Preset List page, under Preset Switching.",
         ),
         parent_group="track",
-    ),
-    RowKind.TRACK_PRESET_LIST_POPULATE: RowSpec(
-        affordance=RowAffordance.COMMAND,
-        panel_label="Populate…",
-        present_style=RowPresentStyle.FULL_LINE,
-        apply_horizontal=noop_horizontal,
-        apply_action=_apply_preset_list_populate_action,
-        fit_strategy=FitStrategy.NONE,
-        help_title="Populate Presets",
-        help_entries=(("Enter", "choose a directory"),),
-        help_description=(
-            "Replaces the whole list with presets from a folder, a quick way to audition a collection.",
-        ),
-        parent_group="track",
-        blocked_by_section_lock=True,
     ),
     RowKind.TRACK_PRESET_DURATION: RowSpec(
         affordance=RowAffordance.VALUE_STEP,

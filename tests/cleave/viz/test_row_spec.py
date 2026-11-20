@@ -361,7 +361,6 @@ def test_track_sub_row_kinds() -> None:
             RowKind.TRACK_PRESET_LIST,
             RowKind.TRACK_PRESET_LIST_ITEM,
             RowKind.TRACK_PRESET_LIST_GOTO,
-            RowKind.TRACK_PRESET_LIST_POPULATE,
             RowKind.TRACK_PRESET_DURATION,
             RowKind.TRACK_SOFT_CUT_DURATION,
             RowKind.TRACK_EASTER_EGG,
@@ -420,7 +419,6 @@ def test_track_value_rows_blocked_by_section_lock() -> None:
             RowKind.TRACK_BEAT,
             RowKind.TRACK_EFFECT,
             RowKind.TRACK_PRESET_LIST_ITEM,
-            RowKind.TRACK_PRESET_LIST_POPULATE,
             RowKind.TRACK_PRESET_SWITCHING_RESUME,
         }
     )
@@ -445,7 +443,6 @@ def test_only_effects_header_navigable_when_section_locked() -> None:
 
 def test_preset_list_actions_are_action_rows() -> None:
     for kind in (
-        RowKind.TRACK_PRESET_LIST_POPULATE,
         RowKind.TRACK_PRESET_LIST_GOTO,
         RowKind.TRACK_PRESET_SWITCHING_RESUME,
     ):
@@ -488,7 +485,6 @@ def test_render_value_children_blocked_by_section_lock() -> None:
     assert row_blocked_by_section_lock(RowKind.POST_FX_FADE_IN_START) is True
     assert row_blocked_by_section_lock(RowKind.POST_FX_CHROMA_BOOST_AMOUNT) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_GENERATE) is True
-    assert row_blocked_by_section_lock(RowKind.TRACK_PRESET_LIST_POPULATE) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_BAR_PHASE) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_SNAP_CUES) is True
     assert row_blocked_by_section_lock(RowKind.SONG_MARKER_ITEM) is True
@@ -941,10 +937,7 @@ def test_format_row_value_timeline_cuts() -> None:
     )
 
 
-def test_preset_list_populate_is_full_line_action() -> None:
-    field = row_spec(RowKind.TRACK_PRESET_LIST_POPULATE)
-    assert field.present_style == RowPresentStyle.FULL_LINE
-    assert field.panel_label == "Populate…"
+def test_go_to_preset_list_is_full_line_action() -> None:
     goto_field = row_spec(RowKind.TRACK_PRESET_LIST_GOTO)
     assert goto_field.present_style == RowPresentStyle.FULL_LINE
     assert goto_field.panel_label == "Go to preset list"
