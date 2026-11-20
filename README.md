@@ -27,14 +27,13 @@ Cleave is in active development. It is very usable, but may not maintain backwar
 
 ## Getting Started
 
-1. **Open a song.** On Windows, drop a music file onto `cleave.exe`, or launch Cleave and pick a file in the window. On Linux, run `./cleave.py play ~/music/mysong.mp3`, or `./cleave.py play` to pick a file in the window. Cleave reads wav, mp3, flac, m4a, aac, ogg, aiff, and aif.
-2. **Grab the downloads.** On first launch, the Welcome to Cleave step offers the Milkdrop presets and the AI models Cleave needs, each with its own progress bar. Anything you skip is fetched when first needed, or later from Settings > Download packages.
-3. **Let Cleave prepare the song.** It separates the track into stems (drums, bass, vocals, other) and detects the beat and bar grid, showing progress in the window. This happens once per song.
-4. **Press `H`.** The help column describes whatever is highlighted, anywhere in the editor, dialogs included.
+1. **Open a song.** On Windows, drop a music file onto `cleave.exe`, or launch Cleave and pick a file in the window. On Linux, run `./cleave.py play ~/music/mysong.mp3`, or `./cleave.py play`.
+  1.1 Cleave reads wav, mp3, flac, m4a, aac, ogg, aiff, and aif.
+3. **Grab the downloads.** On first launch, Cleave offers to download the AI models and the Milkdrop presets it needs to separate the stems and display the visuals. Anything you skip is fetched when first needed, or later from Settings > Download packages.
+4. **Let Cleave prepare the song.** It separates the track into stems (drums, bass, vocals, other) and detects the beat and bar grid.
+6. **Press `H`.** The help column describes whatever is highlighted, anywhere in the editor, dialogs included.
 
 The [User Guide](docs/user-guide/README.md) covers the rest: layers, presets, preset curation, the timeline, credits cards, post-processing, and rendering.
-
-If the preview struggles with several layers, lower Settings > Preview > preview quality. Renders always run at full quality and full frame rate.
 
 ## CLI
 
@@ -73,7 +72,7 @@ The build is unsigned. If SmartScreen warns on the setup exe or the zip, choose 
 
 ### CUDA (NVIDIA GPU)
 
-Stem separation on CPU is slow. When your NVIDIA driver supports CUDA 13.2 (driver 595 or newer), the Welcome to Cleave step offers a CUDA Toolkit download from PyTorch (about 2 GB) for much faster splitting. It is off by default; tick it on first launch, or later from Settings > Download packages. It goes into `%LOCALAPPDATA%\Cleave\cuda`, so the installer and the zip both stay CPU-only and work the same. Skip or fail leaves CPU split working fine.
+Stem separation on CPU is slow. When your NVIDIA driver supports CUDA 13.2 (driver 595 or newer), Cleave offers a CUDA Toolkit download from PyTorch (about 2 GB) for much faster splitting.
 
 ---
 
@@ -150,28 +149,22 @@ Cleave creates a project directory for each song, storing stems, configs and ren
 
 Override the data root with `CLEAVE_DATA` on any OS.
 
-To add the projectM curated preset packs yourself instead of using the Welcome to Cleave download, clone them into those folders:
+To add the preset packs, copy or clone them into these folders:
 
 Windows:
 ```
 cd %USERPROFILE%\Documents\Cleave\presets
-git clone https://github.com/projectM-visualizer/presets-milkdrop-original
-git clone https://github.com/projectM-visualizer/presets-cream-of-the-crop
 git clone https://github.com/projectM-visualizer/presets-projectm-classic
-git clone https://github.com/projectM-visualizer/presets-en-d
 ```
 
 Linux:
 ```bash
 mkdir -p ~/.local/share/cleave/presets
 cd ~/.local/share/cleave/presets
-git clone https://github.com/projectM-visualizer/presets-milkdrop-original
-git clone https://github.com/projectM-visualizer/presets-cream-of-the-crop
 git clone https://github.com/projectM-visualizer/presets-projectm-classic
-git clone https://github.com/projectM-visualizer/presets-en-d
 ```
 
-Optionally grab the texture pack too:
+texture packs live here:
 ```bash
 # Windows: cd %USERPROFILE%\Documents\Cleave\textures
 # Linux:
@@ -182,7 +175,7 @@ git clone https://github.com/projectM-visualizer/presets-milkdrop-texture-pack
 
 There are many thousands of Milkdrop presets available online - these are just a few of the best.
 
-Cleave notices a new pack folder the next time you open a project. If you add presets to a pack that was already there, or while the editor is open, choose Settings > Rescan presets so favourites, roles, and the blacklist pick them up.
+Cleave notices a new pack folder the next time you open a project. If you add/remove presets to a pack that was already there, or while the editor is open, choose Settings > Rescan presets.
 
 A project directory contains:
 * `project.yaml` - metadata, song markers, render settings
