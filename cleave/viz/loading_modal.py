@@ -9,9 +9,12 @@ from __future__ import annotations
 
 import pygame
 
-from cleave.stems import StemCount
+from typing import TYPE_CHECKING
 from cleave.viz.loading import LoadingWindow, present_frame
 from cleave.viz.modal import ModalHost
+
+if TYPE_CHECKING:
+    from cleave.viz.stem_count_prompt import SplitChoice
 
 _TICK_FPS = 60
 _MOUSE_EVENTS = (
@@ -94,16 +97,16 @@ def show_notice(window: LoadingWindow, title: str, message: str) -> bool:
     return run_modal(window, host)
 
 
-def choose_stem_count(window: LoadingWindow) -> StemCount | None:
-    """Ask a new project's stem count. None on Cancel or a closed window."""
-    from cleave.viz.stem_count_prompt import (
-        NEW_PROJECT_STEMS_TITLE,
-        prompt_stem_count,
-    )
+def choose_split(window: LoadingWindow, default: SplitChoice) -> SplitChoice | None:
+    """Ask how to split a new project, starting on *default*.
 
-    picked: list[StemCount] = []
+    None on Cancel or a closed window.
+    """
+    from cleave.viz.stem_count_prompt import NEW_PROJECT_STEMS_TITLE, prompt_split
+
+    picked: list[SplitChoice] = []
     host = ModalHost()
-    prompt_stem_count(host, NEW_PROJECT_STEMS_TITLE, picked.append)
+    prompt_split(host, NEW_PROJECT_STEMS_TITLE, picked.append, default=default)
     if not run_modal(window, host) or not picked:
         return None
     return picked[0]

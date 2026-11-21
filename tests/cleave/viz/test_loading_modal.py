@@ -78,29 +78,72 @@ def test_mouse_events_reach_imgui() -> None:
     window.imgui.process_mouse_event.assert_called_once_with(motion)
 
 
-def test_stem_count_prompt_starts_on_four_and_reports_the_pick() -> None:
+def test_split_prompt_starts_on_four_and_reports_the_pick() -> None:
     from cleave.viz.modal import ModalHost
     from cleave.viz.stem_count_prompt import (
         NEW_PROJECT_STEMS_TITLE,
-        prompt_stem_count,
+        SplitChoice,
+        prompt_split,
     )
 
-    picked: list[int] = []
+    picked: list[SplitChoice] = []
     cancelled: list[bool] = []
     host = ModalHost()
-    prompt_stem_count(
-        host, NEW_PROJECT_STEMS_TITLE, picked.append, lambda: cancelled.append(True)
-    )
+
+    def ask() -> None:
+        prompt_split(
+            host, NEW_PROJECT_STEMS_TITLE, picked.append, lambda: cancelled.append(True)
+        )
+
+    def key(code: int) -> None:
+        host.handle_keydown(pygame.event.Event(pygame.KEYDOWN, key=code, mod=0))
+
+    ask()
     view = host.view_state()
     assert view is not None
-    assert view.options == ("4 stems", "6 stems", "Cancel")
+    assert view.options == ("4 stems", "4 stems HQ", "6 stems", "Cancel")
     assert view.focus_index == 0
-    host.handle_keydown(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RIGHT, mod=0))
-    host.handle_keydown(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN, mod=0))
-    assert picked == [6]
+    key(pygame.K_RIGHT)
+    key(pygame.K_RETURN)
+    assert picked == [SplitChoice(4, high_quality=True)]
     assert not host.active
 
-    prompt_stem_count(host, NEW_PROJECT_STEMS_TITLE, picked.append, lambda: cancelled.append(True))
-    host.handle_keydown(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, mod=0))
+    ask()
+    key(pygame.K_RIGHT)
+    key(pygame.K_RIGHT)
+    key(pygame.K_RETURN)
+    assert picked[-1] == SplitChoice(6)
+
+    ask()
+    key(pygame.K_ESCAPE)
     assert cancelled == [True]
-    assert picked == [6]
+    assert len(picked) == 2
+
+
+def test_project_split_reads_the_manifest(tmp_path) -> None:
+    from cleave.project import write_manifest
+    from cleave.viz.stem_count_prompt import SplitChoice, project_split
+
+    def split_with(model: str) -> SplitChoice:
+        write_manifest(
+            tmp_path,
+            slug="song",
+            mix_filename="song.wav",
+            original_path=tmp_path / "song.wav",
+            demucs_model=model,
+        )
+        return project_split(tmp_path)
+
+    assert split_with("htdemucs") == SplitChoice(4)
+    assert split_with("htdemucs_ft") == SplitChoice(4, high_quality=True)
+    assert split_with("htdemucs_6s") == SplitChoice(6)
+
+
+def test_split_prompt_starts_on_the_given_default() -> None:
+    from cleave.viz.modal import ModalHost
+    from cleave.viz.stem_count_prompt import SplitChoice, prompt_split
+
+    host = ModalHost()
+    prompt_split(host, "t", lambda _c: None, default=SplitChoice(4, high_quality=True))
+    view = host.view_state()
+    assert view is not None and view.focus_index == 1

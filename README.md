@@ -7,7 +7,7 @@
 
 # Cleave - stem separated music visualizer
 
-[![Version](https://img.shields.io/badge/version-v0.4.0--46%20%28dev%20build%29-orange)](https://github.com/SpoddyCoder/cleave/compare/v0.4.0...0.5.0) [![Tests](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml/badge.svg)](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml)
+[![Version](https://img.shields.io/badge/version-v0.4.0--47%20%28dev%20build%29-orange)](https://github.com/SpoddyCoder/cleave/compare/v0.4.0...0.5.0) [![Tests](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml/badge.svg)](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml)
 
 Layer together drums, bass, vocals and other stems (plus guitar and piano, if you like) - each driving Milkdrop presets to create your own unique visual masterpieces.
 
@@ -30,7 +30,7 @@ Cleave is in active development. It is very usable, but may not maintain backwar
 1. **Open a song.** On Windows, drop a music file onto `cleave.exe`, or launch Cleave and pick a file in the window. On Linux, run `./cleave.py play ~/music/mysong.mp3`, or `./cleave.py play`.
   1.1 Cleave reads wav, mp3, flac, m4a, aac, ogg, aiff, and aif.
 3. **Grab the downloads.** On first launch, Cleave offers to download the AI models and the Milkdrop presets it needs to separate the stems and display the visuals. Anything you skip is fetched when first needed, or later from Settings > Download packages.
-4. **Let Cleave prepare the song.** Choose 4 stems (drums, bass, vocals, other) or 6 (adding guitar and piano). Cleave separates the track and detects the beat and bar grid.
+4. **Let Cleave prepare the song.** Choose 4 stems (drums, bass, vocals, other), 4 stems HQ (slower, cleaner), or 6 (adding guitar and piano). Cleave separates the track and detects the beat and bar grid.
 6. **Press `H`.** The help column describes whatever is highlighted, anywhere in the editor, dialogs included.
 
 The [User Guide](docs/user-guide/README.md) covers the rest: layers, presets, preset curation, the timeline, credits cards, post-processing, and rendering.

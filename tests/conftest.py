@@ -43,9 +43,12 @@ def _no_user_themes_between_tests() -> Iterator[None]:
 
 @pytest.fixture(autouse=True)
 def _new_project_stem_prompt_picks_four(monkeypatch) -> None:
-    """The window's new-project stem prompt answers 4; tests that drive it repatch."""
+    """The window's new-project split prompt takes the button it starts on.
+
+    That is 4 stems, or 4 stems HQ after ``play -hq``; tests that drive it repatch.
+    """
     monkeypatch.setattr(
-        "cleave.viz.loading_modal.choose_stem_count", lambda _window: 4
+        "cleave.viz.loading_modal.choose_split", lambda _window, default: default
     )
 
 

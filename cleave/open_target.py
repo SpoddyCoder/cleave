@@ -49,12 +49,14 @@ class OpenTarget:
 
     ``path`` is suitable for :func:`cleave.separate.resolve_separate_target`.
     ``stem_count`` is the split to make: set for ``RESEPARATE``, and for
-    ``AUDIO`` once chosen (None asks in the window).
+    ``AUDIO`` once chosen (None asks in the window). ``high_quality`` is the
+    choice made in the window; None uses the command line's ``-hq``.
     """
 
     path: Path
     kind: OpenTargetKind
     stem_count: StemCount | None = None
+    high_quality: bool | None = None
 
 
 def is_audio_target(path: Path) -> bool:

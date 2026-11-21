@@ -250,21 +250,21 @@ def _reseparate_enabled(ctx: CommandContext) -> bool:
 
 
 def _run_reseparate(controls: TuningControls) -> None:
-    from cleave.stems import project_stem_count
     from cleave.viz.stem_count_prompt import (
         RESEPARATE_BODY,
         RESEPARATE_TITLE,
-        prompt_stem_count,
+        project_split,
+        prompt_split,
     )
 
     project_dir = controls.project_dir
     if project_dir is None or controls.modal_host.active:
         return
-    prompt_stem_count(
+    prompt_split(
         controls.modal_host,
         RESEPARATE_TITLE,
-        lambda count: controls.project_switch.request_reseparate(project_dir, count),
-        current=project_stem_count(project_dir),
+        lambda choice: controls.project_switch.request_reseparate(project_dir, choice),
+        current=project_split(project_dir),
         body=RESEPARATE_BODY,
     )
 

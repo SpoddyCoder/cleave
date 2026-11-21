@@ -1048,8 +1048,9 @@ def test_reseparate_asks_stem_count_then_requests_the_split(
     view = controls.modal_host.view_state()
     assert view is not None
     assert view.message == "Re-separate stems"
-    assert view.options == ("4 stems (current)", "6 stems", "Cancel")
+    assert view.options == ("4 stems (current)", "4 stems HQ", "6 stems", "Cancel")
     assert view.focus_index == 1
+    controls.modal_host.handle_keydown(keydown(pygame.K_RIGHT))
     controls.modal_host.handle_keydown(keydown(pygame.K_RETURN))
     assert controls.consume_pending_switch() is True
     target = controls.project_switch.take_accepted()
@@ -1057,3 +1058,4 @@ def test_reseparate_asks_stem_count_then_requests_the_split(
     assert target.kind is OpenTargetKind.RESEPARATE
     assert target.path == project
     assert target.stem_count == 6
+    assert target.high_quality is False

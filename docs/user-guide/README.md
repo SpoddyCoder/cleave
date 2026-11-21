@@ -80,7 +80,7 @@ The five preset packs are grouped under **projectM curated preset packs**, one l
 
 Supported formats are wav, mp3, flac, m4a, aac, ogg, aiff, and aif.
 
-When you open a new song, Cleave first asks how many stems to split it into (see [4 or 6 stems](#4-or-6-stems)). It then analyses the song, with progress shown in a **Creating project** dialog:
+When you open a new song, Cleave first asks how to split it (see [4 or 6 stems](#4-or-6-stems)). It then analyses the song, with progress shown in a **Creating project** dialog:
 
 1. **Stem separation** into the stems you chose. This is the slow step; on CPU, a few minutes per song is normal.
 2. **Audio analysis**, which finds the beats, bars, loudness, and pitch that drive the visuals.
@@ -94,11 +94,12 @@ Each song becomes a **project**: a folder holding the stems, your settings, and 
 | Choice | Stems |
 | --- | --- |
 | 4 stems (the default) | drums, bass, vocals, other |
+| 4 stems HQ | The same four stems, separated more cleanly but more slowly, with more accurate vocal pitch. |
 | 6 stems | drums, bass, vocals, guitar, piano, other |
 
-Six stems gives guitar and piano parts their own layers, where four stems folds them into other. Piano separates less cleanly than the rest, so expect some bleed between piano and other. High Quality separation has no 6-stem model.
+4 stems HQ uses the Demucs HQ model, which downloads the first time you choose it (about 320 MB) if you skipped it at first launch. Six stems gives guitar and piano parts their own layers, where four stems folds them into other. Piano separates less cleanly than the rest, so expect some bleed between piano and other. There is no HQ version of 6 stems.
 
-A new 6-stem project starts with six layers, one per stem. To change an existing project, choose **Project > Re-separate stems** and pick a count. Cleave asks to save unsaved changes, splits the song again, re-extracts its signals, and reopens the project. Your layers stay as they are, except that going from 6 stems to 4 moves guitar and piano layers to other and clears their Cleave Effects. Re-separating with the count the project already has simply splits it again.
+A new 6-stem project starts with six layers, one per stem. To change an existing project, choose **Project > Re-separate stems** and pick a split; the project's current one is marked. Cleave asks to save unsaved changes, splits the song again, re-extracts its signals, and reopens the project. Your layers stay as they are, except that going from 6 stems to 4 moves guitar and piano layers to other and clears their Cleave Effects. Picking the current split simply splits the song again.
 
 ### Saving
 

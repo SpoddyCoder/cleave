@@ -14,6 +14,7 @@ from cleave.open_target import OpenTarget, OpenTargetKind
 from cleave.stems import StemSource
 from cleave.viz.file_picker import PickerMode
 from cleave.viz.loading import LoadingWindow
+from cleave.viz.stem_count_prompt import SplitChoice
 
 NEW_PROJECT_TITLE = "Creating project"
 """Progress dialog title while a new project's stems are split."""
@@ -67,14 +68,18 @@ def _run_sessions(
             if current is None or window.quit_requested:
                 return
         if current.kind is OpenTargetKind.AUDIO and current.stem_count is None:
-            chosen = _ask_stem_count(window)
+            chosen = _ask_split(window, high_quality=high_quality)
             if window.quit_requested:
                 return
-            if chosen is _CANCELLED:
+            if chosen is None:
                 picker_mode = PickerMode.NEW_PROJECT
                 current = None
                 continue
-            current = replace(current, stem_count=chosen)
+            current = replace(
+                current,
+                stem_count=chosen.stem_count,
+                high_quality=chosen.high_quality,
+            )
         try:
             project_dir = _project_dir_for(
                 window,
@@ -116,6 +121,8 @@ def _project_dir_for(
 
     reseparate = target.kind is OpenTargetKind.RESEPARATE
     title = RESEPARATE_PROGRESS_TITLE if reseparate else NEW_PROJECT_TITLE
+    if target.high_quality is not None:
+        high_quality = target.high_quality
     project_dir = run_separate(
         target.path,
         high_quality=high_quality,
@@ -131,24 +138,22 @@ def _project_dir_for(
     return project_dir
 
 
-_CANCELLED = object()
+def _ask_split(window: LoadingWindow, *, high_quality: bool) -> SplitChoice | None:
+    """How to split a new project, or None when the user cancelled.
 
-
-def _ask_stem_count(window: LoadingWindow) -> object:
-    """A new project's stem count, or ``_CANCELLED``.
-
-    Without stem split installed there is nothing to choose; the split
-    reports that itself, so the default count goes through.
+    The dialog starts on 4 stems, or 4 stems HQ after ``play -hq``. Without
+    stem split installed there is nothing to choose; the split reports that
+    itself, so the default goes through.
     """
     from cleave.separate import stem_split_available
-    from cleave.stems import DEFAULT_STEM_COUNT
-    from cleave.viz.loading_modal import choose_stem_count
+    from cleave.viz.loading_modal import choose_split
+    from cleave.viz.stem_count_prompt import SplitChoice
 
+    default = SplitChoice(4, high_quality=high_quality)
     if not stem_split_available():
-        return DEFAULT_STEM_COUNT
+        return default
     window.ensure_imgui()
-    chosen = choose_stem_count(window)
-    return _CANCELLED if chosen is None else chosen
+    return choose_split(window, default)
 
 
 def _picker_mode_after_failure(target: OpenTarget | None) -> PickerMode:

@@ -12,7 +12,7 @@ from pathlib import Path
 import pygame
 
 from cleave.open_target import OpenTarget, OpenTargetKind
-from cleave.stems import StemCount
+from cleave.viz.stem_count_prompt import SplitChoice
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.file_picker import (
     CANCEL_LABEL,
@@ -65,8 +65,8 @@ class ProjectSwitchController:
         """Browse for audio to create a project. Replaces a picker already up."""
         self._prompt(PickerMode.NEW_PROJECT)
 
-    def request_reseparate(self, project_dir: Path, stem_count: StemCount) -> None:
-        """Leave the session to split *project_dir* into *stem_count* stems, then reopen it."""
+    def request_reseparate(self, project_dir: Path, choice: SplitChoice) -> None:
+        """Leave the session to split *project_dir* as *choice* says, then reopen it."""
         if self._modal.active:
             return
         self.cancel()
@@ -75,7 +75,8 @@ class ProjectSwitchController:
             OpenTarget(
                 path=project_dir,
                 kind=OpenTargetKind.RESEPARATE,
-                stem_count=stem_count,
+                stem_count=choice.stem_count,
+                high_quality=choice.high_quality,
             )
         )
 

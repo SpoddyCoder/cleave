@@ -10,6 +10,7 @@ import pytest
 from cleave.open_target import OpenTarget, OpenTargetKind
 from cleave.viz.file_picker import PickerMode
 from cleave.viz.session_loop import NEW_PROJECT_TITLE, run_editor_sessions
+from cleave.viz.stem_count_prompt import SplitChoice
 
 
 def _window() -> MagicMock:
@@ -197,7 +198,29 @@ def test_new_project_asks_stem_count_and_splits_with_it(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     window = _window()
-    monkeypatch.setattr("cleave.viz.loading_modal.choose_stem_count", lambda _w: 6)
+    monkeypatch.setattr(
+        "cleave.viz.loading_modal.choose_split", lambda _w, _default: SplitChoice(6)
+    )
+
+    with (
+        patch("cleave.separate.run_separate", return_value=Path("/projects/song")) as run_separate,
+        patch("cleave.viz.continue_launch", return_value=None),
+    ):
+        run_editor_sessions(window, _audio(), config=None, high_quality=True)
+
+    assert run_separate.call_args.kwargs["stem_count"] == 6
+    assert run_separate.call_args.kwargs["high_quality"] is False
+    assert run_separate.call_args.kwargs["force"] is False
+
+
+def test_new_project_four_stems_hq_splits_with_high_quality(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    window = _window()
+    monkeypatch.setattr(
+        "cleave.viz.loading_modal.choose_split",
+        lambda _w, _default: SplitChoice(4, high_quality=True),
+    )
 
     with (
         patch("cleave.separate.run_separate", return_value=Path("/projects/song")) as run_separate,
@@ -205,15 +228,15 @@ def test_new_project_asks_stem_count_and_splits_with_it(
     ):
         run_editor_sessions(window, _audio(), config=None)
 
-    assert run_separate.call_args.kwargs["stem_count"] == 6
-    assert run_separate.call_args.kwargs["force"] is False
+    assert run_separate.call_args.kwargs["stem_count"] == 4
+    assert run_separate.call_args.kwargs["high_quality"] is True
 
 
 def test_stem_count_cancel_returns_to_new_project_picker(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     window = _window()
-    monkeypatch.setattr("cleave.viz.loading_modal.choose_stem_count", lambda _w: None)
+    monkeypatch.setattr("cleave.viz.loading_modal.choose_split", lambda _w, _default: None)
 
     with (
         patch("cleave.separate.run_separate") as run_separate,
@@ -230,18 +253,19 @@ def test_audio_with_stem_count_skips_the_prompt(
 ) -> None:
     window = _window()
 
-    def no_prompt(_window: object) -> None:
+    def no_prompt(_window: object, _default: object) -> None:
         raise AssertionError("prompted")
 
-    monkeypatch.setattr("cleave.viz.loading_modal.choose_stem_count", no_prompt)
-    target = OpenTarget(Path("/song.wav"), OpenTargetKind.AUDIO, stem_count=6)
+    monkeypatch.setattr("cleave.viz.loading_modal.choose_split", no_prompt)
+    target = OpenTarget(Path("/song.wav"), OpenTargetKind.AUDIO, stem_count=4)
     with (
         patch("cleave.separate.run_separate", return_value=Path("/projects/song")) as run_separate,
         patch("cleave.viz.continue_launch", return_value=None),
     ):
-        run_editor_sessions(window, target, config=None)
+        run_editor_sessions(window, target, config=None, high_quality=True)
 
-    assert run_separate.call_args.kwargs["stem_count"] == 6
+    assert run_separate.call_args.kwargs["stem_count"] == 4
+    assert run_separate.call_args.kwargs["high_quality"] is True
 
 
 def test_reseparate_splits_with_force_then_reopens_the_project() -> None:
