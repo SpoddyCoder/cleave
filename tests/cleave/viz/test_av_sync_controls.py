@@ -17,7 +17,7 @@ from cleave.viz.calibration_clicks import CalibrationClicks, CalibrationUiSnapsh
 from cleave.viz.focus_nav import TimelineFocus
 from cleave.viz.mix_player import FREQUENCY_HZ, NUM_CHANNELS, MixPlayer
 from cleave.viz.modal import ModalHost
-from cleave.viz.playback import PlaybackState
+from cleave.viz.playback import PlaybackState, seek_to
 from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.tap_sync import METRONOME_BEATS_PER_BAR, METRONOME_QUARTER_SEC
 from tests.support.viz import keydown, make_test_cfg
@@ -50,6 +50,7 @@ def _make(
         duration_sec,
         on_ui_begin=on_begin,
         on_ui_restore=lambda _snapshot: ui_log.append("restore"),
+        on_seek=lambda sec: seek_to(playback, sec, duration_sec),
     )
     cfg = make_test_cfg()
     cfg.editor = replace(cfg.editor, audio_latency_ms=audio_latency_ms)
@@ -173,3 +174,29 @@ def test_options_keep_the_current_value() -> None:
     assert options[:2] == (0, 10)
     assert 45 in options
     assert audio_latency_options_ms(50).count(50) == 1
+
+
+@pytest.mark.parametrize("key", [pygame.K_RETURN, pygame.K_ESCAPE])
+def test_on_close_runs_once_after_apply_or_cancel(key: int) -> None:
+    controls, _playback, modal, _notes, _ui_log, _applied = _make()
+    closed: list[bool] = []
+    controls.prompt_start(on_close=lambda: closed.append(controls.active))
+
+    modal.handle_keydown(keydown(key))
+
+    assert closed == [False]
+    assert modal.view_state() is None
+
+
+@pytest.mark.parametrize("key", [pygame.K_RETURN, pygame.K_ESCAPE])
+def test_playhead_returns_to_where_the_test_began(key: int) -> None:
+    controls, playback, modal, _notes, _ui_log, _applied = _make()
+    playback.player.seek(3.0)
+    controls.prompt_start()
+    # The beeps run on the song clock, so the playhead moves meanwhile.
+    playback.player.seek(9.0)
+
+    modal.handle_keydown(keydown(key))
+
+    assert playback.player.file_position_sec() == pytest.approx(3.0)
+    assert playback.paused

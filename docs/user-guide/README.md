@@ -71,6 +71,15 @@ Cleave opens on a short splash with its logo, credit, and version; press any key
 
 The five preset packs are grouped under **projectM curated preset packs**, one line each, so you can pick just the ones you want. Each download reports its own progress. You can cancel at any point, and anything that fails is listed with a Retry button. Anything you skip is fetched automatically when it is first needed, or you can get it at any time from **Settings > Download packages**.
 
+The first time the editor opens a project, a **Set up audio latency** dialog offers the two latency settings worth setting up for your computer, both switched on:
+
+| Setting | What it is for |
+| --- | --- |
+| Audio latency | Lines the preview up with the sound you hear, for outputs such as wireless headphones that play late. See [The visuals are out of time with the music](#the-visuals-are-out-of-time-with-the-music). |
+| Tap timing | Lines up song markers and recorded clips with the beat, allowing for how late your key presses land. See [Markers and recorded clips land late](#markers-and-recorded-clips-land-late). |
+
+Click **OK** to run the ones you left on, one after the other: **Measure audio latency** first, then **Calibrate tap timing**. **Cancel** skips both. The song stays paused until you are done, then starts playing. The dialog shows only once; either test is always on the **Settings** menu.
+
 ---
 
 ## Opening a song

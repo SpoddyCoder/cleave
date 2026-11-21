@@ -15,12 +15,11 @@ from __future__ import annotations
 import queue
 import threading
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import pygame
 import yaml
 
-from cleave.config_schema.first_run import FirstRunState
 from cleave.first_run import (
     PRESET_PACK_IDS,
     FirstRunCancelled,
@@ -31,7 +30,7 @@ from cleave.first_run import (
     ItemResult,
     run_downloads,
 )
-from cleave.user_config import persist_first_run_state
+from cleave.user_config import persist_first_run_state, saved_first_run_state
 from cleave.viz.brand import Logo
 from cleave.viz.loading import LoadingWindow
 from cleave.viz.loading_modal import present_modal_frame
@@ -78,7 +77,7 @@ def _downloading_message(item: FirstRunItem) -> str:
 
 def _mark_done() -> None:
     try:
-        persist_first_run_state(FirstRunState(welcome_done=True))
+        persist_first_run_state(replace(saved_first_run_state(), welcome_done=True))
     except (OSError, ValueError, yaml.YAMLError):
         return
 

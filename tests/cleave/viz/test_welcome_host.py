@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 import pygame
 import pytest
 
+from cleave.config_schema.first_run import FirstRunState
 from cleave.first_run import FirstRunItem, FirstRunItemId
 from cleave.model_weights import WeightDownloadError
 from cleave.viz.controls import TuningControls
@@ -27,7 +28,13 @@ def _pygame_ready() -> None:
 
 @pytest.fixture
 def persist() -> Iterator[MagicMock]:
-    with patch("cleave.viz.welcome_host.persist_first_run_state") as mock:
+    with (
+        patch(
+            "cleave.viz.welcome_host.saved_first_run_state",
+            return_value=FirstRunState(latency_setup_done=True),
+        ),
+        patch("cleave.viz.welcome_host.persist_first_run_state") as mock,
+    ):
         yield mock
 
 
@@ -87,7 +94,9 @@ def test_skip_marks_done_without_downloading(persist: MagicMock) -> None:
     assert not flow.active
     assert log == []
     persist.assert_called_once()
-    assert persist.call_args.args[0].welcome_done is True
+    assert persist.call_args.args[0] == FirstRunState(
+        welcome_done=True, latency_setup_done=True
+    )
 
 
 def test_download_runs_ticked_items_only(persist: MagicMock) -> None:

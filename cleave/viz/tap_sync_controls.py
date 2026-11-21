@@ -105,6 +105,7 @@ class TapSyncControls:
         self._tap_deltas: list[float] = []
         self._last_accent_index: int | None = None
         self._metronome_accent_times: tuple[float, ...] = ()
+        self._on_close: Callable[[], None] | None = None
 
     @property
     def active(self) -> bool:
@@ -132,12 +133,19 @@ class TapSyncControls:
             ),
         )
 
-    def prompt_start(self) -> None:
+    def prompt_start(self, *, on_close: Callable[[], None] | None = None) -> None:
+        """Ask to start, then listen for taps.
+
+        *on_close* runs once when calibration ends: applied, dismissed, or
+        cancelled at the start prompt or while listening.
+        """
+        self._on_close = on_close
         self._clicks.pause_transport()
         self._modal_host.prompt_confirm(
             _TAP_SYNC_CONFIRM_TITLE,
             "Start",
             self._begin_calibration,
+            self._closed,
             body=_TAP_SYNC_CONFIRM_BODY,
         )
 
@@ -154,6 +162,7 @@ class TapSyncControls:
             return
         self._clicks.restore_ui()
         self._finish_calibration()
+        self._closed()
 
     def _finish_calibration(self) -> None:
         self._active = False
@@ -222,9 +231,17 @@ class TapSyncControls:
         self._on_notification(
             f"Tap latency set to {format_tap_latency_ms(latency_ms)}"
         )
+        self._closed()
 
     def _dismiss_without_apply(self) -> None:
         self._finish_calibration()
+        self._closed()
+
+    def _closed(self) -> None:
+        on_close = self._on_close
+        self._on_close = None
+        if on_close is not None:
+            on_close()
 
     def handle_keydown(self, event) -> bool:
         import pygame

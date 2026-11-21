@@ -16,7 +16,7 @@ from cleave.config import (
     render_fps,
     project_resolution,
 )
-from cleave.user_config import persist_editor_settings
+from cleave.user_config import persist_editor_settings, saved_first_run_state
 from cleave.effects.runtime import EffectRuntime
 from cleave.gl_color_format import GlColorFormat, resolve_live_compositor_format
 from cleave.gl_compositor import GlCompositor
@@ -327,6 +327,8 @@ def init_gl_resources_heavy(
     )
     if missing_anchor is not None:
         controls.show_notification(missing_anchor)
+    if not saved_first_run_state().latency_setup_done:
+        controls.latency_setup.request()
 
     runtime = LiveVisualizerRuntime(
         seed=seed,

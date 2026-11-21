@@ -10,7 +10,7 @@ from cleave.viz.focus_nav import MainFocus, TimelineFocus
 from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.modal import ModalHost
 from cleave.viz.mix_player import FREQUENCY_HZ, NUM_CHANNELS, MixPlayer
-from cleave.viz.playback import PlaybackState
+from cleave.viz.playback import PlaybackState, seek_to
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.tap_sync import (
     MIN_KEPT_TAPS,
@@ -70,6 +70,7 @@ def _make_controls(
         duration_sec,
         on_ui_begin=on_begin,
         on_ui_restore=on_restore,
+        on_seek=lambda sec: seek_to(playback, sec, duration_sec),
     )
 
     def apply_tap_latency(ms: int) -> None:
@@ -499,3 +500,75 @@ def test_latency_options_step_by_ten_and_keep_the_measured_value() -> None:
     assert options[options.index(187) - 1 : options.index(187) + 2] == (180, 187, 190)
     assert options[-1] == MAX_TAP_LATENCY_MS
     assert latency_options_ms(200).count(200) == 1
+
+
+def test_on_close_runs_when_the_start_prompt_is_cancelled() -> None:
+    controls, _playback, modal, _notifications, _ui_log = _make_controls()
+    closed: list[str] = []
+    controls.prompt_start(on_close=lambda: closed.append("closed"))
+
+    modal.handle_keydown(keydown(pygame.K_ESCAPE))
+
+    assert closed == ["closed"]
+
+
+def test_on_close_runs_when_listening_is_cancelled() -> None:
+    controls, _playback, modal, _notifications, ui_log = _make_controls()
+    closed: list[str] = []
+    controls.prompt_start(on_close=lambda: closed.append("closed"))
+    modal.handle_keydown(keydown(pygame.K_RETURN))
+    assert closed == []
+
+    controls.cancel()
+
+    assert closed == ["closed"]
+
+
+@pytest.mark.parametrize("key", [pygame.K_RETURN, pygame.K_ESCAPE])
+def test_on_close_runs_once_after_the_apply_dialog(key: int) -> None:
+    controls, playback, modal, _notifications, ui_log = _make_controls()
+    closed: list[bool] = []
+    playback.player.seek(0.0)
+    controls.prompt_start(on_close=lambda: closed.append(controls.active))
+    modal.handle_keydown(keydown(pygame.K_RETURN))
+    _tap_on_accents(
+        controls,
+        playback,
+        controls._metronome_accent_times,
+        latency_sec=0.2,
+        count=MIN_KEPT_TAPS,
+    )
+
+    modal.handle_keydown(keydown(key))
+
+    assert closed == [False]
+
+
+def test_playhead_returns_after_listening_is_cancelled() -> None:
+    controls, playback, modal, _notifications, ui_log = _make_controls()
+    playback.player.seek(2.0)
+    _start_calibration(controls, modal, ui_log)
+    playback.player.seek(8.0)
+
+    controls.cancel()
+
+    assert playback.player.file_position_sec() == pytest.approx(2.0)
+    assert playback.paused
+
+
+def test_playhead_returns_after_the_apply_dialog() -> None:
+    controls, playback, modal, _notifications, ui_log = _make_controls()
+    playback.player.seek(1.0)
+    accent_times = _start_calibration(controls, modal, ui_log)
+    _tap_on_accents(
+        controls,
+        playback,
+        accent_times,
+        latency_sec=0.2,
+        count=MIN_KEPT_TAPS,
+    )
+
+    modal.handle_keydown(keydown(pygame.K_RETURN))
+
+    assert playback.player.file_position_sec() == pytest.approx(1.0)
+    assert playback.paused

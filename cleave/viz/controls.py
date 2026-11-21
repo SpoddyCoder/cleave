@@ -47,6 +47,7 @@ from cleave.viz.project_switch import ProjectSwitchController
 from cleave.viz.song_marker_controls import SongMarkerController
 from cleave.viz.av_sync_controls import AvSyncControls
 from cleave.viz.calibration_clicks import CalibrationClicks, CalibrationUiSnapshot
+from cleave.viz.latency_setup_controls import LatencySetupFlow
 from cleave.viz.tap_sync_controls import TapSyncControls
 from cleave.viz.transport_controls import TransportControls, hold_paused
 from cleave.viz.welcome_host import CANCEL_LABEL, WelcomeFlow
@@ -351,6 +352,7 @@ class TuningControls:
             duration_sec,
             on_ui_begin=self._begin_calibration_ui,
             on_ui_restore=self._restore_calibration_ui,
+            on_seek=self.seek_to,
         )
         self._tap_sync = TapSyncControls(
             cfg,
@@ -366,6 +368,19 @@ class TuningControls:
             on_notification=self.show_notification,
             on_preview_audio_latency=self._preview_audio_latency,
             on_apply_audio_latency=self._apply_measured_audio_latency,
+        )
+        self.latency_setup = LatencySetupFlow(
+            self._modal_host,
+            measure_audio_latency=lambda done: self._av_sync.prompt_start(
+                on_close=done
+            ),
+            calibrate_tap_timing=lambda done: self._tap_sync.prompt_start(
+                on_close=done
+            ),
+            busy=lambda: self.calibrating or self.welcome.active,
+            hold_playback=lambda: hold_paused(
+                self.playback, self.transport.toggle_pause
+            ),
         )
         self._apply_latency()
         self.editor_mode = EditorModeController(
@@ -662,6 +677,7 @@ class TuningControls:
         self.project_render.tick()
         self.welcome.tick()
         self.preset_rescan.tick()
+        self.latency_setup.tick()
 
     def build_view_state(
         self,

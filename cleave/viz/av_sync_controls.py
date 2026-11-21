@@ -59,6 +59,7 @@ class AvSyncControls:
         self._on_apply_audio_latency = on_apply_audio_latency
         self._active = False
         self._beat_times: tuple[float, ...] = ()
+        self._on_close: Callable[[], None] | None = None
 
     @property
     def active(self) -> bool:
@@ -74,7 +75,12 @@ class AvSyncControls:
             return 0.0
         return 1.0 if now - self._beat_times[index] < FLASH_SEC else 0.0
 
-    def prompt_start(self) -> None:
+    def prompt_start(self, *, on_close: Callable[[], None] | None = None) -> None:
+        """Start the beeps and open the dialog.
+
+        *on_close* runs once when the dialog closes, applied or cancelled.
+        """
+        self._on_close = on_close
         schedule = self._clicks.begin(accents_only=True)
         self._beat_times = tuple(click.time_sec for click in schedule)
         self._active = True
@@ -89,10 +95,12 @@ class AvSyncControls:
             self._finish()
             self._on_apply_audio_latency(latency_ms)
             self._on_notification(f"Audio latency set to {latency_ms} ms")
+            self._closed()
 
         def cancel() -> None:
             self._finish()
             self._on_preview_audio_latency(saved_ms)
+            self._closed()
 
         self._modal_host.prompt_form(
             FormSpec(
@@ -121,3 +129,9 @@ class AvSyncControls:
         self._active = False
         self._beat_times = ()
         self._clicks.end()
+
+    def _closed(self) -> None:
+        on_close = self._on_close
+        self._on_close = None
+        if on_close is not None:
+            on_close()

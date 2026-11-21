@@ -1,8 +1,10 @@
 """Click track shared by the latency calibrations.
 
 Both calibrations pause the transport, clear the shell around the preview,
-and play a metronome on its own while the song stays silent. This owns that
-setup and puts everything back afterwards.
+and play a metronome on its own while the song stays silent. The clicks run
+on the song clock, so the playhead moves while they play; when they stop,
+the playhead goes back to where it was. This owns that setup and puts
+everything back afterwards.
 """
 
 from __future__ import annotations
@@ -11,7 +13,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from cleave.viz.focus_nav import FocusCursor
-from cleave.viz.playback import PlaybackState, toggle_pause
+from cleave.viz.playback import PlaybackState, current_sec, toggle_pause
 from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.tap_sync import MetronomeClick, build_metronome_schedule
 
@@ -34,12 +36,15 @@ class CalibrationClicks:
         *,
         on_ui_begin: Callable[[], CalibrationUiSnapshot],
         on_ui_restore: Callable[[CalibrationUiSnapshot], None],
+        on_seek: Callable[[float], None],
     ) -> None:
         self.playback = playback
         self.duration_sec = duration_sec
         self._on_ui_begin = on_ui_begin
         self._on_ui_restore = on_ui_restore
+        self._on_seek = on_seek
         self._ui_snapshot: CalibrationUiSnapshot | None = None
+        self._start_sec: float | None = None
 
     def pause_transport(self) -> None:
         if not self.playback.paused:
@@ -53,6 +58,7 @@ class CalibrationClicks:
         """
         self.pause_transport()
         self._ui_snapshot = self._on_ui_begin()
+        self._start_sec = current_sec(self.playback, self.duration_sec)
         start_sec = self.playback.player.file_position_sec()
         schedule = build_metronome_schedule(start_sec, self.duration_sec)
         if accents_only:
@@ -66,12 +72,16 @@ class CalibrationClicks:
         return schedule
 
     def stop_clicks(self) -> None:
-        """Silence the clicks and leave the transport paused."""
+        """Silence the clicks and leave the transport paused where it began."""
         player = self.playback.player
         player.set_click_schedule(None)
         player.set_click_only(False)
         self.playback.paused = True
         player.pause(True)
+        start_sec = self._start_sec
+        self._start_sec = None
+        if start_sec is not None:
+            self._on_seek(start_sec)
 
     def restore_ui(self) -> None:
         snapshot = self._ui_snapshot

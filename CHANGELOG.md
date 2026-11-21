@@ -19,6 +19,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Project > Re-separate stems splits the open project's song again, into 4 stems, 4 stems HQ, or 6 stems, and re-extracts its signals, with progress in the window. Going from 6 stems to 4 moves guitar and piano layers to other and clears their Cleave Effects. Cleave asks to save unsaved changes first.
 - Settings > Calibrate tap timing measures how late your key presses land after the beat you hear, including keyboard delay and the habit of tapping slightly early, and stores it as Settings > Latency > tap latency. Song markers dropped and clips recorded while the song plays move back by that much so they land on the beat. Tap latency can be below zero.
 - Rewind and forward buttons either side of PLAYING / PAUSED in the transport bar. Click one to move 10 seconds back or forward, hold it down to seek quickly (speeding up the longer you hold), or double-click to go to the start or end of the song.
+- The first time the editor opens a project, a Set up audio latency dialog offers the two latency calibrations, Measure audio latency and Calibrate tap timing, both switched on. OK runs the ones you leave on, one after the other; Cancel skips them. The song stays paused until you finish. It shows only once, and both stay in the Settings menu.
 
 ### Changed
 
@@ -48,6 +49,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Measure audio latency and Calibrate tap timing no longer leave the song further on than where they started. The song kept moving silently under the click track, so it picked up as far past where you left it as the test had taken.
 - With switching following the timeline, a layer that is on from the start of the song now counts that opening stretch as its first clip. Before, the next clip played the first preset in the list again, and Populate made one preset too few.
 - Preset switching always starts at the first preset in the list, live and in renders. Before, it started from whichever preset the layer was last browsed to before saving, so looking at a list entry and saving could move where the song's presets began.
 - Playing a preset list entry whose file is missing now shows that file's name on the preset row with the red missing mark, and tries to load it so the failure is reported. Before, the row read "All presets blacklisted" and nothing said what was wrong.

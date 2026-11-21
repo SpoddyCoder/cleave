@@ -508,13 +508,14 @@ def test_first_run_state_round_trip_keeps_other_sections(tmp_path: Path) -> None
     config_path = tmp_path / "config.yaml"
     write_user_config(replace(default_editor_settings(), ui_scale=150), config_path)
     persist_window_geometry(WindowGeometry(width=1600, height=900), config_path)
-    persist_first_run_state(FirstRunState(welcome_done=True), config_path)
+    state = FirstRunState(welcome_done=True, latency_setup_done=True)
+    persist_first_run_state(state, config_path)
 
-    assert saved_first_run_state(config_path) == FirstRunState(welcome_done=True)
+    assert saved_first_run_state(config_path) == state
     assert saved_window_geometry(config_path).width == 1600
     assert load_user_config(config_path).editor.ui_scale == 150
     write_user_config(default_editor_settings(), config_path)
-    assert saved_first_run_state(config_path).welcome_done is True
+    assert saved_first_run_state(config_path) == state
 
 
 def test_navigator_expand_click_defaults_round_trips_and_rejects_unknown(
