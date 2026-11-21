@@ -112,7 +112,7 @@ A new 6-stem project starts with six layers, one per stem. To change an existing
 The numbers below refer to the screenshot at the top of this guide.
 
 1. **Menu bar:** the Cleave logo (click it for **Help > About Cleave**), then File, Edit, View, Project, Settings, and Help, with the open project's name on the right.
-2. **Transport bar:** play state, current time, and current bar. Click PLAYING / PAUSED to toggle playback. Drag the time or bar sideways to scrub, or double-click either to type a position. Warnings and errors show in the middle of the bar; a long one scrolls to show the rest. Click a warning to dismiss it.
+2. **Transport bar:** rewind and forward buttons, play state, current time, and current bar. Click PLAYING / PAUSED to toggle playback. Click the rewind or forward button either side of it to move 10 seconds back or forward. Hold one down to seek quickly; it speeds up the longer you hold. Double-click one to go to the start or end of the song. Drag the time or bar sideways to scrub, or double-click either to type a position. Warnings and errors show in the middle of the bar; a long one scrolls to show the rest. Click a warning to dismiss it.
 3. **Navigator:** the structure of your show: Overlay, Post-FX, Pattern Mask, Timeline, and Layers. Click a row to open its page. When a project opens, Layers is expanded, plus any section that is on or has something under it switched on.
 4. **Inspector:** the settings for the page selected in the navigator.
 5. **Preview:** the live output, at your video's aspect ratio.
@@ -559,7 +559,7 @@ The preview shows the live output at your video's aspect ratio. Right-click it f
 | Shift+Left / Shift+Right | Skip 2 seconds. |
 | Ctrl+Left / Ctrl+Right | Skip 30 seconds. |
 
-You can also drag the time in the transport bar, or click the timeline strip's ruler.
+You can also click the transport bar's rewind and forward buttons (click for 10 seconds, hold to seek quickly, double-click for the start or end), drag the time in the transport bar, or click the timeline strip's ruler.
 
 ### Full screen
 

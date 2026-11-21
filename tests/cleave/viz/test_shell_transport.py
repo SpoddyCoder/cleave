@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from cleave.viz.material_icons import FAST_FORWARD_GLYPH, FAST_REWIND_GLYPH
 from cleave.viz.panel_notification import PanelNotificationActive
 from cleave.viz.shell_transport import (
     TransportPart,
@@ -26,7 +27,13 @@ def test_transport_parts_while_playing() -> None:
         fps=60.0,
     )
     assert transport_parts(readout) == [
-        TransportPart("PLAYING", palette().value, TransportField.PLAY, icon="\u25b6"),
+        TransportPart("", palette().value, TransportField.REWIND, icon=FAST_REWIND_GLYPH),
+        TransportPart(
+            "PLAYING", palette().value, TransportField.PLAY, gap=False, icon="\u25b6"
+        ),
+        TransportPart(
+            "", palette().value, TransportField.FORWARD, gap=False, icon=FAST_FORWARD_GLYPH
+        ),
         TransportPart("01:23", palette().value, TransportField.TIME),
         TransportPart("/ 04:12", palette().value, gap=False),
         TransportPart("BAR 34", palette().value, TransportField.BAR),
@@ -43,12 +50,23 @@ def test_transport_parts_while_paused() -> None:
         fps=None,
     )
     assert transport_parts(readout) == [
-        TransportPart("PAUSED", palette().value, TransportField.PLAY, icon="\u275a\u275a"),
+        TransportPart("", palette().value, TransportField.REWIND, icon=FAST_REWIND_GLYPH),
+        TransportPart(
+            "PAUSED", palette().value, TransportField.PLAY, gap=False, icon="\u275a\u275a"
+        ),
+        TransportPart(
+            "", palette().value, TransportField.FORWARD, gap=False, icon=FAST_FORWARD_GLYPH
+        ),
         TransportPart("00:00", palette().value, TransportField.TIME),
         TransportPart("/ 00:00", palette().value, gap=False),
         TransportPart("BAR —", palette().value),
     ]
     assert transport_fps_text(readout) == "— FPS"
+
+
+def test_icon_only_part_measures_its_icon() -> None:
+    part = TransportPart("", palette().value, TransportField.REWIND, icon=FAST_REWIND_GLYPH)
+    assert part.label == FAST_REWIND_GLYPH
 
 
 def _active(

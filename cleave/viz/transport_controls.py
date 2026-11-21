@@ -1,4 +1,4 @@
-"""Transport bar actions: play and pause, the clock, and the bar number.
+"""Transport bar actions: play and pause, rewind and forward, the clock, and the bar.
 
 The shell host draws the bar and reports pointer gestures here. A drag steps
 from where it started, so a seek that has not reached the audible clock yet
@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import bisect
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from enum import Enum
 
 from cleave.viz.inline_edit import InlineEditController
@@ -17,6 +18,19 @@ from cleave.viz.playback import PlaybackState, current_sec, format_mmss, toggle_
 # One drag step moves the clock this many seconds, or one bar.
 TIME_DRAG_STEP_SEC = 1.0
 
+# One click on rewind or forward moves the playhead this many seconds.
+TRANSPORT_STEP_SEC = 10.0
+
+# Holding rewind or forward this long starts a fast seek instead of a step.
+HOLD_DELAY_SEC = 0.35
+# The fast seek starts at this many song seconds per second held...
+HOLD_START_RATE = 8.0
+# ...and speeds up evenly to this rate over HOLD_RAMP_SEC.
+HOLD_MAX_RATE = 60.0
+HOLD_RAMP_SEC = 4.0
+# A fast seek moves the playhead at most this often, so audio is not flushed every frame.
+HOLD_SEEK_INTERVAL_SEC = 0.1
+
 TIME_ENTRY_ERROR = "Enter a time as M:SS or seconds"
 
 
@@ -24,6 +38,8 @@ class TransportField(Enum):
     """An interactive part of the transport bar. Also the inline edit target."""
 
     PLAY = "play"
+    REWIND = "rewind"
+    FORWARD = "forward"
     TIME = "time"
     BAR = "bar"
 
@@ -71,6 +87,31 @@ def parse_bar_text(text: str, bar_count: int) -> int | None:
     return None
 
 
+def hold_seek_distance(seeking_sec: float) -> float:
+    """Song seconds a fast seek covers after *seeking_sec* of seeking.
+
+    The rate climbs evenly from ``HOLD_START_RATE`` to ``HOLD_MAX_RATE`` over
+    ``HOLD_RAMP_SEC``, then holds.
+    """
+    t = max(0.0, seeking_sec)
+    climb = HOLD_MAX_RATE - HOLD_START_RATE
+    if t <= HOLD_RAMP_SEC:
+        return HOLD_START_RATE * t + climb * t * t / (2.0 * HOLD_RAMP_SEC)
+    ramp = HOLD_START_RATE * HOLD_RAMP_SEC + climb * HOLD_RAMP_SEC * 0.5
+    return ramp + HOLD_MAX_RATE * (t - HOLD_RAMP_SEC)
+
+
+@dataclass
+class _HoldSeek:
+    """A rewind or forward button being held down."""
+
+    forward: bool
+    origin_sec: float
+    held_sec: float = 0.0
+    since_seek_sec: float = 0.0
+    last_target: float | None = None
+
+
 def hold_paused(
     playback: PlaybackState, pause_toggle: Callable[[], None]
 ) -> Callable[[], None]:
@@ -105,6 +146,7 @@ class TransportControls:
         self._drag_field: TransportField | None = None
         self._drag_origin = 0.0
         self._drag_steps = 0
+        self._hold: _HoldSeek | None = None
 
     @property
     def has_bars(self) -> bool:
@@ -112,6 +154,47 @@ class TransportControls:
 
     def toggle_pause(self) -> None:
         toggle_pause(self._playback, self._duration_sec)
+
+    def step(self, forward: bool) -> None:
+        """Seek ``TRANSPORT_STEP_SEC`` forward or back from the playhead."""
+        delta = TRANSPORT_STEP_SEC if forward else -TRANSPORT_STEP_SEC
+        self._seek_to(max(0.0, min(self._duration_sec, self.position_sec() + delta)))
+
+    def jump(self, forward: bool) -> None:
+        """Seek to the end of the song, or back to its start."""
+        self._seek_to(self._duration_sec if forward else 0.0)
+
+    def begin_hold(self, forward: bool) -> None:
+        """Start timing a press on rewind or forward, from the current playhead."""
+        self._hold = _HoldSeek(forward, self.position_sec())
+
+    def hold_tick(self, dt_sec: float) -> None:
+        """Advance a held button; past ``HOLD_DELAY_SEC`` it fast seeks."""
+        hold = self._hold
+        if hold is None:
+            return
+        hold.held_sec += max(0.0, dt_sec)
+        seeking = hold.held_sec - HOLD_DELAY_SEC
+        if seeking <= 0.0:
+            return
+        hold.since_seek_sec += max(0.0, dt_sec)
+        if hold.last_target is not None and hold.since_seek_sec < HOLD_SEEK_INTERVAL_SEC:
+            return
+        hold.since_seek_sec = 0.0
+        distance = hold_seek_distance(seeking)
+        target = hold.origin_sec + (distance if hold.forward else -distance)
+        target = max(0.0, min(self._duration_sec, target))
+        if target != hold.last_target:
+            hold.last_target = target
+            self._seek_to(target)
+
+    @property
+    def hold_seeking(self) -> bool:
+        """True once a held button has passed ``HOLD_DELAY_SEC``, so its release is not a click."""
+        return self._hold is not None and self._hold.held_sec > HOLD_DELAY_SEC
+
+    def end_hold(self) -> None:
+        self._hold = None
 
     def position_sec(self) -> float:
         return current_sec(self._playback, self._duration_sec)

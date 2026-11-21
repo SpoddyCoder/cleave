@@ -7,10 +7,16 @@ import pygame
 from cleave.viz.inline_edit import InlineEditController
 from cleave.viz.playback import PlaybackState
 from cleave.viz.transport_controls import (
+    HOLD_DELAY_SEC,
+    HOLD_MAX_RATE,
+    HOLD_RAMP_SEC,
+    HOLD_SEEK_INTERVAL_SEC,
+    HOLD_START_RATE,
     TIME_ENTRY_ERROR,
     TransportControls,
     TransportField,
     bar_at,
+    hold_seek_distance,
     parse_bar_text,
     parse_clock_text,
 )
@@ -75,6 +81,65 @@ def test_toggle_pause() -> None:
     transport.toggle_pause()
     transport.toggle_pause()
     assert player.paused == [True, False]
+
+
+def test_step_seeks_ten_seconds_and_clamps() -> None:
+    transport, _inline, seeks, player = _transport(50.0)
+    transport.step(True)
+    transport.step(False)
+    player.position = 95.0
+    transport.step(True)
+    player.position = 4.0
+    transport.step(False)
+    assert seeks == [60.0, 40.0, 100.0, 0.0]
+
+
+def test_jump_seeks_to_start_or_end() -> None:
+    transport, _inline, seeks, _player = _transport(50.0)
+    transport.jump(True)
+    transport.jump(False)
+    assert seeks == [100.0, 0.0]
+
+
+def test_hold_seek_distance_speeds_up_then_holds() -> None:
+    assert hold_seek_distance(0.0) == 0.0
+    early = hold_seek_distance(0.5) / 0.5
+    late = (hold_seek_distance(HOLD_RAMP_SEC) - hold_seek_distance(HOLD_RAMP_SEC - 0.5)) / 0.5
+    assert HOLD_START_RATE <= early < late <= HOLD_MAX_RATE
+    after = hold_seek_distance(HOLD_RAMP_SEC + 1.0) - hold_seek_distance(HOLD_RAMP_SEC)
+    assert after == HOLD_MAX_RATE
+
+
+def test_short_press_does_not_fast_seek() -> None:
+    transport, _inline, seeks, _player = _transport(50.0)
+    transport.begin_hold(True)
+    transport.hold_tick(HOLD_DELAY_SEC * 0.5)
+    assert not transport.hold_seeking
+    assert seeks == []
+
+
+def test_hold_fast_seeks_from_its_origin_at_most_each_interval() -> None:
+    transport, _inline, seeks, _player = _transport(50.0)
+    transport.begin_hold(True)
+    transport.hold_tick(HOLD_DELAY_SEC + 0.01)
+    assert transport.hold_seeking
+    assert len(seeks) == 1 and seeks[0] > 50.0
+    transport.hold_tick(HOLD_SEEK_INTERVAL_SEC * 0.5)
+    assert len(seeks) == 1
+    transport.hold_tick(HOLD_SEEK_INTERVAL_SEC * 0.5)
+    assert len(seeks) == 2 and seeks[1] > seeks[0]
+    transport.end_hold()
+    assert not transport.hold_seeking
+    transport.hold_tick(1.0)
+    assert len(seeks) == 2
+
+
+def test_hold_rewind_stops_at_the_start() -> None:
+    transport, _inline, seeks, _player = _transport(5.0)
+    transport.begin_hold(False)
+    transport.hold_tick(HOLD_DELAY_SEC + 2.0)
+    transport.hold_tick(1.0)
+    assert seeks == [0.0]
 
 
 def test_time_drag_steps_from_its_anchor() -> None:

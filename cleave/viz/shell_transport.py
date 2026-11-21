@@ -12,6 +12,7 @@ from cleave.viz.icon_button import glyph_x, text_box
 from cleave.viz.imgui_host import PAUSE_GLYPH, PLAY_GLYPH
 from cleave.viz.imgui_icon_button import box_button, glyph_drop, paint_hover, text_top
 from cleave.viz.imgui_theme import rgba, row_band
+from cleave.viz.material_icons import FAST_FORWARD_GLYPH, FAST_REWIND_GLYPH
 from cleave.viz.panel_notification import (
     attention_scroll_hold_sec,
     attention_scroll_offset,
@@ -66,13 +67,16 @@ class TransportPart:
     @property
     def label(self) -> str:
         """Icon and text as laid out, for measuring."""
-        return f"{self.icon} {self.text}" if self.icon else self.text
+        if self.icon and self.text:
+            return f"{self.icon} {self.text}"
+        return self.icon or self.text
 
 
 def transport_parts(readout: TransportReadout) -> list[TransportPart]:
-    """Play state, clock, and bar for the transport bar, all in the value role.
+    """Rewind, play state, forward, clock, and bar, all in the value role.
 
-    Play and pause, the current time, and the bar take the pointer. The bar
+    Rewind and forward are icon-only buttons either side of play and pause.
+    They, play and pause, the current time, and the bar take the pointer. The bar
     has no field when there is no downbeat grid. Frame rate is
     ``transport_fps_text`` so the bar can pin it to the right.
     """
@@ -80,7 +84,11 @@ def transport_parts(readout: TransportReadout) -> list[TransportPart]:
     word = "PAUSED" if readout.paused else "PLAYING"
     has_bars = readout.bar_text != "—"
     return [
-        TransportPart(word, palette().value, TransportField.PLAY, icon=icon),
+        TransportPart("", palette().value, TransportField.REWIND, icon=FAST_REWIND_GLYPH),
+        TransportPart(word, palette().value, TransportField.PLAY, gap=False, icon=icon),
+        TransportPart(
+            "", palette().value, TransportField.FORWARD, gap=False, icon=FAST_FORWARD_GLYPH
+        ),
         TransportPart(format_mmss(readout.position_sec), palette().value, TransportField.TIME),
         TransportPart(f"/ {format_mmss(readout.duration_sec)}", palette().value, gap=False),
         TransportPart(
@@ -96,6 +104,11 @@ def transport_fps_text(readout: TransportReadout) -> str:
     fps = format_fps_value(readout.fps) if readout.fps is not None else "—"
     return f"{fps} FPS"
 
+
+# Parts that act on click rather than drag.
+_TRANSPORT_BUTTONS = frozenset(
+    {TransportField.PLAY, TransportField.REWIND, TransportField.FORWARD}
+)
 
 # Widest text the transport time and bar fields are sized for.
 _TRANSPORT_FIELD_TEMPLATE = {
@@ -265,6 +278,8 @@ class TransportBar:
         self._ctx = context
         self._inline = inline_field
         self._drag_accum = 0.0
+        # True from a double-click's jump until its release, so it does not step.
+        self._jumped = False
         # True on the frame a click landed on a timed toast.
         self.notice_clicked = False
 
@@ -295,6 +310,8 @@ class TransportBar:
                     request_pointer(PointerShape.HAND)
                 if _transport_notice_clicked(chip):
                     self.notice_clicked = True
+        if not imgui.is_mouse_down(0):
+            self._jumped = False
         origin = imgui.get_window_pos()
         size = imgui.get_window_size()
         stroke_h_rule(
@@ -308,7 +325,9 @@ class TransportBar:
     def _draw_part(self, part: TransportPart) -> None:
         """One transport part, a space wider than its text for the hover fill.
 
-        Play and pause toggle on click. The time and the bar step while
+        Play and pause toggle on click. Rewind and forward step
+        ``TRANSPORT_STEP_SEC`` on click, fast seek ever quicker while held,
+        and jump to the start or end on double-click. The time and the bar step while
         dragged sideways and open a text field on double-click.
         """
         space = imgui.calc_text_size(" ").x
@@ -333,7 +352,7 @@ class TransportBar:
             self._paint_text(part, box, hovered=False)
             return
         pointer = (
-            PointerShape.HAND if field is TransportField.PLAY else PointerShape.RESIZE_EW
+            PointerShape.HAND if field in _TRANSPORT_BUTTONS else PointerShape.RESIZE_EW
         )
         state = box_button(f"##transport-{field.value}", box, pointer=pointer)
         self._paint_text(part, box, hovered=state.hovered or state.held)
@@ -343,6 +362,21 @@ class TransportBar:
         if field is TransportField.PLAY:
             if state.pressed:
                 transport.toggle_pause()
+            return
+        if field in (TransportField.REWIND, TransportField.FORWARD):
+            forward = field is TransportField.FORWARD
+            if state.hovered and imgui.is_mouse_double_clicked(0):
+                transport.end_hold()
+                transport.jump(forward)
+                self._jumped = True
+            elif state.activated:
+                transport.begin_hold(forward)
+            if state.held:
+                transport.hold_tick(float(imgui.get_io().delta_time))
+            if state.pressed and not transport.hold_seeking and not self._jumped:
+                transport.step(forward)
+            if state.released:
+                transport.end_hold()
             return
         if state.activated:
             self._drag_accum = 0.0
@@ -379,4 +413,5 @@ class TransportBar:
         if part.icon:
             draw.add_text(imgui.ImVec2(x, y + glyph_drop(part.icon[0])), u32, part.icon)
             x += imgui.calc_text_size(f"{part.icon} ").x
-        draw.add_text(imgui.ImVec2(x, y), u32, part.text)
+        if part.text:
+            draw.add_text(imgui.ImVec2(x, y), u32, part.text)
