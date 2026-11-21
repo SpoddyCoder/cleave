@@ -6,7 +6,7 @@ from cleave.about import about_body, about_credit
 
 def test_about_body_lists_tagline_author_year_url_and_version() -> None:
     assert about_body(date(2031, 3, 4)).split("\n") == [
-        "Stem separated music visualizer powered by projectM",
+        "Stem-driven visualizer for making music videos, powered by projectM",
         "",
         "Created by P. Fernihough \u00a9 2031",
         "https://github.com/SpoddyCoder/cleave",

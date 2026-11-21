@@ -461,7 +461,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="cleave",
         description=(
-            "Stem-driven music visualizer with editor and render\n\n"
+            "Stem-driven visualizer for making music videos\n\n"
             "positional arguments:\n"
             f"  target                {_TARGET_HELP}"
         ),
