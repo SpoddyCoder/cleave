@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
 
 from cleave.analyse import run_analyse
-from cleave.stems import STEM_NAMES, stems_dir
+from cleave.signals import load_signals
+from cleave.stems import FOUR_STEM_NAMES, stems_dir
 from cleave.project import write_manifest
 
 
@@ -39,7 +40,7 @@ def _write_project(project: Path) -> None:
     project.mkdir()
     stem_root = stems_dir(project)
     stem_root.mkdir(parents=True, exist_ok=True)
-    for name in STEM_NAMES:
+    for name in FOUR_STEM_NAMES:
         (stem_root / f"{name}.wav").write_bytes(b"wav")
     mix = project / "mix.wav"
     mix.write_bytes(b"wav")
@@ -228,3 +229,49 @@ def test_extract_mix_rms_returns_matching_lengths(
     assert len(values) > 0
     _load.assert_called_once_with(path)
     _rms.assert_called_once()
+
+
+@patch("cleave.analyse.extract_mix_rms", return_value=_stub_signal())
+@patch("cleave.analyse.extract_mix_onset", return_value=_stub_signal())
+@patch("cleave.analyse.extract_other", return_value=_stub_other())
+@patch("cleave.analyse.extract_vocals", return_value=_stub_vocals())
+@patch("cleave.analyse.extract_bass", return_value=_stub_bass())
+@patch(
+    "cleave.analyse.extract_beats_downbeats",
+    return_value=(np.array([0.5]), np.array([0.5])),
+)
+@patch("cleave.analyse.extract_drums_onset", return_value=_stub_signal())
+@patch("cleave.analyse._stem_duration_sec", return_value=1.0)
+def test_run_analyse_six_stem_project_writes_guitar_and_piano(
+    _duration: object,
+    _drums: object,
+    _beats: object,
+    _bass: object,
+    _vocals: object,
+    other: MagicMock,
+    _mix_onset: object,
+    _mix_rms: object,
+    tmp_path: Path,
+) -> None:
+    project = tmp_path / "project"
+    _write_project(project)
+    for name in ("guitar", "piano"):
+        (stems_dir(project) / f"{name}.wav").write_bytes(b"wav")
+    write_manifest(
+        project,
+        slug="test-project",
+        mix_filename="mix.wav",
+        original_path=project / "mix.wav",
+        demucs_model="htdemucs_6s",
+    )
+
+    data = json.loads(run_analyse(project, high_quality=False).read_text())
+
+    for name in ("guitar", "piano", "other"):
+        assert set(data[name]) == {"spectral_centroid", "rms"}
+    assert [c.args[0].stem for c in other.call_args_list] == [
+        "guitar",
+        "piano",
+        "other",
+    ]
+    load_signals(project)

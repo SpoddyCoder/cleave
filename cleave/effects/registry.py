@@ -44,6 +44,14 @@ def _def(effect_id: str, driver_slug: str) -> EffectDef:
     )
 
 
+def _tonal_roster(stem: StemSource) -> tuple[EffectDef, ...]:
+    """Guitar and piano rows: ``other``'s centroid rows on their own signals."""
+    return tuple(
+        EffectDef(effect_id, "centroid", stem, "spectral_centroid")
+        for effect_id in ("pulse", "flash", "grit")
+    )
+
+
 _EFFECT_ROSTER: dict[StemSource, tuple[EffectDef, ...]] = {
     "drums": (
         _def("pulse", "onset"),
@@ -62,6 +70,8 @@ _EFFECT_ROSTER: dict[StemSource, tuple[EffectDef, ...]] = {
         _def("flash", "rms"),
         _def("grit", "rms"),
     ),
+    "guitar": _tonal_roster("guitar"),
+    "piano": _tonal_roster("piano"),
     "other": (
         _def("pulse", "centroid"),
         _def("flash", "centroid"),

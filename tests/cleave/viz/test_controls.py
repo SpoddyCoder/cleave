@@ -5339,3 +5339,19 @@ def test_switching_on_keeps_the_layer_preset_and_off_restores_it(
     controls.layer_mutations.step_preset_switching_trigger("layer_1", delta=-1)
     assert layer.preset_switching_trigger == "off"
     assert layer.playlist.current == (pack / "a.milk").resolve()
+
+
+def test_step_stem_cycles_only_the_project_stems() -> None:
+    from cleave.stems import stem_sources
+
+    controls = make_controls(("layer_1",))
+    layer = controls.session.layers["layer_1"]
+    layer.stem = "other"
+    controls.layer_mutations.step_stem("layer_1", delta=-1)
+    assert layer.stem == "vocals"
+
+    controls.session.stem_sources = stem_sources(6)
+    controls.layer_mutations.step_stem("layer_1", delta=1)
+    assert layer.stem == "guitar"
+    controls.layer_mutations.step_stem("layer_1", delta=1)
+    assert layer.stem == "piano"

@@ -76,3 +76,31 @@ def test_mouse_events_reach_imgui() -> None:
     )
     assert result is True
     window.imgui.process_mouse_event.assert_called_once_with(motion)
+
+
+def test_stem_count_prompt_starts_on_four_and_reports_the_pick() -> None:
+    from cleave.viz.modal import ModalHost
+    from cleave.viz.stem_count_prompt import (
+        NEW_PROJECT_STEMS_TITLE,
+        prompt_stem_count,
+    )
+
+    picked: list[int] = []
+    cancelled: list[bool] = []
+    host = ModalHost()
+    prompt_stem_count(
+        host, NEW_PROJECT_STEMS_TITLE, picked.append, lambda: cancelled.append(True)
+    )
+    view = host.view_state()
+    assert view is not None
+    assert view.options == ("4 stems", "6 stems", "Cancel")
+    assert view.focus_index == 0
+    host.handle_keydown(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RIGHT, mod=0))
+    host.handle_keydown(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN, mod=0))
+    assert picked == [6]
+    assert not host.active
+
+    prompt_stem_count(host, NEW_PROJECT_STEMS_TITLE, picked.append, lambda: cancelled.append(True))
+    host.handle_keydown(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, mod=0))
+    assert cancelled == [True]
+    assert picked == [6]

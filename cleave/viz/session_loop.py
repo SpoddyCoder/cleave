@@ -7,6 +7,7 @@ left to open.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 from cleave.open_target import OpenTarget, OpenTargetKind
@@ -16,6 +17,8 @@ from cleave.viz.loading import LoadingWindow
 
 NEW_PROJECT_TITLE = "Creating project"
 """Progress dialog title while a new project's stems are split."""
+RESEPARATE_PROGRESS_TITLE = "Re-separating stems"
+"""Progress dialog title while an open project's stems are split again."""
 
 
 def run_editor_sessions(
@@ -63,6 +66,15 @@ def _run_sessions(
             current = run_file_picker(window, mode=picker_mode)
             if current is None or window.quit_requested:
                 return
+        if current.kind is OpenTargetKind.AUDIO and current.stem_count is None:
+            chosen = _ask_stem_count(window)
+            if window.quit_requested:
+                return
+            if chosen is _CANCELLED:
+                picker_mode = PickerMode.NEW_PROJECT
+                current = None
+                continue
+            current = replace(current, stem_count=chosen)
         try:
             project_dir = _project_dir_for(
                 window,
@@ -102,17 +114,41 @@ def _project_dir_for(
         return target.path
     from cleave.separate import run_separate
 
+    reseparate = target.kind is OpenTargetKind.RESEPARATE
+    title = RESEPARATE_PROGRESS_TITLE if reseparate else NEW_PROJECT_TITLE
     project_dir = run_separate(
         target.path,
         high_quality=high_quality,
+        force=reseparate,
+        stem_count=target.stem_count,
         beat_detection_stem=beat_detection_stem,
         on_progress=lambda message, fraction: window.update(
-            NEW_PROJECT_TITLE, message, fraction
+            title, message, fraction
         ),
     )
     if window.quit_requested:
         return None
     return project_dir
+
+
+_CANCELLED = object()
+
+
+def _ask_stem_count(window: LoadingWindow) -> object:
+    """A new project's stem count, or ``_CANCELLED``.
+
+    Without stem split installed there is nothing to choose; the split
+    reports that itself, so the default count goes through.
+    """
+    from cleave.separate import stem_split_available
+    from cleave.stems import DEFAULT_STEM_COUNT
+    from cleave.viz.loading_modal import choose_stem_count
+
+    if not stem_split_available():
+        return DEFAULT_STEM_COUNT
+    window.ensure_imgui()
+    chosen = choose_stem_count(window)
+    return _CANCELLED if chosen is None else chosen
 
 
 def _picker_mode_after_failure(target: OpenTarget | None) -> PickerMode:
@@ -125,6 +161,6 @@ def _picker_mode_after_failure(target: OpenTarget | None) -> PickerMode:
         return PickerMode.COLD_START
     if target.kind is OpenTargetKind.AUDIO:
         return PickerMode.NEW_PROJECT
-    if target.kind is OpenTargetKind.PROJECT:
+    if target.kind in (OpenTargetKind.PROJECT, OpenTargetKind.RESEPARATE):
         return PickerMode.OPEN_PROJECT
     return PickerMode.COLD_START

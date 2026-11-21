@@ -11,9 +11,19 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import cast
 
-from cleave.config import ensure_project_viz_config
+from cleave.config import ensure_project_viz_config, remap_layers_to_stem_count
 from cleave.open_target import AUDIO_SUFFIXES, UNSUPPORTED_AUDIO_FORMAT
-from cleave.stems import STEM_SOURCES, StemSource, stem_paths, stems_dir
+from cleave.stems import (
+    SIX_STEM_NAMES,
+    STEM_SOURCES,
+    StemCount,
+    StemSource,
+    project_stem_count,
+    stem_control_label,
+    stem_paths,
+    stem_sources,
+    stems_dir,
+)
 from cleave.paths import (
     is_frozen,
     model_cache_dir,
@@ -22,10 +32,9 @@ from cleave.paths import (
     resolve_project,
 )
 from cleave.model_weights import (
-    DEMUCS_HQ_MODEL,
-    DEMUCS_MODEL,
     demucs_bag,
     demucs_checkpoint_name,
+    demucs_model_for,
     demucs_weight_spec,
     ensure_weight_files,
     hub_checkpoints_dir,
@@ -38,6 +47,22 @@ def project_stems_complete(project_dir: Path) -> bool:
     """Return True when every stem wav from :func:`stem_paths` exists."""
     paths = stem_paths(project_dir)
     return all(path.is_file() for path in paths.values())
+
+
+def target_stem_count(
+    project_dir: Path, requested: StemCount | None
+) -> StemCount:
+    """Explicit *requested* count, else the project's own (4 for a new project)."""
+    if requested is not None:
+        return requested
+    return project_stem_count(project_dir)
+
+
+def stem_count_change(project_dir: Path, requested: StemCount | None) -> bool:
+    """True when an explicit count differs from an already separated project's."""
+    if requested is None or not manifest_path(project_dir).is_file():
+        return False
+    return requested != project_stem_count(project_dir)
 
 
 def signals_complete(project_dir: Path) -> bool:
@@ -87,11 +112,25 @@ def beat_detection_stem_mismatch(
 def resolve_beat_detection_stem(
     project_dir: Path, requested: StemSource | None
 ) -> StemSource:
-    """Explicit CLI value, else stored, else ``full_mix``."""
+    """Explicit CLI value, else stored, else ``full_mix``.
+
+    A stored stem the project no longer has (after a 6 to 4 re-split) reads
+    as ``full_mix``.
+    """
     if requested is not None:
         return requested
     stored = signals_beat_detection_stem(project_dir)
-    return stored if stored is not None else "full_mix"
+    if stored is None or stored not in stem_sources(project_stem_count(project_dir)):
+        return "full_mix"
+    return stored
+
+
+def _require_beat_stem_in(stem_count: StemCount, stem: StemSource | None) -> None:
+    if stem is not None and stem not in stem_sources(stem_count):
+        raise ValueError(
+            f"beat detection stem {stem_control_label(stem)!r} needs a 6-stem "
+            "project"
+        )
 
 
 def resolve_separate_target(path_or_slug: Path | str) -> tuple[Path, Path]:
@@ -563,6 +602,7 @@ def _run_demucs(
     *,
     high_quality: bool,
     force: bool,
+    stem_count: StemCount,
     on_progress: Callable[[str, float | None], None] | None = None,
 ) -> None:
     """Separate *audio_path* with Demucs and write stems into *project_dir*."""
@@ -574,7 +614,7 @@ def _run_demucs(
     else:
         slug = project_slug(audio_path)
 
-    model = DEMUCS_HQ_MODEL if high_quality else DEMUCS_MODEL
+    model = demucs_model_for(stem_count, high_quality=high_quality)
 
     project_dir.mkdir(parents=True, exist_ok=True)
     (project_dir / "renders").mkdir(exist_ok=True)
@@ -602,12 +642,24 @@ def _run_demucs(
         demucs_model=model,
     )
 
+    dest_paths = stem_paths(project_dir, stem_count)
     _write_demucs_stems(
         mix_for_demucs,
-        stem_paths(project_dir),
+        dest_paths,
         model=model,
         on_progress=on_progress,
     )
+    _remove_stale_stems(project_dir, dest_paths)
+
+
+def _remove_stale_stems(project_dir: Path, kept: Mapping[str, Path]) -> None:
+    """Delete stem wavs a previous split wrote that *kept* does not name."""
+    for name in SIX_STEM_NAMES:
+        if name in kept:
+            continue
+        stale = stems_dir(project_dir) / f"{name}.wav"
+        if stale.is_file():
+            stale.unlink()
 
 
 def run_separate(
@@ -615,26 +667,38 @@ def run_separate(
     *,
     high_quality: bool = False,
     force: bool = False,
+    stem_count: StemCount | None = None,
     beat_detection_stem: StemSource | None = None,
     on_progress: Callable[[str, float | None], None] | None = None,
 ) -> Path:
     """Separate and/or analyse a Cleave project from an audio file or project slug.
 
-    *beat_detection_stem* is ``None`` when the CLI flag was omitted.
+    *stem_count* ``None`` keeps the project's count (4 for a new project); a
+    different count re-separates and moves layers off stems the new split
+    lacks. *beat_detection_stem* is ``None`` when the CLI flag was omitted.
     *on_progress* receives ``(message, fraction)``; ``fraction`` is ``None`` for
     named waits. When omitted, existing stdout messages are unchanged.
     """
     project_dir, audio_path = resolve_separate_target(target)
-    ensure_project_viz_config(project_dir)
+    count = target_stem_count(project_dir, stem_count)
+    _require_beat_stem_in(count, beat_detection_stem)
+    ensure_project_viz_config(project_dir, count)
 
+    count_changed = stem_count_change(project_dir, stem_count)
     stems_complete = project_stems_complete(project_dir)
     signals_done = signals_complete(project_dir)
     stem_mismatch = beat_detection_stem_mismatch(project_dir, beat_detection_stem)
 
-    if stems_complete and signals_done and not force and not stem_mismatch:
+    if (
+        stems_complete
+        and signals_done
+        and not force
+        and not count_changed
+        and not stem_mismatch
+    ):
         return project_dir
 
-    run_demucs = force or not stems_complete
+    run_demucs = force or count_changed or not stems_complete
     need_analyse = run_demucs or not signals_done or stem_mismatch
     if need_analyse:
         require_stem_split()
@@ -650,8 +714,10 @@ def run_separate(
             project_dir,
             high_quality=high_quality,
             force=force,
+            stem_count=count,
             on_progress=on_progress,
         )
+        remap_layers_to_stem_count(project_dir, count)
 
     if need_analyse:
         from cleave.analyse import run_analyse

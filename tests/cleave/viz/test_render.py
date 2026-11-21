@@ -35,7 +35,7 @@ from cleave.config_schema.project_resolution import (
     DEFAULT_RESOLUTION_HEIGHT,
     DEFAULT_RESOLUTION_WIDTH,
 )
-from cleave.stems import STEM_NAMES, stems_dir
+from cleave.stems import FOUR_STEM_NAMES, stems_dir
 from cleave.project import (
     ProjectRenderSettings,
     ProjectResolutionSettings,
@@ -182,7 +182,7 @@ def _mock_render_runtime(
 def _write_stub_stems(project: Path) -> None:
     base = stems_dir(project)
     base.mkdir(parents=True, exist_ok=True)
-    for name in STEM_NAMES:
+    for name in FOUR_STEM_NAMES:
         (base / f"{name}.wav").write_bytes(b"wav")
 
 

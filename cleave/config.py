@@ -20,7 +20,14 @@ from cleave.blend_modes import BlendMode
 from cleave.paths import default_preset_root, default_texture_paths, resource_dir
 from cleave.preset_list_entry import PresetListEntry
 from cleave.effects.constants import clamp_effect_pct
-from cleave.stems import StemSource
+from cleave.stems import (
+    DEFAULT_STEM_COUNT,
+    STEM_COUNTS,
+    StemCount,
+    StemSource,
+    stem_control_label,
+    stem_sources,
+)
 from cleave.project import (
     DEFAULT_PROJECT_SLUG,
     ProjectManifest,
@@ -155,9 +162,17 @@ from cleave.timeline import TimelineLane
 VIZ_CONFIG_FILENAME = "cleave-viz.yaml"
 
 
-def bundled_viz_template_path() -> Path:
-    """Return the shipped creative YAML template (never an active session)."""
-    return resource_dir() / "assets" / VIZ_CONFIG_FILENAME
+_SIX_STEM_TEMPLATE_FILENAME = "cleave-viz-6.yaml"
+
+
+def bundled_viz_template_path(stem_count: StemCount = DEFAULT_STEM_COUNT) -> Path:
+    """Return the shipped creative YAML template for a *stem_count* project.
+
+    The 4-stem template has a layer per stem; the 6-stem one adds guitar and
+    piano layers. Neither is ever an active session.
+    """
+    name = _SIX_STEM_TEMPLATE_FILENAME if stem_count == 6 else VIZ_CONFIG_FILENAME
+    return resource_dir() / "assets" / name
 
 
 @dataclass(frozen=True)
@@ -398,6 +413,7 @@ class CleaveConfig:
     resolution_height: int = DEFAULT_RESOLUTION_HEIGHT
     render_fps: int = DEFAULT_RENDER_FPS
     project_slug: str = DEFAULT_PROJECT_SLUG
+    stem_count: StemCount = DEFAULT_STEM_COUNT
 
     def layers_in_z_order(self) -> list[tuple[str, LayerConfig]]:
         """Return layers in compositor draw order (bottom-to-top)."""
@@ -423,19 +439,65 @@ def project_viz_config_path(project_dir: Path) -> Path:
     return project_dir.resolve() / VIZ_CONFIG_FILENAME
 
 
-def ensure_project_viz_config(project_dir: Path) -> Path:
-    """Copy the bundled template into *project_dir* when cleave-viz.yaml is missing."""
+def ensure_project_viz_config(
+    project_dir: Path, stem_count: StemCount = DEFAULT_STEM_COUNT
+) -> Path:
+    """Copy the *stem_count* template into *project_dir* when cleave-viz.yaml is missing."""
     dst = project_viz_config_path(project_dir)
     if dst.is_file():
         return dst
 
-    src = bundled_viz_template_path()
+    src = bundled_viz_template_path(stem_count)
     if not src.is_file():
         raise FileNotFoundError(f"config template not found: {src}")
 
     project_dir.mkdir(parents=True, exist_ok=True)
     dst.write_bytes(src.read_bytes())
     return dst
+
+
+def remap_layers_to_stem_count(project_dir: Path, stem_count: StemCount) -> bool:
+    """Move layers whose stem a *stem_count* split lacks onto ``other``.
+
+    A 4-stem split folds guitar and piano into ``other``, so their layers
+    follow it. Their Cleave Effects are cleared, since drivers depend on the
+    stem. True when cleave-viz.yaml changed.
+    """
+    path = project_viz_config_path(project_dir)
+    if not path.is_file():
+        return False
+    with path.open(encoding="utf-8") as fh:
+        data = yaml.safe_load(fh)
+    layers = data.get("layers") if isinstance(data, dict) else None
+    if not isinstance(layers, dict):
+        return False
+    allowed = stem_sources(stem_count)
+    changed = False
+    for layer in layers.values():
+        if not isinstance(layer, dict):
+            continue
+        stem = layer.get("stem")
+        if isinstance(stem, str) and stem not in allowed:
+            layer["stem"] = "other"
+            layer.pop("effects", None)
+            changed = True
+    if changed:
+        with path.open("w", encoding="utf-8") as fh:
+            dump_yaml(data, fh)
+    return changed
+
+
+def _validate_layer_stems(
+    layers: Mapping[str, LayerConfig], stem_count: StemCount
+) -> None:
+    allowed = stem_sources(stem_count)
+    for slot, layer in layers.items():
+        if layer.stem not in allowed:
+            raise ValueError(
+                f"layers.{slot}.stem {stem_control_label(layer.stem)!r} is not "
+                f"in this {stem_count}-stem project; use Project > Re-separate "
+                "stems to split it into 6 stems"
+            )
 
 
 def find_config_path(
@@ -451,7 +513,10 @@ def find_config_path(
     if not local_path.is_file():
         return None
     resolved = local_path.resolve()
-    if resolved == bundled_viz_template_path().resolve():
+    if any(
+        resolved == bundled_viz_template_path(count).resolve()
+        for count in STEM_COUNTS
+    ):
         return None
     return resolved
 
@@ -619,6 +684,13 @@ def load_config(
     else:
         render_fps = DEFAULT_RENDER_FPS
     project_slug = manifest.slug if manifest is not None else DEFAULT_PROJECT_SLUG
+    if manifest is not None:
+        from cleave.model_weights import stem_count_for_model
+
+        stem_count = stem_count_for_model(manifest.demucs_model)
+    else:
+        stem_count = DEFAULT_STEM_COUNT
+    _validate_layer_stems(layers, stem_count)
 
     return CleaveConfig(
         paths=paths,
@@ -635,6 +707,7 @@ def load_config(
         resolution_height=resolution_height,
         render_fps=render_fps,
         project_slug=project_slug,
+        stem_count=stem_count,
     )
 
 

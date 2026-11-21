@@ -146,6 +146,7 @@ pkg_binaries = [entry for entry in pkg_binaries if not _is_cuda_binary(entry)]
 
 datas = [
     (str(REPO / "assets" / "cleave-viz.yaml"), "assets"),
+    (str(REPO / "assets" / "cleave-viz-6.yaml"), "assets"),
     (str(REPO / "assets" / "fonts"), "assets/fonts"),
     (str(REPO / "assets" / "cleave-logo-full.png"), "assets"),
     (str(REPO / "assets" / "cleave-logo-square.png"), "assets"),

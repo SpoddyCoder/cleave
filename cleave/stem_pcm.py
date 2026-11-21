@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 
-from cleave.stems import STEM_NAMES, StemSource, stem_paths
+from cleave.stems import StemSource, stem_paths
 from cleave.pcm_io import SAMPLE_RATE_HZ, load_wav_pcm_44k
 from cleave.project import mix_path
 
@@ -23,6 +23,11 @@ class StemPcmBank:
     _pcm: dict[str, np.ndarray] = field(repr=False)
     _channels: dict[str, int] = field(repr=False)
     sample_rate_hz: int = SAMPLE_RATE_HZ
+
+    @property
+    def sources(self) -> tuple[StemSource, ...]:
+        """Loaded sources: the project's stems, then ``full_mix``."""
+        return tuple(self._pcm)  # type: ignore[arg-type]
 
     def pcm(self, stem: StemSource) -> np.ndarray:
         """Preloaded float32 PCM for *stem* (mono 1D or interleaved stereo)."""
@@ -146,7 +151,7 @@ def fold_pcm_to_max_samples(
 
 
 def load_stem_pcm(project_dir: Path) -> StemPcmBank:
-    """Load five audio sources from *project_dir* into memory."""
+    """Load the project's stems and its mix from *project_dir* into memory."""
     project_dir = project_dir.resolve()
     paths = stem_paths(project_dir)
     missing = [name for name, path in paths.items() if not path.is_file()]
@@ -161,7 +166,7 @@ def load_stem_pcm(project_dir: Path) -> StemPcmBank:
 
     pcm: dict[str, np.ndarray] = {}
     channels: dict[str, int] = {}
-    for name in STEM_NAMES:
+    for name in paths:
         pcm[name], channels[name] = load_wav_pcm_44k(paths[name])
     pcm["full_mix"], channels["full_mix"] = load_wav_pcm_44k(mix)
 

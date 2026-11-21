@@ -12,7 +12,6 @@ from cleave.config_schema.layers import (
     clamp_easter_egg,
     preset_switching_mode_for_trigger,
 )
-from cleave.stems import STEM_SOURCES
 from cleave.preset_library import PresetCollection
 from cleave.preset_playlist import (
     is_top_level_browse_dir,
@@ -312,7 +311,7 @@ class LayerMutations:
 
     def step_stem(self, slot: str, *, delta: int) -> None:
         layer = self.session.layers[slot]
-        stem = step_choice(STEM_SOURCES, layer.stem, delta)
+        stem = step_choice(self.session.stem_sources, layer.stem, delta)
         if stem == layer.stem:
             return
         layer.stem = stem

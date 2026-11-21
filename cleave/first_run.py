@@ -38,6 +38,7 @@ class FirstRunItemId(Enum):
     EN_D = "en_d"
     DEMUCS = "demucs"
     DEMUCS_HQ = "demucs_hq"
+    DEMUCS_6S = "demucs_6s"
     BEAT_THIS = "beat_this"
     CUDA = "cuda"
 
@@ -226,6 +227,7 @@ def first_run_items() -> tuple[FirstRunItem, ...]:
     would run on the CPU.
     """
     from cleave.model_weights import (
+        DEMUCS_6S_MODEL,
         DEMUCS_HQ_MODEL,
         DEMUCS_MODEL,
         beat_this_weight_spec,
@@ -247,6 +249,13 @@ def first_run_items() -> tuple[FirstRunItem, ...]:
             lambda: demucs_weight_spec(DEMUCS_HQ_MODEL),
             name="Demucs HQ",
             purpose="higher quality but slower stem separation",
+            default_on=False,
+        ),
+        _weight_item(
+            FirstRunItemId.DEMUCS_6S,
+            lambda: demucs_weight_spec(DEMUCS_6S_MODEL),
+            name="Demucs 6-stem",
+            purpose="adds guitar and piano stems",
             default_on=False,
         ),
         _weight_item(

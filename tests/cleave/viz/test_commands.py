@@ -1014,3 +1014,46 @@ def test_latency_buttons_have_their_own_help_and_run_their_tests() -> None:
         with patch.object(getattr(controls, controller), "prompt_start") as start:
             assert apply_field_action(controls, RowDescriptor(kind)) is True
             start.assert_called_once_with()
+
+
+def test_reseparate_enabled_only_with_a_project_and_stem_split() -> None:
+    command = command_by_id("project.separate")
+    assert command.enabled(CommandContext(can_reseparate=True)) is True
+    assert command.enabled(CommandContext()) is False
+    assert command.enabled(CommandContext(can_reseparate=True, render_busy=True)) is False
+    assert command_context(make_controls()).can_reseparate is False
+
+
+def test_reseparate_asks_stem_count_then_requests_the_split(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from cleave.open_target import OpenTargetKind
+    from cleave.project import write_manifest
+
+    monkeypatch.setattr("cleave.viz.commands.stem_split_installed", lambda: True)
+    project = tmp_path / "song"
+    project.mkdir()
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.wav",
+        original_path=project / "song.wav",
+        demucs_model="htdemucs",
+    )
+    controls = make_controls(project_dir=project)
+    assert command_context(controls).can_reseparate is True
+
+    command_by_id("project.separate").run(controls)
+
+    view = controls.modal_host.view_state()
+    assert view is not None
+    assert view.message == "Re-separate stems"
+    assert view.options == ("4 stems (current)", "6 stems", "Cancel")
+    assert view.focus_index == 1
+    controls.modal_host.handle_keydown(keydown(pygame.K_RETURN))
+    assert controls.consume_pending_switch() is True
+    target = controls.project_switch.take_accepted()
+    assert target is not None
+    assert target.kind is OpenTargetKind.RESEPARATE
+    assert target.path == project
+    assert target.stem_count == 6

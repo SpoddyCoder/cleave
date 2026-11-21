@@ -10,8 +10,12 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from cleave.project import PROJECT_FILENAME
+
+if TYPE_CHECKING:
+    from cleave.stems import StemCount
 
 AUDIO_SUFFIXES = frozenset(
     {
@@ -35,6 +39,8 @@ class OpenTargetKind(Enum):
 
     AUDIO = "audio"
     PROJECT = "project"
+    # Re-split an existing project's stems, then open it.
+    RESEPARATE = "reseparate"
 
 
 @dataclass(frozen=True)
@@ -42,10 +48,13 @@ class OpenTarget:
     """An accepted path plus how the rest of the pipeline should read it.
 
     ``path`` is suitable for :func:`cleave.separate.resolve_separate_target`.
+    ``stem_count`` is the split to make: set for ``RESEPARATE``, and for
+    ``AUDIO`` once chosen (None asks in the window).
     """
 
     path: Path
     kind: OpenTargetKind
+    stem_count: StemCount | None = None
 
 
 def is_audio_target(path: Path) -> bool:

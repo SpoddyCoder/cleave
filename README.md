@@ -7,9 +7,9 @@
 
 # Cleave - stem separated music visualizer
 
-[![Version](https://img.shields.io/badge/version-v0.4.0--45%20%28dev%20build%29-orange)](https://github.com/SpoddyCoder/cleave/compare/v0.4.0...0.5.0) [![Tests](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml/badge.svg)](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml)
+[![Version](https://img.shields.io/badge/version-v0.4.0--46%20%28dev%20build%29-orange)](https://github.com/SpoddyCoder/cleave/compare/v0.4.0...0.5.0) [![Tests](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml/badge.svg)](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml)
 
-Layer together drums, bass, vocals and other stems - each driving Milkdrop presets to create your own unique visual masterpieces.
+Layer together drums, bass, vocals and other stems (plus guitar and piano, if you like) - each driving Milkdrop presets to create your own unique visual masterpieces.
 
 The visual editor lets you browse and tune presets in real time - automate preset switching, layer in effects, post processing and more. Render the final output in high definition and high frame rates using FFmpeg.
 
@@ -30,7 +30,7 @@ Cleave is in active development. It is very usable, but may not maintain backwar
 1. **Open a song.** On Windows, drop a music file onto `cleave.exe`, or launch Cleave and pick a file in the window. On Linux, run `./cleave.py play ~/music/mysong.mp3`, or `./cleave.py play`.
   1.1 Cleave reads wav, mp3, flac, m4a, aac, ogg, aiff, and aif.
 3. **Grab the downloads.** On first launch, Cleave offers to download the AI models and the Milkdrop presets it needs to separate the stems and display the visuals. Anything you skip is fetched when first needed, or later from Settings > Download packages.
-4. **Let Cleave prepare the song.** It separates the track into stems (drums, bass, vocals, other) and detects the beat and bar grid.
+4. **Let Cleave prepare the song.** Choose 4 stems (drums, bass, vocals, other) or 6 (adding guitar and piano). Cleave separates the track and detects the beat and bar grid.
 6. **Press `H`.** The help column describes whatever is highlighted, anywhere in the editor, dialogs included.
 
 The [User Guide](docs/user-guide/README.md) covers the rest: layers, presets, preset curation, the timeline, credits cards, post-processing, and rendering.
@@ -45,8 +45,8 @@ The editor is the main way to use Cleave. The command line is for scripts, autom
 
 Available commands:
 
-* `play` - open a song in the editor. Accepts a source audio file or project slug/path. Omit the target to browse from the editor window.
-* `separate` - run stem separation without opening the editor. Add `-hq` for the slower, higher quality model, or `--force` to split again.
+* `play` - open a song in the editor. Accepts a source audio file or project slug/path. Omit the target to browse from the editor window. `--stems 4` or `--stems 6` picks the stem count without asking.
+* `separate` - run stem separation without opening the editor. Add `--stems 6` for guitar and piano stems (a different count splits an existing project again), `-hq` for the slower, higher quality 4-stem model, or `--force` to split again.
 * `render` - render a project to video. Accepts a project slug or path.
 * `backup` - archive a project directory to a `.cleave-tar.gz` file (command line only for now).
 * `restore` - unpack a `.cleave-tar.gz` archive into `projects/<slug>/` (command line only for now).

@@ -17,6 +17,8 @@ _STEM_PRESENCE: dict[StemSource, str] = {
     "drums": "onset_strength",
     "bass": "rms",
     "vocals": "rms",
+    "guitar": "rms",
+    "piano": "rms",
     "other": "rms",
     "full_mix": "rms",
 }

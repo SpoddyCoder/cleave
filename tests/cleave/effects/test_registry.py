@@ -115,3 +115,17 @@ def test_every_effect_id_has_handler() -> None:
         assert effect_id in EFFECT_HANDLERS
         handler = EFFECT_HANDLERS[effect_id]
         assert handler.effect_id == effect_id
+
+
+@pytest.mark.parametrize("stem", ["guitar", "piano"])
+def test_six_stem_rosters_drive_from_their_own_centroid(stem: str) -> None:
+    rows = effect_roster(stem)
+    assert [(r.effect_id, r.driver_slug) for r in rows] == [
+        ("pulse", "centroid"),
+        ("flash", "centroid"),
+        ("grit", "centroid"),
+    ]
+    assert {(r.signal_stem, r.signal_key) for r in rows} == {
+        (stem, "spectral_centroid")
+    }
+    validate_effect_entry("layer_1", stem, "pulse", "centroid")

@@ -191,3 +191,94 @@ def test_video_quit_during_launch_reraises_without_closing() -> None:
 
     show_error.assert_not_called()
     window.close.assert_not_called()
+
+
+def test_new_project_asks_stem_count_and_splits_with_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    window = _window()
+    monkeypatch.setattr("cleave.viz.loading_modal.choose_stem_count", lambda _w: 6)
+
+    with (
+        patch("cleave.separate.run_separate", return_value=Path("/projects/song")) as run_separate,
+        patch("cleave.viz.continue_launch", return_value=None),
+    ):
+        run_editor_sessions(window, _audio(), config=None)
+
+    assert run_separate.call_args.kwargs["stem_count"] == 6
+    assert run_separate.call_args.kwargs["force"] is False
+
+
+def test_stem_count_cancel_returns_to_new_project_picker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    window = _window()
+    monkeypatch.setattr("cleave.viz.loading_modal.choose_stem_count", lambda _w: None)
+
+    with (
+        patch("cleave.separate.run_separate") as run_separate,
+        patch("cleave.viz.file_picker_host.run_file_picker", return_value=None) as picker,
+    ):
+        run_editor_sessions(window, _audio(), config=None)
+
+    run_separate.assert_not_called()
+    picker.assert_called_once_with(window, mode=PickerMode.NEW_PROJECT)
+
+
+def test_audio_with_stem_count_skips_the_prompt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    window = _window()
+
+    def no_prompt(_window: object) -> None:
+        raise AssertionError("prompted")
+
+    monkeypatch.setattr("cleave.viz.loading_modal.choose_stem_count", no_prompt)
+    target = OpenTarget(Path("/song.wav"), OpenTargetKind.AUDIO, stem_count=6)
+    with (
+        patch("cleave.separate.run_separate", return_value=Path("/projects/song")) as run_separate,
+        patch("cleave.viz.continue_launch", return_value=None),
+    ):
+        run_editor_sessions(window, target, config=None)
+
+    assert run_separate.call_args.kwargs["stem_count"] == 6
+
+
+def test_reseparate_splits_with_force_then_reopens_the_project() -> None:
+    from cleave.viz.session_loop import RESEPARATE_PROGRESS_TITLE
+
+    window = _window()
+    project_dir = Path("/projects/song")
+    target = OpenTarget(project_dir, OpenTargetKind.RESEPARATE, stem_count=6)
+
+    def separate(path: Path, **kwargs: object) -> Path:
+        assert path == project_dir
+        assert kwargs["force"] is True
+        assert kwargs["stem_count"] == 6
+        kwargs["on_progress"]("Separating stems…", 0.25)
+        window.update.assert_called_with(
+            RESEPARATE_PROGRESS_TITLE, "Separating stems…", 0.25
+        )
+        return project_dir
+
+    with (
+        patch("cleave.separate.run_separate", side_effect=separate),
+        patch("cleave.viz.continue_launch", return_value=None) as launch,
+    ):
+        run_editor_sessions(window, target, config=None)
+
+    launch.assert_called_once_with(window, project_dir, config=None)
+
+
+def test_reseparate_failure_returns_to_open_project_picker() -> None:
+    window = _window()
+    target = OpenTarget(Path("/projects/song"), OpenTargetKind.RESEPARATE, stem_count=4)
+
+    with (
+        patch("cleave.separate.run_separate", side_effect=RuntimeError("boom")),
+        patch("cleave.viz.file_picker_host.show_picker_error", return_value=True),
+        patch("cleave.viz.file_picker_host.run_file_picker", return_value=None) as picker,
+    ):
+        run_editor_sessions(window, target, config=None)
+
+    picker.assert_called_once_with(window, mode=PickerMode.OPEN_PROJECT)

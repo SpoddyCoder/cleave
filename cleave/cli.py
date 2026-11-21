@@ -17,12 +17,21 @@ from cleave.win_console import attach_parent_console
 
 if TYPE_CHECKING:
     from cleave.open_target import OpenTarget
-    from cleave.stems import StemSource
+    from cleave.stems import StemCount, StemSource
     from cleave.viz.render import RenderSegment
 
 # Parser/help constants (must match defining modules; avoid importing them for -h).
 VIZ_CONFIG_FILENAME = "cleave-viz.yaml"
-BEAT_DETECTION_STEM_CHOICES = ("drums", "full-mix", "bass", "vocals", "other")
+BEAT_DETECTION_STEM_CHOICES = (
+    "drums",
+    "full-mix",
+    "bass",
+    "vocals",
+    "guitar",
+    "piano",
+    "other",
+)
+STEM_COUNT_CHOICES = (4, 6)
 
 SIGNALS_FILENAME = "signals.json"
 _TARGET_HELP = "Source audio file or cleave project (path or slug)"
@@ -162,6 +171,15 @@ def _optional_beat_detection_stem(args: argparse.Namespace) -> StemSource | None
     return parse_beat_detection_stem(raw)
 
 
+def _optional_stem_count(args: argparse.Namespace) -> StemCount | None:
+    from cleave.stems import parse_stem_count
+
+    raw = getattr(args, "stems", None)
+    if raw is None:
+        return None
+    return parse_stem_count(raw)
+
+
 def cmd_separate(args: argparse.Namespace) -> None:
     from cleave.config import ensure_project_viz_config
     from cleave.separate import (
@@ -170,6 +188,8 @@ def cmd_separate(args: argparse.Namespace) -> None:
         resolve_separate_target,
         run_separate,
         signals_complete,
+        stem_count_change,
+        target_stem_count,
     )
 
     target = Path(args.target)
@@ -178,13 +198,17 @@ def cmd_separate(args: argparse.Namespace) -> None:
     except (FileNotFoundError, ValueError) as e:
         _exit_error(f"error: {e}")
 
-    ensure_project_viz_config(project_dir)
+    stem_count = _optional_stem_count(args)
+    ensure_project_viz_config(
+        project_dir, target_stem_count(project_dir, stem_count)
+    )
 
     beat_stem = _optional_beat_detection_stem(args)
     if (
         project_stems_complete(project_dir)
         and signals_complete(project_dir)
         and not args.force
+        and not stem_count_change(project_dir, stem_count)
         and not beat_detection_stem_mismatch(project_dir, beat_stem)
     ):
         print(
@@ -203,6 +227,7 @@ def cmd_separate(args: argparse.Namespace) -> None:
             target,
             high_quality=args.high_quality,
             force=args.force,
+            stem_count=stem_count,
             beat_detection_stem=beat_stem,
         )
     except (FileNotFoundError, ValueError, RuntimeError) as e:
@@ -210,7 +235,7 @@ def cmd_separate(args: argparse.Namespace) -> None:
     elapsed = _format_elapsed(time.perf_counter() - started)
 
     signals_path = result / SIGNALS_FILENAME
-    if args.force:
+    if args.force or (stems_before and stem_count is not None):
         print(f"Re-separated and analysed project at {result}")
     elif stems_before and not signals_before:
         print(f"Wrote signals to {signals_path}")
@@ -274,6 +299,9 @@ def cmd_play(args: argparse.Namespace) -> None:
             print(f"error: {e}", file=sys.stderr)
             sys.exit(1)
 
+    if play_target is not None:
+        play_target = _with_stem_count(play_target, _optional_stem_count(args))
+
     from cleave.viz.session_loop import run_editor_sessions
 
     run_editor_sessions(
@@ -283,6 +311,23 @@ def cmd_play(args: argparse.Namespace) -> None:
         high_quality=bool(args.high_quality),
         beat_detection_stem=_optional_beat_detection_stem(args),
     )
+
+
+def _with_stem_count(target: OpenTarget, stem_count: StemCount | None) -> OpenTarget:
+    """Apply ``--stems``: audio skips the window prompt; a project with another
+    count is re-separated before it opens."""
+    from dataclasses import replace
+
+    from cleave.open_target import OpenTargetKind
+    from cleave.separate import stem_count_change
+
+    if stem_count is None:
+        return target
+    if target.kind is OpenTargetKind.AUDIO:
+        return replace(target, stem_count=stem_count)
+    if stem_count_change(target.path, stem_count):
+        return replace(target, kind=OpenTargetKind.RESEPARATE, stem_count=stem_count)
+    return target
 
 
 def _play_open_target(target: str) -> OpenTarget:
@@ -393,6 +438,25 @@ def _add_beat_detection_stem_arg(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _add_stems_arg(parser: argparse.ArgumentParser, *, editor: bool) -> None:
+    default_help = (
+        "new projects ask in the window"
+        if editor
+        else "the project's current count, else 4"
+    )
+    parser.add_argument(
+        "--stems",
+        type=int,
+        choices=STEM_COUNT_CHOICES,
+        default=None,
+        help=(
+            "Stem count: 4 (drums, bass, vocals, other) or 6 (adds guitar "
+            "and piano; one model, so --high-quality only changes vocal "
+            f"pitch). A different count re-separates (default: {default_help})"
+        ),
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="cleave",
@@ -430,6 +494,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Re-run Demucs and signal extraction even when outputs exist",
     )
+    _add_stems_arg(separate, editor=False)
     _add_beat_detection_stem_arg(separate)
     separate.set_defaults(func=cmd_separate)
 
@@ -449,6 +514,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="htdemucs_ft for separation; pyin for vocal pitch (slower)",
     )
+    _add_stems_arg(play, editor=True)
     _add_beat_detection_stem_arg(play)
     play.add_argument(
         "-c",

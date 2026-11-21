@@ -178,14 +178,14 @@ Port playback and compositing to the browser. `signals.json` is already portable
 
 ## Deeper stem separation with Demucs
 
-Cleave today uses the standard four-stem split: drums, bass, vocals, other. Demucs can do more if you want finer control later.
+Cleave splits into four stems (drums, bass, vocals, other) or, per project, six (adding guitar and piano with `htdemucs_6s`). Demucs can do more if you want finer control later.
 
 **What is possible today (no new research required):**
 
 | Capability | How | Cleave use |
 | --- | --- | --- |
-| Four-stem split | `htdemucs` (fast) or `htdemucs_ft` (higher quality) | Current default; one Milkdrop layer per stem |
-| Six-stem split | `htdemucs_6s` model adds **guitar** and **piano** | Two extra layers or replace `other` with more targeted stems |
+| Four-stem split | `htdemucs` (fast) or `htdemucs_ft` (higher quality) | Default; one Milkdrop layer per stem |
+| Six-stem split | `htdemucs_6s` model adds **guitar** and **piano** | Shipped: per-project choice, six default layers |
 | Two-stem mode | `--two-stems=vocals` (or drums, etc.) | Quick vocal isolation pass; less useful when running a full multi-layer stack |
 | Re-run on a stem | Separate `drums.wav` again with a different model | Experimental; quality varies; not a built-in kick/snare/hihat mode |
 

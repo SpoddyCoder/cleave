@@ -14,6 +14,7 @@ from cleave.model_weights import (
     WeightDownloadError,
     beat_this_weight_spec,
     demucs_bag,
+    demucs_model_for,
     demucs_weight_spec,
     download_done_message,
     download_failed_message,
@@ -21,6 +22,7 @@ from cleave.model_weights import (
     ensure_weight_files,
     hub_checkpoints_dir,
     missing_weight_files,
+    stem_count_for_model,
 )
 
 
@@ -91,6 +93,32 @@ def test_demucs_htdemucs_ft_spec_is_four_file_bag() -> None:
         "demucs-04573f0d.safetensors",
     ]
     assert all(len(item.hash_prefix or "") == 64 for item in spec.files)
+
+
+def test_demucs_htdemucs_6s_spec_is_pinned_single_file() -> None:
+    spec = demucs_weight_spec("htdemucs_6s")
+    assert spec.label == "Demucs htdemucs_6s"
+    assert spec.size_hint == "~52 MB"
+    assert [item.filename for item in spec.files] == ["demucs-5c90dfd2.safetensors"]
+    assert spec.files[0].urls == (
+        "https://huggingface.co/adefossez/HTDemucs-6s/resolve/"
+        "3c5ee475be622df764938de97e4281a7b07ffa58/5c90dfd2.safetensors",
+    )
+
+
+def test_demucs_model_for_stem_count() -> None:
+    assert demucs_model_for(4, high_quality=False) == "htdemucs"
+    assert demucs_model_for(4, high_quality=True) == "htdemucs_ft"
+    assert demucs_model_for(6, high_quality=False) == "htdemucs_6s"
+    assert demucs_model_for(6, high_quality=True) == "htdemucs_6s"
+
+
+def test_stem_count_for_model() -> None:
+    assert stem_count_for_model("htdemucs") == 4
+    assert stem_count_for_model("htdemucs_ft") == 4
+    assert stem_count_for_model("htdemucs_6s") == 6
+    with pytest.raises(ValueError, match="unknown Demucs model"):
+        stem_count_for_model("mdx_extra")
 
 
 def test_demucs_bag_reads_the_installed_bag_definition() -> None:

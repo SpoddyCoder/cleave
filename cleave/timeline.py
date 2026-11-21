@@ -28,6 +28,8 @@ _STEM_SOURCE_ABBREVIATIONS = {
     "drums": "D",
     "bass": "B",
     "vocals": "V",
+    "guitar": "G",
+    "piano": "P",
     "other": "O",
     "full_mix": "M",
 }

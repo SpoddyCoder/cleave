@@ -16,14 +16,14 @@ from cleave.archive import (
     resolve_backup_output,
     restore_project,
 )
-from cleave.stems import STEM_NAMES, stems_dir
+from cleave.stems import FOUR_STEM_NAMES, stems_dir
 from cleave.project import PROJECT_FILENAME, load_manifest, write_manifest
 
 
 def _write_stub_stems(project: Path) -> None:
     base = stems_dir(project)
     base.mkdir(parents=True, exist_ok=True)
-    for name in STEM_NAMES:
+    for name in FOUR_STEM_NAMES:
         (base / f"{name}.wav").write_bytes(b"wav")
 
 

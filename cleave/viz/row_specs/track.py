@@ -25,8 +25,8 @@ from cleave.viz.tuning_view_state import TrackBlock, TuningViewState
 
 from cleave.blend_modes import BLEND_MODES
 from cleave.config_schema.layers import PRESET_SWITCHING_TRIGGERS
-from cleave.stems import STEM_SOURCES
 from cleave.viz.row_specs.common import bool_choice, options_choice
+from cleave.viz.session import active_stem_sources
 if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
 
@@ -863,7 +863,7 @@ SPECS: dict[RowKind, RowSpec] = {
         format_value=_format_track_stem,
         tooltip=_stem_row_tooltip,
         apply_horizontal=_apply_track_stem,
-        choice=options_choice(STEM_SOURCES, lambda s, d: _track_block(s, d).runtime.stem, stem_control_label, jump=_jump_track_stem),
+        choice=options_choice(active_stem_sources, lambda s, d: _track_block(s, d).runtime.stem, stem_control_label, jump=_jump_track_stem),
         help_title="Stem",
         help_entries=(("Left/Right", "choose stem source"),),
         help_description=(

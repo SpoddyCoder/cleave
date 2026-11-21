@@ -9,7 +9,7 @@ import pygame
 import pytest
 
 import cleave.viz.controls  # noqa: F401 - preload before effects.runtime imports
-from cleave.stems import STEM_NAMES, stems_dir
+from cleave.stems import FOUR_STEM_NAMES, stems_dir
 from cleave.signals import Signals
 from tests.support.config import write_minimal_config
 from tests.support.signals import make_onset_signals, make_signals
@@ -41,6 +41,14 @@ def _no_user_themes_between_tests() -> Iterator[None]:
     set_user_palettes(())
 
 
+@pytest.fixture(autouse=True)
+def _new_project_stem_prompt_picks_four(monkeypatch) -> None:
+    """The window's new-project stem prompt answers 4; tests that drive it repatch."""
+    monkeypatch.setattr(
+        "cleave.viz.loading_modal.choose_stem_count", lambda _window: 4
+    )
+
+
 @pytest.fixture
 def signals_onset() -> Signals:
     return make_onset_signals([0.0, 1.0, 0.0])
@@ -63,6 +71,6 @@ def minimal_project(tmp_path: Path) -> Path:
     write_minimal_config(project_dir, preset_root)
     stem_root = stems_dir(project_dir)
     stem_root.mkdir(parents=True, exist_ok=True)
-    for stem in STEM_NAMES:
+    for stem in FOUR_STEM_NAMES:
         (stem_root / f"{stem}.wav").write_bytes(b"wav")
     return project_dir

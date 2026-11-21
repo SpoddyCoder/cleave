@@ -253,3 +253,44 @@ def test_window_mean_nan_safe() -> None:
     assert signals.window_mean("drums", "onset_strength", 0.0, 0.03) == pytest.approx(
         0.0
     )
+
+
+def _signals_payload(**extra: object) -> dict:
+    return {
+        "version": 4,
+        "sample_rate_hz": 100,
+        "duration_sec": 0.1,
+        "drums": {"onset_strength": [0.0]},
+        "bass": {"rms": [0.0], "sub_bass": [0.0], "mid_bass": [0.0]},
+        "vocals": {"rms": [0.0], "pitch_hz": [220.0]},
+        "other": {"spectral_centroid": [1000.0], "rms": [0.0]},
+        "full_mix": {"onset_strength": [0.0], "rms": [0.0]},
+        **extra,
+    }
+
+
+def test_load_signals_six_stems(tmp_path: Path) -> None:
+    tonal = {"spectral_centroid": [900.0], "rms": [0.5]}
+    path = tmp_path / "signals.json"
+    path.write_text(json.dumps(_signals_payload(guitar=tonal, piano=tonal)))
+    signals = load_signals(path)
+    assert signals.sample("guitar", "rms", 0.0) == 0.5
+    assert signals.sample("piano", "spectral_centroid", 0.0) == 900.0
+
+
+def test_load_signals_rejects_guitar_without_piano(tmp_path: Path) -> None:
+    path = tmp_path / "signals.json"
+    tonal = {"spectral_centroid": [900.0], "rms": [0.5]}
+    path.write_text(json.dumps(_signals_payload(guitar=tonal)))
+    with pytest.raises(ValueError, match="missing stem section.*piano"):
+        load_signals(path)
+
+
+def test_load_signals_rejects_piano_missing_keys(tmp_path: Path) -> None:
+    path = tmp_path / "signals.json"
+    tonal = {"spectral_centroid": [900.0], "rms": [0.5]}
+    path.write_text(
+        json.dumps(_signals_payload(guitar=tonal, piano={"rms": [0.0]}))
+    )
+    with pytest.raises(ValueError, match="piano missing key"):
+        load_signals(path)

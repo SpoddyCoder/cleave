@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from cleave.signals import SIGNALS_VERSION
-from cleave.stems import STEM_NAMES, stems_dir
+from cleave.stems import FOUR_STEM_NAMES, stems_dir
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCRIPT = REPO_ROOT / "scripts" / "assert_separate_project.py"
@@ -28,7 +28,7 @@ def _load_assert_separate_project():
 assert_mod = _load_assert_separate_project()
 
 
-def _write_stems(project: Path, names: tuple[str, ...] = STEM_NAMES) -> None:
+def _write_stems(project: Path, names: tuple[str, ...] = FOUR_STEM_NAMES) -> None:
     base = stems_dir(project)
     base.mkdir(parents=True)
     for name in names:

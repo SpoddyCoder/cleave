@@ -96,6 +96,8 @@ DEFAULT_BLEND_MODE: dict[StemSource, BlendMode] = {
     "other": "black-key",
     "bass": "black-key",
     "vocals": "black-key",
+    "guitar": "black-key",
+    "piano": "black-key",
     "full_mix": "black-key",
 }
 

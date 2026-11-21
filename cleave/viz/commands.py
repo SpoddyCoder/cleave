@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
+from functools import cache
 from typing import TYPE_CHECKING, Literal
 
 import pygame
@@ -76,6 +77,8 @@ class CommandContext:
     # Pages the history's Back and Forward would show, None where there is none.
     page_back_id: str | None = None
     page_forward_id: str | None = None
+    # An open project and stem split (PyTorch, Demucs) installed.
+    can_reseparate: bool = False
 
 
 def _disabled(_ctx: CommandContext) -> bool:
@@ -151,7 +154,19 @@ def command_context(controls: TuningControls) -> CommandContext:
         fullscreen=bool(getattr(getattr(controls, "window", None), "fullscreen", False)),
         page_back_id=page_back_id,
         page_forward_id=page_forward_id,
+        can_reseparate=(
+            getattr(controls, "project_dir", None) is not None
+            and stem_split_installed()
+        ),
     )
+
+
+@cache
+def stem_split_installed() -> bool:
+    """True when PyTorch is importable. Checks without importing it."""
+    from importlib.util import find_spec
+
+    return find_spec("torch") is not None
 
 
 def command_menu_item(
@@ -228,6 +243,30 @@ def _run_new(controls: TuningControls) -> None:
 
 def _run_open(controls: TuningControls) -> None:
     controls.project_switch.prompt_open()
+
+
+def _reseparate_enabled(ctx: CommandContext) -> bool:
+    return ctx.can_reseparate and _project_switch_enabled(ctx)
+
+
+def _run_reseparate(controls: TuningControls) -> None:
+    from cleave.stems import project_stem_count
+    from cleave.viz.stem_count_prompt import (
+        RESEPARATE_BODY,
+        RESEPARATE_TITLE,
+        prompt_stem_count,
+    )
+
+    project_dir = controls.project_dir
+    if project_dir is None or controls.modal_host.active:
+        return
+    prompt_stem_count(
+        controls.modal_host,
+        RESEPARATE_TITLE,
+        lambda count: controls.project_switch.request_reseparate(project_dir, count),
+        current=project_stem_count(project_dir),
+        body=RESEPARATE_BODY,
+    )
 
 
 def _save_enabled(ctx: CommandContext) -> bool:
@@ -517,7 +556,13 @@ _ABOUT = Command(
     run=_run_about,
 )
 
-_SEPARATE = _later("project.separate", "Re-separate stems…", "command")
+_SEPARATE = Command(
+    id="project.separate",
+    label="Re-separate stems…",
+    kind="command",
+    enabled=_reseparate_enabled,
+    run=_when_enabled(_reseparate_enabled, _run_reseparate),
+)
 _RENDER = Command(
     id="project.render",
     label="Render…",

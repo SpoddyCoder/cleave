@@ -1,0 +1,198 @@
+render:
+  post_fx:
+    fade:
+      enabled: false
+      fade_in:
+        start: 0
+        end: 15
+        type: smoothstep
+      fade_out:
+        start: 4
+        end: 0
+        type: smoothstep
+    highlight_rolloff:
+      enabled: false
+      mode: composite
+      curve: rolloff
+      threshold_pct: 78
+      ceiling_pct: 65
+      strength_pct: 70
+      softness_pct: 40
+      desaturation_pct: 30
+    chroma_boost:
+      enabled: false
+      mode: composite
+      variant: vibrance
+      amount_pct: 25
+
+  overlays:
+    opening-card:
+      enabled: true
+      animation:
+        type: fade
+        slide-direction: left
+        appear-at: 5
+        display-time: 30
+      position: bottom-left
+      title:
+        content: |
+          Your Track Title
+        font-size: 28
+        font-colour: "#f0f4ff"
+        background-colour: "#5b6fd6"
+        margin-bottom: 12
+      body:
+        content: |
+          Artist Name  ·  Album  ·  2026
+        font-size: 16
+        colour: "#b8c4e0"
+      background:
+        margin: 36
+        padding: 24
+        colour: "#0c1020"
+        opacity: 0.85
+        border:
+          colour: "#5b6fd6"
+          width: 2
+    closing-card:
+      enabled: true
+      animation:
+        type: fade
+        slide-direction: left
+        disappear-at: 0
+        display-time: 30
+      position: bottom-left
+      title:
+        content: |
+          Your Track Title
+        font-size: 28
+        font-colour: "#f0f4ff"
+        background-colour: "#5b6fd6"
+        margin-bottom: 12
+      body:
+        content: |
+          Artist Name  ·  Album  ·  2026
+        font-size: 16
+        colour: "#b8c4e0"
+      background:
+        margin: 36
+        padding: 24
+        colour: "#0c1020"
+        opacity: 0.85
+        border:
+          colour: "#5b6fd6"
+          width: 2
+
+layer_z_order:
+  - layer_1
+  - layer_2
+  - layer_3
+  - layer_4
+  - layer_5
+  - layer_6
+
+layers:
+  layer_1:
+    stem: drums
+    preset: presets-cream-of-the-crop/Dancer/Aurora/
+    enabled: true
+    opacity: 0.5
+    blend_mode: black-key
+    preset_switching: "on"
+    preset_switching_trigger: projectm
+    preset_duration: 23
+    soft_cut_duration: 2.0
+    hard_cut_sensitivity: 0.7
+    effects:
+      pulse:
+        onset: 0
+      flash:
+        onset: 0
+
+  layer_2:
+    stem: bass
+    preset: presets-milkdrop-original/Milkdrop-Original/
+    enabled: true
+    opacity: 0.6
+    blend_mode: black-key
+    preset_switching: "on"
+    preset_switching_trigger: projectm
+    preset_duration: 31
+    soft_cut_duration: 5.0
+    hard_cut_enabled: false
+    effects:
+      pulse:
+        sub_bass: 0
+      grit:
+        sub_bass: 0
+
+  layer_3:
+    stem: vocals
+    preset: presets-cream-of-the-crop/Sparkle/Explosions/
+    enabled: true
+    opacity: 0.7
+    blend_mode: black-key
+    preset_switching: "on"
+    preset_switching_trigger: projectm
+    preset_duration: 37
+    soft_cut_duration: 3.0
+    hard_cut_sensitivity: 0.7
+    effects:
+      hue:
+        pitch: 0
+      pulse:
+        rms: 0
+      flash:
+        rms: 0
+
+  layer_4:
+    stem: guitar
+    preset: presets-cream-of-the-crop/Waveform/Wire Circular/
+    enabled: true
+    opacity: 0.6
+    blend_mode: black-key
+    preset_switching: "on"
+    preset_switching_trigger: projectm
+    preset_duration: 29
+    soft_cut_duration: 3.0
+    hard_cut_enabled: false
+    effects:
+      pulse:
+        centroid: 0
+      flash:
+        centroid: 0
+
+  layer_5:
+    stem: piano
+    preset: presets-cream-of-the-crop/Geometric/Circles Nested/
+    enabled: true
+    opacity: 0.6
+    blend_mode: black-key
+    preset_switching: "on"
+    preset_switching_trigger: projectm
+    preset_duration: 41
+    soft_cut_duration: 4.0
+    hard_cut_enabled: false
+    effects:
+      pulse:
+        centroid: 0
+
+  layer_6:
+    stem: other
+    preset: presets-milkdrop-original/Milkdrop-Original/
+    enabled: true
+    opacity: 1.0
+    blend_mode: black-key
+    preset_switching: "on"
+    preset_switching_trigger: projectm
+    preset_duration: 43
+    soft_cut_duration: 3.0
+    hard_cut_enabled: false
+    effects:
+      pulse:
+        centroid: 0
+      grit:
+        centroid: 0
+
+timeline:
+  enabled: false

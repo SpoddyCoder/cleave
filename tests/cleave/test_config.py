@@ -94,7 +94,7 @@ from cleave.viz.session import (
     timeline_runtime_from_cfg,
 )
 from cleave.paths import default_preset_root, default_texture_paths, repo_root
-from cleave.stems import STEM_NAMES
+from cleave.stems import FOUR_STEM_NAMES
 from cleave.timeline import SlotCue, TimelineLane
 from tests.support.config import (
     TEST_LAYER_STEMS,
@@ -2028,3 +2028,57 @@ def test_session_and_view_state_persisted_fields_import_default_constants() -> N
         + ", ".join(f"{cls}.{field}" for cls, field in unused)
     )
 
+
+
+def _write_six_stem_manifest(project: Path) -> None:
+    from cleave.project import write_manifest
+
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.wav",
+        original_path=project / "song.wav",
+        demucs_model="htdemucs_6s",
+    )
+
+
+def test_six_stem_template_loads_in_a_six_stem_project(tmp_path: Path) -> None:
+    project = tmp_path / "projects" / "song"
+    ensure_project_viz_config(project, 6)
+    _write_six_stem_manifest(project)
+    cfg = load_config(project_root=project)
+    assert cfg.stem_count == 6
+    assert [cfg.layers[slot].stem for slot in cfg.layers] == [
+        "drums",
+        "bass",
+        "vocals",
+        "guitar",
+        "piano",
+        "other",
+    ]
+    assert find_config_path(project_root=bundled_viz_template_path(6).parent) is None
+
+
+def test_load_config_rejects_six_stem_layer_in_four_stem_project(
+    tmp_path: Path,
+) -> None:
+    project = tmp_path / "projects" / "song"
+    ensure_project_viz_config(project, 6)
+    with pytest.raises(ValueError, match="not in this 4-stem project"):
+        load_config(project_root=project)
+
+
+def test_remap_layers_to_four_stems_moves_guitar_and_piano_to_other(
+    tmp_path: Path,
+) -> None:
+    from cleave.config import remap_layers_to_stem_count
+
+    project = tmp_path / "projects" / "song"
+    ensure_project_viz_config(project, 6)
+    assert remap_layers_to_stem_count(project, 6) is False
+    assert remap_layers_to_stem_count(project, 4) is True
+    layers = yaml.safe_load((project / VIZ_CONFIG_FILENAME).read_text())["layers"]
+    assert layers["layer_4"]["stem"] == "other"
+    assert "effects" not in layers["layer_4"]
+    assert layers["layer_1"]["effects"]
+    assert load_config(project_root=project).stem_count == 4

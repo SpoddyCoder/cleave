@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 import soundfile as sf
 
-from cleave.stems import STEM_NAMES, stems_dir
+from cleave.stems import FOUR_STEM_NAMES, stems_dir
 from cleave.pcm_io import SAMPLE_RATE_HZ
 from cleave.project import write_manifest
 from cleave.stem_pcm import (
@@ -23,9 +23,9 @@ from cleave.stem_pcm import (
 def _make_bank(*, duration_samples: int = 4410) -> StemPcmBank:
     pcm = {
         stem: np.arange(duration_samples, dtype=np.float32) + float(i)
-        for i, stem in enumerate(STEM_NAMES)
+        for i, stem in enumerate(FOUR_STEM_NAMES)
     }
-    channels = {stem: 1 for stem in STEM_NAMES}
+    channels = {stem: 1 for stem in FOUR_STEM_NAMES}
     return StemPcmBank(
         project_dir=Path("/tmp/test-project"),
         duration_sec=duration_samples / SAMPLE_RATE_HZ,
@@ -89,7 +89,7 @@ def _write_wav(path: Path, data: np.ndarray) -> None:
 def _write_pcm_project(project: Path) -> None:
     stem_root = stems_dir(project)
     stem_root.mkdir(parents=True, exist_ok=True)
-    for i, name in enumerate(STEM_NAMES):
+    for i, name in enumerate(FOUR_STEM_NAMES):
         _write_wav(
             stem_root / f"{name}.wav",
             np.full(100, float(i + 1), dtype=np.float32),
@@ -122,7 +122,7 @@ def test_load_stem_pcm_missing_mix_raises(tmp_path: Path) -> None:
     project.mkdir()
     stem_root = stems_dir(project)
     stem_root.mkdir(parents=True, exist_ok=True)
-    for name in STEM_NAMES:
+    for name in FOUR_STEM_NAMES:
         _write_wav(stem_root / f"{name}.wav", np.zeros(10, dtype=np.float32))
     write_manifest(
         project,
@@ -154,7 +154,7 @@ def test_load_stem_pcm_stereo_preserves_channels(tmp_path: Path) -> None:
     stem_root = stems_dir(project)
     stem_root.mkdir(parents=True, exist_ok=True)
     stereo = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
-    for name in STEM_NAMES:
+    for name in FOUR_STEM_NAMES:
         sf.write(stem_root / f"{name}.wav", stereo, SAMPLE_RATE_HZ, subtype="FLOAT")
     mix_path = project / "mix.wav"
     sf.write(mix_path, np.full(100, 9.0, dtype=np.float32), SAMPLE_RATE_HZ, subtype="FLOAT")

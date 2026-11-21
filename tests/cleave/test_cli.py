@@ -29,14 +29,14 @@ from cleave.cli import (
     owns_console,
 )
 from cleave.viz.render import RenderResult
-from cleave.stems import STEM_NAMES, stems_dir
+from cleave.stems import FOUR_STEM_NAMES, stems_dir
 from cleave.project import write_manifest
 
 
 def _write_stub_stems(project: Path) -> None:
     base = stems_dir(project)
     base.mkdir(parents=True, exist_ok=True)
-    for name in STEM_NAMES:
+    for name in FOUR_STEM_NAMES:
         (base / f"{name}.wav").write_bytes(b"wav")
 
 
@@ -404,6 +404,7 @@ def test_cmd_separate_does_not_noop_when_beat_stem_differs(
         Path("song"),
         high_quality=False,
         force=False,
+        stem_count=None,
         beat_detection_stem="drums",
     )
 
@@ -604,6 +605,8 @@ def test_bare_file_runs_play(
     run_separate.assert_called_once_with(
         Path(str(audio)),
         high_quality=False,
+        force=False,
+        stem_count=4,
         beat_detection_stem=None,
         on_progress=ANY,
     )
@@ -989,6 +992,8 @@ def test_cmd_play_forwards_high_quality_to_run_separate(
     run_separate.assert_called_once_with(
         audio,
         high_quality=True,
+        force=False,
+        stem_count=4,
         beat_detection_stem=None,
         on_progress=ANY,
     )
@@ -1015,6 +1020,8 @@ def test_cmd_play_forwards_beat_detection_stem(
     run_separate.assert_called_once_with(
         audio,
         high_quality=False,
+        force=False,
+        stem_count=4,
         beat_detection_stem="vocals",
         on_progress=ANY,
     )
@@ -1195,7 +1202,8 @@ def test_module_help_lists_subcommands() -> None:
         env=env,
     )
     assert play.stdout.startswith(
-        "usage: cleave play [-h] [-hq] [-bds {drums,full-mix,bass,vocals,other}]"
+        "usage: cleave play [-h] [-hq] [--stems {4,6}] "
+        "[-bds {drums,full-mix,bass,vocals,guitar,piano,other}]"
     )
 
     render = subprocess.run(
@@ -1512,3 +1520,37 @@ def test_main_exits_quietly_on_keyboard_interrupt(monkeypatch, capsys) -> None:
         cli.main(["play"])
     assert exc.value.code == 130
     assert "Traceback" not in capsys.readouterr().err
+
+
+def test_cmd_separate_stems_change_resplits_complete_project(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = _complete_project(tmp_path)
+
+    with patch("cleave.separate.run_separate", return_value=project.resolve()) as run_separate:
+        cmd_separate(build_parser().parse_args(["separate", "my-track", "--stems", "6"]))
+
+    assert run_separate.call_args.kwargs["stem_count"] == 6
+
+
+def test_cmd_play_stems_on_a_project_reseparates_it(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from cleave.open_target import OpenTargetKind
+
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = _complete_project(tmp_path)
+    window = _mock_loading_window()
+
+    with (
+        patch("cleave.viz.open_loading_window", return_value=window),
+        patch("cleave.viz.session_loop.run_editor_sessions") as sessions,
+    ):
+        cmd_play(build_parser().parse_args(["play", str(project), "--stems", "6"]))
+        target = sessions.call_args.args[1]
+        assert target.kind is OpenTargetKind.RESEPARATE
+        assert target.stem_count == 6
+
+        cmd_play(build_parser().parse_args(["play", str(project), "--stems", "4"]))
+        assert sessions.call_args.args[1].kind is OpenTargetKind.PROJECT

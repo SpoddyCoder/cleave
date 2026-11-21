@@ -32,7 +32,7 @@ from cleave.config_schema.render import (
     default_chroma_boost_runtime_values,
     default_highlight_rolloff_runtime_values,
 )
-from cleave.stems import STEM_NAMES, StemSource
+from cleave.stems import FOUR_STEM_NAMES, StemSource
 from cleave.preset_playlist import playlist_at_dir
 from cleave.viz.session import (
     LayerRuntime,
@@ -106,7 +106,7 @@ def slot_for_stem(stem: str) -> str:
 
 
 def make_preset_dirs(preset_root: Path) -> None:
-    for stem in STEM_NAMES:
+    for stem in FOUR_STEM_NAMES:
         stem_dir = preset_root / stem
         stem_dir.mkdir(parents=True, exist_ok=True)
         (stem_dir / "anchor.milk").write_text("milk", encoding="utf-8")
@@ -143,7 +143,7 @@ def write_minimal_config(project_dir: Path, preset_root: Path, **overrides) -> P
     project_dir.mkdir(parents=True, exist_ok=True)
     preset_root.mkdir(parents=True, exist_ok=True)
 
-    for stem in STEM_NAMES:
+    for stem in FOUR_STEM_NAMES:
         milk = preset_root / stem / f"{stem}.milk"
         milk.parent.mkdir(parents=True, exist_ok=True)
         milk.write_text(f"; minimal test preset for {stem}\n", encoding="utf-8")

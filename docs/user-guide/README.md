@@ -1,6 +1,6 @@
 # Cleave User Guide
 
-Cleave turns a song into a music video. It separates the track into four **stems** (drums, bass, vocals, and other) and gives each one its own layer of Milkdrop visuals, so the kick can drive one layer while the vocal line shapes another. You stack and blend the layers, sequence them across the song, add effects and credits, then render the result to video.
+Cleave turns a song into a music video. It separates the track into **stems** (drums, bass, vocals, and other, or with guitar and piano as well) and gives each one its own layer of Milkdrop visuals, so the kick can drive one layer while the vocal line shapes another. You stack and blend the layers, sequence them across the song, add effects and credits, then render the result to video.
 
 You don't need to read this guide cover to cover before starting. Open a song, press **H**, and the help column will explain whatever you highlight. Come back here for the bigger picture and the workflows that span several pages.
 
@@ -67,6 +67,7 @@ Cleave opens on a short splash with its logo, credit, and version; press any key
 | Demucs | The model that separates a song into stems. | Yes |
 | BeatThis! | The model that detects beats and downbeats. | Yes |
 | Demucs HQ | A slower, higher-quality separation model. | No |
+| Demucs 6-stem | The model for 6-stem projects, which adds guitar and piano stems. | No |
 
 The five preset packs are grouped under **projectM curated preset packs**, one line each, so you can pick just the ones you want. Each download reports its own progress. You can cancel at any point, and anything that fails is listed with a Retry button. Anything you skip is fetched automatically when it is first needed, or you can get it at any time from **Settings > Download packages**.
 
@@ -79,14 +80,25 @@ The five preset packs are grouped under **projectM curated preset packs**, one l
 
 Supported formats are wav, mp3, flac, m4a, aac, ogg, aiff, and aif.
 
-The first time you open a song, Cleave analyses it, with progress shown in a **Creating project** dialog:
+When you open a new song, Cleave first asks how many stems to split it into (see [4 or 6 stems](#4-or-6-stems)). It then analyses the song, with progress shown in a **Creating project** dialog:
 
-1. **Stem separation** into drums, bass, vocals, and other. This is the slow step; on CPU, a few minutes per song is normal.
+1. **Stem separation** into the stems you chose. This is the slow step; on CPU, a few minutes per song is normal.
 2. **Audio analysis**, which finds the beats, bars, loudness, and pitch that drive the visuals.
 
 This happens once per song; after that, the project opens immediately.
 
 Each song becomes a **project**: a folder holding the stems, your settings, and your renders. See [Where your files live](#where-your-files-live).
+
+### 4 or 6 stems
+
+| Choice | Stems |
+| --- | --- |
+| 4 stems (the default) | drums, bass, vocals, other |
+| 6 stems | drums, bass, vocals, guitar, piano, other |
+
+Six stems gives guitar and piano parts their own layers, where four stems folds them into other. Piano separates less cleanly than the rest, so expect some bleed between piano and other. High Quality separation has no 6-stem model.
+
+A new 6-stem project starts with six layers, one per stem. To change an existing project, choose **Project > Re-separate stems** and pick a count. Cleave asks to save unsaved changes, splits the song again, re-extracts its signals, and reopens the project. Your layers stay as they are, except that going from 6 stems to 4 moves guitar and piano layers to other and clears their Cleave Effects. Re-separating with the count the project already has simply splits it again.
 
 ### Saving
 
@@ -157,7 +169,7 @@ The same icons, in the same order, also sit at the right of the icon line under 
 
 ## Layers
 
-A **layer** is one Milkdrop visual driven by one stem. New projects start with four layers, one per stem, and a project can hold up to eight.
+A **layer** is one Milkdrop visual driven by one stem. New projects start with one layer per stem (four, or six for a 6-stem project), and a project can hold up to eight.
 
 Layers stack from the top of the Layers list down, so the first layer sits in front. Milkdrop renders on black, and the default blend mode keys black out, so the bright parts of each layer show through over the ones below.
 
@@ -178,7 +190,7 @@ To manage layers:
 - **Delete** a layer with **Delete layer** on its page, or from its context menu.
 - **Reorder** by dragging the dotted handle in front of a layer's name, or by pressing M and moving it with Up/Down.
 - **Jump** to a layer with its number key, 1 to 8.
-- **Change the stem** with the **driving stem** setting on the layer's page. A layer can also follow the full mix.
+- **Change the stem** with the **driving stem** setting on the layer's page. It lists the project's stems, and a layer can also follow the full mix.
 
 ### Compositing
 

@@ -26,6 +26,7 @@ from cleave.extract import (
 )
 from cleave.project import mix_path
 from cleave.resample import TARGET_HZ, resample_to_100hz
+from cleave.signals import SIGNALS_VERSION
 
 
 def _stem_duration_sec(path: Path) -> float:
@@ -42,6 +43,8 @@ _ANALYSE_FRAC_DRUMS = 0.0
 _ANALYSE_FRAC_BEATS = 0.05
 _ANALYSE_FRAC_BASS = 0.50
 _ANALYSE_FRAC_VOCALS = 0.65
+_ANALYSE_FRAC_GUITAR = 0.70
+_ANALYSE_FRAC_PIANO = 0.75
 _ANALYSE_FRAC_OTHER = 0.80
 _ANALYSE_FRAC_MIX_ONSET = 0.85
 _ANALYSE_FRAC_MIX_RMS = 0.90
@@ -80,8 +83,17 @@ def run_analyse(
     bass = extract_bass(paths["bass"])
     _report_analyse(on_progress, _ANALYSE_FRAC_VOCALS)
     vocals = extract_vocals(paths["vocals"], high_quality=high_quality)
+    # Guitar and piano (6-stem projects) are tonal like ``other``.
+    tonal: dict[str, dict] = {}
+    for name, fraction in (
+        ("guitar", _ANALYSE_FRAC_GUITAR),
+        ("piano", _ANALYSE_FRAC_PIANO),
+    ):
+        if name in paths:
+            _report_analyse(on_progress, fraction)
+            tonal[name] = extract_other(paths[name])
     _report_analyse(on_progress, _ANALYSE_FRAC_OTHER)
-    other = extract_other(paths["other"])
+    tonal["other"] = extract_other(paths["other"])
     _report_analyse(on_progress, _ANALYSE_FRAC_MIX_ONSET)
     mix_onset = extract_mix_onset(mix)
     _report_analyse(on_progress, _ANALYSE_FRAC_MIX_RMS)
@@ -101,7 +113,7 @@ def run_analyse(
         downbeat_times = [float(t) for t in downbeats]
 
     output: dict = {
-        "version": 4,
+        "version": SIGNALS_VERSION,
         "sample_rate_hz": int(TARGET_HZ),
         "duration_sec": duration_sec,
         "beat_detection_stem": beat_detection_stem,
@@ -123,11 +135,14 @@ def run_analyse(
                 resample_to_100hz(*vocals["pitch_hz"], duration_sec)
             ),
         },
-        "other": {
-            "spectral_centroid": resample_to_100hz(
-                *other["spectral_centroid"], duration_sec
-            ).tolist(),
-            "rms": resample_to_100hz(*other["rms"], duration_sec).tolist(),
+        **{
+            name: {
+                "spectral_centroid": resample_to_100hz(
+                    *features["spectral_centroid"], duration_sec
+                ).tolist(),
+                "rms": resample_to_100hz(*features["rms"], duration_sec).tolist(),
+            }
+            for name, features in tonal.items()
         },
         "full_mix": {
             "onset_strength": resample_to_100hz(*mix_onset, duration_sec).tolist(),

@@ -12,17 +12,14 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from cleave.signals import SIGNALS_VERSION
-from cleave.stems import STEM_NAMES, stem_paths
+from cleave.stems import stem_paths
 
 
 def missing_stem_wavs(project_dir: Path) -> list[str]:
     """Return stem names whose wav is missing under ``stems/``."""
-    missing: list[str] = []
-    for name in STEM_NAMES:
-        path = stem_paths(project_dir)[name]
-        if not path.is_file():
-            missing.append(name)
-    return missing
+    return [
+        name for name, path in stem_paths(project_dir).items() if not path.is_file()
+    ]
 
 
 def read_signals_version(project_dir: Path) -> object:

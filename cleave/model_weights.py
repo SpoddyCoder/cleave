@@ -16,10 +16,12 @@ from pathlib import Path
 from urllib.error import URLError
 
 from cleave.paths import model_cache_dir
+from cleave.stems import StemCount
 
 WeightProgress = Callable[[str, float | None], None]
 
-# Each Hybrid Transformer safetensors file is 84,025,440 bytes (~80 MB);
+# Each 4-stem Hybrid Transformer safetensors file is 84,025,440 bytes (~80 MB),
+# the 6-stem one 54,885,744 bytes (~52 MB);
 # Beat This ``final0`` is ~78 MB (hub file_name below).
 _DEMUCS_CHECKPOINT_MB = 80
 _BEAT_THIS_CHECKPOINT_MB = 78
@@ -41,6 +43,7 @@ class _DemucsHfRepo:
     repo: str
     revision: str
     sha256: tuple[tuple[str, str], ...]
+    checkpoint_mb: int = _DEMUCS_CHECKPOINT_MB
 
 
 # Demucs 4.1 publishes its pretrained bags as safetensors on the Hugging Face
@@ -63,6 +66,14 @@ _DEMUCS_HF_REPOS = {
             ("92cfc3b6", "a241863551f30d01c42bd7b97da40839922ead3acb0f1fcab25682f55b4eeb59"),
             ("04573f0d", "68854b0d7c2b3274723b5761f6fd9f5aec5f1bcd3f0de7c1669546fdb7871b7c"),
         ),
+    ),
+    "htdemucs_6s": _DemucsHfRepo(
+        repo="HTDemucs-6s",
+        revision="3c5ee475be622df764938de97e4281a7b07ffa58",
+        sha256=(
+            ("5c90dfd2", "d2a1745f0744721f6b8ca5bf469b67c651ea5ed1b52998cab033b2158609d411"),
+        ),
+        checkpoint_mb=52,
     ),
 }
 
@@ -100,9 +111,31 @@ _PROGRESS_MIN_INTERVAL_SEC = 0.1
 _PROGRESS_MIN_DELTA = 0.01
 
 BEAT_THIS_CHECKPOINT = "final0"
-# Demucs bags Cleave separates with: default and High Quality (``-hq``).
+# Demucs bags Cleave separates with: 4-stem default and High Quality
+# (``-hq``), and 6-stem (adds guitar and piano; no High Quality variant).
 DEMUCS_MODEL = "htdemucs"
 DEMUCS_HQ_MODEL = "htdemucs_ft"
+DEMUCS_6S_MODEL = "htdemucs_6s"
+_MODEL_STEM_COUNTS: dict[str, StemCount] = {
+    DEMUCS_MODEL: 4,
+    DEMUCS_HQ_MODEL: 4,
+    DEMUCS_6S_MODEL: 6,
+}
+
+
+def demucs_model_for(stem_count: StemCount, *, high_quality: bool) -> str:
+    """Demucs bag for a *stem_count* split. 6 stems has one model only."""
+    if stem_count == 6:
+        return DEMUCS_6S_MODEL
+    return DEMUCS_HQ_MODEL if high_quality else DEMUCS_MODEL
+
+
+def stem_count_for_model(model: str) -> StemCount:
+    """Stem count a Demucs bag *model* writes."""
+    try:
+        return _MODEL_STEM_COUNTS[model]
+    except KeyError:
+        raise ValueError(f"unknown Demucs model: {model}") from None
 
 
 @dataclass(frozen=True)
@@ -213,7 +246,8 @@ def demucs_checkpoint_name(signature: str) -> str:
 def demucs_weight_spec(model: str) -> WeightSpec:
     """Hugging Face safetensors for Demucs bag *model*, one per model in the bag.
 
-    Cleave uses ``htdemucs`` (one file) and ``htdemucs_ft`` (four-file bag).
+    Cleave uses ``htdemucs`` and ``htdemucs_6s`` (one file each) and
+    ``htdemucs_ft`` (four-file bag).
     """
     pinned = _DEMUCS_HF_REPOS.get(model)
     if pinned is None:
@@ -234,7 +268,7 @@ def demucs_weight_spec(model: str) -> WeightSpec:
         raise ValueError(f"Demucs model {model!r} has no checkpoint files")
     return WeightSpec(
         label=f"Demucs {model}",
-        size_mb=_DEMUCS_CHECKPOINT_MB * len(files),
+        size_mb=pinned.checkpoint_mb * len(files),
         files=tuple(files),
     )
 

@@ -10,7 +10,7 @@ import pygame
 from cleave.preset_library import PresetLibrary
 from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from tests.support.config import TEST_LAYER_STEMS
-from cleave.stems import STEM_NAMES
+from cleave.stems import FOUR_STEM_NAMES
 from cleave.viz.app import LiveVisualizerRuntime, VisualizerSeed
 from cleave.timeline import SlotCue, TimelineLane
 from cleave.viz.focus_nav import MainFocus, TimelineFocus
@@ -107,7 +107,7 @@ def _make_runtime(
     )
     runtime.controls = TuningControls(
         session,
-        make_test_cfg(tuple(STEM_NAMES), preset_root=preset_root),
+        make_test_cfg(tuple(FOUR_STEM_NAMES), preset_root=preset_root),
         preset_root=preset_root,
         playback=playback,
         duration_sec=120.0,

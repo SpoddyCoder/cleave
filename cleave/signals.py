@@ -13,6 +13,8 @@ _META_KEYS = frozenset(
 )
 SIGNALS_VERSION = 4
 _EXPECTED_STEMS = frozenset({"drums", "bass", "vocals", "other", "full_mix"})
+# A 6-stem project adds both, with the same keys as ``other``.
+_SIX_STEM_EXTRAS = frozenset({"guitar", "piano"})
 _FULL_MIX_KEYS = frozenset({"onset_strength", "rms"})
 _OTHER_KEYS = frozenset({"spectral_centroid", "rms"})
 
@@ -133,11 +135,16 @@ def _validate_signals_data(data: dict, stems: dict[str, dict[str, np.ndarray]]) 
         missing = ", ".join(sorted(missing_full_mix))
         raise ValueError(f"signals.json full_mix missing key(s): {missing}")
 
-    other_keys = set(stems.get("other", {}))
-    missing_other = _OTHER_KEYS - other_keys
-    if missing_other:
-        missing = ", ".join(sorted(missing_other))
-        raise ValueError(f"signals.json other missing key(s): {missing}")
+    extras = _SIX_STEM_EXTRAS & set(stems)
+    if extras and extras != _SIX_STEM_EXTRAS:
+        missing = ", ".join(sorted(_SIX_STEM_EXTRAS - extras))
+        raise ValueError(f"signals.json missing stem section(s): {missing}")
+
+    for name in ("other", *sorted(extras)):
+        missing_keys = _OTHER_KEYS - set(stems.get(name, {}))
+        if missing_keys:
+            missing = ", ".join(sorted(missing_keys))
+            raise ValueError(f"signals.json {name} missing key(s): {missing}")
 
 
 def load_signals(path: Path) -> Signals:

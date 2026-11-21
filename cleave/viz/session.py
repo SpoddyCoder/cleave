@@ -79,7 +79,7 @@ from cleave.config_schema.timeline import (
     DEFAULT_TIMELINE_SHOW_BAR_GRID,
     TimelinePlacementSnap,
 )
-from cleave.stems import StemSource
+from cleave.stems import DEFAULT_STEM_COUNT, StemSource, stem_sources
 from cleave.preset_list_entry import PresetListEntry
 from cleave.preset_library import PresetCollection
 from cleave.preset_playlist import PresetPlaylist, preset_browse_floor
@@ -551,6 +551,8 @@ class TuningSession:
     projectm_log_notify_tracker: ProjectMLogNotifyTracker = field(
         default_factory=ProjectMLogNotifyTracker
     )
+    # The project's stems plus full_mix (4 or 6 stems); not persisted.
+    stem_sources: tuple[StemSource, ...] = stem_sources(DEFAULT_STEM_COUNT)
     # Stems with no sound in this project's audio; not persisted.
     silent_stems: frozenset[StemSource] = frozenset()
     preset_health: PresetHealth = field(default_factory=PresetHealth)
@@ -755,12 +757,23 @@ def _beat_sensitivity(cfg: CleaveConfig, slot: str) -> float:
     return cfg.milkdrop_beat_sensitivity
 
 
+_active_stem_sources: tuple[StemSource, ...] = stem_sources(DEFAULT_STEM_COUNT)
+
+
+def active_stem_sources() -> tuple[StemSource, ...]:
+    """Stem choices of the session built last (one live project per process)."""
+    return _active_stem_sources
+
+
 def session_from_cfg(
     cfg: CleaveConfig,
     playlists: dict[str, PresetPlaylist],
 ) -> TuningSession:
+    global _active_stem_sources
     preset_root = cfg.paths.preset_root
+    _active_stem_sources = stem_sources(cfg.stem_count)
     return TuningSession(
+        stem_sources=_active_stem_sources,
         layer_z_order=list(cfg.layer_z_order),
         overlays=overlays_runtime_from_cfg(cfg),
         post_fx=post_fx_runtime_from_cfg(cfg),

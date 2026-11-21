@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import pygame
 
+from cleave.stems import StemCount
 from cleave.viz.loading import LoadingWindow, present_frame
 from cleave.viz.modal import ModalHost
 
@@ -91,3 +92,18 @@ def show_notice(window: LoadingWindow, title: str, message: str) -> bool:
     host = ModalHost()
     host.prompt_notice(title, body=message or "unknown error")
     return run_modal(window, host)
+
+
+def choose_stem_count(window: LoadingWindow) -> StemCount | None:
+    """Ask a new project's stem count. None on Cancel or a closed window."""
+    from cleave.viz.stem_count_prompt import (
+        NEW_PROJECT_STEMS_TITLE,
+        prompt_stem_count,
+    )
+
+    picked: list[StemCount] = []
+    host = ModalHost()
+    prompt_stem_count(host, NEW_PROJECT_STEMS_TITLE, picked.append)
+    if not run_modal(window, host) or not picked:
+        return None
+    return picked[0]
