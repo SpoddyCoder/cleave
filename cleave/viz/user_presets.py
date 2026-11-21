@@ -12,6 +12,7 @@ from pathlib import Path
 import yaml
 
 from cleave.config_schema.layers import resolve_user_preset
+from cleave.preset_list_entry import PresetListEntry
 from cleave.project import PROJECT_FILENAME
 
 USER_PRESETS_DIRNAME = "presets"
@@ -29,37 +30,78 @@ def path_list_identity(paths: Sequence[str]) -> dict[str, int | str]:
     return {"len": len(paths), "digest": path_list_digest(paths)}
 
 
-def preset_list_display_names(paths: list[str]) -> list[str]:
-    """Format preset-list row labels, numbering duplicate paths in the list."""
-    if not paths:
+def preset_list_identity(entries: Sequence[PresetListEntry]) -> dict[str, int | str]:
+    """Structure-signature identity for a preset list, covering each entry's source."""
+    return path_list_identity(
+        [f"{entry.path}\x01{entry.source or ''}" for entry in entries]
+    )
+
+
+def preset_list_display_names(entries: Sequence[PresetListEntry]) -> list[str]:
+    """Format preset-list row labels, numbering entries that share a copy.
+
+    An entry reads as its original file name, so a deduplicated copy such as
+    ``foo_2.milk`` still shows as ``foo.milk``.
+    """
+    if not entries:
         return []
-    resolved = [Path(path).resolve() for path in paths]
+    resolved = [entry.file.resolve() for entry in entries]
     by_resolved: dict[Path, list[int]] = {}
     for index, path in enumerate(resolved):
         by_resolved.setdefault(path, []).append(index)
-    labels = [""] * len(paths)
+    labels = [""] * len(entries)
     for indices in by_resolved.values():
         if len(indices) == 1:
             index = indices[0]
-            labels[index] = Path(paths[index]).name
+            labels[index] = entries[index].display_name
             continue
         for instance, index in enumerate(indices, start=1):
-            labels[index] = f"{Path(paths[index]).name} ({instance})"
+            labels[index] = f"{entries[index].display_name} ({instance})"
     return labels
 
 
-def preset_list_item_display_name(paths: list[str], index: int) -> str:
-    """Format a preset-list row label, numbering duplicate paths in the list."""
-    return preset_list_display_names(paths)[index]
+def preset_list_item_display_name(
+    entries: Sequence[PresetListEntry], index: int
+) -> str:
+    """Format a preset-list row label, numbering entries that share a copy."""
+    return preset_list_display_names(entries)[index]
 
 
-def copy_with_dedup(dest_dir: Path, src_path: Path) -> Path:
-    """Copy ``src_path`` into ``dest_dir`` with dedup; return the destination path."""
+def copy_with_dedup(dest_dir: Path, src_path: Path) -> PresetListEntry:
+    """Copy ``src_path`` into ``dest_dir`` with dedup; return the list entry.
+
+    The entry remembers ``src_path`` as its source unless the preset already
+    lived in ``dest_dir``.
+    """
     dest_path, needs_copy = resolve_user_preset_dest(dest_dir, src_path)
     if needs_copy:
         dest_dir.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src_path, dest_path)
-    return dest_path
+    resolved_src = src_path.resolve()
+    try:
+        resolved_src.relative_to(dest_dir.resolve())
+        source = None
+    except ValueError:
+        source = str(resolved_src)
+    return PresetListEntry(path=str(dest_path.resolve()), source=source)
+
+
+def preview_anchor(entry: PresetListEntry) -> Path:
+    """The file to browse when previewing ``entry``.
+
+    The original, so the preset rows show the folder it came from, while it
+    still exists and matches the copy; otherwise the project copy.
+    """
+    copy = entry.file
+    if entry.source is None:
+        return copy
+    source = Path(entry.source)
+    try:
+        if source.is_file() and _same_preset_file(source, copy):
+            return source
+    except OSError:
+        pass
+    return copy
 
 
 def resolve_user_preset_dest(dest_dir: Path, src_path: Path) -> tuple[Path, bool]:
@@ -173,8 +215,8 @@ def _preset_refs_from_viz_yaml(path: Path) -> set[Path]:
         if not isinstance(raw, list):
             continue
         for entry in raw:
-            if isinstance(entry, str):
-                refs.add(resolve_user_preset(entry, cfg_dir))
+            if isinstance(entry, dict) and isinstance(entry.get("path"), str):
+                refs.add(resolve_user_preset(entry["path"], cfg_dir))
     return refs
 
 

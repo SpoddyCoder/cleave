@@ -70,6 +70,7 @@ from tests.support.viz import (
     minimal_view_state,
     noop_layer_bindings,
 )
+from tests.support.preset_list import entries
 
 
 def _track_lock_state(locked: bool) -> SimpleNamespace:
@@ -986,7 +987,7 @@ def test_resume_switching_row_only_while_paused() -> None:
                     effects={},
                     preset_switching="on",
                     preset_switching_trigger="timer",
-                    preset_list=["/tmp/a.milk"],
+                    preset_list=entries("/tmp/a.milk"),
                     switching_paused=paused,
                 )
             }

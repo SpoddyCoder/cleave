@@ -147,7 +147,14 @@ class LiveLayerBindingsFactory:
         self._apply_preset_switching(slot)
 
     def on_switching_resume(self, slot: str) -> None:
-        previewing = self.ctx.layers_by_slot[slot].switching_paused
+        layer = self.ctx.layers_by_slot[slot]
+        runtime = self.ctx.session.layers[slot]
+        previewing = layer.switching_paused
+        if previewing and runtime.resume_browse is not None:
+            # Browsing during the preview moved the folder; return to where
+            # it was while switching ran.
+            runtime.restore_browse(runtime.resume_browse)
+            layer.playlist = runtime.playlist
         self._apply_preset_switching(slot, resume=True)
         if previewing:
             self._notify_layer(slot, SWITCHING_RESUMED_NOTIFICATION)
@@ -335,6 +342,13 @@ class LiveLayerBindingsFactory:
             session=ctx.session,
             resume=resume,
         )
+        # Browsing while switching runs starts a preview, so the browse
+        # position only changes during one: remember it for the resume.
+        running = layer.preset_rotation is not None or layer.projectm_playlist is not None
+        if running and not layer.switching_paused:
+            runtime.resume_browse = runtime.browse_snapshot()
+        elif not layer.switching_paused:
+            runtime.resume_browse = None
 
     def _apply_effect_modifiers(self) -> None:
         ctx = self.ctx

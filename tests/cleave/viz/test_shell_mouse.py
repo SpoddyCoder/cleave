@@ -43,6 +43,7 @@ from cleave.viz.shell_layout import (
     splitter_hit,
 )
 from tests.support.viz import make_controls
+from tests.support.preset_list import entries
 
 
 _OPACITY = RowDescriptor(RowKind.TRACK_OPACITY, slot="layer_1")
@@ -1131,7 +1132,7 @@ def _preset_item_row(index: int) -> InspectorRow:
 
 def test_right_click_on_a_preset_list_row_focuses_it_and_opens_its_menu() -> None:
     controls = make_controls(("layer_1",))
-    controls.session.layers["layer_1"].preset_list = ["/tmp/a.milk", "/tmp/b.milk"]
+    controls.session.layers["layer_1"].preset_list = entries("/tmp/a.milk", "/tmp/b.milk")
     with _host() as host:
         host.context.controls = controls
         layout = _open_strip_layout()
@@ -1157,7 +1158,7 @@ def test_right_click_on_a_preset_list_row_focuses_it_and_opens_its_menu() -> Non
 
 def test_focus_context_menu_opens_under_the_focused_preset_list_row() -> None:
     controls = make_controls(("layer_1",))
-    controls.session.layers["layer_1"].preset_list = ["/tmp/a.milk"]
+    controls.session.layers["layer_1"].preset_list = entries("/tmp/a.milk")
     with _host() as host:
         host.context.controls = controls
         row = _preset_item_row(0)

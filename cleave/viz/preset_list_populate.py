@@ -17,6 +17,7 @@ from cleave.timeline import (
     lane_on_transition_cues,
 )
 from cleave.viz.session import TuningSession
+from cleave.preset_list_entry import PresetListEntry
 from cleave.viz.user_presets import USER_PRESETS_DIRNAME, copy_with_dedup
 
 DEFAULT_POPULATE_ROLE: CueRole = "bed"
@@ -77,15 +78,9 @@ def _on_segment_roles(session: TuningSession, slot: str) -> list[CueRole | None]
 def _copy_into_user_presets(
     project_dir: Path,
     sources: Sequence[Path],
-) -> list[str]:
+) -> list[PresetListEntry]:
     dest_dir = project_dir / USER_PRESETS_DIRNAME
-    out: list[str] = []
-    for src in sources:
-        if not src.is_file():
-            continue
-        dest = copy_with_dedup(dest_dir, src)
-        out.append(str(dest.resolve()))
-    return out
+    return [copy_with_dedup(dest_dir, src) for src in sources if src.is_file()]
 
 
 def browse_pool(playlist: PresetPlaylist) -> tuple[Path, ...]:
@@ -114,7 +109,7 @@ def populate_from_directory(
     max_count: int | None = None,
     order: DirectoryOrder = "random",
     rng: random.Random | None = None,
-) -> list[str]:
+) -> list[PresetListEntry]:
     """Replace ``preset_list`` with copies from the layer's browse folder or collection.
 
     Timeline trigger: one pick per on-segment (from lane cues if any).
@@ -158,7 +153,7 @@ def populate_from_cue_marker_roles(
     catalog: PresetCatalog,
     default_role: CueRole = DEFAULT_POPULATE_ROLE,
     rng: random.Random | None = None,
-) -> list[str]:
+) -> list[PresetListEntry]:
     """Replace ``preset_list`` with one pick per on-segment from each cue's role pool."""
     layer = session.layers[slot]
     roles = _on_segment_roles(session, slot)

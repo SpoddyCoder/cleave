@@ -301,3 +301,14 @@ def test_repopulate_skips_non_timeline_trigger(tmp_path: Path) -> None:
         rng=random.Random(0),
     )
     assert session.layers["layer_1"].preset_list == []
+
+
+def test_populate_records_where_each_copy_came_from(tmp_path: Path) -> None:
+    session = _session(tmp_path, trigger="timer")
+    browse = session.layers["layer_1"].playlist.current_dir
+    (browse / "a.milk").write_text("MILK")
+    out = populate_from_directory(
+        session, "layer_1", project_dir=tmp_path / "project", order="sequential"
+    )
+    assert [entry.source for entry in out] == [str((browse / "a.milk").resolve())]
+    assert Path(out[0].path).parent == (tmp_path / "project" / "presets").resolve()

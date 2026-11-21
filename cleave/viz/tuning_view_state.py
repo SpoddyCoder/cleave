@@ -99,9 +99,11 @@ from cleave.viz.session import (
     VisualLimiterRuntime,
     default_overlay_card_runtime,
 )
+from cleave.preset_list_entry import PresetListEntry
 from cleave.viz.user_presets import (
     path_list_identity,
     preset_list_display_names,
+    preset_list_identity,
 )
 
 if TYPE_CHECKING:
@@ -550,12 +552,14 @@ class TuningViewState:
 
 
 @lru_cache(maxsize=64)
-def _preset_list_identity(paths: tuple[str, ...]) -> dict[str, int | str]:
+def _preset_list_identity(
+    entries: tuple[PresetListEntry, ...],
+) -> dict[str, int | str]:
     """Digest of a preset list, kept per list content.
 
-    The key hashes cached string hashes, so an unchanged list costs no digest.
+    The key hashes the frozen entries, so an unchanged list costs no digest.
     """
-    return path_list_identity(paths)
+    return preset_list_identity(entries)
 
 
 @lru_cache(maxsize=64)
@@ -687,11 +691,15 @@ class TuningViewStateBuilder:
         self._get_notification = get_notification
         self._layers_by_slot = layers_by_slot
         self._auto_display_cache: dict[Path, PresetPlaylist] = {}
-        self._preset_list_label_cache: dict[tuple[str, ...], list[str]] = {}
-        self._preset_list_marker_cache: dict[
-            tuple[tuple[str, ...], int], list[str]
+        self._preset_list_label_cache: dict[
+            tuple[PresetListEntry, ...], list[str]
         ] = {}
-        self._list_basenames_cache: dict[tuple[str, ...], frozenset[str]] = {}
+        self._preset_list_marker_cache: dict[
+            tuple[tuple[PresetListEntry, ...], int], list[str]
+        ] = {}
+        self._list_basenames_cache: dict[
+            tuple[PresetListEntry, ...], frozenset[str]
+        ] = {}
         self._structure: _ViewStateStructure | None = None
 
     def invalidate_structure(self) -> None:
@@ -723,11 +731,15 @@ class TuningViewStateBuilder:
                 runtime.failed_presets_revision = revision
 
     def _preset_list_basenames(self, layer: LayerRuntime) -> frozenset[str]:
-        """File names in *layer*'s preset list; list entries may be project copies."""
+        """File names in *layer*'s preset list: each project copy and its original."""
         key = tuple(layer.preset_list)
         names = self._list_basenames_cache.get(key)
         if names is None:
-            names = frozenset(Path(path).name for path in key)
+            names = frozenset(
+                name
+                for entry in key
+                for name in (entry.file.name, entry.display_name)
+            )
             self._list_basenames_cache[key] = names
         return names
 
@@ -766,21 +778,21 @@ class TuningViewStateBuilder:
             return None
         return self.session.preset_health.file_problem(layer, current)
 
-    def _preset_list_labels(self, paths: list[str]) -> list[str]:
-        paths_key = tuple(paths)
-        labels = self._preset_list_label_cache.get(paths_key)
+    def _preset_list_labels(self, entries: list[PresetListEntry]) -> list[str]:
+        entries_key = tuple(entries)
+        labels = self._preset_list_label_cache.get(entries_key)
         if labels is None:
-            labels = preset_list_display_names(paths)
-            self._preset_list_label_cache[paths_key] = labels
+            labels = preset_list_display_names(entries)
+            self._preset_list_label_cache[entries_key] = labels
         return labels
 
-    def _preset_list_markers(self, paths: list[str]) -> list[str]:
-        key = (tuple(paths), self._library.revision)
+    def _preset_list_markers(self, entries: list[PresetListEntry]) -> list[str]:
+        key = (tuple(entries), self._library.revision)
         markers = self._preset_list_marker_cache.get(key)
         if markers is None:
             markers = [
-                self._library.marker(Path(path)).strip()
-                for path in paths
+                self._library.marker(entry.file).strip()
+                for entry in entries
             ]
             self._preset_list_marker_cache[key] = markers
         return markers
@@ -812,12 +824,15 @@ class TuningViewStateBuilder:
         target = active.resolve()
         target_str = str(target)
         target_posix = target.as_posix()
-        for index, raw in enumerate(paths):
-            if raw == target_str or raw == target_posix:
+        for index, entry in enumerate(paths):
+            if entry.path in (target_str, target_posix):
                 return index
-        for index, raw in enumerate(paths):
+        for index, entry in enumerate(paths):
+            if entry.source in (target_str, target_posix):
+                return index
+        for index, entry in enumerate(paths):
             try:
-                if Path(raw).resolve() == target:
+                if entry.file.resolve() == target:
                     return index
             except OSError:
                 continue

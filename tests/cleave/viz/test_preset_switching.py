@@ -20,13 +20,14 @@ from cleave.viz.preset_switching import (
     switching_list_index,
 )
 from cleave.viz.session import LayerRuntime, TuningSession
+from tests.support.preset_list import entries
 
 _MILK = (
     Path("/tmp/presets/drums/a.milk"),
     Path("/tmp/presets/drums/b.milk"),
     Path("/tmp/presets/drums/c.milk"),
 )
-_LIST = [str(path) for path in _MILK]
+_LIST = entries(*_MILK)
 
 
 def _stem_layer(*, paths: tuple[Path, ...] = _MILK, index: int = 0) -> StemLayer:
@@ -151,7 +152,7 @@ def test_apply_projectm_records_first_list_item_when_browse_not_in_list(
         layer,
         mode="on",
         trigger="projectm",
-        preset_list=[str(path) for path in listed],
+        preset_list=entries(*listed),
     )
     assert layer.auto_preset_path == listed[0].resolve()
     layer.pm.load_preset.assert_called_with(listed[0].resolve(), smooth=False)

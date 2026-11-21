@@ -10,6 +10,7 @@ from cleave.viz.context_menu import ContextMenuItem, ContextSubmenu
 from cleave.viz.preset_context_menu import preset_row_menu, preset_row_menu_entries
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from tests.support.viz import make_controls
+from tests.support.preset_list import entries
 
 
 def _item_desc(index: int) -> RowDescriptor:
@@ -35,7 +36,7 @@ def _controls_with_list(tmp: str, names: tuple[str, ...] = ("a", "b", "c")):
         paths.append(str(path))
     controls = make_controls(("layer_1",), project_dir=root / "project")
     layer = controls.session.layers["layer_1"]
-    layer.preset_list = list(paths)
+    layer.preset_list = entries(*paths)
     layer.preset_switching = "on"
     return controls, paths
 
@@ -109,7 +110,7 @@ def test_move_items_reorder_and_stop_at_the_ends() -> None:
         assert last["preset.move_down"].enabled is False
         assert last["preset.move_down"].hint == "Already the last preset"
         first["preset.move_down"].run()
-        assert controls.session.layers["layer_1"].preset_list == [b, a, c]
+        assert controls.session.layers["layer_1"].preset_list == entries(b, a, c)
         assert controls.shell_focus.inspector_cursor == _item_desc(1)
 
 

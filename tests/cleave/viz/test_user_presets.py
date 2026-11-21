@@ -4,24 +4,28 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from cleave.preset_list_entry import PresetListEntry
 from cleave.project import PROJECT_FILENAME
 from cleave.viz.user_presets import (
     cleanup_unreferenced_user_presets,
+    copy_with_dedup,
     iter_project_viz_config_paths,
     path_list_digest,
     path_list_identity,
     preset_list_display_names,
     preset_list_item_display_name,
+    preview_anchor,
     resolve_user_preset_dest,
     user_preset_referenced_on_disk,
 )
+from tests.support.preset_list import entries
 
 
 def _write_viz_yaml(path: Path, preset_relpaths: list[str]) -> None:
     if not preset_relpaths:
         path.write_text("layers:\n  layer_1: {}\n", encoding="utf-8")
         return
-    presets = "\n".join(f"      - {rel}" for rel in preset_relpaths)
+    presets = "\n".join(f"      - path: {rel}" for rel in preset_relpaths)
     path.write_text(
         "layers:\n"
         "  layer_1:\n"
@@ -32,32 +36,32 @@ def _write_viz_yaml(path: Path, preset_relpaths: list[str]) -> None:
 
 
 def test_preset_list_item_display_name_single() -> None:
-    paths = ["/tmp/presets/foo.milk"]
+    paths = entries("/tmp/presets/foo.milk")
     assert preset_list_item_display_name(paths, 0) == "foo.milk"
 
 
 def test_preset_list_item_display_name_duplicates() -> None:
-    paths = [
+    paths = entries(
         "/tmp/presets/foo.milk",
         "/tmp/presets/foo.milk",
         "/tmp/presets/bar.milk",
-    ]
+    )
     assert preset_list_item_display_name(paths, 0) == "foo.milk (1)"
     assert preset_list_item_display_name(paths, 1) == "foo.milk (2)"
     assert preset_list_item_display_name(paths, 2) == "bar.milk"
 
 
 def test_preset_list_display_names_single() -> None:
-    paths = ["/tmp/presets/foo.milk"]
+    paths = entries("/tmp/presets/foo.milk")
     assert preset_list_display_names(paths) == ["foo.milk"]
 
 
 def test_preset_list_display_names_duplicates() -> None:
-    paths = [
+    paths = entries(
         "/tmp/presets/foo.milk",
         "/tmp/presets/foo.milk",
         "/tmp/presets/bar.milk",
-    ]
+    )
     assert preset_list_display_names(paths) == [
         "foo.milk (1)",
         "foo.milk (2)",
@@ -196,7 +200,7 @@ def test_cleanup_ignores_project_yaml_and_non_viz_yaml(tmp_path: Path) -> None:
         "layers:\n"
         "  layer_1:\n"
         "    preset_switching_list:\n"
-        "      - presets/orphan.milk\n",
+        "      - path: presets/orphan.milk\n",
         encoding="utf-8",
     )
     (tmp_path / "notes.yaml").write_text("title: hello\n", encoding="utf-8")
@@ -236,3 +240,57 @@ def test_user_preset_referenced_on_disk_skip_config(tmp_path: Path) -> None:
     assert user_preset_referenced_on_disk(tmp_path, milk, skip_config=active) is True
     _write_viz_yaml(other, [])
     assert user_preset_referenced_on_disk(tmp_path, milk, skip_config=active) is False
+
+
+def test_display_names_use_the_original_file_name() -> None:
+    entry = PresetListEntry("/proj/presets/foo_2.milk", source="/packs/a/foo.milk")
+    assert preset_list_display_names([entry]) == ["foo.milk"]
+
+
+def test_copy_with_dedup_records_the_source(tmp_path: Path) -> None:
+    src = tmp_path / "packs" / "a" / "foo.milk"
+    src.parent.mkdir(parents=True)
+    src.write_text("x", encoding="utf-8")
+    presets = tmp_path / "project" / "presets"
+
+    entry = copy_with_dedup(presets, src)
+
+    assert entry == PresetListEntry(
+        str((presets / "foo.milk").resolve()), source=str(src.resolve())
+    )
+    assert copy_with_dedup(presets, presets / "foo.milk") == PresetListEntry(
+        str((presets / "foo.milk").resolve())
+    )
+
+
+def _copied(tmp_path: Path) -> tuple[Path, PresetListEntry]:
+    src = tmp_path / "packs" / "a" / "foo.milk"
+    src.parent.mkdir(parents=True)
+    src.write_text("x", encoding="utf-8")
+    return src, copy_with_dedup(tmp_path / "project" / "presets", src)
+
+
+def test_preview_anchor_is_the_original_while_it_matches(tmp_path: Path) -> None:
+    src, entry = _copied(tmp_path)
+    assert preview_anchor(entry) == src.resolve()
+
+
+def test_preview_anchor_falls_back_to_the_copy_when_the_original_changed(
+    tmp_path: Path,
+) -> None:
+    src, entry = _copied(tmp_path)
+    src.write_text("edited", encoding="utf-8")
+    assert preview_anchor(entry) == entry.file
+
+
+def test_preview_anchor_falls_back_to_the_copy_when_the_original_is_gone(
+    tmp_path: Path,
+) -> None:
+    src, entry = _copied(tmp_path)
+    src.unlink()
+    assert preview_anchor(entry) == entry.file
+
+
+def test_preview_anchor_without_a_source_is_the_copy() -> None:
+    entry = PresetListEntry("/proj/presets/foo.milk")
+    assert preview_anchor(entry) == entry.file

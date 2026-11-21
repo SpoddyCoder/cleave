@@ -43,6 +43,7 @@ from tests.support.viz import (
     keydown,
     make_controls,
 )
+from tests.support.preset_list import entries
 
 
 def _session() -> TuningSession:
@@ -696,7 +697,7 @@ def test_held_switching_adds_a_hold_toggle_to_the_layer() -> None:
     )
     layer = session.layers["layer_1"]
     layer.preset_switching = "on"
-    layer.preset_list = [str(Path(__file__))]
+    layer.preset_list = entries(str(Path(__file__)))
     node_id = layer_node_id("layer_1")
 
     def toggle_ids() -> tuple[str, ...]:

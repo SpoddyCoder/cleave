@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from cleave.preset_list_entry import PresetListEntry
 from cleave.config import CleaveConfig, LayerConfig, PathsConfig, EditorConfig
 from cleave.config_schema.descriptors import (
     ParseCtx,
@@ -160,11 +161,28 @@ def test_parse_preset_switching_list_relative_to_cfg_dir(tmp_path: Path) -> None
     preset_root.mkdir()
     data = {"layers": _layer_yaml()}
     data["layers"]["layer_1"]["preset_switching"] = "on"
-    data["layers"]["layer_1"]["preset_switching_list"] = ["presets/a.milk"]
+    data["layers"]["layer_1"]["preset_switching_list"] = [
+        {"path": "presets/a.milk", "source": "/packs/a.milk"},
+        {"path": "presets/a.milk"},
+    ]
     layers = parse_layers_section(
         data, ParseCtx(preset_root=preset_root, cfg_dir=tmp_path)
     )
-    assert layers["layer_1"].preset_switching_list == [milk.resolve()]
+    assert layers["layer_1"].preset_switching_list == [
+        PresetListEntry(milk.resolve().as_posix(), source="/packs/a.milk"),
+        PresetListEntry(milk.resolve().as_posix()),
+    ]
+
+
+def test_parse_preset_switching_list_rejects_a_bare_path(tmp_path: Path) -> None:
+    preset_root = tmp_path / "preset-root"
+    preset_root.mkdir()
+    data = {"layers": _layer_yaml()}
+    data["layers"]["layer_1"]["preset_switching_list"] = ["presets/a.milk"]
+    with pytest.raises(ValueError, match="must be a mapping"):
+        parse_layers_section(
+            data, ParseCtx(preset_root=preset_root, cfg_dir=tmp_path)
+        )
 
 
 def test_persist_omits_defaults() -> None:
@@ -238,7 +256,9 @@ def test_persist_writes_non_defaults(tmp_path: Path) -> None:
                 stem="drums",
                 preset_switching="on",
                 preset_switching_trigger="projectm",
-                preset_list=[str(milk.resolve())],
+                preset_list=[
+                    PresetListEntry(str(milk.resolve()), source="/packs/a.milk")
+                ],
             )
         },
     )
@@ -246,7 +266,9 @@ def test_persist_writes_non_defaults(tmp_path: Path) -> None:
     layer_out = out["layer_1"]
     assert layer_out["preset_switching"] == "on"
     assert layer_out["preset_switching_trigger"] == "projectm"
-    assert layer_out["preset_switching_list"] == ["presets/a.milk"]
+    assert layer_out["preset_switching_list"] == [
+        {"path": "presets/a.milk", "source": "/packs/a.milk"}
+    ]
 
 
 def test_persist_list_outside_cfg_dir_keeps_absolute() -> None:
@@ -279,14 +301,16 @@ def test_persist_list_outside_cfg_dir_keeps_absolute() -> None:
                 browse_floor=Path("/tmp/presets/layer_1"),
                 stem="drums",
                 preset_switching="on",
-                preset_list=[str(outside)],
+                preset_list=[PresetListEntry(str(outside))],
             )
         },
     )
     out = persist_layers(
         PersistCtx(cfg=cfg, session=session, cfg_dir=Path("/tmp/test"))
     )
-    assert out["layer_1"]["preset_switching_list"] == [outside.resolve().as_posix()]
+    assert out["layer_1"]["preset_switching_list"] == [
+        {"path": outside.resolve().as_posix()}
+    ]
 
 
 def test_round_trip_snapshot(tmp_path: Path) -> None:
@@ -311,7 +335,7 @@ def test_round_trip_snapshot(tmp_path: Path) -> None:
                 stem="drums",
                 preset_switching="on",
                 preset_switching_trigger="timer",
-                preset_switching_list=[copied],
+                preset_switching_list=[PresetListEntry(str(copied))],
             )
         },
         editor=EditorConfig(),
@@ -330,7 +354,7 @@ def test_round_trip_snapshot(tmp_path: Path) -> None:
                 stem="drums",
                 preset_switching="on",
                 preset_switching_trigger="timer",
-                preset_list=[str(copied.resolve())],
+                preset_list=[PresetListEntry(str(copied.resolve()))],
             )
         },
     )
@@ -338,5 +362,5 @@ def test_round_trip_snapshot(tmp_path: Path) -> None:
     loaded = yaml.safe_load(cfg_path.read_text())
     assert loaded["layers"]["layer_1"]["preset_switching"] == "on"
     assert loaded["layers"]["layer_1"]["preset_switching_list"] == [
-        "presets/b.milk"
+        {"path": "presets/b.milk"}
     ]

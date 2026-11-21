@@ -80,6 +80,8 @@ from cleave.config_schema.timeline import (
     TimelinePlacementSnap,
 )
 from cleave.stems import StemSource
+from cleave.preset_list_entry import PresetListEntry
+from cleave.preset_library import PresetCollection
 from cleave.preset_playlist import PresetPlaylist, preset_browse_floor
 from cleave.projectm_health import PresetSkipNotifyTracker, ProjectMLogNotifyTracker
 from cleave.song_markers import SongMarker
@@ -443,6 +445,17 @@ class SettingsRuntime:
     editor_mode: EditorMode = "visualizer"
 
 
+@dataclass(frozen=True)
+class BrowseSnapshot:
+    """A layer's browse folder or collection and position, to put back later."""
+
+    current_dir: Path
+    paths: tuple[Path, ...]
+    index: int
+    collection: PresetCollection | None
+    browse_floor: Path
+
+
 @dataclass
 class LayerRuntime:
     playlist: PresetPlaylist
@@ -463,7 +476,7 @@ class LayerRuntime:
     hard_cut_enabled: bool = DEFAULT_HARD_CUT_ENABLED
     easter_egg: float = DEFAULT_EASTER_EGG
     preset_start_clean: bool = DEFAULT_PRESET_START_CLEAN
-    preset_list: list[str] = field(default_factory=list)  # absolute paths
+    preset_list: list[PresetListEntry] = field(default_factory=list)
     # The layer's own preset (file or folder), saved as ``preset:``. Browsing
     # sets it only while switching is off; with switching on, browsing is a
     # preview and leaves it alone. None means "follow the browse playlist".
@@ -477,10 +490,38 @@ class LayerRuntime:
     # Switching-list index playing, or resuming after a browse pause; not
     # persisted. Mirrored from the live StemLayer.
     switching_list_index: int | None = None
+    # Browse position while switching last ran, put back when a browse pause
+    # resumes, so the directory row returns with the switching list; not
+    # persisted.
+    resume_browse: BrowseSnapshot | None = None
     # Presets whose last load failed on this layer, by preset_failure_key, with
     # libprojectM's reason; not persisted. Mirrored from the live ProjectM.
     failed_presets: dict[str, str] = field(default_factory=dict)
     failed_presets_revision: int = 0
+
+    def browse_snapshot(self) -> BrowseSnapshot:
+        playlist = self.playlist
+        return BrowseSnapshot(
+            current_dir=playlist.current_dir,
+            paths=playlist.paths,
+            index=playlist.index,
+            collection=playlist.collection,
+            browse_floor=self.browse_floor,
+        )
+
+    def restore_browse(self, snapshot: BrowseSnapshot) -> None:
+        """Put the browse position from *snapshot* back, without loading."""
+        playlist = self.playlist
+        playlist.replace_with(
+            PresetPlaylist(
+                current_dir=snapshot.current_dir,
+                paths=snapshot.paths,
+                index=snapshot.index,
+                catalog=playlist.catalog,
+                collection=snapshot.collection,
+            )
+        )
+        self.browse_floor = snapshot.browse_floor
 
 
 @dataclass
@@ -760,9 +801,7 @@ def session_from_cfg(
                 hard_cut_enabled=layer_cfg.hard_cut_enabled,
                 easter_egg=layer_cfg.easter_egg,
                 preset_start_clean=layer_cfg.preset_start_clean,
-                preset_list=[
-                    path.as_posix() for path in layer_cfg.preset_switching_list
-                ],
+                preset_list=list(layer_cfg.preset_switching_list),
             )
             for slot, layer_cfg in cfg.layers.items()
         },

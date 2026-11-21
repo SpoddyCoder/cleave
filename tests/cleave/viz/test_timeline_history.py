@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 from cleave.timeline import SlotCue, TimelineLane
 from cleave.viz.timeline_history import TimelineHistory
+from tests.support.preset_list import entries
 
 
 def _lane(*times: float) -> TimelineLane:
@@ -19,7 +20,7 @@ def _session() -> SimpleNamespace:
         timeline=SimpleNamespace(
             lanes={"layer_1": _lane(1.0)}, enabled=True, selected_clip_t={}
         ),
-        layers={"layer_1": SimpleNamespace(preset_list=["a.milk"])},
+        layers={"layer_1": SimpleNamespace(preset_list=entries("a.milk"))},
         pattern_mask=SimpleNamespace(
             enabled=False, type="stripes", feather_pct=5, transition=2.0
         ),
@@ -74,14 +75,14 @@ def test_undo_restores_everything_generate_touches() -> None:
     with history.recording("Generate timeline"):
         session.timeline.lanes["layer_1"] = _lane(2.0)
         session.timeline.enabled = False
-        session.layers["layer_1"].preset_list[:] = ["b.milk"]
+        session.layers["layer_1"].preset_list[:] = entries("b.milk")
         session.pattern_mask.enabled = True
         session.pattern_mask.type = "strips"
         session.pattern_mask.feather_pct = 0
         session.pattern_mask.transition = 1.0
     history.undo()
     assert session.timeline.enabled is True
-    assert session.layers["layer_1"].preset_list == ["a.milk"]
+    assert session.layers["layer_1"].preset_list == entries("a.milk")
     assert changed == ["layer_1"]
     mask = session.pattern_mask
     assert (mask.enabled, mask.type, mask.feather_pct, mask.transition) == (

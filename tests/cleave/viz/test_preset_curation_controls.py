@@ -17,6 +17,7 @@ from cleave.viz.modal import (
 from cleave.viz.preset_curation_controls import PresetCurationController
 from cleave.viz.session import LayerRuntime, TuningSession
 from tests.support.viz import keydown, noop_layer_bindings
+from tests.support.preset_list import entries
 
 
 def _write(path: Path, content: str) -> None:
@@ -50,7 +51,7 @@ def _make_controller(
                 browse_floor=root,
                 stem="drums",
                 opacity_pct=50,
-                preset_list=[str(root / "pack" / "demo.milk")],
+                preset_list=entries(str(root / "pack" / "demo.milk")),
             ),
         },
     )
@@ -115,7 +116,7 @@ def test_confirm_blacklist_hides_from_folder_but_keeps_preset_list(
     layer = session.layers["layer_1"]
     assert [p.name for p in layer.playlist.paths] == ["other.milk"]
     assert preset_changes == ["layer_1"]
-    assert layer.preset_list == [str(src)]
+    assert layer.preset_list == entries(str(src))
     assert _tree_snapshot(tmp_path) == before
 
 

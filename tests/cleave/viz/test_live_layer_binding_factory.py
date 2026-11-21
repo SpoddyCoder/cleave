@@ -23,6 +23,7 @@ from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.post_fx_bindings import PostFxBindings
 from cleave.viz.session import LayerRuntime, TuningSession
 from tests.support.viz import make_test_cfg, stub_playback_state
+from tests.support.preset_list import entries
 
 _FACTORY = "cleave.viz.live_layer_binding_factory"
 _MILK = (
@@ -49,7 +50,7 @@ def _session(*, preset_list: list[str] | None = None) -> TuningSession:
                 preset_list=list(
                     preset_list
                     if preset_list is not None
-                    else [str(p) for p in _MILK]
+                    else entries(*_MILK)
                 ),
             )
         },
@@ -333,7 +334,7 @@ def test_resume_returns_to_list_item_playing_at_pause(
     mock_playlist_cls.create.side_effect = (
         lambda: _stateful_projectm_playlist(_THREE)
     )
-    _ctx, factory, layer = _make_factory(preset_list=[str(p) for p in _THREE])
+    _ctx, factory, layer = _make_factory(preset_list=entries(*_THREE))
     _stub_projectm_timing(layer)
     factory.on_preset_switching_change("layer_1")
     layer.projectm_playlist.set_position(2)
@@ -361,7 +362,7 @@ def test_previewing_a_list_entry_then_editing_keeps_the_preview_and_schedule(
     mock_playlist_cls.create.side_effect = (
         lambda: _stateful_projectm_playlist(_THREE)
     )
-    _ctx, factory, layer = _make_factory(preset_list=[str(p) for p in _THREE])
+    _ctx, factory, layer = _make_factory(preset_list=entries(*_THREE))
     _stub_projectm_timing(layer)
     factory.on_preset_switching_change("layer_1")
     layer.projectm_playlist.set_position(2)
@@ -396,3 +397,32 @@ def test_reload_ends_the_preview_and_starts_the_list_afresh() -> None:
     assert layer.playlist is playlist
     mock_apply.assert_called_once()
     assert mock_apply.call_args.kwargs["resume"] is False
+
+
+@patch("cleave.viz.preset_switching.ProjectMPlaylist")
+def test_resume_returns_the_browse_folder_to_where_switching_ran(
+    mock_playlist_cls: MagicMock,
+) -> None:
+    mock_playlist_cls.create.side_effect = (
+        lambda: _stateful_projectm_playlist(_THREE)
+    )
+    ctx, factory, layer = _make_factory(preset_list=entries(*_THREE))
+    _stub_projectm_timing(layer)
+    runtime = ctx.session.layers["layer_1"]
+    factory.on_preset_switching_change("layer_1")
+
+    other = Path("/tmp/presets/other")
+    runtime.playlist.replace_with(
+        PresetPlaylist(current_dir=other, paths=(other / "x.milk",), index=0)
+    )
+    runtime.browse_floor = other
+    factory.on_preset_change("layer_1", runtime.playlist)
+    assert layer.switching_paused is True
+
+    factory.on_switching_resume("layer_1")
+    assert layer.switching_paused is False
+    assert runtime.playlist.current_dir == Path("/tmp/presets/layer_1")
+    assert runtime.playlist.paths == _MILK
+    assert runtime.playlist.index == 0
+    assert runtime.browse_floor == Path("/tmp/presets/layer_1")
+    assert layer.playlist is runtime.playlist

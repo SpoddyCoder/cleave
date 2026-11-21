@@ -18,6 +18,7 @@ from collections.abc import Callable, Hashable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
 
+from cleave.preset_list_entry import PresetListEntry
 from cleave.timeline import TimelineLane, copy_lane
 from cleave.viz.session import TuningSession
 
@@ -29,7 +30,7 @@ _MERGE_WINDOW_SEC = 1.0
 class _Snapshot:
     lanes: dict[str, TimelineLane]
     timeline_enabled: bool
-    preset_lists: dict[str, list[str]]
+    preset_lists: dict[str, list[PresetListEntry]]
     pattern_mask: tuple[bool, str, int, float]
     # Restored with the rest, but never counts as a change.
     selected_clip_t: dict[str, float]

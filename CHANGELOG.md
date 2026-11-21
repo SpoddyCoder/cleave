@@ -24,6 +24,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - On a layer's Milkdrop Preset page, the preset row has a + button just left of its arrows that adds the preset to the preset list (P still does the same). A Go to preset list button at the left of the icon line under the page title, on this page and on the Preset Switching page, opens the layer's Preset List page.
 - On a layer's Preset List page, the Populate button is now Populate list and sits at the left of the icon line under the page title, instead of at the bottom of the list. The icon line has a small gap under the title bar. The preset list entry's context menu item is renamed to match.
 - Editing the preset list or the Preset Switching settings while previewing keeps the preview, instead of resuming switching.
+- Previewing a preset list entry now shows the folder the preset came from on the preset directory row, so the arrows and the preset browser carry on from there, instead of the project folder Cleave copies list presets into. If the original has been moved, deleted, or edited, it shows the project's copy as before. List entries show the preset's own name, even when the copy had to be renamed. The preset list is saved in a new form, so a project whose layers have a preset list saved by an earlier version does not open.
 - With switching on, browsing presets no longer changes the layer's saved preset or marks the project as changed. Turning switching off brings back the preset you chose with it off.
 - The help for the projectm trigger now says it is live, so the editor and a render can switch at different moments.
 - The inspector's page title now sits on its own line above a line of the page's icons (on/off, solo, lock, pause, and back and forward), so a long title is no longer squeezed by the icons.
@@ -54,6 +55,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Pressing Ctrl+C in the console to quit `cleave play` exits quietly instead of printing a traceback.
 - Populate list and Generate timeline's refill preset lists no longer offer clip roles when no preset in your library has a role. Before, choosing it left the preset list empty.
 - Stem separation uses the GPU straight after the Welcome to Cleave step downloads the CUDA Toolkit, instead of running on the CPU until Cleave is restarted.
+- Resuming preset switching after browsing to another preset folder now takes the preset directory row back to the folder it showed before the preview, as it already did for the preset row. Before, the directory row stayed on the browsed folder, so the arrows stepped through a folder unrelated to what was playing.
 
 ## [0.4.0] - 2026-11-19
 

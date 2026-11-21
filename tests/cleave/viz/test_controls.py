@@ -116,6 +116,7 @@ from cleave.viz.row_present_renderers import (
     row_value_color_for,
 )
 from cleave.viz.tuning_view_state import TuningViewState
+from tests.support.preset_list import entries
 
 
 def _expand_project(controls: TuningControls) -> None:
@@ -3332,7 +3333,7 @@ def test_move_mode_colors_preset_list_item() -> None:
     layer = controls.session.layers["layer_1"]
     layer.preset_switching = "on"
     layer.preset_switching_trigger = "timer"
-    layer.preset_list = ["/tmp/presets/a.milk", "/tmp/presets/b.milk"]
+    layer.preset_list = entries("/tmp/presets/a.milk", "/tmp/presets/b.milk")
 
     item = RowDescriptor(
         RowKind.TRACK_PRESET_LIST_ITEM, slot="layer_1", preset_index=0
@@ -3354,11 +3355,11 @@ def test_preset_list_move_keeps_inspector_selection_on_moved_row() -> None:
     layer = controls.session.layers["layer_1"]
     layer.preset_switching = "on"
     layer.preset_switching_trigger = "timer"
-    layer.preset_list = [
+    layer.preset_list = entries(
         "/tmp/presets/a.milk",
         "/tmp/presets/b.milk",
         "/tmp/presets/c.milk",
-    ]
+    )
     first = RowDescriptor(
         RowKind.TRACK_PRESET_LIST_ITEM, slot="layer_1", preset_index=0
     )
@@ -3367,7 +3368,7 @@ def test_preset_list_move_keeps_inspector_selection_on_moved_row() -> None:
 
     controls.preset_list.move_item_to(2)
 
-    assert layer.preset_list[2] == "/tmp/presets/a.milk"
+    assert layer.preset_list[2].path == "/tmp/presets/a.milk"
     assert controls.shell_focus.inspector_cursor == RowDescriptor(
         RowKind.TRACK_PRESET_LIST_ITEM, slot="layer_1", preset_index=2
     )
@@ -3391,11 +3392,11 @@ def test_preset_list_enter_auditions_item_and_resumes() -> None:
     layer.preset_switching = "on"
     layer.preset_switching_trigger = "timer"
     layer.switching_paused = True
-    layer.preset_list = [
+    layer.preset_list = entries(
         "/tmp/presets/a.milk",
         "/tmp/presets/b.milk",
         "/tmp/presets/c.milk",
-    ]
+    )
     item = RowDescriptor(
         RowKind.TRACK_PRESET_LIST_ITEM, slot="layer_1", preset_index=2
     )
@@ -3429,7 +3430,7 @@ def test_active_preset_list_item_uses_highlight_color() -> None:
     layer.preset_switching_trigger = "timer"
     a = Path("/tmp/presets/list-a.milk").resolve()
     b = Path("/tmp/presets/list-b.milk").resolve()
-    layer.preset_list = [str(a), str(b)]
+    layer.preset_list = entries(str(a), str(b))
     layer.auto_preset_path = b
 
     controls.focus_descriptor = RowDescriptor(RowKind.OVERLAYS_HEADER)
@@ -3457,7 +3458,7 @@ def test_first_preset_list_item_highlighted_when_auto_unset() -> None:
     layer.preset_switching = "on"
     layer.preset_switching_trigger = "projectm"
     listed = Path("/tmp/user/presets/copy-a.milk").resolve()
-    layer.preset_list = [str(listed)]
+    layer.preset_list = entries(str(listed))
     layer.auto_preset_path = None
     controls.focus_descriptor = RowDescriptor(RowKind.OVERLAYS_HEADER)
     view = controls.build_view_state(paused=False)
@@ -4563,7 +4564,7 @@ def _focus_user_preset_item_row(
     path = preset_path or Path("/tmp/projects/my-track/user-preset-0.milk")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("milk", encoding="utf-8")
-    layer.preset_list = [str(path)]
+    layer.preset_list = entries(str(path))
     desc = RowDescriptor(
         RowKind.TRACK_PRESET_LIST_ITEM,
         slot="layer_1",
@@ -5191,7 +5192,7 @@ def test_step_preset_duration_toasts_when_list_too_short() -> None:
     layer.preset_switching = "on"
     layer.preset_switching_trigger = "timer"
     layer.preset_duration = 30.0
-    layer.preset_list = ["a.milk", "b.milk", "c.milk", "d.milk"]
+    layer.preset_list = entries("a.milk", "b.milk", "c.milk", "d.milk")
     noted: list[str] = []
     controls.show_notification = noted.append  # type: ignore[method-assign]
     controls.layer_mutations.step_preset_duration("layer_1", forward=False)
@@ -5204,7 +5205,7 @@ def test_cycle_preset_switching_trigger_toasts_when_list_nonempty() -> None:
     layer = controls.session.layers["layer_1"]
     layer.preset_switching = "on"
     layer.preset_switching_trigger = "timer"
-    layer.preset_list = ["a.milk"]
+    layer.preset_list = entries("a.milk")
     noted: list[str] = []
     controls.show_notification = noted.append  # type: ignore[method-assign]
     controls.layer_mutations.step_preset_switching_trigger("layer_1", delta=1)
@@ -5219,7 +5220,7 @@ def test_cycle_preset_switching_trigger_skips_list_toast_for_timeline_disabled()
     layer = controls.session.layers["layer_1"]
     layer.preset_switching = "on"
     layer.preset_switching_trigger = "projectm"
-    layer.preset_list = ["a.milk"]
+    layer.preset_list = entries("a.milk")
     controls.session.timeline.enabled = False
     noted: list[str] = []
     controls.show_notification = noted.append  # type: ignore[method-assign]

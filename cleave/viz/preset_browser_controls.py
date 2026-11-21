@@ -22,7 +22,7 @@ import pygame
 from cleave.preset_library import PresetLibrary
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.key_repeat import KeyRepeatController, mod_alt, mod_ctrl
-from cleave.viz.layer_mutations import BrowseSnapshot, LayerMutations
+from cleave.viz.layer_mutations import LayerMutations
 from cleave.viz.preset_browser import (
     BrowserAction,
     BrowserOutcome,
@@ -34,7 +34,7 @@ from cleave.viz.preset_browser import (
 )
 from cleave.viz.preset_browser_surface import BrowserPointerIntent, BrowserPointerKind
 from cleave.viz.preset_switching import panel_layer_number
-from cleave.viz.session import TuningSession
+from cleave.viz.session import BrowseSnapshot, TuningSession
 
 PREVIEW_DELAY_SEC = 0.15
 
@@ -168,7 +168,10 @@ class PresetBrowserControls:
             in_list = (
                 layer is not None
                 and not is_preset_curation_mode(self._session.settings.editor_mode)
-                and any(Path(entry).name == path.name for entry in layer.preset_list)
+                and any(
+                    path.name in (entry.file.name, entry.display_name)
+                    for entry in layer.preset_list
+                )
             )
             return self._library.marker(path, in_preset_list=in_list).strip()
 

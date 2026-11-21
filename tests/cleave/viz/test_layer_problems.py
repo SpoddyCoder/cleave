@@ -36,6 +36,7 @@ from cleave.viz.row_specs.track import preset_row_problem
 from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.shell_focus import ShellRegion
 from tests.support.viz import make_controls
+from tests.support.preset_list import entries
 
 GOOD = Path(__file__)
 MISSING = GOOD.parent / "no-such-preset.milk"
@@ -78,7 +79,7 @@ def test_a_bad_list_entry_marks_the_entry_and_the_layer() -> None:
     layer = _layer()
     layer.preset_switching = "on"
     layer.preset_switching_trigger = "timer"
-    layer.preset_list = [str(GOOD), str(MISSING)]
+    layer.preset_list = entries(str(GOOD), str(MISSING))
     session = _session(layer)
     (problem,) = layer_problems(session, "layer_1")
     assert problem.page is ProblemPage.PRESET_LIST
@@ -93,7 +94,7 @@ def test_a_list_where_nothing_can_load_is_a_layer_problem() -> None:
     layer = _layer()
     layer.preset_switching = "on"
     layer.preset_switching_trigger = "timer"
-    layer.preset_list = [str(MISSING), str(GOOD)]
+    layer.preset_list = entries(str(MISSING), str(GOOD))
     session = _session(layer)
     assert _messages(session) == ["1 preset in the preset list can't load"]
     # A failure arriving later is picked up through the revision, not the disk.
@@ -119,7 +120,7 @@ def test_a_missing_or_failed_preset_is_a_problem_only_while_switching_is_off() -
 
     layer.preset_switching = "on"
     layer.preset_switching_trigger = "timer"
-    layer.preset_list = [str(GOOD)]
+    layer.preset_list = entries(str(GOOD))
     assert layer_problems(session, "layer_1") == ()
 
 
@@ -127,7 +128,7 @@ def test_timeline_trigger_needs_the_timeline_on_and_clips_on_the_layer() -> None
     layer = _layer()
     layer.preset_switching = "on"
     layer.preset_switching_trigger = "timeline"
-    layer.preset_list = [str(GOOD)]
+    layer.preset_list = entries(str(GOOD))
     session = _session(layer)
     session.timeline.enabled = False
     assert _messages(session) == [
@@ -150,7 +151,7 @@ def _timeline_layer(clip_starts: tuple[float, ...], presets: int) -> TuningSessi
     layer = _layer()
     layer.preset_switching = "on"
     layer.preset_switching_trigger = "timeline"
-    layer.preset_list = [str(GOOD)] * presets
+    layer.preset_list = entries(GOOD) * presets
     session = _session(layer)
     session.timeline.enabled = True
     cues = []
@@ -231,7 +232,7 @@ def test_a_silent_driving_stem_is_a_problem() -> None:
 
 def test_the_disk_is_read_only_when_a_project_loads() -> None:
     layer = _layer()
-    layer.preset_list = [str(GOOD), str(MISSING)]
+    layer.preset_list = entries(str(GOOD), str(MISSING))
     session = TuningSession(layer_z_order=["layer_1"], layers={"layer_1": layer})
     with patch(
         "cleave.viz.layer_problems.os.path.isfile", side_effect=os.path.isfile
@@ -242,18 +243,18 @@ def test_the_disk_is_read_only_when_a_project_loads() -> None:
             layer_problems(session, "layer_1")
             session.preset_health.list_problems("layer_1", layer)
         # A preset added while editing was picked from disk: never stat'd.
-        layer.preset_list.append(str(GOOD.parent / "added-later.milk"))
+        layer.preset_list.extend(entries(GOOD.parent / "added-later.milk"))
         assert session.preset_health.list_problems("layer_1", layer)[2] is None
         assert isfile.call_count == 2
 
 
 def test_list_problems_are_kept_until_the_list_or_failures_change() -> None:
     layer = _layer()
-    layer.preset_list = [str(MISSING)]
+    layer.preset_list = entries(str(MISSING))
     health = _session(layer).preset_health
     first = health.list_problems("layer_1", layer)
     assert health.list_problems("layer_1", layer) is first
-    layer.preset_list = [str(GOOD)]
+    layer.preset_list = entries(str(GOOD))
     assert health.list_problems("layer_1", layer) == (None,)
 
 
@@ -303,7 +304,7 @@ def test_first_problem_target_is_the_first_bad_list_entry() -> None:
     layer = _layer()
     layer.preset_switching = "on"
     layer.preset_switching_trigger = "timer"
-    layer.preset_list = [str(GOOD), str(MISSING), str(MISSING)]
+    layer.preset_list = entries(str(GOOD), str(MISSING), str(MISSING))
     session = _session(layer)
     assert first_problem_target(session, "layer_1") == ProblemTarget(
         layer_page_node_id("layer_1", "preset_list"),
@@ -316,7 +317,7 @@ def test_warning_toggle_focuses_the_row_of_the_first_problem() -> None:
     layer = controls.session.layers["layer_1"]
     layer.preset_switching = "on"
     layer.preset_switching_trigger = "timer"
-    layer.preset_list = [str(GOOD), str(MISSING)]
+    layer.preset_list = entries(str(GOOD), str(MISSING))
     controls.session.preset_health.check_on_disk(controls.session)
     row_hotkeys.activate_header_toggle(
         controls, TOGGLE_WARN, RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
@@ -332,7 +333,7 @@ def test_warning_toggle_focuses_the_row_of_the_first_problem() -> None:
 def test_view_state_marks_bad_preset_rows() -> None:
     controls = make_controls(("layer_1",))
     layer = controls.session.layers["layer_1"]
-    layer.preset_list = [str(GOOD), str(MISSING)]
+    layer.preset_list = entries(str(GOOD), str(MISSING))
     layer.playlist = PresetPlaylist(current_dir=GOOD.parent, paths=(MISSING,), index=0)
     controls.session.preset_health.check_on_disk(controls.session)
     view = controls.build_view_state(paused=False)

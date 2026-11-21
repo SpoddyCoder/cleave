@@ -52,7 +52,7 @@ class PresetHealth:
             current = layer.playlist.current
             if current is not None:
                 paths.add(os.fspath(current))
-            paths.update(layer.preset_list)
+            paths.update(entry.path for entry in layer.preset_list)
         self.missing = frozenset(
             preset_failure_key(path) for path in paths if not os.path.isfile(path)
         )
@@ -75,7 +75,9 @@ class PresetHealth:
         cached = self._lists.get(slot)
         if cached is not None and cached[0] == key:
             return cached[1]
-        problems = tuple(self.file_problem(layer, path) for path in layer.preset_list)
+        problems = tuple(
+            self.file_problem(layer, entry.file) for entry in layer.preset_list
+        )
         self._lists[slot] = (key, problems)
         return problems
 

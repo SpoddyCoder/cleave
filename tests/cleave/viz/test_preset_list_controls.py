@@ -14,6 +14,9 @@ from cleave.viz.session import LayerRuntime, TuningSession
 from tests.support.viz import keydown, noop_layer_bindings
 
 import pygame
+from tests.support.preset_list import entries
+from cleave.preset_list_entry import PresetListEntry
+from cleave.viz.user_presets import copy_with_dedup
 
 
 def _write(path: Path, content: str) -> None:
@@ -31,7 +34,7 @@ def _make_controller(
     on_notification=None,
     get_active_config_path=None,
     on_focus_preset_item=None,
-    preset_list: list[str] | None = None,
+    preset_list: list[PresetListEntry] | None = None,
     catalog: PresetCatalog = UNFILTERED_CATALOG,
 ) -> tuple[PresetListController, TuningSession, ModalHost]:
     modal_host = modal if modal is not None else ModalHost()
@@ -78,7 +81,7 @@ def test_resolve_file_path_current_and_list_item() -> None:
         _write(listed, "milk")
         controller, _session, _modal = _make_controller(
             preset_root=root,
-            preset_list=[str(listed)],
+            preset_list=entries(str(listed)),
         )
         assert controller.resolve_file_path(
             "layer_1",
@@ -105,13 +108,13 @@ def test_enter_move_mode_and_swap_updates_list_and_focus() -> None:
         b = str(root / "b.milk")
         controller, session, _modal = _make_controller(
             preset_root=root,
-            preset_list=[a, b],
+            preset_list=entries(a, b),
             on_focus_preset_item=lambda slot, index: focused.append((slot, index)),
         )
         controller.enter_move_mode("layer_1", 0)
         assert controller.move_mode_preset == ("layer_1", 0)
         controller.swap_item(1)
-        assert session.layers["layer_1"].preset_list == [b, a]
+        assert session.layers["layer_1"].preset_list == entries(b, a)
         assert controller.move_mode_preset == ("layer_1", 1)
         assert focused == [("layer_1", 1)]
 
@@ -124,22 +127,22 @@ def test_move_item_to_jumps_and_focuses() -> None:
         a, b, c, d = (str(root / f"{name}.milk") for name in "abcd")
         controller, session, _modal = _make_controller(
             preset_root=root,
-            preset_list=[a, b, c, d],
+            preset_list=entries(a, b, c, d),
             on_focus_preset_item=lambda slot, index: focused.append((slot, index)),
         )
         controller.enter_move_mode("layer_1", 0)
         controller.move_item_to(2)
-        assert session.layers["layer_1"].preset_list == [b, c, a, d]
+        assert session.layers["layer_1"].preset_list == entries(b, c, a, d)
         assert controller.move_mode_preset == ("layer_1", 2)
         controller.move_item_to(0)
-        assert session.layers["layer_1"].preset_list == [a, b, c, d]
+        assert session.layers["layer_1"].preset_list == entries(a, b, c, d)
         controller.move_item_to(4)
         controller.move_item_to(-1)
-        assert session.layers["layer_1"].preset_list == [a, b, c, d]
+        assert session.layers["layer_1"].preset_list == entries(a, b, c, d)
         assert focused == [("layer_1", 2), ("layer_1", 0)]
         controller.move_item_to(3)
         controller.cancel_move_mode()
-        assert session.layers["layer_1"].preset_list == [a, b, c, d]
+        assert session.layers["layer_1"].preset_list == entries(a, b, c, d)
 
 
 def test_move_item_to_without_move_mode_is_noop() -> None:
@@ -149,10 +152,10 @@ def test_move_item_to_without_move_mode_is_noop() -> None:
         a, b = str(root / "a.milk"), str(root / "b.milk")
         controller, session, _modal = _make_controller(
             preset_root=root,
-            preset_list=[a, b],
+            preset_list=entries(a, b),
         )
         controller.move_item_to(1)
-        assert session.layers["layer_1"].preset_list == [a, b]
+        assert session.layers["layer_1"].preset_list == entries(a, b)
 
 
 def test_move_item_steps_once_and_focuses() -> None:
@@ -163,15 +166,15 @@ def test_move_item_steps_once_and_focuses() -> None:
         a, b, c = (str(root / f"{name}.milk") for name in "abc")
         controller, session, _modal = _make_controller(
             preset_root=root,
-            preset_list=[a, b, c],
+            preset_list=entries(a, b, c),
             on_focus_preset_item=lambda slot, index: focused.append((slot, index)),
         )
         controller.move_item("layer_1", 0, 1)
-        assert session.layers["layer_1"].preset_list == [b, a, c]
+        assert session.layers["layer_1"].preset_list == entries(b, a, c)
         controller.move_item("layer_1", 0, -1)
         controller.move_item("layer_1", 2, 1)
         controller.move_item("layer_1", 5, -1)
-        assert session.layers["layer_1"].preset_list == [b, a, c]
+        assert session.layers["layer_1"].preset_list == entries(b, a, c)
         assert controller.move_mode_preset is None
         assert focused == [("layer_1", 1)]
 
@@ -184,12 +187,12 @@ def test_cancel_move_mode_restores_original_order() -> None:
         b = str(root / "b.milk")
         controller, session, _modal = _make_controller(
             preset_root=root,
-            preset_list=[a, b],
+            preset_list=entries(a, b),
         )
         controller.enter_move_mode("layer_1", 0)
         controller.swap_item(1)
         controller.cancel_move_mode()
-        assert session.layers["layer_1"].preset_list == [a, b]
+        assert session.layers["layer_1"].preset_list == entries(a, b)
         assert controller.move_mode_preset is None
 
 
@@ -202,7 +205,7 @@ def test_confirm_move_mode_keeps_order_and_notifies_bindings() -> None:
         b = str(root / "b.milk")
         controller, session, _modal = _make_controller(
             preset_root=root,
-            preset_list=[a, b],
+            preset_list=entries(a, b),
             layer_bindings=noop_layer_bindings(
                 on_preset_switching_change=switched.append,
             ),
@@ -210,7 +213,7 @@ def test_confirm_move_mode_keeps_order_and_notifies_bindings() -> None:
         controller.enter_move_mode("layer_1", 0)
         controller.swap_item(1)
         controller.confirm_move_mode()
-        assert session.layers["layer_1"].preset_list == [b, a]
+        assert session.layers["layer_1"].preset_list == entries(b, a)
         assert controller.move_mode_preset is None
         assert switched == ["layer_1"]
 
@@ -298,7 +301,9 @@ def test_add_current_uses_playing_auto_preset_not_browse() -> None:
         assert modal.view_state() is None
         dest = project / "presets" / "later.milk"
         assert dest.is_file()
-        assert session.layers["layer_1"].preset_list == [str(dest.resolve())]
+        assert session.layers["layer_1"].preset_list == [
+            PresetListEntry(str(dest.resolve()), source=str(playing.resolve()))
+        ]
 
 
 def test_add_current_uses_projectm_playlist_position_not_stale_first() -> None:
@@ -324,7 +329,7 @@ def test_add_current_uses_projectm_playlist_position_not_stale_first() -> None:
         controller, session, modal = _make_controller(
             preset_root=root,
             project_dir=project,
-            preset_list=[str(first.resolve()), str(later.resolve())],
+            preset_list=entries(str(first.resolve()), str(later.resolve())),
         )
         controller._layers_by_slot = {"layer_1": stem}
         session.layers["layer_1"].auto_preset_path = first.resolve()
@@ -351,7 +356,9 @@ def test_add_current_copies_into_user_presets() -> None:
         assert modal.view_state() is None
         dest = project / "presets" / "demo.milk"
         assert dest.is_file()
-        assert session.layers["layer_1"].preset_list == [str(dest.resolve())]
+        assert session.layers["layer_1"].preset_list == [
+            PresetListEntry(str(dest.resolve()), source=str(src.resolve()))
+        ]
         assert switched == ["layer_1"]
 
 
@@ -365,7 +372,7 @@ def test_confirm_delete_unlinks_unreferenced_user_preset() -> None:
         controller, session, _modal = _make_controller(
             preset_root=root,
             project_dir=project,
-            preset_list=[str(dest.resolve())],
+            preset_list=entries(str(dest.resolve())),
             get_active_config_path=lambda: None,
         )
         controller.confirm_delete("layer_1", 0)
@@ -456,7 +463,7 @@ def test_audition_pauses_switching_and_resume_clears_it() -> None:
         _write(other, "milk")
         controller, session, _modal = _make_controller(
             preset_root=root,
-            preset_list=[str(other.resolve())],
+            preset_list=entries(str(other.resolve())),
         )
         stem, pm, seen = _bind_live_layer(controller, session, root)
         controller.audition("layer_1", 5)
@@ -493,7 +500,7 @@ def test_populate_keeps_the_preview() -> None:
         controller, session, _modal = _make_controller(
             preset_root=root,
             project_dir=project,
-            preset_list=[str((root / "pack" / "other.milk").resolve())],
+            preset_list=entries(str((root / "pack" / "other.milk").resolve())),
         )
         stem, _pm, _seen = _bind_live_layer(controller, session, root)
         controller.audition("layer_1", 0)
@@ -514,7 +521,7 @@ def test_preset_list_edits_keep_the_preview() -> None:
         controller, session, _modal = _make_controller(
             preset_root=root,
             project_dir=project,
-            preset_list=[str(other.resolve()), str(demo.resolve())],
+            preset_list=entries(str(other.resolve()), str(demo.resolve())),
         )
         stem, _pm, _seen = _bind_live_layer(controller, session, root)
         controller.audition("layer_1", 0)
@@ -569,7 +576,7 @@ def test_auditioning_the_scheduled_entry_does_not_preview() -> None:
 
     controls = make_controls(("layer_1",))
     layer = controls.session.layers["layer_1"]
-    layer.preset_list = ["/tmp/a.milk", "/tmp/b.milk"]
+    layer.preset_list = entries("/tmp/a.milk", "/tmp/b.milk")
     layer.switching_list_index = 1
     seen: list[tuple[str, str]] = []
     controls.preset_list._layer_bindings = noop_layer_bindings(
@@ -585,3 +592,46 @@ def test_auditioning_the_scheduled_entry_does_not_preview() -> None:
 
     controls.preset_list.audition("layer_1", 0)
     assert seen[-1] == ("change", "layer_1")
+
+
+def _copied_entry(tmp: str) -> tuple[Path, Path, PresetListEntry]:
+    root = Path(tmp) / "packs"
+    src = root / "pack" / "other.milk"
+    _write(root / "pack" / "demo.milk", "milk")
+    _write(src, "other")
+    entry = copy_with_dedup(Path(tmp) / "project" / "presets", src)
+    return root, src, entry
+
+
+def test_audition_browses_the_folder_the_preset_came_from() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root, src, entry = _copied_entry(tmp)
+        controller, session, _modal = _make_controller(
+            preset_root=root, preset_list=[entry]
+        )
+        controller.audition("layer_1", 0)
+        playlist = session.layers["layer_1"].playlist
+        assert playlist.current == src.resolve()
+        assert playlist.current_dir == src.parent.resolve()
+
+
+def test_audition_browses_the_copy_once_the_original_changes() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root, src, entry = _copied_entry(tmp)
+        src.write_text("edited", encoding="utf-8")
+        controller, session, _modal = _make_controller(
+            preset_root=root, preset_list=[entry]
+        )
+        controller.audition("layer_1", 0)
+        assert session.layers["layer_1"].playlist.current == entry.file
+
+
+def test_add_current_from_the_project_folder_keeps_no_source() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root, _src, entry = _copied_entry(tmp)
+        controller, session, _modal = _make_controller(
+            preset_root=root, project_dir=Path(tmp) / "project"
+        )
+        session.layers["layer_1"].auto_preset_path = entry.file
+        controller.add_current("layer_1")
+        assert session.layers["layer_1"].preset_list == [PresetListEntry(entry.path)]

@@ -11,6 +11,7 @@ from cleave.viz.layer import StemLayer
 from cleave.viz.session import LayerRuntime, TimelineRuntime, TuningSession
 from cleave.viz.wiring import make_tuning_controls
 from tests.support.viz import make_test_cfg, stub_playback_state
+from tests.support.preset_list import entries
 
 _MILK = (
     Path("/tmp/presets/layer_1/a.milk"),
@@ -44,7 +45,7 @@ def _session(
                 preset_list=list(
                     preset_list
                     if preset_list is not None
-                    else [str(p) for p in _MILK]
+                    else entries(*_MILK)
                 ),
             )
         },

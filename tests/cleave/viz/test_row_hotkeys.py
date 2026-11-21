@@ -23,6 +23,7 @@ from tests.support.viz import (
     make_controls,
     make_controls_with_manager,
 )
+from tests.support.preset_list import entries
 
 
 _LAYER_DELETE = "Delete layer"
@@ -145,7 +146,7 @@ def test_inspector_preset_item_delete_and_move_stay_on_the_item() -> None:
     layer = controls.session.layers["layer_1"]
     layer.preset_switching = "on"
     layer.preset_switching_trigger = "timer"
-    layer.preset_list = ["/tmp/presets/a.milk", "/tmp/presets/b.milk"]
+    layer.preset_list = entries("/tmp/presets/a.milk", "/tmp/presets/b.milk")
     item = RowDescriptor(
         RowKind.TRACK_PRESET_LIST_ITEM, slot="layer_1", preset_index=0
     )
@@ -236,7 +237,7 @@ def test_section_lock_inspector_refuses_edits_and_delete_still_prompts() -> None
     layer = controls.session.layers["layer_1"]
     layer.locked = True
     layer.preset_switching_trigger = "timer"
-    layer.preset_list = ["/tmp/presets/a.milk", "/tmp/presets/b.milk"]
+    layer.preset_list = entries("/tmp/presets/a.milk", "/tmp/presets/b.milk")
     runtime = _runtime(controls)
     opacity = RowDescriptor(RowKind.TRACK_OPACITY, slot="layer_1")
     _focus_inspector(controls, "layer_1", opacity)
@@ -251,7 +252,7 @@ def test_section_lock_inspector_refuses_edits_and_delete_still_prompts() -> None
     assert controls.modal_host.view_state() is None
     preset_row = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
     assert apply_field_nav_button(controls, preset_row, 0) is False
-    assert layer.preset_list == ["/tmp/presets/a.milk", "/tmp/presets/b.milk"]
+    assert layer.preset_list == entries("/tmp/presets/a.milk", "/tmp/presets/b.milk")
 
     item = RowDescriptor(
         RowKind.TRACK_PRESET_LIST_ITEM, slot="layer_1", preset_index=0

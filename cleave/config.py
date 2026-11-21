@@ -18,6 +18,7 @@ _YAML_DUMP_WIDTH = 2**31 - 1
 
 from cleave.blend_modes import BlendMode
 from cleave.paths import default_preset_root, default_texture_paths, resource_dir
+from cleave.preset_list_entry import PresetListEntry
 from cleave.effects.constants import clamp_effect_pct
 from cleave.stems import StemSource
 from cleave.project import (
@@ -184,7 +185,7 @@ class LayerConfig:
     hard_cut_enabled: bool = DEFAULT_HARD_CUT_ENABLED
     easter_egg: float = DEFAULT_EASTER_EGG
     preset_start_clean: bool = DEFAULT_PRESET_START_CLEAN
-    preset_switching_list: list[Path] = field(default_factory=list)
+    preset_switching_list: list[PresetListEntry] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

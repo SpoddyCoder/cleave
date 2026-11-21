@@ -15,6 +15,7 @@ from cleave.config_schema.validators import parse_blend_mode
 from cleave.effects.constants import clamp_effect_pct
 from cleave.effects.registry import validate_effect_entry
 from cleave.paths import config_anchor_path, config_relative_path
+from cleave.preset_list_entry import PresetListEntry
 from cleave.stems import STEM_SOURCES, StemSource
 
 PresetSwitchingMode = Literal["off", "on"]
@@ -193,7 +194,7 @@ def _parse_preset_switching_list(
     slot: str,
     layer_raw: dict[str, Any],
     ctx: ParseCtx,
-) -> list[Path]:
+) -> list[PresetListEntry]:
     raw = layer_raw.get("preset_switching_list")
     if raw is None:
         return []
@@ -205,14 +206,28 @@ def _parse_preset_switching_list(
             stacklevel=2,
         )
         return []
-    presets: list[Path] = []
-    for index, entry in enumerate(raw):
-        if not isinstance(entry, str):
-            raise ValueError(
-                f"layers.{slot}.preset_switching_list[{index}] must be a string"
+    entries: list[PresetListEntry] = []
+    for index, item in enumerate(raw):
+        where = f"layers.{slot}.preset_switching_list[{index}]"
+        if not isinstance(item, dict):
+            raise ValueError(f"{where} must be a mapping with a path")
+        path = item.get("path")
+        if not isinstance(path, str):
+            raise ValueError(f"{where}.path must be a string")
+        source = item.get("source")
+        if source is not None and not isinstance(source, str):
+            raise ValueError(f"{where}.source must be a string")
+        entries.append(
+            PresetListEntry(
+                path=resolve_user_preset(path, ctx.cfg_dir).as_posix(),
+                source=(
+                    Path(os.path.expanduser(source)).as_posix()
+                    if source is not None
+                    else None
+                ),
             )
-        presets.append(resolve_user_preset(entry, ctx.cfg_dir))
-    return presets
+        )
+    return entries
 
 
 def parse_layer_z_order_section(data: dict[str, Any], ctx: ParseCtx) -> list[str]:
@@ -376,6 +391,20 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
     return layers
 
 
+def _persist_preset_list_entry(
+    entry: PresetListEntry, cfg_dir: Path | None
+) -> dict[str, str]:
+    path = (
+        entry.file.as_posix()
+        if cfg_dir is None
+        else config_relative_path(entry.file, cfg_dir)
+    )
+    out = {"path": path}
+    if entry.source is not None:
+        out["source"] = entry.source
+    return out
+
+
 def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
     preset_root = ctx.cfg.paths.preset_root
     layers_out: dict[str, dict[str, Any]] = {}
@@ -404,7 +433,7 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
         hard_cut_enabled = runtime.hard_cut_enabled
         easter_egg = runtime.easter_egg
         preset_start_clean = runtime.preset_start_clean
-        preset_switching_list = [Path(path) for path in runtime.preset_list]
+        preset_switching_list = list(runtime.preset_list)
 
         layer_out: dict[str, Any] = {
             "stem": stem,
@@ -439,15 +468,10 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
         if preset_start_clean != DEFAULT_PRESET_START_CLEAN:
             layer_out["preset_start_clean"] = preset_start_clean
         if preset_switching_list:
-            if ctx.cfg_dir is None:
-                layer_out["preset_switching_list"] = [
-                    path.as_posix() for path in preset_switching_list
-                ]
-            else:
-                layer_out["preset_switching_list"] = [
-                    config_relative_path(path, ctx.cfg_dir)
-                    for path in preset_switching_list
-                ]
+            layer_out["preset_switching_list"] = [
+                _persist_preset_list_entry(entry, ctx.cfg_dir)
+                for entry in preset_switching_list
+            ]
         layers_out[slot] = layer_out
 
     return layers_out

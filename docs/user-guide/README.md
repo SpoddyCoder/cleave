@@ -266,7 +266,7 @@ Picking a preset yourself while switching is on, in the preset browser or with E
 - a yellow pause icon shows on the layer's row in the navigator and in the icon line under the title of each of the layer's pages;
 - the preset list keeps highlighting the entry scheduled for this point in the song, not the one you are looking at.
 
-Editing the list or the Preset Switching settings keeps the preview on screen. To end it, click the pause icon (or **Resume switching** on the Preset Switching page). The layer jumps straight to the entry it would be showing had you never previewed, and a notification confirms that switching has resumed. If you had a list entry selected, the selection moves to the scheduled entry, so you can see where switching picked up:
+Editing the list or the Preset Switching settings keeps the preview on screen. To end it, click the pause icon (or **Resume switching** on the Preset Switching page). The layer jumps straight to the entry it would be showing had you never previewed, the preset directory row goes back to the folder it showed before you started browsing, and a notification confirms that switching has resumed. If you had a list entry selected, the selection moves to the scheduled entry, so you can see where switching picked up:
 
 - **timer and timeline triggers:** the entry for the current song position, so your clips play their chosen presets in order.
 - **projectm trigger:** the entry that was playing when the preview started, since projectM's own timing can't be worked out ahead of time.
@@ -281,6 +281,8 @@ The **Preset List** page holds the presets the layer cycles through, in order. I
 - **Drag** an entry's handle, or press M, to reorder it, and press **Delete** to remove it.
 
 All of these are also in the entry's context menu.
+
+Cleave keeps a copy of every preset in the list inside the project, so the project plays the same on another computer or after the original pack changes. The list still shows each preset under its own name, and previewing an entry takes the preset rows to the folder it came from, so the arrows and the preset browser carry on from there. If that file has since been moved, deleted, or edited, the preview shows the project's own copy instead, in the project's presets folder.
 
 ![Right-click menu on a preset list entry](images/preset-list-menu.png)
 

@@ -40,6 +40,7 @@ from cleave.config_schema.render import parse_render_section
 from cleave.config_schema.timeline import parse_timeline_section
 from cleave.paths import resource_dir
 from cleave.project import CompositorSettings, MilkdropSettings, write_manifest
+from cleave.preset_list_entry import PresetListEntry
 from tests.support.config import (
     TEST_LAYER_STEMS,
     default_post_fx_config,
@@ -1633,13 +1634,17 @@ def test_load_config_snapshot_resolves_switching_list_and_manifest_from_project(
     cfg = load_config(config_path, project_dir)
     session = session_from_cfg(cfg, _round_trip_playlists(pack_root))
     session.layers["layer_1"].preset_switching = "on"
-    session.layers["layer_1"].preset_list = [str(foo.resolve())]
+    session.layers["layer_1"].preset_list = [
+        PresetListEntry(str(foo.resolve()), source="/packs/foo.milk")
+    ]
 
     snapshot_path = project_dir / "cleave-render-snapshot.yaml"
     write_session_snapshot(snapshot_path, cfg=cfg, session=session)
 
     loaded = load_config(snapshot_path, project_dir)
-    assert loaded.layers["layer_1"].preset_switching_list == [foo.resolve()]
+    assert loaded.layers["layer_1"].preset_switching_list == [
+        PresetListEntry(foo.resolve().as_posix(), source="/packs/foo.milk")
+    ]
     assert loaded.milkdrop_beat_sensitivity == manifest_beat
     assert loaded.compositor_hdr is manifest_hdr
 
@@ -1647,9 +1652,11 @@ def test_load_config_snapshot_resolves_switching_list_and_manifest_from_project(
     tmp_copy.parent.mkdir()
     tmp_copy.write_text(snapshot_path.read_text(encoding="utf-8"), encoding="utf-8")
     loaded_tmp = load_config(tmp_copy, resource_dir())
-    assert foo.resolve() not in loaded_tmp.layers["layer_1"].preset_switching_list
     assert loaded_tmp.layers["layer_1"].preset_switching_list == [
-        (tmp_copy.parent / "presets" / "foo.milk").resolve()
+        PresetListEntry(
+            (tmp_copy.parent / "presets" / "foo.milk").resolve().as_posix(),
+            source="/packs/foo.milk",
+        )
     ]
     assert loaded_tmp.milkdrop_beat_sensitivity == DEFAULT_BEAT_SENSITIVITY
     assert loaded_tmp.compositor_hdr is DEFAULT_COMPOSITOR_HDR

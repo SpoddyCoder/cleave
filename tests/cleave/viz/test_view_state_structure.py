@@ -9,6 +9,7 @@ from cleave.viz.inspector import build_inspector_rows
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.tuning_view_state import view_state_structure_signature
 from tests.support.viz import make_controls
+from tests.support.preset_list import entries
 
 
 def test_structure_signature_stable_for_fps_and_focus() -> None:
@@ -398,7 +399,7 @@ def test_builder_syncs_playing_list_preset_from_projectm_position() -> None:
     layer.preset_switching_trigger = "projectm"
     a = Path("/tmp/presets/list-a.milk").resolve()
     b = Path("/tmp/presets/list-b.milk").resolve()
-    layer.preset_list = [str(a), str(b)]
+    layer.preset_list = entries(str(a), str(b))
     layer.auto_preset_path = a
 
     stem = MagicMock(spec=StemLayer)
@@ -554,7 +555,7 @@ def test_builder_appends_curation_markers_without_structure_change() -> None:
     user_path = Path("/tmp/projects/my-track/user.milk")
     user_path.parent.mkdir(parents=True, exist_ok=True)
     user_path.write_text("milk", encoding="utf-8")
-    layer.preset_list = [str(user_path)]
+    layer.preset_list = entries(str(user_path))
 
     sig_before = view_state_structure_signature(
         session, config_save)
@@ -582,6 +583,30 @@ def test_builder_appends_curation_markers_without_structure_change() -> None:
     assert block_after.preset_list_markers == ["[F] [B]"]
 
 
+def test_builder_highlights_a_list_entry_previewed_from_its_original() -> None:
+    from cleave.preset_list_entry import PresetListEntry
+
+    controls = make_controls(("layer_1",))
+    layer = controls.session.layers["layer_1"]
+    layer.preset_switching = "on"
+    layer.preset_switching_trigger = "timer"
+    current = layer.playlist.current
+    assert current is not None
+    layer.preset_list = [
+        PresetListEntry("/tmp/projects/my-track/presets/other.milk"),
+        PresetListEntry(
+            "/tmp/projects/my-track/presets/copy_2.milk",
+            source=str(current.resolve()),
+        ),
+    ]
+    view = controls.build_view_state(paused=False)
+    assert view.tracks["layer_1"].active_preset_list_index == 1
+    assert view.tracks["layer_1"].preset_list_labels == [
+        "other.milk",
+        current.name,
+    ]
+
+
 def test_builder_marks_current_preset_in_this_layers_preset_list() -> None:
     controls = make_controls(("layer_1", "layer_2"))
     session = controls.session
@@ -600,12 +625,12 @@ def test_builder_marks_current_preset_in_this_layers_preset_list() -> None:
     listed.write_text("milk", encoding="utf-8")
 
     # Listed on another layer only: no [L] here.
-    layer_2.preset_list = [str(listed)]
+    layer_2.preset_list = entries(str(listed))
     view = controls.build_view_state(paused=False)
     assert view.tracks["layer_1"].preset_markers == ""
     assert view.tracks["layer_2"].preset_list_markers == [""]
 
-    layer_1.preset_list = [str(listed)]
+    layer_1.preset_list = entries(str(listed))
     sig_before = view_state_structure_signature(session, config_save)
     view = controls.build_view_state(paused=False)
     assert view.tracks["layer_1"].preset_label == current_name
@@ -629,7 +654,7 @@ def test_builder_caches_preset_list_base_labels(monkeypatch) -> None:
     user_path = Path("/tmp/projects/my-track/user.milk")
     user_path.parent.mkdir(parents=True, exist_ok=True)
     user_path.write_text("milk", encoding="utf-8")
-    layer.preset_list = [str(user_path)]
+    layer.preset_list = entries(str(user_path))
 
     calls: list[int] = []
     original = __import__(
@@ -665,7 +690,7 @@ def test_structure_signature_invalidates_on_preset_list_change() -> None:
     layer = session.layers["layer_1"]
     sig_before = view_state_structure_signature(
         session, config_save)
-    layer.preset_list = ["/tmp/a.milk"]
+    layer.preset_list = entries("/tmp/a.milk")
     sig_after = view_state_structure_signature(
         session, config_save)
     assert sig_before != sig_after
@@ -676,7 +701,7 @@ def test_structure_signature_uses_digest_not_full_paths() -> None:
     session = controls.session
     layer = session.layers["layer_1"]
     long_path = "/tmp/projects/my-track/very-long-directory-name/preset.milk"
-    layer.preset_list = [long_path]
+    layer.preset_list = entries(long_path)
     sig = view_state_structure_signature(
         session, controls._config_save)
     assert long_path not in sig
@@ -689,7 +714,7 @@ def test_structure_signature_stable_for_long_preset_list() -> None:
     session = controls.session
     config_save = controls._config_save
     layer = session.layers["layer_1"]
-    layer.preset_list = [f"/tmp/preset-{i}.milk" for i in range(40)]
+    layer.preset_list = entries(f"/tmp/preset-{i}.milk" for i in range(40))
     sig_a = view_state_structure_signature(
         session, config_save)
     sig_b = view_state_structure_signature(
@@ -701,7 +726,7 @@ def test_builder_caches_labels_across_idle_builds(monkeypatch) -> None:
     controls = make_controls(("layer_1",))
     session = controls.session
     layer = session.layers["layer_1"]
-    layer.preset_list = [f"/tmp/preset-{i}.milk" for i in range(40)]
+    layer.preset_list = entries(f"/tmp/preset-{i}.milk" for i in range(40))
 
     calls: list[int] = []
     original = __import__(
@@ -784,9 +809,9 @@ def test_structure_signature_invalidates_on_preset_list_reorder_in_place() -> No
     session = controls.session
     config_save = controls._config_save
     layer = session.layers["layer_1"]
-    layer.preset_list = ["/tmp/a.milk", "/tmp/b.milk"]
+    layer.preset_list = entries("/tmp/a.milk", "/tmp/b.milk")
     sig_before = view_state_structure_signature(session, config_save)
-    layer.preset_list[:] = ["/tmp/b.milk", "/tmp/a.milk"]
+    layer.preset_list[:] = entries("/tmp/b.milk", "/tmp/a.milk")
     sig_after = view_state_structure_signature(session, config_save)
     assert sig_before != sig_after
 

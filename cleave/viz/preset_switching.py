@@ -18,6 +18,7 @@ from cleave.config_schema.layers import (
     PresetSwitchingMode,
     PresetSwitchingTrigger,
 )
+from cleave.preset_list_entry import PresetListEntry, entry_paths
 from cleave.preset_rotation import PresetRotation
 from cleave.projectm import ProjectM
 from cleave.projectm_playlist import ProjectMPlaylist
@@ -80,8 +81,8 @@ def _timeline_list_index(on_transition_count: int) -> int:
     return max(0, int(on_transition_count) - 1)
 
 
-def _preset_paths(preset_list: list[str] | None) -> list[Path]:
-    return [Path(path) for path in (preset_list or [])]
+def _preset_paths(preset_list: list[PresetListEntry] | None) -> list[Path]:
+    return entry_paths(preset_list or [])
 
 
 def reapply_projectm_preset_switching(
@@ -139,7 +140,7 @@ def apply_preset_switching(
     *,
     mode: PresetSwitchingMode,
     trigger: PresetSwitchingTrigger = DEFAULT_PRESET_SWITCHING_TRIGGER,
-    preset_list: list[str] | None = None,
+    preset_list: list[PresetListEntry] | None = None,
     preset_duration: float = DEFAULT_PRESET_DURATION,
     soft_cut_duration: float = DEFAULT_SOFT_CUT_DURATION,
     easter_egg: float = DEFAULT_EASTER_EGG,
@@ -279,7 +280,7 @@ def _apply_indexed_list_switching(
 def rebuild_list_rotation_preserving_index(
     layer: StemLayer,
     *,
-    preset_list: list[str] | None = None,
+    preset_list: list[PresetListEntry] | None = None,
     preset_start_clean: bool = DEFAULT_PRESET_START_CLEAN,
 ) -> None:
     """Rebuild list rotation; keep the switch index."""

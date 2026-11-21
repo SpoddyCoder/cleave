@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import shutil
 from collections.abc import Callable
 from pathlib import Path
 
 from cleave.preset_library import UNFILTERED_CATALOG, PresetCatalog
+from cleave.preset_list_entry import PresetListEntry
 from cleave.preset_playlist import scan_preset_playlist
 from cleave.viz.layer import StemLayer
 from cleave.viz.live_layer_bindings import LiveLayerBindings
@@ -29,8 +29,9 @@ from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.session import TuningSession
 from cleave.viz.user_presets import (
     USER_PRESETS_DIRNAME,
+    copy_with_dedup,
     preset_list_item_display_name,
-    resolve_user_preset_dest,
+    preview_anchor,
     user_preset_referenced_on_disk,
 )
 
@@ -69,7 +70,7 @@ class PresetListController:
         self._on_move_preset_selection = on_move_preset_selection
         self._layers_by_slot = layers_by_slot
         self.move_mode_preset: tuple[str, int] | None = None
-        self._move_mode_original_preset_list: list[str] | None = None
+        self._move_mode_original_preset_list: list[PresetListEntry] | None = None
 
     def current_preset_path(self, slot: str) -> Path | None:
         """Playing auto-switch preset when set, otherwise the browse selection."""
@@ -94,7 +95,7 @@ class PresetListController:
             index = desc.preset_index
             if index is None or index < 0 or index >= len(layer.preset_list):
                 return None
-            return Path(layer.preset_list[index])
+            return layer.preset_list[index].file
         return None
 
     def enter_move_mode(self, slot: str, index: int) -> None:
@@ -353,7 +354,8 @@ class PresetListController:
                 self.resume(slot)
             return
         playlist = scan_preset_playlist(
-            Path(layer.preset_list[index]), catalog=layer.playlist.catalog
+            preview_anchor(layer.preset_list[index]),
+            catalog=layer.playlist.catalog,
         )
         layer.playlist = playlist
         if self._layer_bindings is not None:
@@ -366,11 +368,9 @@ class PresetListController:
         dest_dir = self._user_presets_dir()
         if dest_dir is None:
             return
-        dest_dir.mkdir(parents=True, exist_ok=True)
-        dest_path, needs_copy = resolve_user_preset_dest(dest_dir, src_path)
-        if needs_copy:
-            shutil.copy2(src_path, dest_path)
-        self.session.layers[slot].preset_list.append(str(dest_path.resolve()))
+        self.session.layers[slot].preset_list.append(
+            copy_with_dedup(dest_dir, src_path)
+        )
         if self._layer_bindings is not None:
             self._layer_bindings.on_preset_switching_change(slot)
         if self._on_notification is not None:
@@ -399,7 +399,7 @@ class PresetListController:
         if index < 0 or index >= len(layer.preset_list):
             return
         removed = layer.preset_list.pop(index)
-        removed_path = Path(removed).resolve()
+        removed_path = removed.file.resolve()
         presets_dir = self._user_presets_dir()
         if presets_dir is not None:
             try:
@@ -407,7 +407,7 @@ class PresetListController:
             except ValueError:
                 pass
             else:
-                still_needed = self._preset_list_path_referenced(removed)
+                still_needed = self._preset_list_path_referenced(removed_path)
                 if not still_needed and self.project_dir is not None:
                     skip_config = (
                         self._get_active_config_path()
@@ -429,11 +429,10 @@ class PresetListController:
             return None
         return self.project_dir / USER_PRESETS_DIRNAME
 
-    def _preset_list_path_referenced(self, path: str) -> bool:
-        target = Path(path).resolve()
+    def _preset_list_path_referenced(self, target: Path) -> bool:
         for layer in self.session.layers.values():
             for other in layer.preset_list:
-                if Path(other).resolve() == target:
+                if other.file.resolve() == target:
                     return True
         return False
 

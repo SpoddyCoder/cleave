@@ -29,6 +29,7 @@ from tests.support.viz import (
     keydown,
     make_controls,
 )
+from tests.support.preset_list import entries
 
 
 _SLOTS = tuple(f"layer_{i}" for i in range(1, 9))
@@ -163,7 +164,9 @@ def _long_preset_page():
     controls = make_controls(_SLOTS)
     block = controls.session.layers["layer_1"]
     block.preset_switching_trigger = "timer"
-    block.preset_list = [f"/tmp/presets/layer_1/preset-{i}.milk" for i in range(60)]
+    block.preset_list = entries(
+        *(f"/tmp/presets/layer_1/preset-{i}.milk" for i in range(60))
+    )
     controls.navigator.select(
         layer_page_node_id("layer_1", LAYER_PAGE_PRESET_LIST)
     )
