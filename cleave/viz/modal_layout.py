@@ -253,6 +253,20 @@ def form_value_offset(measure: TextMeasure, rows: tuple[FormRowView, ...]) -> in
     return widest + form_label_gap()
 
 
+def form_value_x(
+    measure: TextMeasure, rows: tuple[FormRowView, ...], content_w: int
+) -> int:
+    """Where the value column starts in a form *content_w* wide: as far right
+    as lets the widest control end at the content's right edge, and never
+    nearer the labels than ``form_value_offset``. A panel widened by its title,
+    buttons, or minimum width puts the spare room between labels and values,
+    not after the values.
+    """
+    offset = form_value_offset(measure, rows)
+    widest = max((form_control_width(measure, row) for row in rows), default=0)
+    return max(offset, content_w - widest)
+
+
 def measure_form(
     measure: TextMeasure,
     state: ModalViewState,

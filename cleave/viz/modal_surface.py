@@ -48,7 +48,7 @@ from cleave.viz.modal_layout import (
     form_heading_height,
     form_row_height,
     form_row_pad_y,
-    form_value_offset,
+    form_value_x,
     form_section_indent,
     lines_block_height,
     measure_button_row,
@@ -470,7 +470,7 @@ def _draw_form_rows(
     held_row, held_step = view.form_step_held or (None, None)
     left = ox + panel_pad_x()
     right = ox + panel_w - panel_pad_x()
-    value_x = left + form_value_offset(measure, view.form_rows)
+    value_x = left + form_value_x(measure, view.form_rows, right - left)
     for index, row in enumerate(view.form_rows):
         if row.heading is not None:
             heading_h = form_heading_height(line_h, first=index == 0)

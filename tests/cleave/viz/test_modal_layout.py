@@ -15,7 +15,9 @@ from cleave.viz.modal_layout import (
     caret_index_at_point,
     form_label_gap,
     form_section_indent,
+    form_control_width,
     form_value_offset,
+    form_value_x,
     measure_labeled_lines,
     measure_panel,
     measure_text_panel,
@@ -254,3 +256,15 @@ def test_form_values_start_in_one_column_past_the_widest_label() -> None:
     )
     widest = max(100, form_section_indent() + 30)
     assert form_value_offset(measure, rows) == widest + form_label_gap()
+
+
+def test_form_values_move_right_so_the_widest_ends_at_the_edge() -> None:
+    measure = _FixedMeasure()
+    rows = (
+        FormRowView("cut type", ChoiceKind.SEGMENT, ("hard", "soft"), 0, False),
+        FormRowView("fps", ChoiceKind.SEGMENT, ("30", "60"), 0, False),
+    )
+    widest = max(form_control_width(measure, row) for row in rows)
+    offset = form_value_offset(measure, rows)
+    assert form_value_x(measure, rows, offset + widest + 200) == offset + 200
+    assert form_value_x(measure, rows, offset + widest - 50) == offset
