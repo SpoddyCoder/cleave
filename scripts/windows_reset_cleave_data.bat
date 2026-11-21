@@ -31,11 +31,20 @@ if not defined STAMP (
     goto :fail
 )
 
+rem Without these, the folders below would resolve to \Cleave on the
+rem current drive, which is not Cleave's.
+if not defined APPDATA goto :no_appdata
+if not defined LOCALAPPDATA goto :no_appdata
+
 set "DATA_DIR=%DOCS%\Cleave"
 if defined CLEAVE_DATA set "DATA_DIR=%CLEAVE_DATA%"
 set "SETTINGS_DIR=%APPDATA%\Cleave"
 set "LOCAL_DIR=%LOCALAPPDATA%\Cleave"
 set "BACKUP=%DESKTOP%\Cleave-backup-%STAMP%"
+
+call :guard "%DATA_DIR%" || goto :fail
+call :guard "%SETTINGS_DIR%" || goto :fail
+call :guard "%LOCAL_DIR%" || goto :fail
 
 echo.
 echo Cleave folders found:
@@ -107,6 +116,39 @@ echo   %~1
 rmdir /S /Q "%~1"
 if exist "%~1\" set "LEFT=1"
 exit /b 0
+
+:guard
+rem Refuse a folder whose deletion would take far more than Cleave's data:
+rem a drive root, or a known folder such as the profile or Documents.
+rem CLEAVE_DATA is the usual way to get here.
+set "GUARD=%~f1"
+if "%GUARD:~-1%"=="\" set "GUARD=%GUARD:~0,-1%"
+if "%~pnx1"=="\" goto :guard_refuse
+call :guard_known "%USERPROFILE%" || goto :guard_refuse
+call :guard_known "%DOCS%" || goto :guard_refuse
+call :guard_known "%DESKTOP%" || goto :guard_refuse
+call :guard_known "%APPDATA%" || goto :guard_refuse
+call :guard_known "%LOCALAPPDATA%" || goto :guard_refuse
+call :guard_known "%SystemRoot%" || goto :guard_refuse
+exit /b 0
+
+:guard_known
+rem %1 a known folder. Fails when it is the folder :guard is checking.
+rem An empty %1 would expand to the current folder, so skip it.
+if "%~1"=="" exit /b 0
+set "KNOWN=%~f1"
+if "%KNOWN:~-1%"=="\" set "KNOWN=%KNOWN:~0,-1%"
+if /I "%GUARD%"=="%KNOWN%" exit /b 1
+exit /b 0
+
+:guard_refuse
+echo Refusing to delete %GUARD%.
+echo Check CLEAVE_DATA in your environment variables.
+exit /b 1
+
+:no_appdata
+echo APPDATA or LOCALAPPDATA is not set, so the Cleave folders cannot be found.
+goto :fail
 
 :backup_failed
 echo.
