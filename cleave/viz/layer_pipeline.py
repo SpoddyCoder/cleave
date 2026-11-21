@@ -371,7 +371,9 @@ class LayerFramePipeline:
         preview_resolutions: bool = True,
         viz_quality: bool = False,
         project_dir: Path | None = None,
+        on_layer_built: Callable[[int, int], None] | None = None,
     ) -> tuple[list[StemLayer], dict[str, StemLayer]]:
+        """Build every layer in z-order; *on_layer_built* gets (done, total)."""
         texture_paths = list(cfg.paths.texture_paths)
         if project_dir is not None:
             texture_paths = project_texture_search_paths(project_dir, texture_paths)
@@ -408,6 +410,8 @@ class LayerFramePipeline:
                     preset_root=preset_root,
                 )
             )
+            if on_layer_built is not None:
+                on_layer_built(len(runtimes), len(z_order))
 
         layers_by_slot = {layer.slot: layer for layer in runtimes}
         if preview_resolutions:

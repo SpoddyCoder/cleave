@@ -177,6 +177,26 @@ def test_build_preview_resolutions_false_uses_render_output_size(
 
 
 @patch.object(LayerFramePipeline, "build_single")
+def test_build_reports_each_layer_built(build_single: MagicMock) -> None:
+    slots = ("layer_1", "layer_2", "layer_3")
+    layers = {slot: _stem_layer(slot) for slot in slots}
+    build_single.side_effect = lambda slot, *_args, **_kwargs: layers[slot]
+    progress: list[tuple[int, int]] = []
+
+    LayerFramePipeline.build(
+        make_test_cfg(slots),
+        MagicMock(),
+        {slot: layers[slot].playlist for slot in slots},
+        _session(slots),
+        projectm_fps=30,
+        preview_resolutions=False,
+        on_layer_built=lambda done, total: progress.append((done, total)),
+    )
+
+    assert progress == [(1, 3), (2, 3), (3, 3)]
+
+
+@patch.object(LayerFramePipeline, "build_single")
 def test_build_preview_resolutions_false_uses_output_size_at_mismatched_aspect(
     build_single: MagicMock,
 ) -> None:

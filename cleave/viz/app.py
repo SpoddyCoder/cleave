@@ -246,13 +246,13 @@ def init_gl_resources_heavy(
     post_process: GlPostProcess,
     masked_compositor: GlMaskedCompositor,
     overlay_surface: pygame.Surface,
-    on_progress: Callable[[str], None] | None = None,
+    on_progress: Callable[[str, float | None], None] | None = None,
 ) -> LiveVisualizerRuntime:
-    def report(message: str) -> None:
+    def report_layers(done: int, total: int) -> None:
         if on_progress is not None:
-            on_progress(message)
+            on_progress("Building layers…", done / total if total else None)
 
-    report("Building layers…")
+    report_layers(0, len(seed.session.layer_z_order))
     layers, layers_by_slot = LayerFramePipeline.build(
         seed.cfg,
         compositor,
@@ -261,6 +261,7 @@ def init_gl_resources_heavy(
         projectm_fps=LIVE_PROJECTM_FPS,
         preview_resolutions=True,
         project_dir=seed.project_dir,
+        on_layer_built=report_layers,
     )
 
     mix_pcm, sample_rate = load_mix_pcm(seed.audio_path)
@@ -679,8 +680,8 @@ class VisualizerApp:
             window.overlay_surface = overlay_surface
             window.update(OPENING_TITLE, "Loading…")
 
-            def on_progress(message: str) -> None:
-                window.update(OPENING_TITLE, message)
+            def on_progress(message: str, fraction: float | None) -> None:
+                window.update(OPENING_TITLE, message, fraction)
 
             rt = init_gl_resources_heavy(
                 seed,
