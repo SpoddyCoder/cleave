@@ -20,8 +20,9 @@ from cleave.viz.modal import FormField, FormSpec, FormValues, ModalHost
 
 LATENCY_SETUP_TITLE = "Set up audio latency"
 _BODY = (
-    "Two latency settings keep the visuals and your taps in time with the "
-    "music on this computer. Set them up now for best results."
+    "This is your first project setup, so we recommend configuring the "
+    "audio latency settings now for best results. Two latency settings keep "
+    "the visuals and your taps in time with the music on this computer."
 )
 _LATER_HELP = (
     "You can run either one later from the Settings menu.",
