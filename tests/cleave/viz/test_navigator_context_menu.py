@@ -91,3 +91,84 @@ def test_layers_root_offers_add_and_a_gone_row_has_no_menu() -> None:
     controls = make_controls(("layer_1",))
     assert "navigator.layer.add" in _entries(controls, "layers")
     assert navigator_node_menu(controls, "layer:gone", lambda _id: None)() == ()
+
+
+def _open(controls, *node_ids: str) -> None:
+    controls.shell_focus.nav_expanded.update(node_ids)
+
+
+def _labels(controls, node_id: str) -> list[str]:
+    return [item.label for item in _entries(controls, node_id).values()]
+
+
+def test_layer_page_lists_its_layers_switches() -> None:
+    controls = make_controls(("layer_1",))
+    _open(controls, "layer:layer_1")
+    items = _entries(controls, "layer:layer_1:compositing")
+    assert list(items) == [
+        "navigator.toggle.enabled",
+        "navigator.toggle.solo",
+        "navigator.toggle.lock",
+    ]
+    solo = items["navigator.toggle.solo"]
+    assert solo.label.startswith("Solo (1 ")
+    assert solo.shortcut == "S"
+    solo.run()
+    assert controls.session.solo_slot == "layer_1"
+    assert _entries(controls, "layer:layer_1:compositing")[
+        "navigator.toggle.solo"
+    ].checked
+
+
+def test_post_fx_effect_owns_its_switch_and_names_the_parent_lock() -> None:
+    controls = make_controls(("layer_1",))
+    _open(controls, "post_fx")
+    assert _labels(controls, "post_fx.fade") == ["Enabled", "Locked (Post-FX)"]
+    was = controls.session.post_fx.fade.enabled
+    _entries(controls, "post_fx.fade")["navigator.toggle.enabled"].run()
+    assert controls.session.post_fx.fade.enabled is not was
+
+
+def test_timeline_pages_offer_their_buttons() -> None:
+    controls = make_controls(("layer_1",))
+    _open(controls, "timeline")
+    assert _labels(controls, "timeline.grid")[-1] == "Snap clips…"
+    markers = _entries(controls, "timeline.song_markers")
+    assert "navigator.drop_marker" in markers
+    assert markers["navigator.drop_marker"].shortcut == "Ctrl+Enter"
+    assert "navigator.page.timeline.snap_to_markers" in markers
+
+
+def test_go_to_preset_list_follows_the_switching_trigger() -> None:
+    controls = make_controls(("layer_1",))
+    _open(controls, "layer:layer_1")
+    layer = controls.session.layers["layer_1"]
+    page = "layer:layer_1:milkdrop_preset"
+    layer.preset_switching_trigger = "off"
+    assert "navigator.page.layers.go_to_preset_list" not in _entries(controls, page)
+    layer.preset_switching_trigger = "timeline"
+    assert "navigator.page.layers.go_to_preset_list" in _entries(controls, page)
+
+
+def test_preset_list_row_takes_the_page_menu() -> None:
+    controls = make_controls(("layer_1",))
+    _open(controls, "layer:layer_1")
+    controls.session.layers["layer_1"].preset_switching_trigger = "timeline"
+    labels = _labels(controls, "layer:layer_1:preset_list")
+    assert "Paste" in labels
+    assert "Clear list…" in labels
+    assert labels.count("Populate list…") == 1
+
+
+def test_card_row_preview_and_lock_act_on_overlay() -> None:
+    controls = make_controls(("layer_1",))
+    _open(controls, "overlay")
+    page = "overlay.opening_card"
+    items = _entries(controls, page)
+    assert items["navigator.toggle.preview"].label == "Preview (Overlay)"
+    was = controls.session.overlay_preview
+    items["navigator.toggle.preview"].run()
+    assert controls.session.overlay_preview is not was
+    assert _entries(controls, page)["navigator.toggle.preview"].checked is not was
+    items["navigator.toggle.lock"].run()
+    assert controls.session.overlays.locked is True

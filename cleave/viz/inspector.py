@@ -150,6 +150,17 @@ def page_title_command(state: TuningViewState, node_id: str) -> str | None:
     return section.title_command
 
 
+def page_command_ids(state: TuningViewState, node_id: str) -> tuple[str, ...]:
+    """Every button the page shows: the title command, then its button rows."""
+    ids: list[str] = []
+    title = page_title_command(state, node_id)
+    if title is not None:
+        ids.append(title)
+    for row in build_inspector_rows(state, node_id):
+        ids.extend(command_id for command_id in row.command_ids if command_id not in ids)
+    return tuple(ids)
+
+
 def build_inspector_rows(
     state: TuningViewState,
     node_id: str,

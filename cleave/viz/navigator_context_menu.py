@@ -1,11 +1,14 @@
 """Right-click menu for a navigator row.
 
-Expand or collapse the row, and flip its on/off, solo, and lock icons.
-The right-click has already selected the row, so its page shows in the
-inspector. A layer row with more than one problem or notice leads with View
+A root or layer row: expand or collapse it, and flip its on/off, solo, and
+lock icons. A layer row with more than one problem or notice leads with View
 all problems, then adds a page jump, move up and down, and add and delete
-layer. Each item calls the same path as its icon
-or key, and a disabled item says why in its hint.
+layer. A sub-row (a card, an effect, a layer page) lists the switches that
+act for its page, naming the row that owns each when it is a parent, then
+the page's own buttons; Preset List takes its page menu, and Song Markers
+adds dropping a marker at the playhead. The right-click has already selected
+the row, so its page shows in the inspector. Each item calls the same path
+as its icon, button, or key, and a disabled item says why in its hint.
 """
 
 from __future__ import annotations
@@ -24,8 +27,10 @@ from cleave.viz.context_menu import (
     join_groups,
 )
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
+from cleave.viz.inspector import page_command_ids
 from cleave.viz.layer_problems import is_problem, issue_menu_label, layer_issues
 from cleave.viz.navigator import (
+    LAYER_PAGE_PRESET_LIST,
     TOGGLE_ADD,
     TOGGLE_ENABLED,
     TOGGLE_LOCK,
@@ -35,7 +40,10 @@ from cleave.viz.navigator import (
     NavToggle,
     build_navigator,
     layer_page_nodes,
+    layer_page_of,
+    page_toggles,
 )
+from cleave.viz.preset_context_menu import preset_list_page_menu
 from cleave.viz.row_hotkeys import activate_header_toggle, node_control_descriptor
 
 if TYPE_CHECKING:
@@ -71,16 +79,17 @@ def navigator_node_menu_entries(
     toggle_expanded: Callable[[str], None],
 ) -> tuple[ContextMenuEntry, ...]:
     focus = controls.shell_focus
-    node = next(
-        (
-            candidate
-            for candidate in build_navigator(controls.session, focus.nav_expanded)
-            if candidate.id == node_id
-        ),
-        None,
-    )
+    nodes = build_navigator(controls.session, focus.nav_expanded)
+    node = next((candidate for candidate in nodes if candidate.id == node_id), None)
     if node is None:
         return ()
+    if _is_sub_row(node):
+        return join_groups(
+            [
+                _owner_switch_items(controls, node, nodes),
+                _page_action_items(controls, node),
+            ]
+        )
     layer_row = _is_layer_row(controls, node)
     groups: list[tuple[ContextMenuEntry, ...]] = [
         _issue_items(controls, node) if layer_row else (),
@@ -90,6 +99,77 @@ def navigator_node_menu_entries(
     if layer_row:
         groups.append(_layer_items(controls, node))
     return join_groups(groups)
+
+
+def _is_sub_row(node: NavNode) -> bool:
+    """A card, a Post-FX effect, a root's child page, or a layer page."""
+    return node.parent_id is not None and node.parent_id != "layers"
+
+
+def _owner_switch_items(
+    controls: TuningControls, node: NavNode, nodes: tuple[NavNode, ...]
+) -> tuple[ContextMenuEntry, ...]:
+    """On/off, solo, preview, and lock for the page, as its title line shows them.
+
+    A switch a parent owns names that parent, as Locked (Post-FX), and acts
+    through that parent's header, as the title line's button does.
+    """
+    items: list[ContextMenuEntry] = []
+    for owned in page_toggles(controls.session, node.id, nodes):
+        toggle = owned.toggle
+        label_key = _TOGGLE_ITEMS.get(toggle.id)
+        descriptor = node_control_descriptor(owned.owner_id)
+        if label_key is None or descriptor is None:
+            continue
+        label, key = label_key
+        if owned.owner_id != node.id:
+            label = f"{label} ({owned.owner_label})"
+        hint = navigator_toggle_hint(toggle)
+        items.append(
+            ContextMenuItem(
+                id=f"navigator.toggle.{toggle.id}",
+                label=label,
+                run=lambda toggle_id=toggle.id, desc=descriptor: activate_header_toggle(
+                    controls, toggle_id, desc
+                ),
+                enabled=hint is None,
+                checked=toggle.active,
+                shortcut=key,
+                hint=hint,
+            )
+        )
+    return tuple(items)
+
+
+def _page_action_items(
+    controls: TuningControls, node: NavNode
+) -> tuple[ContextMenuEntry, ...]:
+    """The page's buttons; Preset List takes its own page menu."""
+    if node.slot is not None and layer_page_of(node.id) == LAYER_PAGE_PRESET_LIST:
+        return preset_list_page_menu(controls, node.slot)()
+    items: list[ContextMenuEntry] = []
+    if node.id == "timeline.song_markers":
+        items.append(_drop_marker_item(controls))
+    view = controls.build_view_state(paused=controls.playback.paused)
+    items.extend(
+        command_menu_item(
+            command_by_id(command_id), controls, item_id=f"navigator.page.{command_id}"
+        )
+        for command_id in page_command_ids(view, node.id)
+    )
+    return tuple(items)
+
+
+def _drop_marker_item(controls: TuningControls) -> ContextMenuItem:
+    recording = bool(controls.session.timeline.recording)
+    return ContextMenuItem(
+        id="navigator.drop_marker",
+        label="Drop song marker at playhead",
+        run=controls.song_markers.drop,
+        enabled=not recording,
+        shortcut="Ctrl+Enter",
+        hint="Stop recording to drop markers" if recording else None,
+    )
 
 
 def _issue_items(

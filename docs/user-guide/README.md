@@ -137,6 +137,7 @@ The whole editor works with the mouse:
 - **Click** a row to select it, and click a setting's options or arrows to change it.
 - **Drag** a number sideways for quick, coarse changes.
 - **Right-click** a navigator row, a preset, the preview, or anything on the timeline strip for a context menu.
+  On a sub-row (a card, a Post-FX effect, a layer's page, or a Timeline or Pattern Mask page), the menu has the switches that act for that page, such as Solo and Locked for its layer, with the owner's name in brackets when it belongs to the row above, then the page's own buttons: Go to preset list on a layer's Milkdrop Preset and Preset Switching pages, the list's Paste, Populate list, and Clear list on Preset List, Snap clips on Beat / Bar Grid, Set cut type on clips on Clip Fades, and Drop song marker at playhead and Snap clips to markers on Song Markers.
 - **Drag** the borders between panels to resize them, including the divider between the navigator and the inspector. **Double-click** a border to reset it, or use **View > Reset panel layout** to reset them all. Above 100% UI scale, the navigator and inspector column resets to a wider width so the larger text fits.
 - **Scroll** long lists with the mouse wheel.
 
