@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -31,9 +31,13 @@ from cleave.viz.material_icons import (
     PROBLEM_GLYPH,
 )
 from cleave.viz.navigator import (
+    TOGGLE_NOTICE,
+    TOGGLE_WARN,
+    layer_slot_of,
     page_status,
     page_toggles,
     PageStatus,
+    PageToggle,
     timeline_row_slot_of,
     timeline_row_title,
 )
@@ -216,6 +220,22 @@ def _marker_tooltip_at(markers: str, fitted: str, x: float, y: float) -> bool:
             show_tooltip(text)
         return True
     return False
+
+
+def _title_issue_hit(
+    toggles: Sequence[PageToggle],
+    rects: dict[str, tuple[float, float, float, float]],
+) -> tuple[tuple[int, int, int, int], str] | None:
+    """The title line's layer warning or notice box and its layer, if shown."""
+    for item in toggles:
+        if item.toggle.id not in (TOGGLE_WARN, TOGGLE_NOTICE):
+            continue
+        slot = layer_slot_of(item.owner_id)
+        rect = rects.get(item.toggle.id)
+        if slot is not None and rect is not None:
+            x, y, w, h = rect
+            return (int(x), int(y), int(round(w)), int(round(h))), slot
+    return None
 
 
 def _draw_two_line_row_text(
@@ -455,6 +475,9 @@ class InspectorPanel:
         self._title_attention = AttentionClock()
         # The inspector page's off and locked owners, read each frame.
         self._page_status = PageStatus()
+        # The layer warning or notice mark on the title line in the last draw,
+        # and its layer, for a right-click.
+        self.title_issue_hit: tuple[tuple[int, int, int, int], str] | None = None
         # Rows with a descriptor from the last draw, for right-click and Shift+F10.
         self.row_rects: dict[
             RowDescriptor, tuple[tuple[int, int, int, int], InspectorRow]
@@ -491,6 +514,7 @@ class InspectorPanel:
         )
         # The gap under the title bar pushes the divider down by as much.
         line_gap = inspector_title_line_gap(rule_y)
+        button_rects: dict[str, tuple[float, float, float, float]] = {}
         pressed = draw_inspector_title(
             title,
             elapsed,
@@ -499,7 +523,9 @@ class InspectorPanel:
             + self._page_history_buttons(frame.command_ctx),
             self._title_command(frame, focus.selected_id),
             line_gap,
+            button_rects,
         )
+        self.title_issue_hit = _title_issue_hit(toggles, button_rects)
         toggle = next((item for item in toggles if item.toggle.id == pressed), None)
         if toggle is not None:
             descriptor = node_control_descriptor(toggle.owner_id)

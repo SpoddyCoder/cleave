@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 from imgui_bundle import imgui
 
 from cleave.viz.config_pages import config_page_title, is_config_page
-from cleave.viz.icon_button import icon_columns, icon_gap
+from cleave.viz.icon_button import FRect, icon_box, icon_columns, icon_gap
 from cleave.viz.imgui_icon_button import icon_button
 from cleave.viz.imgui_theme import row_band, row_band_side
 from cleave.viz.navigator import (
@@ -217,6 +217,7 @@ def draw_inspector_title(
     buttons: Sequence[TitleButton] = (),
     command: TitleCommand | None = None,
     line_gap: float = 0.0,
+    button_rects: dict[str, FRect] | None = None,
 ) -> str | None:
     """Inspector page title on two lines: the title with the toast's accent
     swipe behind it, then an icon line.
@@ -230,7 +231,8 @@ def draw_inspector_title(
     does. A title wider than its room waits, scrolls to its last words,
     pauses, then snaps back to its start, cut at its right edge. The bar
     stays once it has swiped in. Returns the id of a pressed, enabled button
-    or command.
+    or command. *button_rects*, when given, receives each button's screen
+    box by id, for a right-click after the frame.
     """
     start = imgui.get_cursor_screen_pos()
     avail = max(0.0, imgui.get_content_region_avail().x)
@@ -314,7 +316,7 @@ def draw_inspector_title(
                     draw.pop_clip_rect()
         finally:
             draw.pop_clip_rect()
-        pressed = _draw_title_buttons(buttons, start, slot_xs, icon_band)
+        pressed = _draw_title_buttons(buttons, start, slot_xs, icon_band, button_rects)
         if command is not None and _draw_title_command(command, bar_x0, icon_band):
             pressed = command.id
         return pressed
@@ -327,11 +329,14 @@ def _draw_title_buttons(
     start: imgui.ImVec2,
     slot_xs: Sequence[float],
     band: tuple[float, float],
+    rects: dict[str, FRect] | None = None,
 ) -> str | None:
     """Icon buttons on the title's icon line, like navigator toggles. A disabled
     button has no hover fill and keeps the arrow pointer."""
     pressed_id: str | None = None
     for button, slot_x in zip(buttons, slot_xs):
+        if rects is not None:
+            rects[button.id] = icon_box(start.x + slot_x, band)
         pressed = icon_button(
             f"##inspector-title-{button.id}",
             button.glyph,

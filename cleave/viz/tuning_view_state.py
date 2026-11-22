@@ -153,6 +153,8 @@ class TrackBlock:
     preset_markers: str = ""
     preset_list_labels: list[str] = field(default_factory=list)
     preset_list_markers: list[str] = field(default_factory=list)
+    # Why the directory row's folder cannot be browsed (None: fine).
+    preset_dir_problem: str | None = None
     # Why the preset row's file, or each list entry's, cannot play (None: fine).
     preset_problem: str | None = None
     preset_list_problems: tuple[str | None, ...] = ()
@@ -773,10 +775,13 @@ class TuningViewStateBuilder:
     def _preset_problem(
         self, layer: LayerRuntime, playlist: PresetPlaylist
     ) -> str | None:
+        """The preset row's file problem; none inside a missing folder, whose
+        directory row carries the mark."""
         current = playlist.current
-        if current is None:
+        health = self.session.preset_health
+        if current is None or health.dir_problem(playlist.current_dir) is not None:
             return None
-        return self.session.preset_health.file_problem(layer, current)
+        return health.file_problem(layer, current)
 
     def _preset_list_labels(self, entries: list[PresetListEntry]) -> list[str]:
         entries_key = tuple(entries)
@@ -873,6 +878,9 @@ class TuningViewStateBuilder:
                 visible=layer.enabled,
                 preset_list_labels=self._preset_list_labels(list(layer.preset_list)),
                 preset_list_markers=self._preset_list_markers(list(layer.preset_list)),
+                preset_dir_problem=self.session.preset_health.dir_problem(
+                    display.current_dir
+                ),
                 preset_problem=self._preset_problem(layer, display),
                 preset_list_problems=self.session.preset_health.list_problems(
                     slot, layer
@@ -908,6 +916,9 @@ class TuningViewStateBuilder:
                 preset_markers=self._preset_markers(layer, display),
                 preset_list_labels=self._preset_list_labels(list(layer.preset_list)),
                 preset_list_markers=self._preset_list_markers(list(layer.preset_list)),
+                preset_dir_problem=self.session.preset_health.dir_problem(
+                    display.current_dir
+                ),
                 preset_problem=self._preset_problem(layer, display),
                 preset_list_problems=self.session.preset_health.list_problems(
                     slot, layer

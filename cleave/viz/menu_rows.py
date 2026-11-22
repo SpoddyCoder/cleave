@@ -1,7 +1,7 @@
 """Menu rows shared by the menu-bar dropdown and context menus.
 
-Both draw the same row: a check column, the label, and a right-aligned
-shortcut, with the lit row look on the keyboard row and the disabled
+Both draw the same row: a check column (a tick, or a problem or notice
+sign), the label, and a right-aligned shortcut, with the lit row look on the keyboard row and the disabled
 colour on rows that cannot run. Callers resolve their own items into
 ``MenuRowView`` first.
 """
@@ -19,8 +19,12 @@ from cleave.viz.context_menu import (
     ContextMenuItem,
     ContextMenuState,
     ContextSubmenu,
+    MenuIcon,
 )
+from cleave.viz.icon_button import icon_box
+from cleave.viz.imgui_icon_button import paint_box
 from cleave.viz.imgui_theme import floating_surface, padded_row_spacing_y, padded_rows, rgba
+from cleave.viz.material_icons import PROBLEM_GLYPH
 from cleave.viz.row_paint import RowState, row_band
 from cleave.viz.tooltips import show_tooltip
 from cleave.viz.theme import palette, ui_chrome_px
@@ -93,6 +97,7 @@ class MenuRowView:
     shortcut: str | None = None
     color: tuple[int, int, int] | None = None
     submenu: bool = False
+    icon: MenuIcon | None = None
 
 
 @dataclass(frozen=True)
@@ -119,6 +124,7 @@ def draw_menu_rows(
     label_w = 0.0
     shortcut_w = 0.0
     any_submenu = False
+    any_icon = False
     for row in rows:
         if row is None:
             continue
@@ -126,6 +132,10 @@ def draw_menu_rows(
         if row.shortcut:
             shortcut_w = max(shortcut_w, imgui.calc_text_size(row.shortcut).x)
         any_submenu = any_submenu or row.submenu
+        any_icon = any_icon or row.icon is not None
+    if any_icon:
+        # A sign is a square as tall as the row's highlight.
+        check_w = max(check_w, imgui.get_text_line_height() + padded_row_spacing_y())
     mark_w = imgui.calc_text_size(SUBMENU_MARK).x if any_submenu else 0.0
     arrow_w = gap * 0.5 + mark_w if any_submenu else 0.0
     row_w = pad_x * 2.0 + check_w + gap + label_w + gap + shortcut_w + arrow_w + pad_x
@@ -192,7 +202,9 @@ def draw_menu_rows(
             # the label down so the fill sits high, flush with the next row.
             text_y = pos.y
             text_x = pos.x + pad_x
-            if row.checked:
+            if row.icon is not None:
+                _paint_row_icon(row.icon, pos.x + pad_x, (rect_min.y, rect_max.y))
+            elif row.checked:
                 draw_list.add_text(
                     imgui.ImVec2(text_x, text_y),
                     imgui.get_color_u32(check_color),
@@ -229,6 +241,15 @@ def draw_menu_rows(
     return MenuRowsResult(clicked=clicked, hovered=hovered, rects=tuple(rects))
 
 
+def _paint_row_icon(icon: MenuIcon, x: float, band: tuple[float, float]) -> None:
+    """The red problem or amber notice sign, as on the layer's navigator row."""
+    if icon is MenuIcon.PROBLEM:
+        fill, glyph = palette().button_danger_bg, palette().on_danger
+    else:
+        fill, glyph = palette().notice_bg, palette().on_notice
+    paint_box(icon_box(x, band), PROBLEM_GLYPH, color=glyph, fill=fill)
+
+
 def context_menu_row_views(
     entries: Sequence[object],
 ) -> tuple[MenuRowView | None, ...]:
@@ -256,6 +277,7 @@ def context_menu_row_views(
                 enabled=entry.enabled,
                 checked=bool(entry.checked),
                 shortcut=entry.shortcut,
+                icon=entry.icon,
             )
         )
     return tuple(views)

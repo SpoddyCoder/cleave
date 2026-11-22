@@ -2,8 +2,9 @@
 
 Expand or collapse the row, and flip its on/off, solo, and lock icons.
 The right-click has already selected the row, so its page shows in the
-inspector. A layer row adds a page jump, move up and
-down, and add and delete layer. Each item calls the same path as its icon
+inspector. A layer row with more than one problem or notice leads with View
+all problems, then adds a page jump, move up and down, and add and delete
+layer. Each item calls the same path as its icon
 or key, and a disabled item says why in its hint.
 """
 
@@ -19,9 +20,11 @@ from cleave.viz.context_menu import (
     ContextMenuItem,
     ContextMenuProvider,
     ContextSubmenu,
+    MenuIcon,
     join_groups,
 )
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
+from cleave.viz.layer_problems import is_problem, issue_menu_label, layer_issues
 from cleave.viz.navigator import (
     TOGGLE_ADD,
     TOGGLE_ENABLED,
@@ -78,13 +81,41 @@ def navigator_node_menu_entries(
     )
     if node is None:
         return ()
+    layer_row = _is_layer_row(controls, node)
     groups: list[tuple[ContextMenuEntry, ...]] = [
+        _issue_items(controls, node) if layer_row else (),
         _tree_items(controls, node, toggle_expanded),
         _toggle_items(controls, node),
     ]
-    if _is_layer_row(controls, node):
+    if layer_row:
         groups.append(_layer_items(controls, node))
     return join_groups(groups)
+
+
+def _issue_items(
+    controls: TuningControls, node: NavNode
+) -> tuple[ContextMenuEntry, ...]:
+    """View all problems, while the layer has more than one problem or notice."""
+    slot = node.slot
+    assert slot is not None
+    issues = layer_issues(controls.session, slot)
+    if issues.count < 2:
+        return ()
+    return (
+        ContextSubmenu(
+            id="navigator.issues",
+            label="View all problems",
+            items=tuple(
+                ContextMenuItem(
+                    id=f"navigator.issue.{index}",
+                    label=issue_menu_label(issue),
+                    run=lambda index=index: controls.show_issue(slot, index),
+                    icon=MenuIcon.PROBLEM if is_problem(issue) else MenuIcon.NOTICE,
+                )
+                for index, issue in enumerate(issues.items())
+            ),
+        ),
+    )
 
 
 def _tree_items(

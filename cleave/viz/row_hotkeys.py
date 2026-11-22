@@ -159,7 +159,7 @@ def activate_header_toggle(
     """Run the header mutation for a navigator icon click."""
     if toggle_id in (TOGGLE_WARN, TOGGLE_NOTICE):
         if desc.kind == RowKind.TRACK_HEADER and desc.slot is not None:
-            controls.show_first_problem(desc.slot)
+            controls.show_issue(desc.slot)
         return
     if toggle_id == TOGGLE_HOLD:
         if desc.kind == RowKind.TRACK_HEADER and desc.slot is not None:

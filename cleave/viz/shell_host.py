@@ -26,6 +26,7 @@ from cleave.viz.imgui_host import ImGuiHost, mouse_button
 from cleave.viz.imgui_theme import rgba
 from cleave.viz.menu_bar import MenuBarState
 from cleave.viz.menu_rows import ContextMenuSurface, ContextSubmenuSurface
+from cleave.viz.navigator import layer_node_id
 from cleave.viz.navigator_context_menu import navigator_node_menu
 from cleave.viz.overlay_profiler import OverlayProfiler
 from cleave.viz.panel_notification import PanelNotificationActive
@@ -400,7 +401,14 @@ class ShellHost:
         return None
 
     def _inspector_menu_at(self, x: float, y: float) -> ContextMenuProvider | None:
-        """The menu for the inspector row under (*x*, *y*); the row takes focus."""
+        """The menu for the inspector row under (*x*, *y*); the row takes focus.
+
+        The layer warning or notice mark on the title line opens the layer
+        row's menu, which lists every problem.
+        """
+        hit = self.inspector.title_issue_hit
+        if hit is not None and rect_has_point(hit[0], x, y):
+            return self._nav_menu(layer_node_id(hit[1]))
         for desc, (rect, row) in self.inspector.row_rects.items():
             if not rect_has_point(rect, x, y):
                 continue

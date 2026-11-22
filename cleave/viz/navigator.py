@@ -13,10 +13,11 @@ from cleave.stems import stem_overlay_header
 from cleave.config_schema.layers import MAX_LAYER_COUNT
 from cleave.viz.editor_mode_controls import curation_focus_slot, is_preset_curation_mode
 from cleave.viz.layer_problems import (
+    LayerNotice,
+    LayerProblem,
     ProblemPage,
+    layer_issues,
     layer_issues_tooltip,
-    layer_notices,
-    layer_problems,
 )
 from cleave.viz.row_kinds import RowDescriptor
 from cleave.viz.theme import palette
@@ -75,8 +76,8 @@ class NavToggle:
     toggle is present only while the layer's preset switching is held, a warn
     toggle only while the layer has a problem, and a notice toggle only while
     it has notices and no problem; all are always active, and a warn or
-    notice toggle's ``detail`` is its tooltip, naming every problem and
-    notice; a hold toggle's
+    notice toggle's ``detail`` is its tooltip, naming the one issue or
+    saying there are several; a hold toggle's
     names the layer. ``blocked`` is true
     while the section lock refuses the toggle, or Add has no room. ``inert``
     is true while a press is refused for another reason (the timeline owns
@@ -575,14 +576,13 @@ def preset_preview_tooltip(owner: str) -> str:
 def _layer_toggles(session: TuningSession, slot: str) -> tuple[NavToggle, ...]:
     layer = session.layers[slot]
     lead: list[NavToggle] = []
-    problems = layer_problems(session, slot)
-    notices = layer_notices(session, slot)
-    if problems or notices:
+    issues = layer_issues(session, slot)
+    if issues.count:
         lead.append(
             NavToggle(
-                TOGGLE_WARN if problems else TOGGLE_NOTICE,
+                TOGGLE_WARN if issues.problems else TOGGLE_NOTICE,
                 True,
-                detail=layer_issues_tooltip(problems, notices),
+                detail=layer_issues_tooltip(issues),
             )
         )
     if switching_held(session, slot):
@@ -616,30 +616,27 @@ _PROBLEM_PAGES = {
 
 @dataclass(frozen=True)
 class ProblemTarget:
-    """Where the layer's first problem, or first notice, is dealt with: a page, and a row on it."""
+    """Where a layer problem or notice is dealt with: a page, and a row on it."""
 
     page_id: str
     row: RowDescriptor | None = None
 
 
-def first_problem_target(session: TuningSession, slot: str) -> ProblemTarget | None:
-    """Page, and row on it, for the layer's first problem, or its first
-    notice when it has no problem, if any.
+def issue_target(
+    session: TuningSession, slot: str, issue: LayerProblem | LayerNotice
+) -> ProblemTarget:
+    """Page, and row on it, where *issue* on the layer at *slot* is dealt with.
 
     When that page is hidden the target falls back to Preset Switching with
-    no row, since the problem's row is not on it.
+    no row, since the issue's row is not on it.
     """
-    issues = layer_problems(session, slot) or layer_notices(session, slot)
-    if not issues:
-        return None
-    problem = issues[0]
-    page = _PROBLEM_PAGES[problem.page]
+    page = _PROBLEM_PAGES[issue.page]
     if not _layer_page_visible(session, slot, page):
         return ProblemTarget(layer_page_node_id(slot, LAYER_PAGE_PRESET_SWITCHING))
     row = (
         None
-        if problem.row is None
-        else RowDescriptor(problem.row, slot=slot, preset_index=problem.preset_index)
+        if issue.row is None
+        else RowDescriptor(issue.row, slot=slot, preset_index=issue.preset_index)
     )
     return ProblemTarget(layer_page_node_id(slot, page), row)
 

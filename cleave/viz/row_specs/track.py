@@ -416,10 +416,13 @@ PRESET_BROWSER_TOOLTIP = "Double-click to open the preset browser"
 
 
 def preset_row_problem(state: TuningViewState, desc: RowDescriptor) -> str | None:
-    """Why the preset file on a preset row or preset list entry cannot play."""
+    """Why the folder on the directory row, or the preset file on a preset row
+    or preset list entry, cannot be used."""
     if desc.slot is None or desc.slot not in state.tracks:
         return None
     block = state.tracks[desc.slot]
+    if desc.kind is RowKind.TRACK_PRESET_DIR:
+        return block.preset_dir_problem
     if desc.kind is RowKind.TRACK_PRESET:
         return block.preset_problem
     if desc.kind is RowKind.TRACK_PRESET_LIST_ITEM and desc.preset_index is not None:
@@ -451,8 +454,11 @@ def _preset_list_item_tooltip(state: TuningViewState, desc: RowDescriptor) -> st
 
 def _preset_dir_row_tooltip(state: TuningViewState, desc: RowDescriptor) -> str:
     if _preset_dir_can_go_down(state, desc):
-        return "Double-click to open the first subfolder"
-    return PRESET_BROWSER_TOOLTIP
+        click = "Double-click to open the first subfolder"
+    else:
+        click = PRESET_BROWSER_TOOLTIP
+    problem = preset_row_problem(state, desc)
+    return click if problem is None else f"{problem}\n{click}"
 
 
 def _preset_dir_up_tooltip(state: TuningViewState, desc: RowDescriptor) -> str:

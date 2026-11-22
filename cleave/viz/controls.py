@@ -14,6 +14,7 @@ from cleave.preset_library import PresetLibrary
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.layer_lifecycle_controls import LayerLifecycleController
 from cleave.viz.layer_mutations import LayerMutations
+from cleave.viz.layer_problems import layer_issues
 from cleave.viz.preset_clipboard import PresetClipboard, PresetEditTarget
 from cleave.viz.preset_browser_controls import PresetBrowserControls
 from cleave.viz.editor_mode_controls import (
@@ -73,7 +74,7 @@ from cleave.viz.focus_nav import (
 from cleave.viz.inspector_controls import InspectorControls
 from cleave.viz.navigator import (
     build_navigator,
-    first_problem_target,
+    issue_target,
     initial_expanded_ids,
     layer_node_id,
     timeline_row_node_id,
@@ -482,11 +483,13 @@ class TuningControls:
         self.on_tap_latency_changed()
         self._show_latency_row(RowKind.SETTINGS_TAP_LATENCY_MS)
 
-    def show_first_problem(self, slot: str) -> None:
-        """Open the page for the layer's first problem (or first notice), on its row."""
-        target = first_problem_target(self.session, slot)
-        if target is None:
+    def show_issue(self, slot: str, index: int = 0) -> None:
+        """Open the page for the layer's issue at *index* (problems, then
+        notices; 0 is the first), on its row."""
+        items = layer_issues(self.session, slot).items()
+        if not 0 <= index < len(items):
             return
+        target = issue_target(self.session, slot, items[index])
         self.navigator.select(target.page_id)
         focus = self.shell_focus
         if target.row is None or focus.selected_id != target.page_id:

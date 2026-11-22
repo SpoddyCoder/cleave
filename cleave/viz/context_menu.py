@@ -17,13 +17,22 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from enum import Enum, auto
 
 import pygame
 
 
+class MenuIcon(Enum):
+    """A sign drawn in a row's check column; its colours are read at draw time."""
+
+    PROBLEM = auto()
+    NOTICE = auto()
+
+
 @dataclass(frozen=True)
 class ContextMenuItem:
-    """One row. ``checked`` None is a plain command; True or False is a check."""
+    """One row. ``checked`` None is a plain command; True or False is a check.
+    ``icon`` draws a sign in the check column instead."""
 
     id: str
     label: str
@@ -32,6 +41,7 @@ class ContextMenuItem:
     checked: bool | None = None
     shortcut: str | None = None
     hint: str | None = None
+    icon: MenuIcon | None = None
 
 
 class ContextMenuSeparator:

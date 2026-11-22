@@ -198,6 +198,7 @@ def test_view_state_reflects_session_mutation_without_block_writes() -> None:
         "preset_label",
         "preset_position",
         "preset_markers",
+        "preset_dir_problem",
         "preset_problem",
         "preset_list_problems",
         "stem_silent",

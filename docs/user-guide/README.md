@@ -325,23 +325,30 @@ Cleave keeps a copy of every preset in the list inside the project, so the proje
 
 ### When a layer has a problem
 
-A red exclamation mark on a layer's navigator row, and in the icon line under the title of each of its pages, means the layer cannot do what you have set it to do. Hover over it to see every problem, and click it to go to the page where you fix the first one, with the row to fix (such as the first bad preset list entry) selected. It shows when:
+A red exclamation mark on a layer's navigator row, and in the icon line under the title of each of its pages, means the layer cannot do what you have set it to do. Hover over it to see the problem, and click it to go to the page where you fix it, with the row to fix (such as the first bad preset list entry) selected. It shows when:
 
 | Problem | Fix |
 | --- | --- |
 | Preset switching is on, but the preset list is empty. | Add presets to the list, or use Populate list. |
 | Some or all of the presets in the list can't load. | Replace or remove the entries marked in the list. |
 | Switching follows the timeline, but the timeline is off, or the layer has no clips on it. | Turn the timeline on, add clips to the layer, or pick another trigger. |
-| Switching is off, and the layer's preset is missing or failed to load. | Choose another preset. |
+| The layer's preset folder is not found (moved, renamed, or left out of a restored project), whether or not switching is on. | Put the folder back, or choose another preset. |
+| Switching is off, and the layer's preset file is not found, or failed to load. | Put the file back, or choose another preset. |
 | The layer's stem is silent in this song (for example, vocals on an instrumental). | Pick another stem on the Compositing page. |
 
-When the layer works but there is something you should know, the exclamation mark is amber instead: a notice. Hover over it to see every notice, and click it to go to the first one. A red mark takes priority; its tooltip lists the problems first, then any notices. A notice shows when:
+When the layer works but there is something you should know, the exclamation mark is amber instead: a notice. Hover over it to see the notice, and click it to go to it. A red mark takes priority when a layer has both. A notice shows when:
 
 | Notice | What to do |
 | --- | --- |
 | Switching follows the timeline, but the preset list has more presets than the layer has clips, so the last ones never play. Clicking the mark selects the first of them. | Add clips to the layer, or remove the extra entries. Populate list makes one entry for each clip. |
 
-A preset file that is missing (moved, renamed, or left out of a restored project) or that failed to load shows the same red warning sign as the layer, just left of its position number (such as 4/15), on the preset row and on its preset list entry. Hover over the sign to see why. Cleave looks for missing files when a project opens; a file that disappears while you work is marked once a layer tries to load it. A bad entry in the preset list also lights the layer's icon, since switching skips it. Playing a missing entry keeps its name on the preset row with the mark, so you can see which file is gone.
+#### More than one problem
+
+When a layer has more than one problem or notice, hovering over the mark says Multiple problems (or Multiple notices) instead of naming them. A click still goes to the first one. To see them all, right-click the mark, or the layer's navigator row: **View all problems** at the top of the menu lists every problem, then every notice, each with its own red or amber mark. Choose one to go to the page and row where you fix it.
+
+#### Marks on preset rows
+
+A preset file that is missing (moved, renamed, or left out of a restored project) or that failed to load shows the same red warning sign as the layer, just left of its position number (such as 4/15), on the preset row and on its preset list entry. Hover over the sign to see why. When the layer's whole preset folder is missing, the sign shows on the preset directory row instead. Cleave looks for missing files and folders when a project opens; a file that disappears while you work is marked once a layer tries to load it. A bad entry in the preset list also lights the layer's icon, since switching skips it. Playing a missing entry keeps its name on the preset row with the mark, so you can see which file is gone.
 
 ### Preset markers
 
