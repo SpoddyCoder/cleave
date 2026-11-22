@@ -9,8 +9,8 @@ from unittest.mock import patch
 from cleave.preset_library import UNFILTERED_CATALOG, PresetLibrary
 from cleave.preset_playlist import PresetPlaylist
 from cleave.timeline import SlotCue, TimelineLane
+from cleave.preset_list_fill import needed_preset_count
 from cleave.viz.preset_list_populate import (
-    needed_preset_count,
     populate_from_cue_marker_roles,
     populate_from_directory,
     repopulate_preset_lists,

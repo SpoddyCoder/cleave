@@ -11,7 +11,11 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import cast
 
-from cleave.config import ensure_project_viz_config, remap_layers_to_stem_count
+from cleave.config import (
+    ensure_project_viz_config,
+    project_viz_config_path,
+    remap_layers_to_stem_count,
+)
 from cleave.open_target import AUDIO_SUFFIXES, UNSUPPORTED_AUDIO_FORMAT
 from cleave.stems import (
     SIX_STEM_NAMES,
@@ -682,6 +686,7 @@ def run_separate(
     project_dir, audio_path = resolve_separate_target(target)
     count = target_stem_count(project_dir, stem_count)
     _require_beat_stem_in(count, beat_detection_stem)
+    new_config = not project_viz_config_path(project_dir).is_file()
     ensure_project_viz_config(project_dir, count)
 
     count_changed = stem_count_change(project_dir, stem_count)
@@ -696,6 +701,8 @@ def run_separate(
         and not count_changed
         and not stem_mismatch
     ):
+        if new_config:
+            _fill_preset_lists(project_dir, on_progress)
         return project_dir
 
     run_demucs = force or count_changed or not stems_complete
@@ -737,4 +744,17 @@ def run_separate(
             on_progress=on_progress,
         )
 
+    if new_config:
+        _fill_preset_lists(project_dir, on_progress)
     return project_dir
+
+
+def _fill_preset_lists(
+    project_dir: Path, on_progress: Callable[[str, float | None], None] | None
+) -> None:
+    """Give a new project's switching layers their preset lists."""
+    from cleave.preset_list_fill import fill_new_project_preset_lists
+
+    if on_progress is not None:
+        on_progress("Filling preset lists…", None)
+    fill_new_project_preset_lists(project_dir)

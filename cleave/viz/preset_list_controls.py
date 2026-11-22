@@ -19,10 +19,10 @@ from cleave.viz.edit_history import EditHistory, preset_list_scope
 from cleave.viz.layer import StemLayer
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.modal import FormField, FormSpec, ModalHost
+from cleave.preset_list_fill import needed_preset_count
 from cleave.viz.preset_list_populate import (
     browse_pool,
     catalog_has_role_presets,
-    needed_preset_count,
     on_segment_populate_count,
     populate_from_cue_marker_roles,
     populate_from_directory,

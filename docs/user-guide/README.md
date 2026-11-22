@@ -297,6 +297,8 @@ Editing the list or the Preset Switching settings keeps the preview on screen. T
 
 The **Preset List** page holds the presets the layer cycles through, in order. It appears whenever switching is not off.
 
+A new project starts with each layer's list already filled: enough presets to last the song at the layer's preset duration, shuffled from the layer's preset folder. Every layer of a new project starts on the Milkdrop Original folder, so install that pack (it is ticked in the Welcome to Cleave step).
+
 The page opens on the layer's preset directory row, the same row as on the Milkdrop Preset page: it shows the folder (or collection) **Populate list** fills the list from, and works the same way: its arrows and clickable folders change folder, and Enter or a double-click (in a folder with no subfolders) or right-click > **Browse presets** opens the preset browser.
 
 - The **+** button on the Milkdrop Preset page's preset row, just left of its arrows (or P from any of the layer's rows), appends the preset you are looking at. The **Go to preset list** button, at the left of the icon line under the title of that page and of the Preset Switching page, opens the Preset List page.
@@ -521,7 +523,7 @@ DIMINUENDO:  FULL >>>  thin ---- thin ---- > restore
 Cleave detects the beat and bar grid when it first prepares a song. On **Timeline > Beat / Bar Grid**:
 
 - **bar grid** draws the bars on the strip.
-- **placement snap** quantises new clips and markers to the nearest beat or bar. Turn it off if detection got the song wrong.
+- **placement snap** quantises new clips and markers to the nearest beat or bar. It is off in a new project; leave it off if detection got the song wrong.
 - **bar phase** shifts the grid by one beat, for when the downbeat has been detected in the wrong place.
 
 For bulk clean-up, use **Snap clips** on this page, **Snap clips to markers** on the Song Markers page, and **Set cut type on clips** on the Clip Fades page.
@@ -554,13 +556,15 @@ Open **Overlay > Opening Card** or **Closing Card** in the navigator. Each card 
 
 Click a text row to edit it in place, or a colour swatch to pick a colour with a live preview. The body text can run over several lines.
 
+A new project's closing card sits in the bottom right with the title Credits; change its text to suit.
+
 Cards normally appear only at their set times. Turn on **preview** (the icon on the Overlay row or in an Overlay page's title, or V on the Overlay page) to hold them on screen while you work.
 
 ---
 
 ## Finishing touches (Post-FX)
 
-**Post-FX** are finishing effects applied to the combined picture, each with its own on/off switch.
+**Post-FX** are finishing effects applied to the combined picture, each with its own on/off switch. They are all off in a new project.
 
 | Effect | What it does |
 | --- | --- |

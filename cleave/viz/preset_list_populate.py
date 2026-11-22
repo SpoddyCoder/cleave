@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 import random
 from collections.abc import Sequence
 from pathlib import Path
@@ -23,20 +22,6 @@ from cleave.viz.user_presets import USER_PRESETS_DIRNAME, copy_with_dedup
 DEFAULT_POPULATE_ROLE: CueRole = "bed"
 
 DirectoryOrder = Literal["random", "sequential"]
-
-
-def needed_preset_count(
-    *,
-    song_duration_sec: float,
-    preset_duration: float,
-    trigger: str,
-) -> int:
-    """How many presets to populate for timer/projectm over the song."""
-    duration = max(1e-6, float(preset_duration))
-    base = math.ceil(float(song_duration_sec) / duration)
-    if trigger == "projectm":
-        return max(1, base + 2)
-    return max(1, base)
 
 
 def _fade_groups(session: TuningSession) -> tuple[TimelineFadeGroup, TimelineFadeGroup]:

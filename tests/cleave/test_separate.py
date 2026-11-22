@@ -330,6 +330,7 @@ def test_run_separate_reports_progress_phases(
     assert messages == [
         ("Preparing audio…", None),
         ("Extracting signals…", None),
+        ("Filling preset lists…", None),
     ]
     assert run_demucs.call_args.kwargs["on_progress"] is on_progress
     fake_analyse.run_analyse.assert_called_once()

@@ -24,6 +24,8 @@ render:
       mode: composite
       variant: vibrance
       amount_pct: 25
+    limiter:
+      enabled: false
 
   overlays:
     opening-card:
@@ -37,14 +39,14 @@ render:
       title:
         content: |
           Your Track Title
-        font-size: 28
+        font-size: 40
         font-colour: "#f0f4ff"
         background-colour: "#5b6fd6"
         margin-bottom: 12
       body:
         content: |
           Artist Name  ·  Album  ·  2026
-        font-size: 16
+        font-size: 26
         colour: "#b8c4e0"
       background:
         margin: 36
@@ -61,18 +63,18 @@ render:
         slide-direction: left
         disappear-at: 0
         display-time: 30
-      position: bottom-left
+      position: bottom-right
       title:
         content: |
-          Your Track Title
-        font-size: 28
+          Credits
+        font-size: 40
         font-colour: "#f0f4ff"
         background-colour: "#5b6fd6"
         margin-bottom: 12
       body:
         content: |
           Artist Name  ·  Album  ·  2026
-        font-size: 16
+        font-size: 26
         colour: "#b8c4e0"
       background:
         margin: 36
@@ -94,7 +96,7 @@ layer_z_order:
 layers:
   layer_1:
     stem: drums
-    preset: presets-cream-of-the-crop/Dancer/Aurora/
+    preset: presets-milkdrop-original/Milkdrop-Original/
     enabled: true
     opacity: 0.5
     blend_mode: black-key
@@ -128,7 +130,7 @@ layers:
 
   layer_3:
     stem: vocals
-    preset: presets-cream-of-the-crop/Sparkle/Explosions/
+    preset: presets-milkdrop-original/Milkdrop-Original/
     enabled: true
     opacity: 0.7
     blend_mode: black-key
@@ -147,7 +149,7 @@ layers:
 
   layer_4:
     stem: guitar
-    preset: presets-cream-of-the-crop/Waveform/Wire Circular/
+    preset: presets-milkdrop-original/Milkdrop-Original/
     enabled: true
     opacity: 0.6
     blend_mode: black-key
@@ -164,7 +166,7 @@ layers:
 
   layer_5:
     stem: piano
-    preset: presets-cream-of-the-crop/Geometric/Circles Nested/
+    preset: presets-milkdrop-original/Milkdrop-Original/
     enabled: true
     opacity: 0.6
     blend_mode: black-key
@@ -196,3 +198,4 @@ layers:
 
 timeline:
   enabled: false
+  placement_snap: "off"

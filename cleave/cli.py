@@ -181,7 +181,7 @@ def _optional_stem_count(args: argparse.Namespace) -> StemCount | None:
 
 
 def cmd_separate(args: argparse.Namespace) -> None:
-    from cleave.config import ensure_project_viz_config
+    from cleave.config import project_viz_config_path
     from cleave.separate import (
         beat_detection_stem_mismatch,
         project_stems_complete,
@@ -189,7 +189,6 @@ def cmd_separate(args: argparse.Namespace) -> None:
         run_separate,
         signals_complete,
         stem_count_change,
-        target_stem_count,
     )
 
     target = Path(args.target)
@@ -199,13 +198,11 @@ def cmd_separate(args: argparse.Namespace) -> None:
         _exit_error(f"error: {e}")
 
     stem_count = _optional_stem_count(args)
-    ensure_project_viz_config(
-        project_dir, target_stem_count(project_dir, stem_count)
-    )
 
     beat_stem = _optional_beat_detection_stem(args)
     if (
-        project_stems_complete(project_dir)
+        project_viz_config_path(project_dir).is_file()
+        and project_stems_complete(project_dir)
         and signals_complete(project_dir)
         and not args.force
         and not stem_count_change(project_dir, stem_count)

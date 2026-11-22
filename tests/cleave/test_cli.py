@@ -365,6 +365,7 @@ def test_cmd_separate_noop_when_complete(
         demucs_model="htdemucs",
     )
     (project / "signals.json").write_text('{"version": 4}')
+    (project / "cleave-viz.yaml").write_text("layers: {}\n")
 
     with patch("cleave.separate.run_separate") as run_separate:
         cmd_separate(build_parser().parse_args(["separate", "song"]))

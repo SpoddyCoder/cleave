@@ -25,6 +25,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- New projects start with every layer's preset list filled: as many presets as the song needs at the layer's preset duration, shuffled from the layer's preset folder. Every layer of a new project uses the Milkdrop Original pack's folder. New projects also start with placement snap off, all Post-FX off, larger card text (title 40 px, body 26 px), and the closing card in the bottom right with the title Credits.
 - The preset directory row, the preset row, and preset list entries give each of their two lines a full row's height, so the path and filename no longer crowd the line above.
 - Shorter timeline right-click menus. On a clip, Split at playhead and Split here are now At playhead and Here under a Split submenu. On the ruler and on rows, Drop song marker here is now a Drop song marker submenu: At playhead (Ctrl+Enter) or Here. On the time ruler, Generate timeline, Snap clips, Snap clips to markers, Set cut type on clips, and Reset timeline sit under a Timeline submenu.
 - Edit > Undo and Redo (Ctrl+Z, Ctrl+Y) now cover preset list edits too: adding, removing, moving, populating, pasting, and replacing entries. A locked layer's list edits cannot be undone until you unlock it, and a locked timeline blocks only timeline steps.
