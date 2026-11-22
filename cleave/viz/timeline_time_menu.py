@@ -1,11 +1,12 @@
 """Context menu items for a point in song time on the timeline strip.
 
-A right-click on the ruler, or on a row away from any cue, gets these items
-for the clicked time: seek there, play from there, and drop a song marker
-there. On a song marker the marker's items replace them: seek to it, play
+A right-click on the ruler, or on a row away from any cue, gets a Drop song
+marker submenu: at the playhead (the Ctrl+Enter path), or at the clicked
+time. On a song marker the marker's items replace them: seek to it, play
 from it, set its type, and delete it. The ruler also
-lists Undo and Redo and the timeline commands (Generate, Snap, Set cut
-type, Reset); a row keeps its menu short and leaves them out. Commands come
+lists Undo and Redo and a Timeline submenu of the timeline commands
+(Generate, Snap, Set cut type, Reset); a row keeps its menu short and leaves
+them out. Commands come
 from ``commands.py`` through ``command_menu_item``, so they share the menu
 bar's label, shortcut, and enabled state.
 """
@@ -87,7 +88,7 @@ class TimelineTimeMenu:
             CONTEXT_SEPARATOR,
             *self._history_items(),
             CONTEXT_SEPARATOR,
-            *self._command_items(),
+            self._command_submenu(),
         )
 
     def _play_from(self, t_sec: float) -> None:
@@ -97,28 +98,32 @@ class TimelineTimeMenu:
             transport.toggle_transport()
 
     def _time_items(self, t_sec: float) -> tuple[ContextMenuEntry, ...]:
-        transport = self._transport
         markers = self._controls.song_markers
         recording = bool(self._controls.session.timeline.recording)
+        hint = "Stop recording to drop markers" if recording else None
         return (
-            ContextMenuItem(
-                id="timeline.time.seek",
-                label="Seek here",
-                run=lambda: transport.seek_to(t_sec),
-            ),
-            ContextMenuItem(
-                id="timeline.time.play",
-                label="Play from here",
-                run=lambda: self._play_from(t_sec),
-            ),
-            CONTEXT_SEPARATOR,
-            ContextMenuItem(
+            ContextSubmenu(
                 id="timeline.time.drop_marker",
-                label="Drop song marker here",
-                run=lambda: markers.drop_at(t_sec),
+                label="Drop song marker",
+                items=(
+                    ContextMenuItem(
+                        id="timeline.time.drop_marker.playhead",
+                        label="At playhead",
+                        run=markers.drop,
+                        enabled=not recording,
+                        shortcut="Ctrl+Enter",
+                        hint=hint,
+                    ),
+                    ContextMenuItem(
+                        id="timeline.time.drop_marker.here",
+                        label="Here",
+                        run=lambda: markers.drop_at(t_sec),
+                        enabled=not recording,
+                        hint=hint,
+                    ),
+                ),
                 enabled=not recording,
-                shortcut="Ctrl+Enter",
-                hint="Stop recording to drop markers" if recording else None,
+                hint=hint,
             ),
         )
 
@@ -197,12 +202,21 @@ class TimelineTimeMenu:
             ),
         )
 
-    def _command_items(self) -> tuple[ContextMenuItem, ...]:
+    def _command_submenu(self) -> ContextSubmenu:
+        """The timeline commands, disabled as one while the timeline is blocked."""
         controls = self._controls
         hint = _timeline_edit_hint(command_context(controls))
-        return tuple(
-            command_menu_item(command_by_id(command_id), controls, disabled_hint=hint)
-            for command_id in _TIMELINE_COMMAND_IDS
+        return ContextSubmenu(
+            id="timeline.commands",
+            label="Timeline",
+            items=tuple(
+                command_menu_item(
+                    command_by_id(command_id), controls, disabled_hint=hint
+                )
+                for command_id in _TIMELINE_COMMAND_IDS
+            ),
+            enabled=hint is None,
+            hint=hint,
         )
 
 

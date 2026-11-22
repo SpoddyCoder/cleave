@@ -106,12 +106,19 @@ def _clip_controls(*, position_sec: float = 1.0, **kwargs):
     return make_timeline_controls(lanes=lanes, position_sec=position_sec, **kwargs)
 
 
+def _flatten(entries):
+    """Each row by id, with a submenu's child rows after it."""
+    rows = {}
+    for entry in entries:
+        if isinstance(entry, (ContextMenuItem, ContextSubmenu)):
+            rows[entry.id] = entry
+        if isinstance(entry, ContextSubmenu):
+            rows.update(_flatten(entry.items))
+    return rows
+
+
 def _entries_by_id(controls, session, row: int, **kwargs):
-    return {
-        entry.id: entry
-        for entry in timeline_row_menu_entries(controls, session, row, **kwargs)
-        if isinstance(entry, (ContextMenuItem, ContextSubmenu))
-    }
+    return _flatten(timeline_row_menu_entries(controls, session, row, **kwargs))
 
 
 def test_no_selected_clip_means_no_clip_items() -> None:
@@ -124,10 +131,9 @@ def test_selected_clip_leads_with_go_to_splits_cuts_role_delete() -> None:
     controls, session, _, _, seeks, _ = _clip_controls()
     session.timeline.selected_clip_t["layer_1"] = 4.0
     entries = timeline_row_menu_entries(controls, session, 0)
-    assert [getattr(entry, "id", None) for entry in entries[:8]] == [
+    assert [getattr(entry, "id", None) for entry in entries[:7]] == [
         "timeline.clip.go_to",
-        "timeline.clip.split",
-        "timeline.clip.split_here",
+        "timeline.clip.split_menu",
         "timeline.clip.cut_in",
         "timeline.clip.cut_out",
         "timeline.clip.role",
@@ -136,6 +142,10 @@ def test_selected_clip_leads_with_go_to_splits_cuts_role_delete() -> None:
     ]
     assert "timeline.clip.blend" not in _entries_by_id(controls, session, 0)
     by_id = _entries_by_id(controls, session, 0)
+    assert [item.label for item in by_id["timeline.clip.split_menu"].items] == [
+        "At playhead",
+        "Here",
+    ]
     cut_in = by_id["timeline.clip.cut_in"]
     assert cut_in.enabled and cut_in.shortcut == "C"
     assert [(item.label, item.checked) for item in cut_in.items] == [
@@ -226,6 +236,7 @@ def test_locked_timeline_greys_out_clip_edits_but_keeps_go_to() -> None:
         "timeline.clip.cut_in",
         "timeline.clip.cut_out",
         "timeline.clip.role",
+        "timeline.clip.split_menu",
         "timeline.clip.split",
         "timeline.clip.split_here",
         "timeline.clip.delete",

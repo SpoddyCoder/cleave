@@ -2,14 +2,14 @@
 
 The directory row offers Browse presets and a Jump to directory submenu of the
 library collections (favourites, roles, blacklisted). A preset list entry
-offers Audition; Move up and down and Remove; Cut, Copy, and Duplicate; Paste
-over, before, and after; Replace with (the browser), Replace with current
-preset, and Insert current preset after; Add current preset and Populate; then
-Favourite, Blacklist, and a Role submenu. The layer's current preset row offers
-Browse presets, Copy and Paste, Add to preset list, and the same curation
-items. A preset in the browser offers Copy and the curation items.
-Each item calls the same path as its key, and a disabled item says why in
-its hint.
+offers Audition; Cut, Copy, a Paste submenu (over, before, after), and
+Duplicate; Replace with (the browser), a Current preset submenu (replace this
+entry, insert after it, add to the end of the list), and Populate; Move up and
+down and Remove; then Favourite, Blacklist, and a Role submenu. The layer's
+current preset row offers Browse presets, Copy and Paste, Add to preset list,
+and the same curation items. A preset in the browser offers Copy and the
+curation items. Each item calls the same path as its key, and a disabled item
+says why in its hint.
 """
 
 from __future__ import annotations
@@ -66,11 +66,9 @@ def preset_row_menu_entries(
         return join_groups(
             [
                 (_audition_item(controls, slot, index),),
-                _list_edit_items(controls, desc, slot, index),
                 _clipboard_items(controls, desc, slot, index),
-                _paste_items(controls, desc, slot, index),
-                _replace_items(controls, desc, slot, index),
-                _list_fill_items(controls, desc, slot),
+                _fill_items(controls, desc, slot, index),
+                _list_edit_items(controls, desc, slot, index),
                 _curate_items(controls, desc, slot),
             ]
         )
@@ -204,7 +202,7 @@ def _list_edit_items(
 def _clipboard_items(
     controls: TuningControls, desc: RowDescriptor, slot: str, index: int
 ) -> tuple[ContextMenuEntry, ...]:
-    """Cut, Copy, and Duplicate for list entry *index*."""
+    """Cut, Copy, a Paste submenu, and Duplicate for list entry *index*."""
     hint = _LOCK_HINT if section_lock_blocks_mutation(controls.session, desc) else None
     clipboard = controls.preset_clipboard
     return (
@@ -222,6 +220,7 @@ def _clipboard_items(
             run=lambda: clipboard.copy_entry(slot, index),
             shortcut=COPY.shortcut,
         ),
+        _paste_submenu(controls, desc, slot, index),
         ContextMenuItem(
             id="preset.duplicate",
             label="Duplicate",
@@ -240,9 +239,9 @@ def _insert_hint(controls: TuningControls, slot: str) -> str | None:
     return None
 
 
-def _paste_items(
+def _paste_submenu(
     controls: TuningControls, desc: RowDescriptor, slot: str, index: int
-) -> tuple[ContextMenuEntry, ...]:
+) -> ContextSubmenu:
     """Paste over, before, and after list entry *index*."""
     clipboard = controls.preset_clipboard
     if section_lock_blocks_mutation(controls.session, desc):
@@ -251,10 +250,10 @@ def _paste_items(
         hint = clipboard.paste_hint()
     ready = hint is None
     insert_hint = _insert_hint(controls, slot) if ready else hint
-    return (
+    items = (
         ContextMenuItem(
             id="preset.paste_over",
-            label="Paste over",
+            label="Over this entry",
             run=lambda: clipboard.paste_over(slot, index),
             enabled=ready,
             shortcut=PASTE.shortcut,
@@ -262,29 +261,49 @@ def _paste_items(
         ),
         ContextMenuItem(
             id="preset.paste_before",
-            label="Paste before",
+            label="Before this entry",
             run=lambda: clipboard.paste_before(slot, index),
             enabled=ready,
             hint=insert_hint,
         ),
         ContextMenuItem(
             id="preset.paste_after",
-            label="Paste after",
+            label="After this entry",
             run=lambda: clipboard.paste_after(slot, index),
             enabled=ready,
             shortcut=PASTE_AFTER.shortcut,
             hint=insert_hint,
         ),
     )
+    return ContextSubmenu(
+        id="preset.paste", label="Paste", items=items, enabled=ready, hint=hint
+    )
 
 
-def _replace_items(
+def _fill_items(
     controls: TuningControls, desc: RowDescriptor, slot: str, index: int
 ) -> tuple[ContextMenuEntry, ...]:
-    """Replace from the browser or with the current preset, and insert the current one."""
+    """Replace with (the browser), a Current preset submenu, and Populate."""
     hint = _fill_hint(controls, desc)
     ready = hint is None
     preset_list = controls.preset_list
+    current = (
+        ContextMenuItem(
+            id="preset.replace_current",
+            label="Replace this entry",
+            run=lambda: preset_list.replace_with_current(slot, index),
+            enabled=ready,
+            hint=hint,
+        ),
+        ContextMenuItem(
+            id="preset.insert_current",
+            label="Insert after this entry",
+            run=lambda: preset_list.insert_current_after(slot, index),
+            enabled=ready,
+            hint=_insert_hint(controls, slot) if ready else hint,
+        ),
+        _add_item(controls, desc, slot, label="Add to end of list"),
+    )
     return (
         ContextMenuItem(
             id="preset.replace_browse",
@@ -293,19 +312,19 @@ def _replace_items(
             enabled=ready,
             hint=hint,
         ),
-        ContextMenuItem(
-            id="preset.replace_current",
-            label="Replace with current preset",
-            run=lambda: preset_list.replace_with_current(slot, index),
+        ContextSubmenu(
+            id="preset.current",
+            label="Current preset",
+            items=current,
             enabled=ready,
             hint=hint,
         ),
         ContextMenuItem(
-            id="preset.insert_current",
-            label="Insert current preset after",
-            run=lambda: preset_list.insert_current_after(slot, index),
+            id="preset.populate",
+            label="Populate list…",
+            run=lambda: controls.preset_list.prompt_populate(slot),
             enabled=ready,
-            hint=_insert_hint(controls, slot) if ready else hint,
+            hint=hint,
         ),
     )
 
@@ -332,22 +351,6 @@ def _preset_row_clipboard_items(
             run=lambda: clipboard.paste_preview(slot),
             enabled=hint is None,
             shortcut=PASTE.shortcut,
-            hint=hint,
-        ),
-    )
-
-
-def _list_fill_items(
-    controls: TuningControls, desc: RowDescriptor, slot: str
-) -> tuple[ContextMenuEntry, ...]:
-    hint = _fill_hint(controls, desc)
-    return (
-        _add_item(controls, desc, slot, label="Add current preset"),
-        ContextMenuItem(
-            id="preset.populate",
-            label="Populate list…",
-            run=lambda: controls.preset_list.prompt_populate(slot),
-            enabled=hint is None,
             hint=hint,
         ),
     )

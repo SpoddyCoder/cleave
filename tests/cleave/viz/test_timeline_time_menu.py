@@ -22,34 +22,47 @@ class _Transport:
         self.paused = not self.paused
 
 
+def _flatten(entries):
+    """Each row by id, with a submenu's child rows after it."""
+    rows = {}
+    for entry in entries:
+        if isinstance(entry, (ContextMenuItem, ContextSubmenu)):
+            rows[entry.id] = entry
+        if isinstance(entry, ContextSubmenu):
+            rows.update(_flatten(entry.items))
+    return rows
+
+
 def _items(menu: TimelineTimeMenu, t: float = 12.0, *, commands: bool = True):
     return {
-        entry.id: entry
-        for entry in menu.entries(t, 0.5, commands=commands)
+        item_id: entry
+        for item_id, entry in _flatten(menu.entries(t, 0.5, commands=commands)).items()
         if isinstance(entry, ContextMenuItem)
     }
 
 
-def test_row_time_items_seek_play_and_drop() -> None:
+def test_drop_song_marker_submenu_drops_at_the_playhead_or_here() -> None:
     controls = make_controls()
     transport = _Transport()
-    items = _items(TimelineTimeMenu(controls, transport), commands=False)
-    assert list(items) == [
-        "timeline.time.seek",
-        "timeline.time.play",
+    playhead_drops: list[str] = []
+    controls.song_markers.drop = lambda: playhead_drops.append("drop")
+    entries = TimelineTimeMenu(controls, transport).entries(12.0, 0.5, commands=False)
+    assert len(entries) == 1
+    drop = entries[0]
+    assert isinstance(drop, ContextSubmenu)
+    assert (drop.id, drop.label, drop.enabled) == (
         "timeline.time.drop_marker",
-    ]
-    items["timeline.time.seek"].run()
-    items["timeline.time.play"].run()
-    assert transport.calls == [("seek", 12.0), ("seek", 12.0), ("transport",)]
-    items["timeline.time.drop_marker"].run()
+        "Drop song marker",
+        True,
+    )
+    playhead, here = drop.items
+    assert (playhead.label, playhead.shortcut) == ("At playhead", "Ctrl+Enter")
+    assert (here.label, here.shortcut) == ("Here", None)
+    playhead.run()
+    assert playhead_drops == ["drop"]
+    here.run()
     assert controls.session.song_markers.times == [12.0]
-
-
-def test_play_from_here_does_not_pause_a_playing_song() -> None:
-    transport = _Transport(paused=False)
-    _items(TimelineTimeMenu(make_controls(), transport))["timeline.time.play"].run()
-    assert transport.calls == [("seek", 12.0)]
+    assert transport.calls == []
 
 
 def _marker_entries(controls, *, commands: bool = False):
@@ -120,15 +133,21 @@ def test_recording_disables_marker_edits_but_not_seeking() -> None:
 def test_a_gone_marker_falls_back_to_the_time_items() -> None:
     controls = make_controls()
     ids = [getattr(e, "id", None) for e in _marker_entries(controls)]
-    assert ids[0] == "timeline.time.seek"
+    assert ids[0] == "timeline.time.drop_marker"
 
 
 def test_recording_blocks_marker_drop() -> None:
     controls = make_controls()
     controls.session.timeline.recording = True
-    drop = _items(TimelineTimeMenu(controls, _Transport()))["timeline.time.drop_marker"]
+    entries = TimelineTimeMenu(controls, _Transport()).entries(12.0, 0.5, commands=True)
+    drop = entries[0]
+    assert drop.id == "timeline.time.drop_marker"
     assert drop.enabled is False
     assert drop.hint == "Stop recording to drop markers"
+    items = _items(TimelineTimeMenu(controls, _Transport()))
+    for item_id in ("timeline.time.drop_marker.playhead", "timeline.time.drop_marker.here"):
+        assert items[item_id].enabled is False
+        assert items[item_id].hint == "Stop recording to drop markers"
 
 
 def test_ruler_lists_history_and_timeline_commands() -> None:
@@ -143,6 +162,23 @@ def test_ruler_lists_history_and_timeline_commands() -> None:
         "timeline.reset",
     ):
         assert command_id in items
+    entries = TimelineTimeMenu(make_controls(), _Transport()).entries(
+        12.0, 0.5, commands=True
+    )
+    commands = entries[-1]
+    assert isinstance(commands, ContextSubmenu)
+    assert (commands.id, commands.label, commands.enabled) == (
+        "timeline.commands",
+        "Timeline",
+        True,
+    )
+    assert [item.id for item in commands.items] == [
+        "timeline.generate",
+        "timeline.snap_cues",
+        "timeline.snap_to_markers",
+        "timeline.set_cut_type",
+        "timeline.reset",
+    ]
     assert items["timeline.generate"].enabled is True
     assert items["edit.undo"].label == "Undo"
     assert items["edit.undo"].enabled is False
@@ -164,6 +200,9 @@ def test_undo_label_names_the_last_command() -> None:
 def test_locked_timeline_disables_commands_with_a_hint() -> None:
     controls = make_controls()
     controls.session.timeline.locked = True
+    entries = TimelineTimeMenu(controls, _Transport()).entries(12.0, 0.5, commands=True)
+    assert entries[-1].enabled is False
+    assert entries[-1].hint == "Unlock the timeline to edit"
     items = _items(TimelineTimeMenu(controls, _Transport()))
     assert items["timeline.generate"].enabled is False
     assert items["timeline.generate"].hint == "Unlock the timeline to edit"

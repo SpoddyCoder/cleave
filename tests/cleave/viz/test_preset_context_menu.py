@@ -19,12 +19,19 @@ def _item_desc(index: int) -> RowDescriptor:
     )
 
 
+def _flatten(entries):
+    """Each row by id, with a submenu's child rows after it."""
+    rows = {}
+    for entry in entries:
+        if isinstance(entry, (ContextMenuItem, ContextSubmenu)):
+            rows[entry.id] = entry
+        if isinstance(entry, ContextSubmenu):
+            rows.update(_flatten(entry.items))
+    return rows
+
+
 def _entries(controls, desc: RowDescriptor):
-    return {
-        entry.id: entry
-        for entry in preset_row_menu_entries(controls, desc)
-        if isinstance(entry, (ContextMenuItem, ContextSubmenu))
-    }
+    return _flatten(preset_row_menu_entries(controls, desc))
 
 
 def _controls_with_list(
@@ -52,30 +59,48 @@ def _names(controls, slot: str = "layer_1") -> list[str]:
 def test_list_item_menu_lists_its_items_in_order() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         controls, _paths = _controls_with_list(tmp)
-        items = _entries(controls, _item_desc(1))
-        assert list(items) == [
+        entries = preset_row_menu_entries(controls, _item_desc(1))
+        assert [getattr(entry, "id", None) for entry in entries] == [
             "preset.audition",
+            None,
+            "preset.cut",
+            "preset.copy",
+            "preset.paste",
+            "preset.duplicate",
+            None,
+            "preset.replace_browse",
+            "preset.current",
+            "preset.populate",
+            None,
             "preset.move_up",
             "preset.move_down",
             "preset.remove",
-            "preset.cut",
-            "preset.copy",
-            "preset.duplicate",
-            "preset.paste_over",
-            "preset.paste_before",
-            "preset.paste_after",
-            "preset.replace_browse",
-            "preset.replace_current",
-            "preset.insert_current",
-            "preset.add_current",
-            "preset.populate",
+            None,
             "preset.favourite",
             "preset.blacklist",
             "preset.role",
         ]
-        paste_ids = {"preset.paste_over", "preset.paste_before", "preset.paste_after"}
+        items = _entries(controls, _item_desc(1))
+        assert [(item.id, item.label) for item in items["preset.paste"].items] == [
+            ("preset.paste_over", "Over this entry"),
+            ("preset.paste_before", "Before this entry"),
+            ("preset.paste_after", "After this entry"),
+        ]
+        assert [(item.id, item.label) for item in items["preset.current"].items] == [
+            ("preset.replace_current", "Replace this entry"),
+            ("preset.insert_current", "Insert after this entry"),
+            ("preset.add_current", "Add to end of list"),
+        ]
+        paste_ids = {
+            "preset.paste",
+            "preset.paste_over",
+            "preset.paste_before",
+            "preset.paste_after",
+        }
         assert all(
-            entry.enabled for item_id, entry in items.items() if item_id not in paste_ids
+            entry.enabled
+            for item_id, entry in items.items()
+            if item_id not in paste_ids and not item_id.startswith("preset.role.")
         )
         for item_id in paste_ids:
             assert items[item_id].enabled is False
@@ -158,10 +183,12 @@ def test_lock_disables_edits_but_not_audition() -> None:
             "preset.remove",
             "preset.cut",
             "preset.duplicate",
+            "preset.paste",
             "preset.paste_over",
             "preset.paste_before",
             "preset.paste_after",
             "preset.replace_browse",
+            "preset.current",
             "preset.replace_current",
             "preset.insert_current",
             "preset.add_current",
@@ -260,7 +287,7 @@ def test_current_preset_row_offers_add_and_curate() -> None:
     controls = make_controls(("layer_1",))
     desc = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
     items = _entries(controls, desc)
-    assert list(items) == [
+    assert [item_id for item_id in items if not item_id.startswith("preset.role.")] == [
         "preset.browse",
         "preset.copy",
         "preset.paste_preview",
@@ -303,7 +330,10 @@ def test_directory_row_jumps_to_a_collection() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         controls, _paths = _controls_with_library(tmp)
         items = _entries(controls, _dir_desc())
-        assert list(items) == ["preset.browse", "preset.jump"]
+        assert [
+            getattr(entry, "id", None)
+            for entry in preset_row_menu_entries(controls, _dir_desc())
+        ] == ["preset.browse", None, "preset.jump"]
         assert items["preset.browse"].label == "Browse presets…"
         jump = items["preset.jump"]
         assert jump.label == "Jump to directory"

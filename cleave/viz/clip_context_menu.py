@@ -1,7 +1,8 @@
 """Context menu section for a timeline row's selected clip.
 
-Go to the clip's start, split it at the playhead or at the right-clicked
-time, set its cut in, cut out, and role from submenus, and delete it. Each
+Go to the clip's start, split it from a Split submenu (at the playhead or at
+the right-clicked time), set its cut in, cut out, and role from submenus, and
+delete it. Each
 choice calls the same ``ClipEditor`` method as the strip's clip keys and the
 inspector's clip rows. Blend is left to the inspector. ``add_clip_entry`` is the row's item for adding a clip at a clicked
 time in a gap. Cut out needs an end cue of the clip's own, so it is disabled
@@ -72,20 +73,30 @@ def clip_menu_entries(
             run=lambda: seek_to(start),
             shortcut="Enter",
         ),
-        ContextMenuItem(
-            id="timeline.clip.split",
-            label="Split at playhead",
-            run=split_at_playhead,
-            enabled=editable and can_split,
-            shortcut="Ctrl+K",
-            hint=split_hint,
-        ),
-        ContextMenuItem(
-            id="timeline.clip.split_here",
-            label="Split here",
-            run=lambda: editor.split_at(slot, split_t) if split_t is not None else None,
-            enabled=editable and can_split_here,
-            hint=split_here_hint,
+        ContextSubmenu(
+            id="timeline.clip.split_menu",
+            label="Split",
+            items=(
+                ContextMenuItem(
+                    id="timeline.clip.split",
+                    label="At playhead",
+                    run=split_at_playhead,
+                    enabled=editable and can_split,
+                    shortcut="Ctrl+K",
+                    hint=split_hint,
+                ),
+                ContextMenuItem(
+                    id="timeline.clip.split_here",
+                    label="Here",
+                    run=lambda: editor.split_at(slot, split_t)
+                    if split_t is not None
+                    else None,
+                    enabled=editable and can_split_here,
+                    hint=split_here_hint,
+                ),
+            ),
+            enabled=editable,
+            hint=edit_hint,
         ),
         ContextSubmenu(
             id="timeline.clip.cut_in",

@@ -570,7 +570,7 @@ class _TimeMenu:
         self.calls.append((t_sec, tolerance_sec, commands, marker_index))
         self.marker_selected.append(marker_selected)
         return (
-            ContextMenuItem(id="time.seek", label="Seek here", run=lambda: None),
+            ContextMenuItem(id="time.drop_marker", label="Drop", run=lambda: None),
         )
 
 
@@ -602,7 +602,7 @@ def test_ruler_right_click_opens_time_and_command_items() -> None:
         time_menu=time_menu,
     ).context_menu_at(0, 0)
     assert provider is not None
-    assert [entry.id for entry in provider()] == ["time.seek"]
+    assert [entry.id for entry in provider()] == ["time.drop_marker"]
     assert time_menu.calls == [(5.0, 0.2, True, None)]
     assert actions.calls == []
 
@@ -628,7 +628,7 @@ def test_row_gap_leads_with_time_items() -> None:
     entries = provider()
     assert entries[0].id == "timeline.clip.add"
     assert entries[1] is CONTEXT_SEPARATOR
-    assert entries[2].id == "time.seek"
+    assert entries[2].id == "time.drop_marker"
     assert entries[3] is CONTEXT_SEPARATOR
     assert entries[4].id == "timeline.row.override"
     assert time_menu.calls == [(5.0, 0.2, False, None)]

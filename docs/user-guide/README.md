@@ -312,10 +312,10 @@ Right-click an entry to rework the list without starting over:
 | --- | --- |
 | Cut (Ctrl+X) / Copy (Ctrl+C) | Take the preset, to paste into this list or another layer's. Cut also removes the entry. |
 | Duplicate (Ctrl+D) | Add a second copy of the entry right after it. |
-| Paste over (Ctrl+V) | Put the copied preset in place of this entry. |
-| Paste before / Paste after (Ctrl+Shift+V) | Insert the copied preset next to this entry. |
+| Paste > Over this entry (Ctrl+V) | Put the copied preset in place of this entry. |
+| Paste > Before this entry / After this entry (Ctrl+Shift+V) | Insert the copied preset next to this entry. |
 | Replace with (or double-click the entry) | Open the preset browser in this entry's folder. The layer previews presets as you move through them; Enter (or a double-click) puts the one you pick in the entry's place and keeps it playing as a preview, and Esc leaves the list as it was. |
-| Replace with current preset / Insert current preset after | Use the preset the layer is showing now. |
+| Current preset > Replace this entry / Insert after this entry / Add to end of list | Use the preset the layer is showing now. |
 
 The same commands are in the **Edit** menu, acting on the highlighted entry. You can also copy the preset on the Milkdrop Preset page's preset row, or a preset in the preset browser (right-click it). Paste on the preset row plays the copied preset as a preview without touching the list. Copy and paste work between layers and between projects: a pasted preset is copied into the project, like any other list preset. With the timeline trigger, every entry belongs to a clip in order, so inserting one moves each later preset on to the next clip, while pasting over or replacing keeps the rest in place.
 
@@ -439,7 +439,7 @@ Click a clip to select it and edit its details in the inspector.
 | Trim a clip | Drag either end. |
 | Roll the edit point between two touching clips | Drag the centre of the join; one clip grows as the other shrinks. |
 | Trim one of two touching clips | Grab just inside that clip, next to the join, and drag. This opens a gap. |
-| Split a clip | Ctrl+K splits at the playhead; the context menu has Split here. |
+| Split a clip | Ctrl+K splits at the playhead. The context menu's Split submenu splits at the playhead or where you right-clicked. |
 | Delete a clip | Press Delete. |
 | Nudge its opacity | `,` and `.` nudge it down and up. |
 | Change its transitions | C cycles the cut in, and Shift+C the cut out. |
@@ -447,6 +447,8 @@ Click a clip to select it and edit its details in the inspector.
 The pointer shows what a drag will do: a four-way arrow moves a clip, a bracket with an arrow trims one end, and a left-right arrow rolls a join.
 
 Each clip also has its own **blend** mode and **role**, set in the inspector or from the context menu.
+
+A right-click on the time ruler offers Drop song marker, Undo, Redo, and a **Timeline** submenu holding Generate timeline, Snap clips, Snap clips to markers, Set cut type on clips, and Reset timeline.
 
 With **placement snap** on (Timeline > Beat / Bar Grid), clips snap to beats or bars.
 
@@ -479,7 +481,7 @@ Sometimes you want to see a layer the timeline has switched off. Click the row's
 
 ### Song markers
 
-**Song markers** map the structure of the song: the drop, the chorus, the breakdown. Press **Ctrl+Enter** to drop one at the playhead, or right-click the time ruler or anywhere on a timeline row, clip or gap, and choose **Drop song marker here**. Markers dropped while the song plays allow for your tap latency (see [Markers and recorded clips land late](#markers-and-recorded-clips-land-late)). Click a marker, on the time ruler or in a gap on a row, to select it and move the playhead to it. Over a clip, a click selects the clip instead.
+**Song markers** map the structure of the song: the drop, the chorus, the breakdown. Press **Ctrl+Enter** to drop one at the playhead, or right-click the time ruler or anywhere on a timeline row, clip or gap, and choose **Drop song marker > At playhead** or **Drop song marker > Here** (where you right-clicked). Markers dropped while the song plays allow for your tap latency (see [Markers and recorded clips land late](#markers-and-recorded-clips-land-late)). Click a marker, on the time ruler or in a gap on a row, to select it and move the playhead to it. Over a clip, a click selects the clip instead.
 
 Markers pay off in three ways: clips snap to them, you can jump between them, and Generate timeline builds its arrangement around them.
 
