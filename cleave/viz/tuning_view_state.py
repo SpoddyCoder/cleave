@@ -73,7 +73,7 @@ from cleave.config_schema.timeline import (
 )
 from cleave.preset_library import PresetLibrary
 from cleave.viz.timeline_clip_edits import selected_clip
-from cleave.viz.preset_browser import BrowserCrumb
+from cleave.viz.preset_browser import BrowserCrumb, mark_missing_crumbs
 from cleave.preset_playlist import (
     PresetPlaylist,
     preset_filename_display,
@@ -119,7 +119,14 @@ _RO_PATTERN_MASK_DEFAULTS = default_render_pattern_mask_runtime_values()
 def directory_crumbs(
     playlist: PresetPlaylist, preset_root: Path, label: str
 ) -> tuple[BrowserCrumb, ...]:
-    """Folders from the top-level pack down to *playlist*'s folder."""
+    """Folders from the top-level pack down to *playlist*'s folder, with the
+    ones that are not on disk marked (``mark_missing_crumbs``)."""
+    return mark_missing_crumbs(_directory_crumbs(playlist, preset_root, label))
+
+
+def _directory_crumbs(
+    playlist: PresetPlaylist, preset_root: Path, label: str
+) -> tuple[BrowserCrumb, ...]:
     if playlist.collection is not None:
         return (BrowserCrumb(label),)
     root = preset_root.resolve()
@@ -127,7 +134,8 @@ def directory_crumbs(
     try:
         parts = folder.relative_to(root).parts
     except ValueError:
-        return (BrowserCrumb(label),)
+        # A folder outside the preset root: one crumb, the whole path.
+        return (BrowserCrumb(label, folder),)
     if not parts:
         return (BrowserCrumb(label, folder),)
     crumbs: list[BrowserCrumb] = []
@@ -143,8 +151,9 @@ class TrackBlock:
     runtime: LayerRuntime
     preset_dir_label: str
     preset_label: str
-    # The directory row's path as folders a click can jump to; a collection
-    # or a folder outside the preset root is one crumb with no path.
+    # The directory row's path as folders a click can jump to, with the ones
+    # not on disk marked missing; a collection is one crumb with no path, and
+    # a folder outside the preset root one crumb for the whole path.
     preset_dir_crumbs: tuple[BrowserCrumb, ...] = ()
     preset_dir_position: str = ""
     preset_dir_can_go_up: bool = False
@@ -866,7 +875,9 @@ class TuningViewStateBuilder:
                 runtime=layer,
                 preset_dir_label=directory.path,
                 preset_dir_crumbs=directory_crumbs(
-                    layer.playlist, self.preset_root, directory.path
+                    layer.playlist,
+                    self.preset_root,
+                    directory.path,
                 ),
                 preset_dir_position=directory.position,
                 preset_dir_can_go_up=directory.can_go_up,

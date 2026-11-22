@@ -352,7 +352,7 @@ When a layer has more than one problem or notice, hovering over the mark says Mu
 
 #### Marks on preset rows
 
-A preset file that is missing (moved, renamed, or left out of a restored project) or that failed to load shows the same red warning sign as the layer, just left of its position number (such as 4/15), on the preset row and on its preset list entry. Hover over the sign to see why. When the layer's whole preset folder is missing, the sign shows on the preset directory row instead. Cleave looks for missing files and folders when a project opens; a file that disappears while you work is marked once a layer tries to load it. A bad entry in the preset list also lights the layer's icon, since switching skips it. Playing a missing entry keeps its name on the preset row with the mark, so you can see which file is gone.
+A preset file that is missing (moved, renamed, or left out of a restored project) or that failed to load shows the same red warning sign as the layer, just left of its position number (such as 4/15), on the preset row and on its preset list entry. Hover over the sign to see why. When the layer's whole preset folder is missing, the sign shows on the preset directory row instead, and the folders in its path that are not found show in red, there and in the preset browser's path. Cleave looks for missing files and folders when a project opens; a file that disappears while you work is marked once a layer tries to load it. A bad entry in the preset list also lights the layer's icon, since switching skips it. Playing a missing entry keeps its name on the preset row with the mark, so you can see which file is gone.
 
 ### Preset markers
 

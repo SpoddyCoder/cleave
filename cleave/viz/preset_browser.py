@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from pathlib import Path
 
@@ -111,6 +111,30 @@ class BrowserCrumb:
 
     label: str
     path: Path | None = None
+    # A folder that is not found, drawn in red.
+    missing: bool = False
+
+
+def mark_missing_crumbs(crumbs: tuple[BrowserCrumb, ...]) -> tuple[BrowserCrumb, ...]:
+    """*crumbs* with the folders that are not on disk marked.
+
+    The first folder that is not found and every crumb under it are marked.
+    A crumb with no path (a collection) is never a folder and is not marked.
+    Checks the disk, so call it when the crumbs are built, not every frame.
+    """
+    first = next(
+        (
+            index
+            for index, crumb in enumerate(crumbs)
+            if crumb.path is not None and not crumb.path.is_dir()
+        ),
+        None,
+    )
+    if first is None:
+        return crumbs
+    return tuple(
+        replace(crumb, missing=index >= first) for index, crumb in enumerate(crumbs)
+    )
 
 
 @dataclass(frozen=True)
@@ -344,6 +368,10 @@ class PresetBrowser:
     _rows: tuple[BrowserRow, ...] = field(default_factory=tuple, repr=False)
     _serial: int = field(default=0, repr=False)
     _pending: ListingRequest | None = field(default=None, repr=False)
+    _crumbs_key: tuple[Path, PresetCollection | None] | None = field(
+        default=None, repr=False
+    )
+    _crumbs: tuple[BrowserCrumb, ...] = field(default_factory=tuple, repr=False)
 
     def __post_init__(self) -> None:
         self.preset_root = self.preset_root.resolve()
@@ -449,6 +477,18 @@ class PresetBrowser:
         return row.path
 
     def crumbs(self) -> tuple[BrowserCrumb, ...]:
+        """The path's crumbs, with folders that are not found marked.
+
+        Built once per folder or collection, since marking checks the disk.
+        """
+        assert self.folder is not None
+        key = (self.folder, self.collection)
+        if self._crumbs_key != key:
+            self._crumbs_key = key
+            self._crumbs = self._build_crumbs()
+        return self._crumbs
+
+    def _build_crumbs(self) -> tuple[BrowserCrumb, ...]:
         assert self.folder is not None
         out = [BrowserCrumb(ROOT_LABEL, self.preset_root)]
         if self.collection is not None:
@@ -458,7 +498,7 @@ class PresetBrowser:
         for part in self.folder.relative_to(self.preset_root).parts:
             path = path / part
             out.append(BrowserCrumb(part, path))
-        return tuple(out)
+        return mark_missing_crumbs(tuple(out))
 
     def view_state(self) -> BrowserViewState:
         location = (

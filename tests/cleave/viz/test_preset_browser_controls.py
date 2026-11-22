@@ -380,6 +380,21 @@ def test_directory_crumbs_run_from_the_pack_down(rig: _Rig) -> None:
         ("Pack", rig.root / "Pack"),
         ("A", rig.root / "Pack" / "A"),
     ]
+    assert not any(crumb.missing for crumb in crumbs)
+    rig.layer.playlist.current_dir = rig.root / "Pack" / "Gone" / "Deeper"
+    missing = directory_crumbs(rig.layer.playlist, rig.root, "Pack/Gone/Deeper/")
+    assert [(crumb.label, crumb.missing) for crumb in missing] == [
+        ("Pack", False),
+        ("Gone", True),
+        ("Deeper", True),
+    ]
+    # One folder up is still not found, though only the deepest was reported.
+    rig.layer.playlist.current_dir = rig.root / "Pack" / "Gone"
+    missing = directory_crumbs(rig.layer.playlist, rig.root, "Pack/Gone/")
+    assert [(crumb.label, crumb.missing) for crumb in missing] == [
+        ("Pack", False),
+        ("Gone", True),
+    ]
     rig.layer.playlist.enter_collection("favourites")
     assert [(c.label, c.path) for c in directory_crumbs(rig.layer.playlist, rig.root, "Favourites")] == [
         ("Favourites", None)

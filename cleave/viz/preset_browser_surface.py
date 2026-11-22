@@ -310,7 +310,12 @@ class PresetBrowserSurface:
                     request_hand()
                 rects.append(hit)
                 indices.append(slot.index)
-            role = palette().value if current else palette().label
+            if self.view.crumbs[slot.index].missing and slot.text != CRUMB_ELLIPSIS:
+                role = palette().error_notification
+            elif current:
+                role = palette().value
+            else:
+                role = palette().label
             draw_text(draw, x + slot.x, text_y, slot.text, role)
         self.crumb_rects = tuple(rects)
         self.crumb_indices = tuple(indices)

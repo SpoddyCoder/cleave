@@ -352,7 +352,12 @@ class ValueControls:
                     request_pointer(PointerShape.HAND)
                     show_tooltip(f"Go to {crumbs[slot.index].label}")
                     hit = slot.index
-            color = value_color if current or dimmed else palette().label
+            if crumbs[slot.index].missing and slot.text != CRUMB_ELLIPSIS:
+                color = palette().error_notification
+            elif current or dimmed:
+                color = value_color
+            else:
+                color = palette().label
             draw.add_text(imgui.ImVec2(slot_x, y), imgui.get_color_u32(rgba(color)), slot.text)
         if not activated or hit is None or desc.slot is None:
             return

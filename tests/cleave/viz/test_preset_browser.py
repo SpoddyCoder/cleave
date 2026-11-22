@@ -10,6 +10,8 @@ import pytest
 from cleave.preset_library import UNFILTERED_CATALOG, PresetLibrary
 from cleave.viz import preset_browser
 from cleave.viz.preset_browser import (
+    BrowserCrumb,
+    mark_missing_crumbs,
     BrowserAction,
     BrowserFocus,
     BrowserOutcome,
@@ -378,3 +380,19 @@ def test_centred_line_puts_the_ink_midway() -> None:
     # Ink 4..16 below the line top; 100..140 has its middle at 120.
     y = centred_line_y(100, 140, 4, 16)
     assert y + 4 - 100 == 140 - (y + 16)
+
+
+def test_missing_crumbs_start_at_the_first_folder_not_found(tmp_path: Path) -> None:
+    (tmp_path / "Pack").mkdir()
+    crumbs = (
+        BrowserCrumb("Pack", tmp_path / "Pack"),
+        BrowserCrumb("Gone", tmp_path / "Pack" / "Gone"),
+        BrowserCrumb("Deeper", tmp_path / "Pack" / "Gone" / "Deeper"),
+    )
+    marked = mark_missing_crumbs(crumbs)
+    assert [crumb.missing for crumb in marked] == [False, True, True]
+    # Going up to a folder that is still not found keeps it marked.
+    assert [crumb.missing for crumb in mark_missing_crumbs(crumbs[:2])] == [False, True]
+    assert mark_missing_crumbs(crumbs[:1]) == crumbs[:1]
+    # A collection has no folder, so it is never marked.
+    assert not mark_missing_crumbs((BrowserCrumb("Favourites"),))[0].missing
