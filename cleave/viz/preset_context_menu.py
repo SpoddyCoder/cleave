@@ -8,7 +8,9 @@ entry, insert after it, add to the end of the list), and Populate; Move up and
 down and Remove; then Favourite, Blacklist, and a Role submenu. The layer's
 current preset row offers Browse presets, Copy and Paste, Add to preset list,
 and the same curation items. A preset in the browser offers Copy and the
-curation items. Each item calls the same path as its key, and a disabled item
+curation items. A right-click on the Preset List page away from any entry
+(the only way in while the list is empty) offers Paste at the end of the
+list, Add current preset, and Populate. Each item calls the same path as its key, and a disabled item
 says why in its hint.
 """
 
@@ -86,6 +88,49 @@ def preset_row_menu_entries(
             ]
         )
     return ()
+
+
+def preset_list_page_menu(
+    controls: TuningControls, slot: str
+) -> ContextMenuProvider:
+    """Provider for the Preset List page itself, off any entry (or an empty list)."""
+    # The heading row ignores the lock; an entry's kind carries the list's.
+    desc = RowDescriptor(RowKind.TRACK_PRESET_LIST_ITEM, slot=slot)
+
+    def entries() -> tuple[ContextMenuEntry, ...]:
+        if slot not in controls.session.layers:
+            return ()
+        clipboard = controls.preset_clipboard
+        if section_lock_blocks_mutation(controls.session, desc):
+            paste_hint: str | None = _LOCK_HINT
+        else:
+            paste_hint = clipboard.paste_hint()
+        fill_hint = _fill_hint(controls, desc)
+        return join_groups(
+            [
+                (
+                    ContextMenuItem(
+                        id="preset.paste_end",
+                        label="Paste",
+                        run=lambda: clipboard.paste_at_end(slot),
+                        enabled=paste_hint is None,
+                        hint=paste_hint,
+                    ),
+                ),
+                (
+                    _add_item(controls, desc, slot, label="Add current preset"),
+                    ContextMenuItem(
+                        id="preset.populate",
+                        label="Populate list…",
+                        run=lambda: controls.preset_list.prompt_populate(slot),
+                        enabled=fill_hint is None,
+                        hint=fill_hint,
+                    ),
+                ),
+            ]
+        )
+
+    return entries
 
 
 def browser_preset_menu(

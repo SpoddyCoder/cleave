@@ -317,6 +317,8 @@ Right-click an entry to rework the list without starting over:
 | Replace with (or double-click the entry) | Open the preset browser in this entry's folder. The layer previews presets as you move through them; Enter (or a double-click) puts the one you pick in the entry's place and keeps it playing as a preview, and Esc leaves the list as it was. |
 | Current preset > Replace this entry / Insert after this entry / Add to end of list | Use the preset the layer is showing now. |
 
+To paste into an empty list, or at the end of any list, right-click the Preset List page away from its entries: that menu has **Paste** (to the end of the list), **Add current preset**, and **Populate list**.
+
 The same commands are in the **Edit** menu, acting on the highlighted entry. You can also copy the preset on the Milkdrop Preset page's preset row, or a preset in the preset browser (right-click it). Paste on the preset row plays the copied preset as a preview without touching the list. Copy and paste work between layers and between projects: a pasted preset is copied into the project, like any other list preset. With the timeline trigger, every entry belongs to a clip in order, so inserting one moves each later preset on to the next clip, while pasting over or replacing keeps the rest in place.
 
 Cleave keeps a copy of every preset in the list inside the project, so the project plays the same on another computer or after the original pack changes. The list still shows each preset under its own name, and previewing an entry takes the preset rows to the folder it came from, so the arrows and the preset browser carry on from there. If that file has since been moved, deleted, or edited, the preview shows the project's own copy instead, in the project's presets folder.

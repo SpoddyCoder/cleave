@@ -7,7 +7,11 @@ from pathlib import Path
 
 from cleave.preset_library import UNFILTERED_CATALOG
 from cleave.viz.context_menu import ContextMenuItem, ContextSubmenu
-from cleave.viz.preset_context_menu import preset_row_menu, preset_row_menu_entries
+from cleave.viz.preset_context_menu import (
+    preset_list_page_menu,
+    preset_row_menu,
+    preset_row_menu_entries,
+)
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from tests.support.viz import make_controls
 from tests.support.preset_list import entries
@@ -253,6 +257,33 @@ def test_cut_moves_an_entry_to_another_layer() -> None:
         assert _names(controls, "layer_2") == []
         controls.undo()
         assert _names(controls) == ["a.milk", "b.milk", "c.milk"]
+
+
+def test_list_page_menu_pastes_into_an_empty_list() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        controls, _paths = _controls_with_list(tmp, slots=("layer_1", "layer_2"))
+        page = _flatten(preset_list_page_menu(controls, "layer_2")())
+        assert page["preset.paste_end"].enabled is False
+        assert page["preset.paste_end"].hint == "Nothing copied"
+        controls.preset_clipboard.copy_entry("layer_1", 2)
+        page = _flatten(preset_list_page_menu(controls, "layer_2")())
+        assert set(page) == {"preset.paste_end", "preset.add_current", "preset.populate"}
+        page["preset.paste_end"].run()
+        page["preset.paste_end"].run()
+        assert _names(controls, "layer_2") == ["c.milk", "c.milk"]
+        controls.undo()
+        assert _names(controls, "layer_2") == ["c.milk"]
+
+
+def test_list_page_menu_is_disabled_when_locked() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        controls, _paths = _controls_with_list(tmp)
+        controls.preset_clipboard.copy_entry("layer_1", 0)
+        controls.session.layers["layer_1"].locked = True
+        page = _flatten(preset_list_page_menu(controls, "layer_1")())
+        for item in page.values():
+            assert item.enabled is False, item.id
+            assert item.hint == "Locked: unlock to change"
 
 
 def test_duplicate_inserts_a_second_copy_after() -> None:

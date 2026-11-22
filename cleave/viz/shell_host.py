@@ -26,7 +26,12 @@ from cleave.viz.imgui_host import ImGuiHost, mouse_button
 from cleave.viz.imgui_theme import rgba
 from cleave.viz.menu_bar import MenuBarState
 from cleave.viz.menu_rows import ContextMenuSurface, ContextSubmenuSurface
-from cleave.viz.navigator import layer_node_id
+from cleave.viz.navigator import (
+    LAYER_PAGE_PRESET_LIST,
+    layer_node_id,
+    layer_page_of,
+    layer_slot_of,
+)
 from cleave.viz.navigator_context_menu import navigator_node_menu
 from cleave.viz.overlay_profiler import OverlayProfiler
 from cleave.viz.panel_notification import PanelNotificationActive
@@ -36,6 +41,7 @@ from cleave.viz.preset_browser_surface import PresetBrowserSurface
 from cleave.viz.preset_context_menu import (
     PRESET_MENU_KINDS,
     browser_preset_menu,
+    preset_list_page_menu,
     preset_row_menu,
 )
 from cleave.viz.profiler_panel import draw_profiler_panel
@@ -389,7 +395,12 @@ class ShellHost:
             found = self.inspector.row_rects.get(desc) if desc is not None else None
             provider = self._inspector_menu(desc) if desc is not None else None
             if found is None or provider is None:
-                return None
+                page = self._inspector_page_menu()
+                layout = self.context.layout
+                if page is None or layout is None:
+                    return None
+                x, y, _w, _h = layout.inspector
+                return page, (float(x), float(y))
             (x, y, _w, h), _row = found
             return provider, (float(x), float(y + h))
         if region is ShellRegion.PREVIEW:
@@ -402,6 +413,8 @@ class ShellHost:
 
     def _inspector_menu_at(self, x: float, y: float) -> ContextMenuProvider | None:
         """The menu for the inspector row under (*x*, *y*); the row takes focus.
+
+        Off any row, the open page's own menu (the Preset List page's).
 
         The layer warning or notice mark on the title line opens the layer
         row's menu, which lists every problem.
@@ -416,12 +429,20 @@ class ShellHost:
             if provider is not None:
                 self.context.controls.inspector.focus_row(row)
             return provider
-        return None
+        return self._inspector_page_menu()
 
     def _inspector_menu(self, desc: RowDescriptor) -> ContextMenuProvider | None:
         if desc.kind in PRESET_MENU_KINDS:
             return preset_row_menu(self.context.controls, desc)
         return None
+
+    def _inspector_page_menu(self) -> ContextMenuProvider | None:
+        """The open page's own menu, off any row: only the Preset List page has one."""
+        node_id = self.context.controls.shell_focus.selected_id
+        slot = layer_slot_of(node_id)
+        if slot is None or layer_page_of(node_id) != LAYER_PAGE_PRESET_LIST:
+            return None
+        return preset_list_page_menu(self.context.controls, slot)
 
     def _nav_menu(self, node_id: str) -> ContextMenuProvider:
         return navigator_node_menu(

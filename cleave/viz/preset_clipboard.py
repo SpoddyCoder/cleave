@@ -95,6 +95,17 @@ class PresetClipboard:
                 slot, index + 1, self._entry, label="Paste preset", verb="Pasted"
             )
 
+    def paste_at_end(self, slot: str) -> None:
+        """Append the copied preset to the end of *slot*'s list (an empty list too)."""
+        if self.can_paste and self._entry is not None:
+            self._preset_list.insert(
+                slot,
+                len(self._preset_list.session.layers[slot].preset_list),
+                self._entry,
+                label="Paste preset",
+                verb="Pasted",
+            )
+
     def paste_preview(self, slot: str) -> None:
         """Play the copied preset on *slot* as a preview; no list changes."""
         if not self.can_paste or self._entry is None:
