@@ -10,11 +10,15 @@ import pytest
 
 from cleave.preset_library import PresetLibrary
 from cleave.preset_playlist import preset_browse_floor, scan_preset_playlist
+from cleave.preset_list_entry import PresetListEntry
+from cleave.viz.edit_history import EditHistory
 from cleave.viz.layer_mutations import LayerMutations
+from cleave.viz.modal import ModalHost
+from cleave.viz.preset_list_controls import PresetListController
 from cleave.viz.preset_browser_controls import PREVIEW_DELAY_SEC, PresetBrowserControls
 from cleave.viz.preset_browser_surface import BrowserPointerIntent, BrowserPointerKind
 from cleave.viz.row_kinds import RowDescriptor, RowKind
-from cleave.viz.row_spec import apply_field_action
+from cleave.viz.row_spec import apply_field_action, apply_field_double_click, row_spec
 from cleave.viz.session import LayerRuntime, TuningSession
 from tests.support.viz import keydown, make_controls
 
@@ -283,6 +287,45 @@ def test_locked_layer_does_not_open_the_browser() -> None:
     assert not controls.preset_browser.active
 
 
+def _controls_with_list_entry(tmp_path: Path):
+    preset = _milk(tmp_path / "Pack" / "a.milk")
+    controls = make_controls(("layer_1",), project_dir=tmp_path / "project")
+    layer = controls.session.layers["layer_1"]
+    layer.preset_switching = "on"
+    layer.preset_list = [PresetListEntry(str(preset))]
+    return controls, RowDescriptor(
+        RowKind.TRACK_PRESET_LIST_ITEM, slot="layer_1", preset_index=0
+    )
+
+
+def test_double_click_on_a_list_entry_opens_the_browser_to_replace_it(
+    tmp_path: Path,
+) -> None:
+    controls, entry = _controls_with_list_entry(tmp_path)
+    spec = row_spec(RowKind.TRACK_PRESET_LIST_ITEM)
+    assert spec.double_click_action is not None
+    assert spec.activate_on_double_click is False
+    assert apply_field_double_click(controls, entry) is True
+    assert controls.preset_browser.active
+    assert controls.preset_browser.slot == "layer_1"
+    assert controls.preset_browser.replace_index == 0
+
+
+def test_double_click_on_a_locked_list_entry_does_nothing(tmp_path: Path) -> None:
+    controls, entry = _controls_with_list_entry(tmp_path)
+    controls.session.layers["layer_1"].locked = True
+    assert apply_field_double_click(controls, entry) is True
+    assert not controls.preset_browser.active
+
+
+def test_enter_on_a_list_entry_still_auditions(tmp_path: Path) -> None:
+    controls, entry = _controls_with_list_entry(tmp_path)
+    controls.preset_list.audition = MagicMock()
+    apply_field_action(controls, entry)
+    controls.preset_list.audition.assert_called_once_with("layer_1", 0)
+    assert not controls.preset_browser.active
+
+
 def test_project_picker_closes_the_browser() -> None:
     controls = make_controls(("layer_1",))
     controls.preset_browser.open("layer_1")
@@ -390,3 +433,68 @@ def test_back_button_closes_and_keeps_the_previewed_preset(rig: _Rig) -> None:
     assert not rig.controls.active
     assert rig.layer.playlist.current == rig.a2
     assert rig.loaded() == [rig.a2]
+
+
+def _replace_rig(tmp_path: Path) -> tuple[_Rig, EditHistory]:
+    """A rig whose browser can replace entries of a two-preset list."""
+    rig = _Rig(tmp_path / "presets")
+    rig.layer.preset_list = [
+        PresetListEntry(str(rig.a1)),
+        PresetListEntry(str(rig.b1)),
+    ]
+    history = EditHistory(rig.session)
+    preset_list = PresetListController(
+        rig.session,
+        rig.root,
+        tmp_path / "project",
+        60.0,
+        ModalHost(),
+        rig.bindings,
+        history=history,
+    )
+    rig.controls = PresetBrowserControls(
+        rig.session,
+        rig.root,
+        rig.library,
+        rig.mutations,
+        preset_list=preset_list,
+        start_text_input=rig.text_input.start,
+        stop_text_input=rig.text_input.stop,
+        text_input_shared=lambda: rig.shared,
+        synchronous=True,
+    )
+    return rig, history
+
+
+def test_replace_mode_starts_on_the_entry_and_enter_replaces_it(tmp_path: Path) -> None:
+    rig, history = _replace_rig(tmp_path)
+    rig.controls.open("layer_1", replace_index=1)
+    browser = rig.controls.browser
+    assert browser is not None
+    assert browser.title == "Replace preset 2: Layer 1"
+    assert browser.selected_preset() == rig.b1
+    rig.controls.apply_pointer(BrowserPointerIntent(BrowserPointerKind.GOTO_CRUMB, 0))
+    rig.search("a2")
+    rig.key(pygame.K_RETURN)
+    assert not rig.controls.active
+    assert [entry.display_name for entry in rig.layer.preset_list] == [
+        "a1.milk",
+        "a2.milk",
+    ]
+    assert rig.layer.preset_list[1].file.parent == (tmp_path / "project" / "presets").resolve()
+    # The replacement keeps playing as a preview.
+    assert rig.layer.playlist.current == rig.a2
+    assert history.undo() == "Replace preset"
+    assert rig.layer.preset_list[1] == PresetListEntry(str(rig.b1))
+
+
+def test_replace_mode_escape_leaves_the_list_alone(tmp_path: Path) -> None:
+    rig, history = _replace_rig(tmp_path)
+    rig.controls.open("layer_1", replace_index=0)
+    rig.key(pygame.K_DOWN)
+    rig.controls.tick(PREVIEW_DELAY_SEC)
+    rig.key(pygame.K_ESCAPE)
+    assert not rig.controls.active
+    assert rig.layer.preset_list[0] == PresetListEntry(str(rig.a1))
+    assert rig.layer.playlist.current == rig.a1
+    assert not history.can_undo

@@ -41,6 +41,7 @@ from cleave.viz.panel_notification import AttentionClock
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_present_renderers import inspector_field_colors
 from cleave.viz.row_spec import (
+    apply_field_double_click,
     format_row_markers,
     format_row_position,
     format_row_value,
@@ -865,14 +866,20 @@ class InspectorPanel:
         if self.values.value_drag_crossed or self.values.press_swallowed:
             return
         focus, activate = inspector_row_click_outcome(
-            double_click_row=look.spec.activate_on_double_click,
+            double_click_row=(
+                look.spec.activate_on_double_click
+                or look.spec.double_click_action is not None
+            ),
             clicked=item.clicked,
             activated=item.activated,
             double_clicked=imgui.is_mouse_double_clicked(0),
         )
         if focus:
             self._ctx.controls.inspector.focus_row(look.row)
-        if activate:
+        if not activate:
+            return
+        desc = look.row.descriptor
+        if desc is None or not apply_field_double_click(self._ctx.controls, desc):
             self._ctx.controls.inspector.activate(look.row)
 
     def _preset_row_drag(

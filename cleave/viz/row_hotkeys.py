@@ -221,7 +221,7 @@ def _hotkey_for_descriptor(
             if slot is not None and desc.preset_index is not None:
                 if section_lock_blocks_mutation(controls.session, desc):
                     return True
-                controls.preset_list.prompt_delete(slot, desc.preset_index)
+                controls.preset_list.remove(slot, desc.preset_index)
             return True
         if row_triggers_layer_delete(kind):
             if is_preset_curation_mode(controls.session.settings.editor_mode):

@@ -1,13 +1,21 @@
-"""User preset-list browsing, populate, and reorder for live tuning."""
+"""Per-layer preset lists: browse, populate, reorder, and edit.
+
+Every change to a list records one step in :class:`EditHistory`, scoped to
+the layer, so Ctrl+Z puts it back. Removing an entry leaves its project copy
+on disk so an undo can restore it; copies nothing refers to are removed when
+the editor closes.
+"""
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Hashable
+from contextlib import AbstractContextManager
 from pathlib import Path
 
 from cleave.preset_library import UNFILTERED_CATALOG, PresetCatalog
 from cleave.preset_list_entry import PresetListEntry
 from cleave.preset_playlist import scan_preset_playlist
+from cleave.viz.edit_history import EditHistory, preset_list_scope
 from cleave.viz.layer import StemLayer
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.modal import FormField, FormSpec, ModalHost
@@ -30,10 +38,10 @@ from cleave.viz.session import TuningSession
 from cleave.viz.user_presets import (
     USER_PRESETS_DIRNAME,
     copy_with_dedup,
-    preset_list_item_display_name,
     preview_anchor,
-    user_preset_referenced_on_disk,
 )
+
+PresetSource = PresetListEntry | Path
 
 
 class PresetListController:
@@ -49,7 +57,7 @@ class PresetListController:
         layer_bindings: LiveLayerBindings | None,
         *,
         on_notification: Callable[[str], None] | None = None,
-        get_active_config_path: Callable[[], Path | None] | None = None,
+        history: EditHistory | None = None,
         on_focus_preset_item: Callable[[str, int], None] | None = None,
         on_move_preset_selection: Callable[[str, int], None] | None = None,
         layers_by_slot: dict[str, StemLayer] | None = None,
@@ -65,7 +73,7 @@ class PresetListController:
         self._modal = modal_host
         self._layer_bindings = layer_bindings
         self._on_notification = on_notification
-        self._get_active_config_path = get_active_config_path
+        self._history = history if history is not None else EditHistory(session)
         self._on_focus_preset_item = on_focus_preset_item
         self._on_move_preset_selection = on_move_preset_selection
         self._layers_by_slot = layers_by_slot
@@ -104,6 +112,7 @@ class PresetListController:
             return
         self._move_mode_original_preset_list = list(layer.preset_list)
         self.move_mode_preset = (slot, index)
+        self._history.begin("Move preset", scope=preset_list_scope(slot))
 
     def swap_item(self, direction: int) -> None:
         if self.move_mode_preset is None:
@@ -132,7 +141,8 @@ class PresetListController:
             return
         if target == index:
             return
-        presets.insert(target, presets.pop(index))
+        with self._record("Move preset", slot, merge_key=("preset_list.move", slot)):
+            presets.insert(target, presets.pop(index))
         self.refresh_switching(slot)
         if self._on_focus_preset_item is not None:
             self._on_focus_preset_item(slot, target)
@@ -143,6 +153,7 @@ class PresetListController:
         slot, _index = self.move_mode_preset
         self.move_mode_preset = None
         self._move_mode_original_preset_list = None
+        self._history.commit()
         if self._layer_bindings is not None:
             self._layer_bindings.on_preset_switching_change(slot)
 
@@ -155,6 +166,7 @@ class PresetListController:
             self.session.layers[slot].preset_list[:] = (
                 self._move_mode_original_preset_list
             )
+            self._history.cancel()
         self.move_mode_preset = None
         self._move_mode_original_preset_list = None
 
@@ -269,31 +281,8 @@ class PresetListController:
                 layer.preset_switching_trigger == "timeline"
                 and not self.session.timeline.enabled
             )
-            if mode in ("directory_random", "directory_sequential"):
-                max_count: int | None = None
-                if layer.preset_switching_trigger != "timeline":
-                    max_count = needed_preset_count(
-                        song_duration_sec=self.duration_sec,
-                        preset_duration=layer.preset_duration,
-                        trigger=layer.preset_switching_trigger,
-                    )
-                order = (
-                    "sequential" if mode == "directory_sequential" else "random"
-                )
-                populate_from_directory(
-                    self.session,
-                    slot,
-                    project_dir=self.project_dir,
-                    max_count=max_count,
-                    order=order,
-                )
-            else:
-                populate_from_cue_marker_roles(
-                    self.session,
-                    slot,
-                    project_dir=self.project_dir,
-                    catalog=self._catalog,
-                )
+            with self._record("Populate preset list", slot):
+                self._populate(slot, mode, self.project_dir)
             if self._layer_bindings is not None:
                 self._layer_bindings.on_preset_switching_change(slot)
             count = len(layer.preset_list)
@@ -317,6 +306,32 @@ class PresetListController:
                     )
         finally:
             self._unlock_preset_after_modal(slot)
+
+    def _populate(self, slot: str, mode: str, project_dir: Path) -> None:
+        layer = self.session.layers[slot]
+        if mode in ("directory_random", "directory_sequential"):
+            max_count: int | None = None
+            if layer.preset_switching_trigger != "timeline":
+                max_count = needed_preset_count(
+                    song_duration_sec=self.duration_sec,
+                    preset_duration=layer.preset_duration,
+                    trigger=layer.preset_switching_trigger,
+                )
+            order = "sequential" if mode == "directory_sequential" else "random"
+            populate_from_directory(
+                self.session,
+                slot,
+                project_dir=project_dir,
+                max_count=max_count,
+                order=order,
+            )
+        else:
+            populate_from_cue_marker_roles(
+                self.session,
+                slot,
+                project_dir=project_dir,
+                catalog=self._catalog,
+            )
 
     def active_list_index(self, slot: str) -> int | None:
         """List entry scheduled to play now, or None when switching is not running."""
@@ -362,79 +377,150 @@ class PresetListController:
             self._layer_bindings.on_preset_change(slot, playlist)
 
     def add_current(self, slot: str) -> None:
+        """Append the layer's current preset to the end of its list."""
         src_path = self.current_preset_path(slot)
         if src_path is None:
             return
+        self.insert(
+            slot,
+            len(self.session.layers[slot].preset_list),
+            src_path,
+            label="Add preset",
+            verb="Added",
+        )
+
+    def replace_with_current(self, slot: str, index: int) -> None:
+        src_path = self.current_preset_path(slot)
+        if src_path is not None:
+            self.replace(slot, index, src_path)
+
+    def insert_current_after(self, slot: str, index: int) -> None:
+        src_path = self.current_preset_path(slot)
+        if src_path is not None and self._valid(slot, index):
+            self.insert(slot, index + 1, src_path)
+
+    def replace(
+        self,
+        slot: str,
+        index: int,
+        source: PresetSource,
+        *,
+        label: str = "Replace preset",
+        verb: str = "Replaced",
+    ) -> bool:
+        """Put *source* in place of entry *index*. False when nothing changed."""
+        if not self._valid(slot, index):
+            return False
+        entry = self._adopt(source)
+        if entry is None:
+            return False
+        with self._record(label, slot):
+            self.session.layers[slot].preset_list[index] = entry
+        self._after_edit(slot, index, f"{verb} preset: {entry.display_name}")
+        return True
+
+    def insert(
+        self,
+        slot: str,
+        index: int,
+        source: PresetSource,
+        *,
+        label: str = "Insert preset",
+        verb: str = "Inserted",
+    ) -> bool:
+        """Insert *source* before entry *index* (the list length appends)."""
+        presets = self.session.layers[slot].preset_list
+        if not 0 <= index <= len(presets):
+            return False
+        entry = self._adopt(source)
+        if entry is None:
+            return False
+        with self._record(label, slot):
+            presets.insert(index, entry)
+        self._after_edit(slot, index, f"{verb} preset: {entry.display_name}")
+        return True
+
+    def duplicate(self, slot: str, index: int) -> None:
+        """Insert a second copy of entry *index* right after it."""
+        if not self._valid(slot, index):
+            return
+        presets = self.session.layers[slot].preset_list
+        entry = presets[index]
+        with self._record("Duplicate preset", slot):
+            presets.insert(index + 1, entry)
+        self._after_edit(slot, index + 1, f"Duplicated preset: {entry.display_name}")
+
+    def remove(
+        self,
+        slot: str,
+        index: int,
+        *,
+        label: str = "Remove preset",
+        verb: str = "Removed",
+    ) -> None:
+        """Take entry *index* out of the list. Undo puts it back."""
+        if not self._valid(slot, index):
+            return
+        presets = self.session.layers[slot].preset_list
+        with self._record(label, slot):
+            removed = presets.pop(index)
+        self.refresh_switching(slot)
+        if presets and self._on_focus_preset_item is not None:
+            self._on_focus_preset_item(slot, min(index, len(presets) - 1))
+        self._notify(slot, f"{verb} preset: {removed.display_name}")
+
+    def entry(self, slot: str, index: int) -> PresetListEntry | None:
+        if not self._valid(slot, index):
+            return None
+        return self.session.layers[slot].preset_list[index]
+
+    def _valid(self, slot: str, index: int) -> bool:
+        layer = self.session.layers.get(slot)
+        return layer is not None and 0 <= index < len(layer.preset_list)
+
+    def _adopt(self, source: PresetSource) -> PresetListEntry | None:
+        """The list entry for *source*, copying it into this project when needed.
+
+        An entry already in this project's ``presets/`` is used as is, so a
+        pasted entry keeps its origin; anything else is copied in.
+        """
         dest_dir = self._user_presets_dir()
         if dest_dir is None:
-            return
-        self.session.layers[slot].preset_list.append(
-            copy_with_dedup(dest_dir, src_path)
+            return None
+        if isinstance(source, Path):
+            return copy_with_dedup(dest_dir, source)
+        try:
+            source.file.resolve().relative_to(dest_dir.resolve())
+        except ValueError:
+            copied = copy_with_dedup(dest_dir, source.file)
+            return PresetListEntry(
+                path=copied.path, source=source.source or copied.source
+            )
+        return source
+
+    def _record(
+        self, label: str, slot: str, *, merge_key: Hashable | None = None
+    ) -> AbstractContextManager[None]:
+        return self._history.recording(
+            label, merge_key=merge_key, scope=preset_list_scope(slot)
         )
-        if self._layer_bindings is not None:
-            self._layer_bindings.on_preset_switching_change(slot)
+
+    def _after_edit(self, slot: str, index: int, message: str) -> None:
+        self.refresh_switching(slot)
+        if self._on_focus_preset_item is not None:
+            self._on_focus_preset_item(slot, index)
+        self._notify(slot, message)
+
+    def _notify(self, slot: str, message: str) -> None:
         if self._on_notification is not None:
             self._on_notification(
-                layer_notification(
-                    self.session.layer_z_order,
-                    slot,
-                    f"Added preset: {src_path.name}",
-                )
+                layer_notification(self.session.layer_z_order, slot, message)
             )
-
-    def prompt_delete(self, slot: str, index: int) -> None:
-        layer = self.session.layers[slot]
-        if index < 0 or index >= len(layer.preset_list):
-            return
-        label = preset_list_item_display_name(layer.preset_list, index)
-        self._modal.prompt_confirm(
-            f"Remove preset: {label}?",
-            "Remove preset",
-            lambda: self.confirm_delete(slot, index),
-            destructive=True,
-        )
-
-    def confirm_delete(self, slot: str, index: int) -> None:
-        layer = self.session.layers[slot]
-        if index < 0 or index >= len(layer.preset_list):
-            return
-        removed = layer.preset_list.pop(index)
-        removed_path = removed.file.resolve()
-        presets_dir = self._user_presets_dir()
-        if presets_dir is not None:
-            try:
-                removed_path.relative_to(presets_dir.resolve())
-            except ValueError:
-                pass
-            else:
-                still_needed = self._preset_list_path_referenced(removed_path)
-                if not still_needed and self.project_dir is not None:
-                    skip_config = (
-                        self._get_active_config_path()
-                        if self._get_active_config_path is not None
-                        else None
-                    )
-                    still_needed = user_preset_referenced_on_disk(
-                        self.project_dir,
-                        removed_path,
-                        skip_config=skip_config,
-                    )
-                if not still_needed:
-                    removed_path.unlink(missing_ok=True)
-        if self._layer_bindings is not None:
-            self._layer_bindings.on_preset_switching_change(slot)
 
     def _user_presets_dir(self) -> Path | None:
         if self.project_dir is None:
             return None
         return self.project_dir / USER_PRESETS_DIRNAME
-
-    def _preset_list_path_referenced(self, target: Path) -> bool:
-        for layer in self.session.layers.values():
-            for other in layer.preset_list:
-                if other.file.resolve() == target:
-                    return True
-        return False
 
     def _unlock_preset_after_modal(self, slot: str) -> None:
         if self._layer_bindings is not None:

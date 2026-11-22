@@ -8,7 +8,7 @@ selected clip's start time.
 
 Selection helpers are plain functions on the session. Every clip edit goes
 through ``ClipEditor``, which turns it into cue operations and records it in
-``TimelineHistory`` so it can be undone. The strip calls it for its focused
+``EditHistory`` so it can be undone. The strip calls it for its focused
 row; the inspector for the row page's slot; the clip context menu for the
 row it opened on.
 """
@@ -52,7 +52,7 @@ from cleave.timeline import (
     update_clip,
 )
 from cleave.viz.session import TuningSession
-from cleave.viz.timeline_history import TimelineHistory
+from cleave.viz.edit_history import EditHistory
 
 # Length of a new clip, and the large trim step, when the song has no bar grid.
 DEFAULT_BAR_SEC = 2.0
@@ -194,7 +194,7 @@ class ClipEditor:
     def __init__(
         self,
         session: TuningSession,
-        history: TimelineHistory,
+        history: EditHistory,
         *,
         duration_sec: float,
         beat_times: Sequence[float] = (),

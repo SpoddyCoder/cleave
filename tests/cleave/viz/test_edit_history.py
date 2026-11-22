@@ -1,11 +1,11 @@
-"""Undo and redo of timeline edits."""
+"""Undo and redo of timeline and preset list edits."""
 
 from __future__ import annotations
 
 from types import SimpleNamespace
 
 from cleave.timeline import SlotCue, TimelineLane
-from cleave.viz.timeline_history import TimelineHistory
+from cleave.viz.edit_history import TIMELINE_SCOPE, EditHistory, preset_list_scope
 from tests.support.preset_list import entries
 
 
@@ -29,7 +29,7 @@ def _session() -> SimpleNamespace:
 
 def test_undo_and_redo_restore_lanes() -> None:
     session = _session()
-    history = TimelineHistory(session)
+    history = EditHistory(session)
     with history.recording("Snap clips"):
         session.timeline.lanes["layer_1"] = _lane(2.0)
     assert history.can_undo is True
@@ -42,7 +42,7 @@ def test_undo_and_redo_restore_lanes() -> None:
 
 def test_a_command_that_changes_nothing_is_not_recorded() -> None:
     session = _session()
-    history = TimelineHistory(session)
+    history = EditHistory(session)
     with history.recording("Snap clips"):
         pass
     assert history.can_undo is False
@@ -50,7 +50,7 @@ def test_a_command_that_changes_nothing_is_not_recorded() -> None:
 
 def test_a_hand_edit_after_the_command_blocks_undo() -> None:
     session = _session()
-    history = TimelineHistory(session)
+    history = EditHistory(session)
     with history.recording("Generate timeline"):
         session.timeline.lanes["layer_1"] = _lane(2.0)
     session.timeline.lanes["layer_1"] = _lane(3.0)
@@ -61,7 +61,7 @@ def test_a_hand_edit_after_the_command_blocks_undo() -> None:
 
 def test_adding_a_layer_blocks_undo() -> None:
     session = _session()
-    history = TimelineHistory(session)
+    history = EditHistory(session)
     with history.recording("Reset timeline"):
         session.timeline.lanes["layer_1"] = _lane()
     session.timeline.lanes["layer_2"] = _lane()
@@ -71,7 +71,7 @@ def test_adding_a_layer_blocks_undo() -> None:
 def test_undo_restores_everything_generate_touches() -> None:
     session = _session()
     changed: list[str] = []
-    history = TimelineHistory(session, on_preset_list_change=changed.append)
+    history = EditHistory(session, on_preset_list_change=changed.append)
     with history.recording("Generate timeline"):
         session.timeline.lanes["layer_1"] = _lane(2.0)
         session.timeline.enabled = False
@@ -95,7 +95,7 @@ def test_undo_restores_everything_generate_touches() -> None:
 
 def test_a_new_command_clears_redo() -> None:
     session = _session()
-    history = TimelineHistory(session)
+    history = EditHistory(session)
     with history.recording("Snap clips"):
         session.timeline.lanes["layer_1"] = _lane(2.0)
     history.undo()
@@ -106,7 +106,7 @@ def test_a_new_command_clears_redo() -> None:
 
 def test_history_is_bounded() -> None:
     session = _session()
-    history = TimelineHistory(session)
+    history = EditHistory(session)
     for index in range(30):
         with history.recording("Snap clips"):
             session.timeline.lanes["layer_1"] = _lane(float(index + 2))
@@ -118,7 +118,7 @@ def test_history_is_bounded() -> None:
 
 def test_undo_and_redo_labels_name_the_command() -> None:
     session = _session()
-    history = TimelineHistory(session)
+    history = EditHistory(session)
     assert history.undo_label is None
     assert history.redo_label is None
     with history.recording("Generate timeline"):
@@ -141,7 +141,7 @@ class _Clock:
 def test_edits_with_one_merge_key_fold_into_one_entry() -> None:
     session = _session()
     clock = _Clock()
-    history = TimelineHistory(session, clock=clock)
+    history = EditHistory(session, clock=clock)
     for t in (2.0, 3.0, 4.0):
         clock.now += 0.2
         with history.recording("Cue level", merge_key=("level", "layer_1", 1.0)):
@@ -154,7 +154,7 @@ def test_edits_with_one_merge_key_fold_into_one_entry() -> None:
 def test_edits_past_the_merge_window_stay_separate() -> None:
     session = _session()
     clock = _Clock()
-    history = TimelineHistory(session, clock=clock)
+    history = EditHistory(session, clock=clock)
     key = ("level", "layer_1", 1.0)
     with history.recording("Cue level", merge_key=key):
         session.timeline.lanes["layer_1"] = _lane(2.0)
@@ -167,7 +167,7 @@ def test_edits_past_the_merge_window_stay_separate() -> None:
 
 def test_a_different_merge_key_starts_a_new_entry() -> None:
     session = _session()
-    history = TimelineHistory(session, clock=_Clock())
+    history = EditHistory(session, clock=_Clock())
     with history.recording("Cue level", merge_key=("level", "layer_1", 1.0)):
         session.timeline.lanes["layer_1"] = _lane(2.0)
     with history.recording("Cue cut", merge_key=("cut", "layer_1", 1.0)):
@@ -178,7 +178,7 @@ def test_a_different_merge_key_starts_a_new_entry() -> None:
 
 def test_an_edit_outside_the_history_breaks_a_merge() -> None:
     session = _session()
-    history = TimelineHistory(session, clock=_Clock())
+    history = EditHistory(session, clock=_Clock())
     key = ("level", "layer_1", 1.0)
     with history.recording("Cue level", merge_key=key):
         session.timeline.lanes["layer_1"] = _lane(2.0)
@@ -192,7 +192,7 @@ def test_an_edit_outside_the_history_breaks_a_merge() -> None:
 
 def test_begin_and_commit_span_frames_and_block_undo_meanwhile() -> None:
     session = _session()
-    history = TimelineHistory(session)
+    history = EditHistory(session)
     with history.recording("Snap clips"):
         session.timeline.lanes["layer_1"] = _lane(2.0)
     history.begin("Record take")
@@ -206,7 +206,7 @@ def test_begin_and_commit_span_frames_and_block_undo_meanwhile() -> None:
 
 def test_cancel_drops_the_pending_edit() -> None:
     session = _session()
-    history = TimelineHistory(session)
+    history = EditHistory(session)
     history.begin("Move cue")
     history.cancel()
     assert history.pending is False
@@ -215,7 +215,7 @@ def test_cancel_drops_the_pending_edit() -> None:
 
 def test_undo_restores_the_selection_but_selection_alone_is_no_edit() -> None:
     session = _session()
-    history = TimelineHistory(session)
+    history = EditHistory(session)
     session.timeline.selected_clip_t = {"layer_1": 1.0}
     with history.recording("Move cue"):
         session.timeline.lanes["layer_1"] = _lane(2.0)
@@ -226,3 +226,38 @@ def test_undo_restores_the_selection_but_selection_alone_is_no_edit() -> None:
     assert session.timeline.selected_clip_t == {"layer_1": 1.0}
     assert history.redo() == "Move cue"
     assert session.timeline.selected_clip_t == {"layer_1": 2.0}
+
+
+def test_preset_list_edits_carry_their_layer_scope() -> None:
+    session = _session()
+    history = EditHistory(session)
+    with history.recording("Remove preset", scope=preset_list_scope("layer_1")):
+        session.layers["layer_1"].preset_list = []
+    assert history.undo_scope == ("preset_list", "layer_1")
+    assert history.undo() == "Remove preset"
+    assert session.layers["layer_1"].preset_list == entries("a.milk")
+    assert history.redo_scope == ("preset_list", "layer_1")
+
+
+def test_a_locked_scope_blocks_only_its_own_entries() -> None:
+    session = _session()
+    locked: set[tuple[str, ...]] = {preset_list_scope("layer_1")}
+    history = EditHistory(session, scope_locked=lambda scope: scope in locked)
+    with history.recording("Remove preset", scope=preset_list_scope("layer_1")):
+        session.layers["layer_1"].preset_list = []
+    assert history.undo_locked is True
+    with history.recording("Snap clips"):
+        session.timeline.lanes["layer_1"] = _lane(2.0)
+    assert history.undo_scope == TIMELINE_SCOPE
+    assert history.undo_locked is False
+
+
+def test_edits_in_different_scopes_do_not_merge() -> None:
+    session = _session()
+    history = EditHistory(session, clock=lambda: 0.0)
+    with history.recording("Move", merge_key="k", scope=preset_list_scope("layer_1")):
+        session.layers["layer_1"].preset_list = entries("b.milk")
+    with history.recording("Move", merge_key="k"):
+        session.timeline.lanes["layer_1"] = _lane(2.0)
+    history.undo()
+    assert session.layers["layer_1"].preset_list == entries("b.milk")

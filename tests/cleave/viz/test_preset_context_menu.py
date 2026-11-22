@@ -27,18 +27,26 @@ def _entries(controls, desc: RowDescriptor):
     }
 
 
-def _controls_with_list(tmp: str, names: tuple[str, ...] = ("a", "b", "c")):
+def _controls_with_list(
+    tmp: str,
+    names: tuple[str, ...] = ("a", "b", "c"),
+    slots: tuple[str, ...] = ("layer_1",),
+):
     root = Path(tmp)
     paths = []
     for name in names:
         path = root / f"{name}.milk"
-        path.write_text("milk", encoding="utf-8")
+        path.write_text(f"milk {name}", encoding="utf-8")
         paths.append(str(path))
-    controls = make_controls(("layer_1",), project_dir=root / "project")
-    layer = controls.session.layers["layer_1"]
-    layer.preset_list = entries(*paths)
-    layer.preset_switching = "on"
+    controls = make_controls(slots, project_dir=root / "project")
+    for slot in slots:
+        controls.session.layers[slot].preset_switching = "on"
+    controls.session.layers["layer_1"].preset_list = entries(*paths)
     return controls, paths
+
+
+def _names(controls, slot: str = "layer_1") -> list[str]:
+    return [entry.display_name for entry in controls.session.layers[slot].preset_list]
 
 
 def test_list_item_menu_lists_its_items_in_order() -> None:
@@ -50,13 +58,35 @@ def test_list_item_menu_lists_its_items_in_order() -> None:
             "preset.move_up",
             "preset.move_down",
             "preset.remove",
+            "preset.cut",
+            "preset.copy",
+            "preset.duplicate",
+            "preset.paste_over",
+            "preset.paste_before",
+            "preset.paste_after",
+            "preset.replace_browse",
+            "preset.replace_current",
+            "preset.insert_current",
             "preset.add_current",
             "preset.populate",
             "preset.favourite",
             "preset.blacklist",
             "preset.role",
         ]
-        assert all(entry.enabled for entry in items.values())
+        paste_ids = {"preset.paste_over", "preset.paste_before", "preset.paste_after"}
+        assert all(
+            entry.enabled for item_id, entry in items.items() if item_id not in paste_ids
+        )
+        for item_id in paste_ids:
+            assert items[item_id].enabled is False
+            assert items[item_id].hint == "Nothing copied"
+        assert items["preset.remove"].label == "Remove from list"
+        assert [
+            items[i].shortcut
+            for i in ("preset.cut", "preset.copy", "preset.duplicate")
+        ] == ["Ctrl+X", "Ctrl+C", "Ctrl+D"]
+        assert items["preset.paste_over"].shortcut == "Ctrl+V"
+        assert items["preset.paste_after"].shortcut == "Ctrl+Shift+V"
         assert [items[i].shortcut for i in ("preset.favourite", "preset.blacklist", "preset.role")] == ["F", "B", "C"]
         assert items["preset.favourite"].label == "Favourite"
         assert items["preset.blacklist"].label == "Blacklist…"
@@ -118,12 +148,22 @@ def test_lock_disables_edits_but_not_audition() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         controls, _paths = _controls_with_list(tmp)
         controls.session.layers["layer_1"].locked = True
+        controls.preset_clipboard.copy_entry("layer_1", 0)
         items = _entries(controls, _item_desc(1))
         assert items["preset.audition"].enabled is True
+        assert items["preset.copy"].enabled is True
         for item_id in (
             "preset.move_up",
             "preset.move_down",
             "preset.remove",
+            "preset.cut",
+            "preset.duplicate",
+            "preset.paste_over",
+            "preset.paste_before",
+            "preset.paste_after",
+            "preset.replace_browse",
+            "preset.replace_current",
+            "preset.insert_current",
             "preset.add_current",
             "preset.populate",
         ):
@@ -143,11 +183,77 @@ def test_add_current_needs_switching_on() -> None:
         assert add.hint == "Turn on preset switching first"
 
 
-def test_remove_prompts_for_confirmation() -> None:
+def test_remove_runs_at_once_and_undo_restores_it() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         controls, _paths = _controls_with_list(tmp)
         _entries(controls, _item_desc(0))["preset.remove"].run()
-        assert controls.modal_host.active
+        assert not controls.modal_host.active
+        assert _names(controls) == ["b.milk", "c.milk"]
+        controls.undo()
+        assert _names(controls) == ["a.milk", "b.milk", "c.milk"]
+        controls.redo()
+        assert _names(controls) == ["b.milk", "c.milk"]
+
+
+def test_copy_then_paste_over_before_and_after() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        controls, _paths = _controls_with_list(tmp)
+        _entries(controls, _item_desc(0))["preset.copy"].run()
+        _entries(controls, _item_desc(2))["preset.paste_over"].run()
+        assert _names(controls) == ["a.milk", "b.milk", "a.milk"]
+        _entries(controls, _item_desc(1))["preset.paste_before"].run()
+        assert _names(controls) == ["a.milk", "a.milk", "b.milk", "a.milk"]
+        _entries(controls, _item_desc(3))["preset.paste_after"].run()
+        assert _names(controls) == ["a.milk", "a.milk", "b.milk", "a.milk", "a.milk"]
+        assert controls.shell_focus.inspector_cursor == _item_desc(4)
+        project_presets = Path(tmp) / "project" / "presets"
+        for entry in controls.session.layers["layer_1"].preset_list[1:]:
+            if entry.display_name == "a.milk":
+                assert entry.file.parent == project_presets
+        for _ in range(3):
+            controls.undo()
+        assert _names(controls) == ["a.milk", "b.milk", "c.milk"]
+
+
+def test_cut_moves_an_entry_to_another_layer() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        controls, _paths = _controls_with_list(tmp, slots=("layer_1", "layer_2"))
+        _entries(controls, _item_desc(1))["preset.cut"].run()
+        assert _names(controls) == ["a.milk", "c.milk"]
+        controls.preset_clipboard.paste_before("layer_2", 0)
+        assert _names(controls, "layer_2") == ["b.milk"]
+        controls.undo()
+        assert _names(controls, "layer_2") == []
+        controls.undo()
+        assert _names(controls) == ["a.milk", "b.milk", "c.milk"]
+
+
+def test_duplicate_inserts_a_second_copy_after() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        controls, _paths = _controls_with_list(tmp)
+        _entries(controls, _item_desc(1))["preset.duplicate"].run()
+        assert _names(controls) == ["a.milk", "b.milk", "b.milk", "c.milk"]
+
+
+def test_paste_is_disabled_once_the_copied_file_is_gone() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        controls, (a, _b, _c) = _controls_with_list(tmp)
+        controls.preset_clipboard.copy_path(Path(a))
+        Path(a).unlink()
+        paste = _entries(controls, _item_desc(1))["preset.paste_over"]
+        assert paste.enabled is False
+        assert paste.hint == "Copied preset file is missing"
+
+
+def test_insert_on_a_timeline_layer_warns_that_later_presets_shift() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        controls, _paths = _controls_with_list(tmp)
+        controls.session.layers["layer_1"].preset_switching_trigger = "timeline"
+        controls.preset_clipboard.copy_entry("layer_1", 0)
+        items = _entries(controls, _item_desc(1))
+        assert items["preset.paste_over"].hint is None
+        assert items["preset.paste_after"].hint == "Later presets move to the next clip"
+        assert items["preset.insert_current"].hint == "Later presets move to the next clip"
 
 
 def test_current_preset_row_offers_add_and_curate() -> None:
@@ -156,6 +262,8 @@ def test_current_preset_row_offers_add_and_curate() -> None:
     items = _entries(controls, desc)
     assert list(items) == [
         "preset.browse",
+        "preset.copy",
+        "preset.paste_preview",
         "preset.add_current",
         "preset.favourite",
         "preset.blacklist",

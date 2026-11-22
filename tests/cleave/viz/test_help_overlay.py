@@ -529,9 +529,15 @@ def test_preset_list_entry_help() -> None:
     entries = dict(keyboard.entries)
     assert entries == {
         "Enter": "play this preset and pause switching",
+        "Double-click": "replace from the preset browser",
         "M": "reorder in list",
         "Drag handle": "reorder with the mouse",
         "Delete": "remove preset",
+        "Ctrl + X / Ctrl + C": "cut / copy preset",
+        "Ctrl + V": "paste over this entry",
+        "Ctrl + Shift + V": "paste after this entry",
+        "Ctrl + D": "duplicate entry",
+        "Ctrl + Z": "undo a list edit",
         "F": "favourite / unfavourite preset",
         "B": "blacklist / unblacklist preset",
         "C": "set preset role (bed/pulse/lead/accent/none)",

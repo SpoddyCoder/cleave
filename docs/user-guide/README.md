@@ -173,7 +173,7 @@ The same icons, in the same order, also sit at the right of the icon line under 
 
 ### Undo
 
-**Edit > Undo** (Ctrl+Z) and **Edit > Redo** (Ctrl+Y) cover timeline edits: adding, moving, trimming, splitting, and deleting clips, recorded takes, and timeline commands such as Generate timeline. The menu item names the step it would undo. Other settings apply as you change them, so save when you are happy, or close without saving to discard your changes.
+**Edit > Undo** (Ctrl+Z) and **Edit > Redo** (Ctrl+Y) cover timeline edits (adding, moving, trimming, splitting, and deleting clips, recorded takes, and timeline commands such as Generate timeline) and preset list edits (adding, removing, moving, pasting, replacing, and Populate list). The menu item names the step it would undo. A step on a locked layer's preset list, or on a locked timeline, waits until you unlock it. Other settings apply as you change them, so save when you are happy, or close without saving to discard your changes.
 
 ---
 
@@ -299,10 +299,25 @@ The **Preset List** page holds the presets the layer cycles through, in order. I
 
 - The **+** button on the Milkdrop Preset page's preset row, just left of its arrows (or P from any of the layer's rows), appends the preset you are looking at. The **Go to preset list** button, at the left of the icon line under the title of that page and of the Preset Switching page, opens the Preset List page.
 - **Populate list**, the button at the left of the page's icon line under its title, rebuilds the whole list. Under **pick from**, choose **shuffled (current directory)** or **in order (current directory)** to fill it from the layer's preset folder. With the timeline trigger, once at least one preset in your library has a role, you can also choose **clip roles**, which casts one preset for each of the layer's clips, picked by that clip's role.
-- **Enter** on an entry previews it; click the layer's pause icon, or **Resume switching**, to return to the schedule. Enter on the highlighted scheduled entry does not preview it, since it is already playing; during a preview it resumes switching.
-- **Drag** an entry's handle, or press M, to reorder it, and press **Delete** to remove it.
+- **Enter** on an entry previews it (a click only selects it); click the layer's pause icon, or **Resume switching**, to return to the schedule. Enter on the highlighted scheduled entry does not preview it, since it is already playing; during a preview it resumes switching.
+- **Drag** an entry's handle, or press M, to reorder it, and press **Delete** to remove it (Ctrl+Z puts it back).
 
 All of these are also in the entry's context menu.
+
+#### Copying, pasting, and replacing presets
+
+Right-click an entry to rework the list without starting over:
+
+| Item | What it does |
+| --- | --- |
+| Cut (Ctrl+X) / Copy (Ctrl+C) | Take the preset, to paste into this list or another layer's. Cut also removes the entry. |
+| Duplicate (Ctrl+D) | Add a second copy of the entry right after it. |
+| Paste over (Ctrl+V) | Put the copied preset in place of this entry. |
+| Paste before / Paste after (Ctrl+Shift+V) | Insert the copied preset next to this entry. |
+| Replace with (or double-click the entry) | Open the preset browser in this entry's folder. The layer previews presets as you move through them; Enter (or a double-click) puts the one you pick in the entry's place and keeps it playing as a preview, and Esc leaves the list as it was. |
+| Replace with current preset / Insert current preset after | Use the preset the layer is showing now. |
+
+The same commands are in the **Edit** menu, acting on the highlighted entry. You can also copy the preset on the Milkdrop Preset page's preset row, or a preset in the preset browser (right-click it). Paste on the preset row plays the copied preset as a preview without touching the list. Copy and paste work between layers and between projects: a pasted preset is copied into the project, like any other list preset. With the timeline trigger, every entry belongs to a clip in order, so inserting one moves each later preset on to the next clip, while pasting over or replacing keeps the rest in place.
 
 Cleave keeps a copy of every preset in the list inside the project, so the project plays the same on another computer or after the original pack changes. The list still shows each preset under its own name, and previewing an entry takes the preset rows to the folder it came from, so the arrows and the preset browser carry on from there. If that file has since been moved, deleted, or edited, the preview shows the project's own copy instead, in the project's presets folder.
 
@@ -647,6 +662,7 @@ These work anywhere in the editor. Press H to see the keys for whatever you are 
 | Ctrl+O | Open project. |
 | Ctrl+S | Save. |
 | Ctrl+Z / Ctrl+Y | Undo / redo. |
+| Ctrl+X / Ctrl+C / Ctrl+V | Cut, copy, or paste a preset on a preset list entry or the preset row. Ctrl+Shift+V pastes after the entry, Ctrl+D duplicates it. |
 | Ctrl+Enter | Drop a song marker. |
 | Ctrl+L | Add a layer. |
 | 1 to 8 | Jump to a layer. |

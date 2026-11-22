@@ -116,6 +116,9 @@ class RowSpec:
     colour_target: ColourTargetFn | None = None
     # A mouse click only focuses the row. Double-click runs apply_action.
     activate_on_double_click: bool = False
+    # A mouse click only focuses the row; a double-click runs this instead of
+    # apply_action, which stays on Enter.
+    double_click_action: ActionMutator | None = None
     fit_strategy: FitStrategy = FitStrategy.PLAIN
     visibility_icon: VisibilityIconFn | None = None
     header_glyph: str | None = None
@@ -423,6 +426,20 @@ def apply_field_action(
     if section_lock_blocks_mutation(controls.session, desc):
         return True
     spec.apply_action(controls, desc)
+    return True
+
+
+def apply_field_double_click(
+    controls: TuningControls,
+    desc: RowDescriptor,
+) -> bool:
+    """Run the row's double-click action. False when it has none."""
+    spec = ROW_SPECS.get(desc.kind)
+    if spec is None or spec.double_click_action is None:
+        return False
+    if section_lock_blocks_mutation(controls.session, desc):
+        return True
+    spec.double_click_action(controls, desc)
     return True
 
 

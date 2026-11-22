@@ -49,7 +49,7 @@ from cleave.viz.timeline_clip_edits import (
     snap_for_session,
     step_clip_selection,
 )
-from cleave.viz.timeline_history import TimelineHistory
+from cleave.viz.edit_history import EditHistory
 
 def _next_option(options: tuple, current: object) -> object:
     """Option after *current*, wrapping; the first when *current* is not listed."""
@@ -117,7 +117,7 @@ class TimelineControls:
             if clip_editor is not None
             else ClipEditor(
                 session,
-                TimelineHistory(session),
+                EditHistory(session),
                 duration_sec=duration_sec,
                 beat_times=beat_times,
                 bar_times=bar_times,

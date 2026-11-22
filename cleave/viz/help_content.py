@@ -257,6 +257,8 @@ _PRESET_SECTION = HelpSection(
     (
         ("Left/Right", "next/previous preset"),
         ("PgUp/PgDn", "next/previous, large step"),
+        ("Ctrl + C", "copy this preset"),
+        ("Ctrl + V", "play the copied preset (preview)"),
         *_PRESET_CURATION_SHORTCUTS,
     ),
 )
@@ -267,9 +269,15 @@ _PRESET_LIST_ITEM_SECTION = HelpSection(
     "Edit",
     (
         ("Enter", "play this preset and pause switching"),
+        ("Double-click", "replace from the preset browser"),
         ("M", "reorder in list"),
         ("Drag handle", "reorder with the mouse"),
         ("Delete", "remove preset"),
+        ("Ctrl + X / Ctrl + C", "cut / copy preset"),
+        ("Ctrl + V", "paste over this entry"),
+        ("Ctrl + Shift + V", "paste after this entry"),
+        ("Ctrl + D", "duplicate entry"),
+        ("Ctrl + Z", "undo a list edit"),
         *_PRESET_CURATION_SHORTCUTS,
     ),
 )

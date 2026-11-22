@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from functools import cache
+from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
 import pygame
@@ -19,7 +20,7 @@ from cleave.config_schema.layers import MAX_LAYER_COUNT
 from cleave.viz.config_pages import CONFIG_PAGES, ConfigPage
 from cleave.viz.context_menu import ContextMenuItem
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
-from cleave.viz.key_repeat import mod_alt, mod_ctrl
+from cleave.viz.key_repeat import mod_alt, mod_ctrl, mod_shift
 from cleave.viz.navigator import (
     LAYER_PAGE_PRESET_LIST,
     layer_node_id,
@@ -31,6 +32,7 @@ from cleave.viz.theme import palette
 
 if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
+    from cleave.viz.preset_clipboard import PresetEditTarget
 
 CommandKind = Literal["command", "jump", "check"]
 LabelRole = tuple[int, int, int]
@@ -55,6 +57,12 @@ _RESOLVED_SHORTCUT_IDS = frozenset(
 )
 
 
+# Clipboard shortcuts act on the inspector, so the strip keeps its own keys.
+_CLIPBOARD_IDS = frozenset(
+    {"edit.cut", "edit.copy", "edit.paste", "edit.paste_after", "edit.duplicate"}
+)
+
+
 @dataclass(frozen=True)
 class CommandContext:
     """Snapshot ``enabled``, ``checked``, and ``label_role`` read."""
@@ -70,8 +78,17 @@ class CommandContext:
     timeline_scope: bool = False
     timeline_recording: bool = False
     timeline_locked: bool = False
-    timeline_can_undo: bool = False
-    timeline_can_redo: bool = False
+    can_undo: bool = False
+    can_redo: bool = False
+    # The section the top Undo / Redo entry edits is locked.
+    undo_locked: bool = False
+    redo_locked: bool = False
+    # The focused preset list entry or Milkdrop Preset row, for the clipboard.
+    preset_target: PresetEditTarget | None = None
+    # Why Paste cannot run, or None when the clipboard holds a preset.
+    preset_paste_hint: str | None = "Nothing copied"
+    # The preset browser is open on a preset.
+    browser_preset_selected: bool = False
     help_visible: bool = False
     fullscreen: bool = False
     # Pages the history's Back and Forward would show, None where there is none.
@@ -147,8 +164,13 @@ def command_context(controls: TuningControls) -> CommandContext:
         timeline_scope=timeline_scope,
         timeline_recording=bool(timeline.recording),
         timeline_locked=bool(timeline.locked),
-        timeline_can_undo=controls.timeline_history.can_undo,
-        timeline_can_redo=controls.timeline_history.can_redo,
+        can_undo=controls.edit_history.can_undo,
+        can_redo=controls.edit_history.can_redo,
+        undo_locked=controls.edit_history.undo_locked,
+        redo_locked=controls.edit_history.redo_locked,
+        preset_target=controls.preset_edit_target(),
+        preset_paste_hint=controls.preset_clipboard.paste_hint(),
+        browser_preset_selected=_browser_preset(controls) is not None,
         help_visible=bool(session.help_visible),
         # Command fakes without window controls read as windowed.
         fullscreen=bool(getattr(getattr(controls, "window", None), "fullscreen", False)),
@@ -433,26 +455,106 @@ def _run_set_cut_type(controls: TuningControls) -> None:
 
 def _undo_enabled(ctx: CommandContext) -> bool:
     return (
-        ctx.timeline_can_undo
-        and _timeline_actions_enabled(ctx)
+        ctx.can_undo
+        and not ctx.undo_locked
+        and not is_preset_curation_mode(ctx.editor_mode)
         and not ctx.timeline_recording
     )
 
 
 def _redo_enabled(ctx: CommandContext) -> bool:
     return (
-        ctx.timeline_can_redo
-        and _timeline_actions_enabled(ctx)
+        ctx.can_redo
+        and not ctx.redo_locked
+        and not is_preset_curation_mode(ctx.editor_mode)
         and not ctx.timeline_recording
     )
 
 
+def _browser_preset(controls: TuningControls) -> Path | None:
+    browser = controls.preset_browser.browser
+    return browser.selected_preset() if browser is not None else None
+
+
+def _list_target(ctx: CommandContext) -> PresetEditTarget | None:
+    """The focused preset list entry when it can be edited."""
+    target = ctx.preset_target
+    if target is None or target.index is None or target.locked:
+        return None
+    if is_preset_curation_mode(ctx.editor_mode):
+        return None
+    return target
+
+
+def _cut_enabled(ctx: CommandContext) -> bool:
+    return _list_target(ctx) is not None
+
+
+def _copy_enabled(ctx: CommandContext) -> bool:
+    return ctx.browser_preset_selected or ctx.preset_target is not None
+
+
+def _paste_enabled(ctx: CommandContext) -> bool:
+    if ctx.preset_paste_hint is not None:
+        return False
+    target = ctx.preset_target
+    if target is not None and target.index is None:
+        return not target.locked
+    return _list_target(ctx) is not None
+
+
+def _paste_after_enabled(ctx: CommandContext) -> bool:
+    return ctx.preset_paste_hint is None and _list_target(ctx) is not None
+
+
+def _run_cut(controls: TuningControls) -> None:
+    target = controls.preset_edit_target()
+    if target is not None and target.index is not None:
+        controls.preset_clipboard.cut_entry(target.slot, target.index)
+
+
+def _run_copy(controls: TuningControls) -> None:
+    path = _browser_preset(controls)
+    if path is not None:
+        controls.preset_clipboard.copy_path(path)
+        return
+    target = controls.preset_edit_target()
+    if target is None:
+        return
+    if target.index is None:
+        controls.preset_clipboard.copy_current(target.slot)
+    else:
+        controls.preset_clipboard.copy_entry(target.slot, target.index)
+
+
+def _run_paste(controls: TuningControls) -> None:
+    target = controls.preset_edit_target()
+    if target is None:
+        return
+    if target.index is None:
+        controls.preset_clipboard.paste_preview(target.slot)
+    else:
+        controls.preset_clipboard.paste_over(target.slot, target.index)
+
+
+def _run_paste_after(controls: TuningControls) -> None:
+    target = controls.preset_edit_target()
+    if target is not None and target.index is not None:
+        controls.preset_clipboard.paste_after(target.slot, target.index)
+
+
+def _run_duplicate(controls: TuningControls) -> None:
+    target = controls.preset_edit_target()
+    if target is not None and target.index is not None:
+        controls.preset_list.duplicate(target.slot, target.index)
+
+
 def _run_undo(controls: TuningControls) -> None:
-    controls.undo_timeline()
+    controls.undo()
 
 
 def _run_redo(controls: TuningControls) -> None:
-    controls.redo_timeline()
+    controls.redo()
 
 
 def _run_open_page(page_id: str) -> Callable[[TuningControls], None]:
@@ -678,6 +780,47 @@ _REDO = Command(
     run=_when_enabled(_redo_enabled, _run_redo),
 )
 
+CUT = Command(
+    id="edit.cut",
+    label="Cut",
+    kind="command",
+    shortcut="Ctrl+X",
+    enabled=_cut_enabled,
+    run=_when_enabled(_cut_enabled, _run_cut),
+)
+COPY = Command(
+    id="edit.copy",
+    label="Copy",
+    kind="command",
+    shortcut="Ctrl+C",
+    enabled=_copy_enabled,
+    run=_when_enabled(_copy_enabled, _run_copy),
+)
+PASTE = Command(
+    id="edit.paste",
+    label="Paste",
+    kind="command",
+    shortcut="Ctrl+V",
+    enabled=_paste_enabled,
+    run=_when_enabled(_paste_enabled, _run_paste),
+)
+PASTE_AFTER = Command(
+    id="edit.paste_after",
+    label="Paste after",
+    kind="command",
+    shortcut="Ctrl+Shift+V",
+    enabled=_paste_after_enabled,
+    run=_when_enabled(_paste_after_enabled, _run_paste_after),
+)
+DUPLICATE = Command(
+    id="edit.duplicate",
+    label="Duplicate",
+    kind="command",
+    shortcut="Ctrl+D",
+    enabled=_cut_enabled,
+    run=_when_enabled(_cut_enabled, _run_duplicate),
+)
+
 _MEASURE_LATENCY = Command(
     id="settings.measure_latency",
     label="Measure audio latency…",
@@ -819,29 +962,35 @@ _PAGE_FORWARD = Command(
 )
 
 # Shortcut text to ``(key, ctrl, alt)``.
-_SHORTCUT_KEYS: dict[str, tuple[int, bool, bool]] = {
-    "Ctrl+N": (pygame.K_n, True, False),
-    "Ctrl+O": (pygame.K_o, True, False),
-    "Ctrl+S": (pygame.K_s, True, False),
-    "Ctrl+Q": (pygame.K_q, True, False),
-    "Ctrl+L": (pygame.K_l, True, False),
-    "Ctrl+R": (pygame.K_r, True, False),
-    "Ctrl+Y": (pygame.K_y, True, False),
-    "Ctrl+Z": (pygame.K_z, True, False),
-    "Ctrl+,": (pygame.K_COMMA, True, False),
-    "Ctrl+F": (pygame.K_f, True, False),
-    "H": (pygame.K_h, False, False),
-    "F11": (pygame.K_F11, False, False),
-    "1": (pygame.K_1, False, False),
-    "2": (pygame.K_2, False, False),
-    "3": (pygame.K_3, False, False),
-    "4": (pygame.K_4, False, False),
-    "5": (pygame.K_5, False, False),
-    "6": (pygame.K_6, False, False),
-    "7": (pygame.K_7, False, False),
-    "8": (pygame.K_8, False, False),
-    "Alt+Left": (pygame.K_LEFT, False, True),
-    "Alt+Right": (pygame.K_RIGHT, False, True),
+# Key, Ctrl, Alt, and Shift (None: either).
+_SHORTCUT_KEYS: dict[str, tuple[int, bool, bool, bool | None]] = {
+    "Ctrl+N": (pygame.K_n, True, False, None),
+    "Ctrl+O": (pygame.K_o, True, False, None),
+    "Ctrl+S": (pygame.K_s, True, False, None),
+    "Ctrl+Q": (pygame.K_q, True, False, None),
+    "Ctrl+L": (pygame.K_l, True, False, None),
+    "Ctrl+R": (pygame.K_r, True, False, None),
+    "Ctrl+Y": (pygame.K_y, True, False, None),
+    "Ctrl+Z": (pygame.K_z, True, False, None),
+    "Ctrl+,": (pygame.K_COMMA, True, False, None),
+    "Ctrl+F": (pygame.K_f, True, False, None),
+    "Ctrl+X": (pygame.K_x, True, False, None),
+    "Ctrl+C": (pygame.K_c, True, False, None),
+    "Ctrl+V": (pygame.K_v, True, False, False),
+    "Ctrl+Shift+V": (pygame.K_v, True, False, True),
+    "Ctrl+D": (pygame.K_d, True, False, None),
+    "H": (pygame.K_h, False, False, None),
+    "F11": (pygame.K_F11, False, False, None),
+    "1": (pygame.K_1, False, False, None),
+    "2": (pygame.K_2, False, False, None),
+    "3": (pygame.K_3, False, False, None),
+    "4": (pygame.K_4, False, False, None),
+    "5": (pygame.K_5, False, False, None),
+    "6": (pygame.K_6, False, False, None),
+    "7": (pygame.K_7, False, False, None),
+    "8": (pygame.K_8, False, False, None),
+    "Alt+Left": (pygame.K_LEFT, False, True, None),
+    "Alt+Right": (pygame.K_RIGHT, False, True, None),
 }
 
 
@@ -915,7 +1064,19 @@ def build_menus(
     return MenuSet(
         (
             Menu("File", (_NEW, _OPEN, _SAVE, SEPARATOR, _QUIT)),
-            Menu("Edit", (_UNDO, _REDO)),
+            Menu(
+                "Edit",
+                (
+                    _UNDO,
+                    _REDO,
+                    SEPARATOR,
+                    CUT,
+                    COPY,
+                    PASTE,
+                    PASTE_AFTER,
+                    DUPLICATE,
+                ),
+            ),
             Menu(
                 "View",
                 (
@@ -1003,7 +1164,7 @@ def command_by_id(
 def _shortcut_resolves(command: Command, *, timeline_scope: bool) -> bool:
     if command.id in _RESOLVED_SHORTCUT_IDS:
         return True
-    if command.id.startswith("layers.focus."):
+    if command.id.startswith("layers.focus.") or command.id in _CLIPBOARD_IDS:
         return not timeline_scope
     return False
 
@@ -1027,7 +1188,8 @@ def command_for_shortcut(
 
     New, open, save, quit, render, the help overlay, Back, Forward, Play full
     screen, Full screen editor,
-    undo, redo,
+    undo, redo, and the preset clipboard (cut, copy, paste, paste after,
+    duplicate; not while *timeline_scope* is set),
     show-timeline-strip, and Settings > Preview (Ctrl+,) resolve from menu
     rows. Add-layer resolves from its inspector button. Layer jumps
     (``1``–``8``) resolve from commands that are not menu rows, and stay
@@ -1037,6 +1199,7 @@ def command_for_shortcut(
     source = MENUS if menus is None else menus
     ctrl = mod_ctrl(mod)
     alt = mod_alt(mod)
+    shift = mod_shift(mod)
     for command in _shortcut_commands(source):
         if not _shortcut_resolves(command, timeline_scope=timeline_scope):
             continue
@@ -1045,7 +1208,9 @@ def command_for_shortcut(
         mapped = _SHORTCUT_KEYS.get(command.shortcut)
         if mapped is None:
             continue
-        want_key, want_ctrl, want_alt = mapped
-        if key == want_key and ctrl == want_ctrl and alt == want_alt:
+        want_key, want_ctrl, want_alt, want_shift = mapped
+        if key == want_key and ctrl == want_ctrl and alt == want_alt and (
+            want_shift is None or shift == want_shift
+        ):
             return command
     return None

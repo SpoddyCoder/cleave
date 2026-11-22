@@ -66,7 +66,7 @@ from cleave.viz.modal import (
 from cleave.viz.session import TuningSession
 from cleave.viz.timeline_clip_edits import row_clips
 from cleave.viz.timeline_cut_controls import apply_cut_to_lanes
-from cleave.viz.timeline_history import TimelineHistory
+from cleave.viz.edit_history import EditHistory
 
 _GENERATE_TITLE = "Generate timeline"
 _RESET_TITLE = "Reset timeline?"
@@ -196,11 +196,11 @@ class TimelinePresetController:
         on_notification: Callable[[str], None] | None = None,
         on_repopulate: Callable[[], None] | None = None,
         has_role_presets: Callable[[], bool] | None = None,
-        history: TimelineHistory | None = None,
+        history: EditHistory | None = None,
     ) -> None:
         self.session = session
         self._modal = modal_host
-        self._history = history if history is not None else TimelineHistory(session)
+        self._history = history if history is not None else EditHistory(session)
         self._beat_times = tuple(beat_times)
         self._bar_times = tuple(bar_times)
         self._signals = signals

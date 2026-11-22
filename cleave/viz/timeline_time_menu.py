@@ -178,7 +178,7 @@ class TimelineTimeMenu:
 
     def _history_items(self) -> tuple[ContextMenuItem, ...]:
         controls = self._controls
-        history = controls.timeline_history
+        history = controls.edit_history
         ctx = command_context(controls)
         undo_label = history.undo_label
         redo_label = history.redo_label
@@ -187,13 +187,13 @@ class TimelineTimeMenu:
                 command_by_id("edit.undo"),
                 controls,
                 label=f"Undo {undo_label}" if undo_label else "Undo",
-                disabled_hint=_history_hint(ctx, ctx.timeline_can_undo, "undo"),
+                disabled_hint=_history_hint(ctx, ctx.can_undo, "undo"),
             ),
             command_menu_item(
                 command_by_id("edit.redo"),
                 controls,
                 label=f"Redo {redo_label}" if redo_label else "Redo",
-                disabled_hint=_history_hint(ctx, ctx.timeline_can_redo, "redo"),
+                disabled_hint=_history_hint(ctx, ctx.can_redo, "redo"),
             ),
         )
 

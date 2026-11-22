@@ -60,6 +60,11 @@ _STATIC_IDS = (
     "file.quit",
     "edit.undo",
     "edit.redo",
+    "edit.cut",
+    "edit.copy",
+    "edit.paste",
+    "edit.paste_after",
+    "edit.duplicate",
     "view.page_back",
     "view.page_forward",
     "view.play_fullscreen",
@@ -129,7 +134,12 @@ def _fake_controls(
     recording: bool = False,
 ):
     return SimpleNamespace(
-        timeline_history=SimpleNamespace(can_undo=False, can_redo=False),
+        edit_history=SimpleNamespace(
+            can_undo=False, can_redo=False, undo_locked=False, redo_locked=False
+        ),
+        preset_edit_target=lambda: None,
+        preset_clipboard=SimpleNamespace(paste_hint=lambda: "Nothing copied"),
+        preset_browser=SimpleNamespace(browser=None),
         session=SimpleNamespace(
             settings=SimpleNamespace(editor_mode=editor_mode),
             layers={},
@@ -199,7 +209,16 @@ def test_menus_list_taxonomy_ids_once() -> None:
         None,
         "file.quit",
     ]
-    assert _row_ids(menus[1]) == ["edit.undo", "edit.redo"]
+    assert _row_ids(menus[1]) == [
+        "edit.undo",
+        "edit.redo",
+        None,
+        "edit.cut",
+        "edit.copy",
+        "edit.paste",
+        "edit.paste_after",
+        "edit.duplicate",
+    ]
     assert _row_ids(menus[2]) == [
         "view.page_back",
         "view.page_forward",
@@ -762,9 +781,9 @@ def test_undo_is_disabled_with_no_history_and_run_is_a_noop() -> None:
     undo = command_by_id("edit.undo")
     assert undo.enabled(CommandContext()) is False
     controls = make_controls(("layer_1",))
-    controls.undo_timeline = MagicMock()
+    controls.undo = MagicMock()
     undo.run(controls)
-    controls.undo_timeline.assert_not_called()
+    controls.undo.assert_not_called()
 
 
 def test_undo_and_redo_follow_a_snap_and_their_shortcuts_resolve() -> None:
@@ -1059,3 +1078,48 @@ def test_reseparate_asks_stem_count_then_requests_the_split(
     assert target.path == project
     assert target.stem_count == 6
     assert target.high_quality is False
+
+
+def test_clipboard_shortcuts_resolve_outside_the_strip() -> None:
+    ctrl = pygame.KMOD_CTRL
+    shift = pygame.KMOD_SHIFT
+    expected = {
+        (pygame.K_x, ctrl): "edit.cut",
+        (pygame.K_c, ctrl): "edit.copy",
+        (pygame.K_v, ctrl): "edit.paste",
+        (pygame.K_v, ctrl | shift): "edit.paste_after",
+        (pygame.K_d, ctrl): "edit.duplicate",
+    }
+    for (key, mod), command_id in expected.items():
+        command = command_for_shortcut(key, mod)
+        assert command is not None and command.id == command_id
+        assert command_for_shortcut(key, mod, timeline_scope=True) is None
+    undo = command_for_shortcut(pygame.K_z, ctrl | shift)
+    assert undo is not None and undo.id == "edit.undo"
+
+
+def test_clipboard_commands_follow_the_focused_preset_row() -> None:
+    from cleave.viz.preset_clipboard import PresetEditTarget
+
+    entry = PresetEditTarget("layer_1", 0, locked=False)
+    row = PresetEditTarget("layer_1", None, locked=False)
+    locked = PresetEditTarget("layer_1", 0, locked=True)
+    cut, copy, paste, paste_after = (
+        command_by_id(i)
+        for i in ("edit.cut", "edit.copy", "edit.paste", "edit.paste_after")
+    )
+    assert not copy.enabled(CommandContext())
+    assert copy.enabled(CommandContext(browser_preset_selected=True))
+    assert cut.enabled(CommandContext(preset_target=entry))
+    assert not cut.enabled(CommandContext(preset_target=row))
+    assert not cut.enabled(CommandContext(preset_target=locked))
+    assert copy.enabled(CommandContext(preset_target=locked))
+    assert not paste.enabled(CommandContext(preset_target=entry))
+    assert paste.enabled(CommandContext(preset_target=entry, preset_paste_hint=None))
+    assert paste.enabled(CommandContext(preset_target=row, preset_paste_hint=None))
+    assert not paste_after.enabled(
+        CommandContext(preset_target=row, preset_paste_hint=None)
+    )
+    assert not cut.enabled(
+        CommandContext(preset_target=entry, editor_mode="preset_curation")
+    )

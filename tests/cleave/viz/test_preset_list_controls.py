@@ -7,6 +7,7 @@ from pathlib import Path
 
 from cleave.preset_library import UNFILTERED_CATALOG, PresetCatalog, PresetLibrary
 from cleave.preset_playlist import PresetPlaylist
+from cleave.viz.edit_history import EditHistory
 from cleave.viz.modal import ModalHost
 from cleave.viz.preset_list_controls import PresetListController
 from cleave.viz.row_kinds import RowDescriptor, RowKind
@@ -32,7 +33,6 @@ def _make_controller(
     modal: ModalHost | None = None,
     layer_bindings=None,
     on_notification=None,
-    get_active_config_path=None,
     on_focus_preset_item=None,
     preset_list: list[PresetListEntry] | None = None,
     catalog: PresetCatalog = UNFILTERED_CATALOG,
@@ -65,11 +65,31 @@ def _make_controller(
         modal_host,
         layer_bindings if layer_bindings is not None else noop_layer_bindings(),
         on_notification=on_notification,
-        get_active_config_path=get_active_config_path,
         on_focus_preset_item=on_focus_preset_item,
         catalog=catalog,
     )
     return controller, session, modal_host
+
+
+def _with_history(
+    controller: PresetListController,
+    session: TuningSession,
+    modal: ModalHost,
+    history: EditHistory,
+    *,
+    on_notification=None,
+) -> PresetListController:
+    """The same controller recording into *history*."""
+    return PresetListController(
+        session,
+        controller.preset_root,
+        controller.project_dir,
+        controller.duration_sec,
+        modal,
+        noop_layer_bindings(),
+        on_notification=on_notification,
+        history=history,
+    )
 
 
 def test_resolve_file_path_current_and_list_item() -> None:
@@ -362,22 +382,26 @@ def test_add_current_copies_into_user_presets() -> None:
         assert switched == ["layer_1"]
 
 
-def test_confirm_delete_unlinks_unreferenced_user_preset() -> None:
+def test_remove_keeps_the_project_copy_so_undo_can_restore_it() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         project = Path(tmp)
         root = project / "pack-root"
         _write(root / "pack" / "demo.milk", "milk")
         dest = project / "presets" / "keep.milk"
         _write(dest, "milk")
-        controller, session, _modal = _make_controller(
+        controller, session, modal = _make_controller(
             preset_root=root,
             project_dir=project,
             preset_list=entries(str(dest.resolve())),
-            get_active_config_path=lambda: None,
         )
-        controller.confirm_delete("layer_1", 0)
+        history = EditHistory(session)
+        controller = _with_history(controller, session, modal, history)
+        controller.remove("layer_1", 0)
+        assert modal.view_state() is None
         assert session.layers["layer_1"].preset_list == []
-        assert not dest.exists()
+        assert dest.exists()
+        assert history.undo() == "Remove preset"
+        assert session.layers["layer_1"].preset_list == entries(str(dest.resolve()))
 
 
 def test_current_preset_path_uses_browsed_preset_while_paused() -> None:
@@ -526,7 +550,7 @@ def test_preset_list_edits_keep_the_preview() -> None:
         stem, _pm, _seen = _bind_live_layer(controller, session, root)
         controller.audition("layer_1", 0)
         assert stem.switching_paused is True
-        controller.confirm_delete("layer_1", 1)
+        controller.remove("layer_1", 1)
         assert stem.switching_paused is True
 
         controller.add_current("layer_1")

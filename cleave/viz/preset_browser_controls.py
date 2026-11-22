@@ -3,7 +3,8 @@
 Opening takes a snapshot of the layer's browse position. Moving the selection
 onto a preset plays it on the layer after :data:`PREVIEW_DELAY_SEC`, through
 the same path as stepping the preset row. Enter keeps the preset; Esc puts the
-snapshot back.
+snapshot back. Opened to replace a preset list entry, it starts in that
+entry's folder, and Enter also puts the chosen preset in the entry's place.
 
 Listings build on a worker thread so the panel can show its spinner while a
 large folder or a library-wide search is read. One listing runs at a time;
@@ -33,8 +34,10 @@ from cleave.viz.preset_browser import (
     PresetBrowser,
 )
 from cleave.viz.preset_browser_surface import BrowserPointerIntent, BrowserPointerKind
+from cleave.viz.preset_list_controls import PresetListController
 from cleave.viz.preset_switching import panel_layer_number
 from cleave.viz.session import BrowseSnapshot, TuningSession
+from cleave.viz.user_presets import preview_anchor
 
 PREVIEW_DELAY_SEC = 0.15
 
@@ -114,6 +117,7 @@ class PresetBrowserControls:
         library: PresetLibrary,
         layer_mutations: LayerMutations,
         *,
+        preset_list: PresetListController | None = None,
         start_text_input: Callable[[], None],
         stop_text_input: Callable[[], None],
         text_input_shared: Callable[[], bool],
@@ -123,6 +127,7 @@ class PresetBrowserControls:
         self._preset_root = preset_root
         self._library = library
         self._mutations = layer_mutations
+        self._preset_list = preset_list
         self._start_text_input = start_text_input
         self._stop_text_input = stop_text_input
         self._text_input_shared = text_input_shared
@@ -130,6 +135,8 @@ class PresetBrowserControls:
         self._repeat = KeyRepeatController()
         self._browser: PresetBrowser | None = None
         self._slot: str | None = None
+        # The preset list entry Enter replaces, or None for a plain browse.
+        self._replace_index: int | None = None
         self._snapshot: BrowseSnapshot | None = None
         self._shown: Path | None = None
         self._pending: Path | None = None
@@ -148,6 +155,10 @@ class PresetBrowserControls:
     @property
     def slot(self) -> str | None:
         return self._slot
+
+    @property
+    def replace_index(self) -> int | None:
+        return self._replace_index
 
     @property
     def key_repeat_armed(self) -> bool:
@@ -179,8 +190,12 @@ class PresetBrowserControls:
 
     # -- open / close ------------------------------------------------------
 
-    def open(self, slot: str) -> None:
-        """Browse *slot*'s presets from the folder or collection it is on."""
+    def open(self, slot: str, *, replace_index: int | None = None) -> None:
+        """Browse *slot*'s presets from the folder or collection it is on.
+
+        With *replace_index*, start at that preset list entry's folder, and
+        Enter replaces the entry with the chosen preset.
+        """
         if slot not in self._session.layers:
             return
         if self._browser is not None:
@@ -188,17 +203,28 @@ class PresetBrowserControls:
         layer = self._session.layers[slot]
         playlist = layer.playlist
         number = panel_layer_number(self._session.layer_z_order, slot)
+        title = f"Browse presets: Layer {number}"
+        folder = playlist.current_dir
+        collection = playlist.collection
+        select = playlist.current
+        if replace_index is not None:
+            if not 0 <= replace_index < len(layer.preset_list):
+                return
+            anchor = preview_anchor(layer.preset_list[replace_index])
+            title = f"Replace preset {replace_index + 1}: Layer {number}"
+            folder, collection, select = anchor.parent, None, anchor
         self._browser = PresetBrowser(
             preset_root=self._preset_root,
             catalog=playlist.catalog,
-            title=f"Browse presets: Layer {number}",
-            folder=playlist.current_dir,
-            collection=playlist.collection,
-            select=playlist.current,
+            title=title,
+            folder=folder,
+            collection=collection,
+            select=select,
             marker=self._marker(slot),
             synchronous=self._synchronous,
         )
         self._slot = slot
+        self._replace_index = replace_index
         self._snapshot = self._mutations.browse_snapshot(slot)
         self._shown = playlist.current
         self._pending = None
@@ -222,17 +248,30 @@ class PresetBrowserControls:
         self._close()
 
     def commit(self) -> None:
-        """Keep the selected preset (playing it now if the preview was pending)."""
+        """Keep the selected preset (playing it now if the preview was pending).
+
+        In replace mode the preset also takes the entry's place in the list,
+        and keeps playing as a preview.
+        """
         browser = self._browser
-        if browser is not None:
-            path = browser.selected_preset()
-            if path is not None and path != self._shown:
-                self._show(path)
+        slot = self._slot
+        replace_index = self._replace_index
+        path = browser.selected_preset() if browser is not None else None
+        if path is not None and path != self._shown:
+            self._show(path)
         self._close()
+        if (
+            path is not None
+            and slot is not None
+            and replace_index is not None
+            and self._preset_list is not None
+        ):
+            self._preset_list.replace(slot, replace_index, path)
 
     def _close(self) -> None:
         self._browser = None
         self._slot = None
+        self._replace_index = None
         self._snapshot = None
         self._pending = None
         self._jobs.clear()

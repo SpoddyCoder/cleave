@@ -20,7 +20,7 @@ from cleave.viz.modal import (
     ModalHost,
 )
 from cleave.viz.session import TuningSession
-from cleave.viz.timeline_history import TimelineHistory
+from cleave.viz.edit_history import EditHistory
 
 ApplyCutScope = Literal["all", "except_markers", "markers_only"]
 
@@ -112,11 +112,11 @@ class TimelineCutController:
         modal_host: ModalHost,
         *,
         on_notification: Callable[[str], None] | None = None,
-        history: TimelineHistory | None = None,
+        history: EditHistory | None = None,
     ) -> None:
         self.session = session
         self._modal = modal_host
-        self._history = history if history is not None else TimelineHistory(session)
+        self._history = history if history is not None else EditHistory(session)
         self._on_notification = on_notification
         self._last_values: FormValues = {
             "cut": _DEFAULT_CUT_INDEX,

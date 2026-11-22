@@ -152,7 +152,7 @@ def test_ruler_lists_history_and_timeline_commands() -> None:
 
 def test_undo_label_names_the_last_command() -> None:
     controls = make_controls()
-    with controls.timeline_history.recording("Snap clips"):
+    with controls.edit_history.recording("Snap clips"):
         controls.session.timeline.lanes["layer_1"] = TimelineLane(
             baseline=None, cues=[SlotCue(t=3.0, level=1.0)]
         )

@@ -14,6 +14,7 @@ from cleave.preset_library import PresetLibrary
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.layer_lifecycle_controls import LayerLifecycleController
 from cleave.viz.layer_mutations import LayerMutations
+from cleave.viz.preset_clipboard import PresetClipboard, PresetEditTarget
 from cleave.viz.preset_browser_controls import PresetBrowserControls
 from cleave.viz.editor_mode_controls import (
     EditorModeController,
@@ -53,7 +54,12 @@ from cleave.viz.transport_controls import TransportControls, hold_paused
 from cleave.viz.welcome_host import CANCEL_LABEL, WelcomeFlow
 from cleave.viz.window_controls import WindowControls
 from cleave.viz.timeline_phase_controls import TimelinePhaseController
-from cleave.viz.timeline_history import TimelineHistory
+from cleave.viz.edit_history import (
+    TIMELINE_SCOPE,
+    EditHistory,
+    EditScope,
+    preset_list_scope_slot,
+)
 from cleave.viz.timeline_clip_edits import ClipEditor
 from cleave.viz.timeline_preset_controls import TimelinePresetController
 from cleave.viz.timeline_cut_controls import TimelineCutController
@@ -204,6 +210,11 @@ class TuningControls:
         layers_by_slot = (
             layer_manager.layers_by_slot if layer_manager is not None else {}
         )
+        self.edit_history = EditHistory(
+            session,
+            on_preset_list_change=lambda slot: self.preset_list.refresh_switching(slot),
+            scope_locked=self._edit_scope_locked,
+        )
         self.preset_list = PresetListController(
             session,
             preset_root,
@@ -212,7 +223,7 @@ class TuningControls:
             self._modal_host,
             layer_bindings,
             on_notification=self.show_notification,
-            get_active_config_path=lambda: self._config_save.active_config_path,
+            history=self.edit_history,
             on_focus_preset_item=self._focus_preset_list_item,
             on_move_preset_selection=self._move_preset_list_selection,
             layers_by_slot=layers_by_slot,
@@ -225,13 +236,9 @@ class TuningControls:
             self.library,
             on_notification=self.show_notification,
         )
-        self.timeline_history = TimelineHistory(
-            session,
-            on_preset_list_change=self.preset_list.refresh_switching,
-        )
         self.clip_editor = ClipEditor(
             session,
-            self.timeline_history,
+            self.edit_history,
             duration_sec=duration_sec,
             beat_times=beat_times,
             bar_times=bar_times,
@@ -245,7 +252,7 @@ class TuningControls:
             on_notification=self.show_notification,
             on_repopulate=self.preset_list.repopulate,
             has_role_presets=self.preset_list.has_role_presets,
-            history=self.timeline_history,
+            history=self.edit_history,
         )
         self.timeline_phase = TimelinePhaseController(
             session,
@@ -258,13 +265,13 @@ class TuningControls:
             beat_times,
             bar_times,
             on_notification=self.show_notification,
-            history=self.timeline_history,
+            history=self.edit_history,
         )
         self._timeline_cuts = TimelineCutController(
             session,
             self._modal_host,
             on_notification=self.show_notification,
-            history=self.timeline_history,
+            history=self.edit_history,
         )
         self._view_state = TuningViewStateBuilder(
             session,
@@ -341,11 +348,17 @@ class TuningControls:
             preset_root,
             self.library,
             self.layer_mutations,
+            preset_list=self.preset_list,
             start_text_input=self._modal_host.start_text_input,
             stop_text_input=self._modal_host.stop_text_input,
             text_input_shared=lambda: (
                 self._modal_host.active or self.inline_edit.text_target is not None
             ),
+        )
+        self.preset_clipboard = PresetClipboard(
+            self.preset_list,
+            self.layer_mutations,
+            on_notification=self.show_notification,
         )
         calibration_clicks = CalibrationClicks(
             playback,
@@ -991,13 +1004,48 @@ class TuningControls:
     def prompt_set_cut_type(self) -> None:
         self._timeline_cuts.prompt()
 
-    def undo_timeline(self) -> None:
-        label = self.timeline_history.undo()
+    def preset_edit_target(self) -> PresetEditTarget | None:
+        """The focused preset list entry or Milkdrop Preset row, for Cut, Copy, and Paste."""
+        focus = self.shell_focus
+        desc = focus.inspector_cursor
+        if focus.region is not ShellRegion.INSPECTOR or desc is None:
+            return None
+        slot = desc.slot
+        if slot is None or slot not in self.session.layers:
+            return None
+        if desc.kind is RowKind.TRACK_PRESET:
+            index = None
+        elif desc.kind is RowKind.TRACK_PRESET_LIST_ITEM:
+            index = desc.preset_index
+            if index is None or not 0 <= index < len(
+                self.session.layers[slot].preset_list
+            ):
+                return None
+        else:
+            return None
+        return PresetEditTarget(
+            slot, index, section_lock_blocks_mutation(self.session, desc)
+        )
+
+    def _edit_scope_locked(self, scope: EditScope) -> bool:
+        """True when the section an undo entry of *scope* changes is locked."""
+        session = self.session
+        if scope == TIMELINE_SCOPE:
+            return bool(session.timeline.locked)
+        slot = preset_list_scope_slot(scope)
+        if slot is None or slot not in session.layers:
+            return True
+        return section_lock_blocks_mutation(
+            session, RowDescriptor(RowKind.TRACK_PRESET_LIST_ITEM, slot=slot)
+        )
+
+    def undo(self) -> None:
+        label = self.edit_history.undo()
         if label is not None:
             self.show_notification(f"Undid {label}")
 
-    def redo_timeline(self) -> None:
-        label = self.timeline_history.redo()
+    def redo(self) -> None:
+        label = self.edit_history.redo()
         if label is not None:
             self.show_notification(f"Redid {label}")
 

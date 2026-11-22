@@ -21,7 +21,7 @@ from cleave.viz.modal import (
     ModalHost,
 )
 from cleave.viz.session import TuningSession
-from cleave.viz.timeline_history import TimelineHistory
+from cleave.viz.edit_history import EditHistory
 
 SONG_MARKER_SNAP_SCOPE_EACH_LAYER = "each_layer"
 SONG_MARKER_SNAP_SCOPE_CLOSEST_WINS = "closest_wins"
@@ -106,11 +106,11 @@ class TimelineSnapController:
         bar_times: Sequence[float] = (),
         *,
         on_notification: Callable[[str], None] | None = None,
-        history: TimelineHistory | None = None,
+        history: EditHistory | None = None,
     ) -> None:
         self.session = session
         self._modal = modal_host
-        self._history = history if history is not None else TimelineHistory(session)
+        self._history = history if history is not None else EditHistory(session)
         self._beat_times = tuple(beat_times)
         self._bar_times = tuple(bar_times)
         self._on_notification = on_notification

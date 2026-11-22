@@ -163,13 +163,10 @@ def test_inspector_preset_item_delete_and_move_stay_on_the_item() -> None:
     runtime = _runtime(controls)
 
     assert dispatch_keydown(keydown(pygame.K_DELETE), runtime) is True
-    modal = controls.modal_host.view_state()
-    assert modal is not None
-    assert modal.message is not None
-    assert modal.message.startswith("Remove preset:")
+    assert controls.modal_host.view_state() is None
+    assert layer.preset_list == entries("/tmp/presets/b.milk")
     manager.remove_layer.assert_not_called()
     assert "layer_1" in controls.session.layers
-    controls.modal_host.dismiss()
 
     assert dispatch_keydown(keydown(pygame.K_m), runtime) is True
     assert controls.preset_list.move_mode_preset == ("layer_1", 0)
@@ -258,11 +255,11 @@ def test_section_lock_inspector_refuses_edits_and_delete_still_prompts() -> None
         RowKind.TRACK_PRESET_LIST_ITEM, slot="layer_1", preset_index=0
     )
     _focus_inspector(controls, "layer_1", item)
-    controls.preset_list.prompt_delete = MagicMock()
+    controls.preset_list.remove = MagicMock()
     assert dispatch_keydown(keydown(pygame.K_m), runtime) is True
     assert controls.preset_list.move_mode_preset is None
     assert dispatch_keydown(keydown(pygame.K_DELETE), runtime) is True
-    controls.preset_list.prompt_delete.assert_not_called()
+    controls.preset_list.remove.assert_not_called()
     assert controls.modal_host.view_state() is None
 
     assert dispatch_keydown(keydown(pygame.K_l), runtime) is True

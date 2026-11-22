@@ -515,6 +515,19 @@ def _apply_preset_list_item_action(
     controls.preset_list.audition(slot, index)
 
 
+def _open_preset_list_item_replace(
+    controls: TuningControls, desc: RowDescriptor
+) -> None:
+    """Double-click: open the preset browser to replace this entry."""
+    slot = desc.slot
+    index = desc.preset_index
+    if slot is None or index is None:
+        return
+    if controls.preset_list.project_dir is None:
+        return
+    controls.preset_browser.open(slot, replace_index=index)
+
+
 def _apply_preset_switching_resume_action(
     controls: TuningControls, desc: RowDescriptor
 ) -> None:
@@ -743,10 +756,11 @@ SPECS: dict[RowKind, RowSpec] = {
         format_markers=_format_track_preset_list_item_markers,
         tooltip=_preset_list_item_tooltip,
         apply_action=_apply_preset_list_item_action,
+        double_click_action=_open_preset_list_item_replace,
         fit_strategy=FitStrategy.NONE,
         help_title="Preset List Entry",
         help_description=(
-            "A preset in this layer's switching list. The highlighted entry is the one scheduled for this point in the song; while you preview another preset, it is where switching goes back to. Enter previews this entry; on the scheduled entry it does nothing, or resumes switching during a preview. Tags after the name mark its curation status and role; hover over one for a reminder:",
+            "A preset in this layer's switching list. The highlighted entry is the one scheduled for this point in the song; while you preview another preset, it is where switching goes back to. Enter previews this entry; on the scheduled entry it does nothing, or resumes switching during a preview. A double-click (or Replace with in the right-click menu) opens the preset browser in this entry's folder, and the preset you pick there takes this entry's place. Right-click also has Cut, Copy, Paste (over, before, or after this entry), and Duplicate. Ctrl+Z undoes any change to the list. With the timeline trigger, inserting an entry moves every later preset on to the next clip. Tags after the name mark its curation status and role; hover over one for a reminder:",
         ),
         help_mode_entries=_PRESET_LIST_MARKER_HELP_ENTRIES,
         can_enter_move_mode=True,

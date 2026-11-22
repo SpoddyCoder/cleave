@@ -1,10 +1,13 @@
-"""Undo and redo for timeline edits.
+"""Undo and redo for timeline and preset list edits.
 
-Each entry holds the timeline before and after one edit: a bulk command, a
-hand edit to a clip, or a recorded take. Undo runs only while the timeline
-still matches what that edit left behind, so a change made outside the
-history is never thrown away. Layer changes count, since lanes are keyed by
-slot.
+Each entry holds the timeline and every layer's preset list before and after
+one edit: a bulk command, a hand edit to a clip, a recorded take, or a preset
+list edit. Undo runs only while that state still matches what the edit left
+behind, so a change made outside the history is never thrown away. Layer
+changes count, since lanes and preset lists are keyed by slot.
+
+Each entry names its scope, so the Undo command can refuse one whose section
+is locked: :data:`TIMELINE_SCOPE`, or :func:`preset_list_scope` for a layer.
 
 Edits that share a merge key and follow each other closely fold into one
 entry, so a held nudge key or a whole drag undoes as one step. The clip
@@ -24,6 +27,21 @@ from cleave.viz.session import TuningSession
 
 _MAX_ENTRIES = 20
 _MERGE_WINDOW_SEC = 1.0
+
+EditScope = tuple[str, ...]
+TIMELINE_SCOPE: EditScope = ("timeline",)
+
+
+def preset_list_scope(slot: str) -> EditScope:
+    """Scope of an edit to *slot*'s preset list."""
+    return ("preset_list", slot)
+
+
+def preset_list_scope_slot(scope: EditScope) -> str | None:
+    """The layer a preset list scope names, or None for any other scope."""
+    if len(scope) == 2 and scope[0] == "preset_list":
+        return scope[1]
+    return None
 
 
 @dataclass(frozen=True)
@@ -51,6 +69,7 @@ class _Entry:
     after: _Snapshot
     merge_key: Hashable | None
     committed_at: float
+    scope: EditScope
 
 
 @dataclass(frozen=True)
@@ -58,20 +77,23 @@ class _Pending:
     label: str
     before: _Snapshot
     merge_key: Hashable | None
+    scope: EditScope
 
 
-class TimelineHistory:
-    """Bounded undo and redo stacks of timeline snapshots."""
+class EditHistory:
+    """Bounded undo and redo stacks of timeline and preset list snapshots."""
 
     def __init__(
         self,
         session: TuningSession,
         *,
         on_preset_list_change: Callable[[str], None] | None = None,
+        scope_locked: Callable[[EditScope], bool] | None = None,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self.session = session
         self._on_preset_list_change = on_preset_list_change
+        self._scope_locked = scope_locked
         self._clock = clock
         self._undo: list[_Entry] = []
         self._redo: list[_Entry] = []
@@ -79,10 +101,14 @@ class TimelineHistory:
 
     @contextmanager
     def recording(
-        self, label: str, *, merge_key: Hashable | None = None
+        self,
+        label: str,
+        *,
+        merge_key: Hashable | None = None,
+        scope: EditScope = TIMELINE_SCOPE,
     ) -> Iterator[None]:
         """Record the edit in this block. One that changes nothing is skipped."""
-        self.begin(label, merge_key=merge_key)
+        self.begin(label, merge_key=merge_key, scope=scope)
         try:
             yield
         finally:
@@ -93,14 +119,20 @@ class TimelineHistory:
         """True between ``begin`` and ``commit`` or ``cancel``."""
         return self._pending is not None
 
-    def begin(self, label: str, *, merge_key: Hashable | None = None) -> None:
+    def begin(
+        self,
+        label: str,
+        *,
+        merge_key: Hashable | None = None,
+        scope: EditScope = TIMELINE_SCOPE,
+    ) -> None:
         """Start an edit that may span frames, such as a drag or a take.
 
         A ``begin`` while another edit is pending commits that one first.
         """
         if self._pending is not None:
             self.commit()
-        self._pending = _Pending(label, self._capture(), merge_key)
+        self._pending = _Pending(label, self._capture(), merge_key, scope)
 
     def commit(self) -> None:
         """Record the pending edit, folding it into the last one when it merges."""
@@ -117,13 +149,21 @@ class TimelineHistory:
             top is not None
             and pending.merge_key is not None
             and top.merge_key == pending.merge_key
+            and top.scope == pending.scope
             and now - top.committed_at <= _MERGE_WINDOW_SEC
             and top.after.same_content(pending.before)
         ):
             self._undo[-1] = replace(top, after=after, committed_at=now)
         else:
             self._undo.append(
-                _Entry(pending.label, pending.before, after, pending.merge_key, now)
+                _Entry(
+                    pending.label,
+                    pending.before,
+                    after,
+                    pending.merge_key,
+                    now,
+                    pending.scope,
+                )
             )
             del self._undo[:-_MAX_ENTRIES]
         self._redo.clear()
@@ -148,6 +188,35 @@ class TimelineHistory:
             and bool(self._redo)
             and self._matches(self._redo[-1].before)
         )
+
+    @property
+    def undo_scope(self) -> EditScope | None:
+        """Scope of the command Undo would reverse, or None when it cannot."""
+        return self._undo[-1].scope if self.can_undo else None
+
+    @property
+    def redo_scope(self) -> EditScope | None:
+        """Scope of the command Redo would repeat, or None when it cannot."""
+        return self._redo[-1].scope if self.can_redo else None
+
+    @property
+    def undo_locked(self) -> bool:
+        """True when the section the next Undo would change is locked."""
+        scope = self.undo_scope
+        return scope is not None and self._is_locked(scope)
+
+    @property
+    def redo_locked(self) -> bool:
+        """True when the section the next Redo would change is locked."""
+        scope = self.redo_scope
+        return scope is not None and self._is_locked(scope)
+
+    def _is_locked(self, scope: EditScope) -> bool:
+        if self._scope_locked is not None:
+            return self._scope_locked(scope)
+        if scope == TIMELINE_SCOPE:
+            return bool(self.session.timeline.locked)
+        return False
 
     @property
     def undo_label(self) -> str | None:
