@@ -629,3 +629,28 @@ def test_a_vertical_field_has_no_list() -> None:
     _vertical_form(modal)
     modal.handle_keydown(keydown(pygame.K_SPACE))
     assert modal.view_state().form_choice is None
+
+
+def test_a_locked_field_takes_focus_but_never_changes() -> None:
+    modal = ModalHost()
+    confirmed: list[FormValues] = []
+    modal.prompt_form(
+        FormSpec(
+            title="Downloads",
+            fields=(
+                FormField("pack", "pack", ("Required",), 0, locked=True),
+                FormField("other", "other", ("Off", "On"), 0),
+            ),
+            confirm_label="Go",
+            on_confirm=confirmed.append,
+        )
+    )
+    row = modal.view_state().form_rows[0]
+    assert row.locked is True and row.focused is True
+    modal.handle_keydown(keydown(pygame.K_RIGHT))
+    modal.set_form_value(0, 1)
+    modal.step_form_value(0, 1)
+    modal.handle_keydown(keydown(pygame.K_DOWN))
+    modal.handle_keydown(keydown(pygame.K_RIGHT))
+    modal.activate_option(0)
+    assert confirmed == [{"pack": 0, "other": 1}]

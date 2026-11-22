@@ -54,6 +54,8 @@ _PACKS_SECTION = "projectM curated preset packs"
 SKIP_LABEL = "Skip"
 CANCEL_LABEL = "Cancel"
 _OFF_ON = ("Off", "On")
+_REQUIRED = ("Required",)
+_REQUIRED_HELP = "Cleave needs this, so it always downloads."
 _FAILED_TITLE = "Some downloads failed"
 _FAILED_BODY = "Check your internet connection, then try again."
 _DOWNLOAD_FAILED = "Download failed"
@@ -80,6 +82,20 @@ def _mark_done() -> None:
         persist_first_run_state(replace(saved_first_run_state(), welcome_done=True))
     except (OSError, ValueError, yaml.YAMLError):
         return
+
+
+def _item_field(item: FirstRunItem) -> FormField:
+    """One download's row: Off / On, or a locked Required for a required item."""
+    help_lines = (f"{item.name}: {item.purpose}.",)
+    return FormField(
+        id=item.id.value,
+        label=f"{item.name} - {item.purpose} ({item.size_hint})",
+        options=_REQUIRED if item.required else _OFF_ON,
+        value=0 if item.required else int(item.default_on),
+        help=(*help_lines, _REQUIRED_HELP) if item.required else help_lines,
+        section=_PACKS_SECTION if item.id in PRESET_PACK_IDS else _SECTION,
+        locked=item.required,
+    )
 
 
 class _DownloadView:
@@ -215,7 +231,8 @@ class WelcomeFlow:
 
         *on_close* runs once when the step closes, including the notice shown
         when nothing is missing. *cancel_label* names the form's dismiss
-        button: Skip at startup, Cancel when opened from the editor.
+        button: Skip at startup, Cancel when opened from the editor. Skip
+        still downloads the required items; Cancel downloads nothing.
         """
         if self._active:
             return
@@ -267,16 +284,28 @@ class WelcomeFlow:
         self, items: tuple[FirstRunItem, ...], cancel_label: str
     ) -> None:
         def selected(values: FormValues) -> tuple[FirstRunItem, ...]:
-            return tuple(item for item in items if values.get(item.id.value) == 1)
+            return tuple(
+                item
+                for item in items
+                if item.required or values.get(item.id.value) == 1
+            )
 
         def info(values: FormValues) -> str:
             total = sum(item.size_mb for item in selected(values))
             return f"~{total} MB to download" if total else "nothing to download"
 
-        def confirm(values: FormValues) -> None:
-            chosen = selected(values)
+        def run(chosen: tuple[FirstRunItem, ...]) -> None:
             if chosen:
                 self._start_downloads(chosen)
+            else:
+                self._complete()
+
+        def confirm(values: FormValues) -> None:
+            run(selected(values))
+
+        def dismiss() -> None:
+            if cancel_label == SKIP_LABEL:
+                run(tuple(item for item in items if item.required))
             else:
                 self._complete()
 
@@ -284,23 +313,11 @@ class WelcomeFlow:
             FormSpec(
                 title=WELCOME_TITLE,
                 body=_WELCOME_BODY,
-                fields=tuple(
-                    FormField(
-                        id=item.id.value,
-                        label=f"{item.name} - {item.purpose} ({item.size_hint})",
-                        options=_OFF_ON,
-                        value=1 if item.default_on else 0,
-                        help=(f"{item.name}: {item.purpose}.",),
-                        section=(
-                            _PACKS_SECTION if item.id in PRESET_PACK_IDS else _SECTION
-                        ),
-                    )
-                    for item in items
-                ),
+                fields=tuple(_item_field(item) for item in items),
                 confirm_label="Download",
                 on_confirm=confirm,
                 cancel_label=cancel_label,
-                on_cancel=self._complete,
+                on_cancel=dismiss,
                 info=info,
                 help=(_WELCOME_BODY,),
                 banner=Logo.FULL,

@@ -1072,3 +1072,28 @@ def test_progress_panel_width_ignores_text() -> None:
             assert surface.panel_rect is not None
             widths.append(surface.panel_rect[2])
         assert widths == [progress_panel_width(screen_w)] * 2
+
+
+def test_a_locked_form_row_draws_muted_text_with_no_value_hits() -> None:
+    modal = ModalHost()
+    modal.prompt_form(
+        FormSpec(
+            title="Downloads",
+            fields=(
+                FormField("pack", "pack", ("Required",), 0, locked=True),
+                FormField("other", "other", ("Off", "On"), 0),
+            ),
+            confirm_label="Go",
+            on_confirm=lambda _values: None,
+        )
+    )
+    with headless_shell_host() as host:
+        surface = ModalSurface(modal.view_state(), ImGuiTextMeasure())
+        _idle(host, surface)
+        row_kinds = {hit.kind for hit in surface._form_hits if hit.row == 0}
+        assert row_kinds == {ModalPointerKind.FOCUS_FORM_ROW}
+        assert any(
+            hit.kind is ModalPointerKind.SET_FORM_VALUE
+            for hit in surface._form_hits
+            if hit.row == 1
+        )

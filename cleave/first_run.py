@@ -59,7 +59,9 @@ class FirstRunItem:
 
     ``name`` and ``purpose`` are user-facing: what the download is, and what
     Cleave uses it for. ``default_on`` items are ticked in the step, and only
-    they bring the step back while ``welcome_done`` is unset. ``needed`` and
+    they bring the step back while ``welcome_done`` is unset. ``required``
+    items always download with the step and cannot be switched off; while
+    missing they bring the step back even after it was completed. ``needed`` and
     ``download`` do the work; ``download`` raises the module's own error type
     on failure and may return a note to show in place of "Done".
     """
@@ -71,6 +73,7 @@ class FirstRunItem:
     default_on: bool
     needed: Callable[[], bool]
     download: DownloadFn
+    required: bool = False
 
     @property
     def size_hint(self) -> str:
@@ -114,15 +117,17 @@ def _pack_items() -> tuple[FirstRunItem, ...]:
         name: str,
         purpose: str,
         default_on: bool,
+        required: bool = False,
     ) -> FirstRunItem:
         return FirstRunItem(
             id=item_id,
             name=name,
             purpose=purpose,
             size_mb=pack.size_mb,
-            default_on=default_on,
+            default_on=default_on or required,
             needed=lambda: packs.pack_needed(pack),
             download=lambda on_progress: packs.download_pack(pack, on_progress),
+            required=required,
         )
 
     return (
@@ -132,6 +137,7 @@ def _pack_items() -> tuple[FirstRunItem, ...]:
             name="Milkdrop Original",
             purpose="the presets from the last official Milkdrop release",
             default_on=True,
+            required=True,
         ),
         item(
             FirstRunItemId.MILKDROP_TEXTURES,
@@ -139,6 +145,7 @@ def _pack_items() -> tuple[FirstRunItem, ...]:
             name="Milkdrop Textures",
             purpose="the textures many presets draw with",
             default_on=True,
+            required=True,
         ),
         item(
             FirstRunItemId.CREAM_OF_THE_CROP,
@@ -279,11 +286,13 @@ def welcome_needed(
     *,
     presets_missing: bool,
 ) -> bool:
-    """Show the step when the preset folder has no presets and a pack is still
-    offered, or a default-on item is missing and the step has not been
-    completed yet. *needed* is already filtered.
+    """Show the step when a required item is missing, the preset folder has
+    no presets and a pack is still offered, or a default-on item is missing
+    and the step has not been completed yet. *needed* is already filtered.
     """
     for item in needed:
+        if item.required:
+            return True
         if presets_missing and item.id in PRESET_PACK_IDS:
             return True
         if item.default_on and not state.welcome_done:

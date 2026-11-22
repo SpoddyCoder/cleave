@@ -59,6 +59,8 @@ class FormField:
     ``help`` and ``option_help`` (one line per option, or empty) fill the help
     column while the field is focused. ``section`` groups the field under a
     heading; consecutive fields with the same section share one heading.
+    A ``locked`` field shows its value as plain text and cannot be changed;
+    it still takes focus so its help shows.
     """
 
     id: str
@@ -72,6 +74,7 @@ class FormField:
     stepper: bool = False
     large_step: int = 1
     vertical: bool = False
+    locked: bool = False
 
 
 @dataclass(frozen=True)
@@ -129,6 +132,7 @@ class FormRowView:
     indented: bool = False
     stepper: bool = False
     vertical: bool = False
+    locked: bool = False
 
 
 @dataclass
@@ -151,8 +155,8 @@ class FormState:
 
 
 def _form_field_kind(field: FormField) -> ChoiceKind | None:
-    """How a field draws: None for a stepper or a vertical list."""
-    if field.stepper or field.vertical:
+    """How a field draws: None for a stepper, a vertical list, or a locked field."""
+    if field.stepper or field.vertical or field.locked:
         return None
     return choice_kind(len(field.options))
 
@@ -173,6 +177,7 @@ def _form_row_views(form: FormState) -> tuple[FormRowView, ...]:
                 indented=section is not None,
                 stepper=field.stepper,
                 vertical=field.vertical,
+                locked=field.locked,
             )
         )
         previous = section
@@ -619,6 +624,8 @@ class ModalHost:
             return
         state.field_index = row
         field = fields[row]
+        if field.locked:
+            return
         state.values[field.id] = max(0, min(value, len(field.options) - 1))
         self._after_form_change(state, field.id)
 
@@ -632,6 +639,8 @@ class ModalHost:
             return
         state.field_index = row
         field = fields[row]
+        if field.locked:
+            return
         state.values[field.id] = step_index(
             state.values[field.id], len(field.options), delta
         )

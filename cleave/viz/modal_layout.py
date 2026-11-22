@@ -226,11 +226,13 @@ def form_field_height(line_h: int, row: FormRowView) -> int:
 
 
 def form_control_width(measure: TextMeasure, row: FormRowView) -> int:
-    """Width of a row's segments, combo, stepper, or radio list: it fits the
+    """Width of a row's segments, combo, stepper, radio list, or locked value: it fits the
     widest option.
     """
     if row.vertical:
         return radio_width(measure, row.options)
+    if row.locked:
+        return measure.size(row.options[row.value])[0]
     if row.stepper:
         return stepper_width(
             measure, row.options, side=form_row_height(measure.get_linesize())

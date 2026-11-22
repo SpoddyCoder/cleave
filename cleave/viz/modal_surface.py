@@ -388,8 +388,13 @@ def _draw_form_control(
     hover: bool,
     held: int | None = None,
 ) -> list[_FormHit]:
-    """Segments, a stepper, or a combo that opens the row's list, filling ``rect``."""
+    """Segments, a stepper, a combo that opens the row's list, or a locked
+    field's muted value, filling ``rect``.
+    """
     x, y, _w, h = rect
+    if row.locked:
+        _text(draw, x, y, row.options[row.value], palette().muted)
+        return []
     if row.stepper:
         back, forward = draw_stepper(
             draw,

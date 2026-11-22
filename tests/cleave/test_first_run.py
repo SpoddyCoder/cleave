@@ -24,6 +24,7 @@ def _item(
     *,
     default_on: bool = True,
     needed: bool = True,
+    required: bool = False,
     download: Callable[..., None] = lambda _progress: None,
 ) -> FirstRunItem:
     return FirstRunItem(
@@ -34,10 +35,12 @@ def _item(
         default_on=default_on,
         needed=lambda: needed,
         download=download,
+        required=required,
     )
 
 
 PRESETS = _item(FirstRunItemId.MILKDROP_ORIGINAL)
+REQUIRED = _item(FirstRunItemId.MILKDROP_TEXTURES, required=True)
 CLASSIC = _item(FirstRunItemId.PROJECTM_CLASSIC, default_on=False)
 DEMUCS = _item(FirstRunItemId.DEMUCS)
 HQ = _item(FirstRunItemId.DEMUCS_HQ, default_on=False)
@@ -56,6 +59,7 @@ HQ = _item(FirstRunItemId.DEMUCS_HQ, default_on=False)
         ((DEMUCS,), True, False, False),
         ((HQ,), False, False, False),
         ((HQ, PRESETS), True, True, True),
+        ((REQUIRED,), True, False, True),
     ],
 )
 def test_welcome_needed(needed, done, missing, expected) -> None:
@@ -70,6 +74,8 @@ def test_preset_packs_are_separate_items() -> None:
     assert PRESET_PACK_IDS <= set(items)
     on = {i for i in PRESET_PACK_IDS if items[i].default_on}
     assert on == {FirstRunItemId.MILKDROP_ORIGINAL, FirstRunItemId.MILKDROP_TEXTURES}
+    required = {i for i, item in items.items() if item.required}
+    assert required == on
     # Packs first; CUDA still before any weight download.
     order = list(items)
     assert set(order[: len(PRESET_PACK_IDS)]) == PRESET_PACK_IDS

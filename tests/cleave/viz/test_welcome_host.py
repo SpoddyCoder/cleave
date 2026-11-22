@@ -16,7 +16,7 @@ from cleave.first_run import FirstRunItem, FirstRunItemId
 from cleave.model_weights import WeightDownloadError
 from cleave.viz.controls import TuningControls
 from cleave.viz.modal import ModalHost
-from cleave.viz.welcome_host import WelcomeFlow, run_welcome
+from cleave.viz.welcome_host import CANCEL_LABEL, WelcomeFlow, run_welcome
 
 _WAIT_SEC = 5.0
 
@@ -47,6 +47,7 @@ def _item(
     download: Callable[..., None],
     *,
     default_on: bool = True,
+    required: bool = False,
 ) -> FirstRunItem:
     return FirstRunItem(
         id=item_id,
@@ -56,6 +57,7 @@ def _item(
         default_on=default_on,
         needed=lambda: True,
         download=download,
+        required=required,
     )
 
 
@@ -363,3 +365,59 @@ def test_editor_form_offers_cancel(persist: MagicMock) -> None:
     with patch("cleave.first_run.first_run_items", return_value=(item,)):
         TuningControls.prompt_welcome(controls)
     assert _buttons(controls.host) == ("Download", "Cancel")
+
+
+def test_required_item_is_locked_on_and_always_downloads(persist: MagicMock) -> None:
+    log: list[str] = []
+    flow, host = _start(
+        (
+            _item(
+                FirstRunItemId.MILKDROP_ORIGINAL,
+                _recording(log, "presets"),
+                default_on=False,
+                required=True,
+            ),
+            _item(FirstRunItemId.DEMUCS, _recording(log, "demucs"), default_on=False),
+        )
+    )
+    view = host.view_state()
+    assert view is not None
+    assert view.form_rows[0].locked is True
+    assert view.form_rows[0].options == ("Required",)
+    assert view.form_rows[1].locked is False
+    host.handle_keydown(_keydown(pygame.K_LEFT))
+    host.handle_keydown(_keydown(pygame.K_RETURN))
+    _tick_until(flow, lambda: not flow.active)
+    assert log == ["presets"]
+
+
+def _required_and_optional(log: list[str]) -> tuple[FirstRunItem, ...]:
+    return (
+        _item(
+            FirstRunItemId.MILKDROP_ORIGINAL,
+            _recording(log, "presets"),
+            required=True,
+        ),
+        _item(FirstRunItemId.DEMUCS, _recording(log, "demucs")),
+    )
+
+
+def test_skip_still_downloads_required_items(persist: MagicMock) -> None:
+    log: list[str] = []
+    flow, host = _start(_required_and_optional(log))
+    host.handle_keydown(_keydown(pygame.K_ESCAPE))
+    assert flow.active
+    _tick_until(flow, lambda: not flow.active)
+    assert log == ["presets"]
+    assert flow.downloaded == frozenset({FirstRunItemId.MILKDROP_ORIGINAL})
+    persist.assert_called_once()
+
+
+def test_editor_cancel_downloads_nothing(persist: MagicMock) -> None:
+    log: list[str] = []
+    host = ModalHost()
+    flow = WelcomeFlow(host)
+    flow.start(_required_and_optional(log), cancel_label=CANCEL_LABEL)
+    host.handle_keydown(_keydown(pygame.K_ESCAPE))
+    assert not flow.active
+    assert log == []

@@ -58,8 +58,8 @@ Cleave opens on a short splash with its logo, credit, and version; press any key
 
 | Download | What it is for | Ticked by default |
 | --- | --- | --- |
-| Milkdrop Original | The presets from the last official Milkdrop release (about 2 MB). | Yes |
-| Milkdrop Textures | The textures many presets draw with (about 4 MB). | Yes |
+| Milkdrop Original | The presets from the last official Milkdrop release (about 2 MB). | Required |
+| Milkdrop Textures | The textures many presets draw with (about 4 MB). | Required |
 | Cream of the Crop | Jason Fletcher's pick of the best Milkdrop presets (about 31 MB). | No |
 | projectM Classic | About 4,200 presets from earlier projectM releases (about 9 MB). | No |
 | En D | About 50 presets created or remixed by En D (about 3 MB). | No |
@@ -69,7 +69,7 @@ Cleave opens on a short splash with its logo, credit, and version; press any key
 | Demucs HQ | A slower, higher-quality separation model. | No |
 | Demucs 6-stem | The model for 6-stem projects, which adds guitar and piano stems. | No |
 
-The five preset packs are grouped under **projectM curated preset packs**, one line each, so you can pick just the ones you want. Each download reports its own progress. You can cancel at any point, and anything that fails is listed with a Retry button. Anything you skip is fetched automatically when it is first needed, or you can get it at any time from **Settings > Download packages**.
+The five preset packs are grouped under **projectM curated preset packs**, one line each, so you can pick just the ones you want. Milkdrop Original and Milkdrop Textures show **Required** instead of Off and On: Cleave needs them, so they always download, even if you choose Skip. If they fail to download, the step comes back the next time Cleave starts. Each download reports its own progress. You can cancel at any point, and anything that fails is listed with a Retry button. Anything you skip is fetched automatically when it is first needed, or you can get it at any time from **Settings > Download packages**.
 
 The first time the editor opens a project, a **Set up audio latency** dialog offers the two latency settings worth setting up for your computer, both switched on:
 
@@ -297,7 +297,7 @@ Editing the list or the Preset Switching settings keeps the preview on screen. T
 
 The **Preset List** page holds the presets the layer cycles through, in order. It appears whenever switching is not off.
 
-A new project starts with each layer's list already filled: enough presets to last the song at the layer's preset duration, shuffled from the layer's preset folder. Every layer of a new project starts on the Milkdrop Original folder, so install that pack (it is ticked in the Welcome to Cleave step).
+A new project starts with each layer's list already filled: enough presets to last the song at the layer's preset duration, shuffled from the layer's preset folder. Every layer of a new project starts on the Milkdrop Original folder, which the Welcome to Cleave step always downloads.
 
 The page opens on the layer's preset directory row, the same row as on the Milkdrop Preset page: it shows the folder (or collection) **Populate list** fills the list from, and works the same way: its arrows and clickable folders change folder, and Enter or a double-click (in a folder with no subfolders) or right-click > **Browse presets** opens the preset browser.
 
