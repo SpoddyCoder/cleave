@@ -29,7 +29,7 @@ from cleave.viz.icon_button import (
     text_box,
 )
 from cleave.viz.imgui_icon_button import glyph_drop, paint_box, paint_hover
-from cleave.viz.imgui_theme import rgba
+from cleave.viz.imgui_theme import first_line_band, rgba, second_line_drop
 from cleave.viz.inspector import InspectorRow
 from cleave.viz.pointer_cursor import PointerShape, request_pointer
 from cleave.viz.row_kinds import RowDescriptor, RowKind
@@ -245,8 +245,7 @@ class ValueControls:
         origin_x, _text_y = selectable_label_origin()
         rect_min = imgui.get_item_rect_min()
         rect_max = imgui.get_item_rect_max()
-        line = imgui.get_text_line_height()
-        band = (rect_min.y, rect_max.y - line if two_line else rect_max.y)
+        band = first_line_band(rect_min.y) if two_line else (rect_min.y, rect_max.y)
         side = band[1] - band[0]
         gap = icon_gap()
         if label is None:
@@ -307,7 +306,7 @@ class ValueControls:
         """
         origin_x, origin_y = selectable_label_origin()
         line = imgui.get_text_line_height()
-        y = origin_y + line
+        y = origin_y + second_line_drop()
         x = origin_x + lead_x
         right_x = imgui.get_item_rect_max().x - imgui.get_style().frame_padding.x
         draw = imgui.get_window_draw_list()
@@ -386,9 +385,7 @@ class ValueControls:
         rect_max = imgui.get_item_rect_max()
         widths = cluster_widths(parts)
         pad = imgui.get_style().frame_padding.x
-        arrows_max_y = rect_max.y
-        if two_line:
-            arrows_max_y -= imgui.get_text_line_height()
+        arrows_max_y = first_line_band(rect_min.y)[1] if two_line else rect_max.y
         back_rect, forward_rect = nudge_arrow_rects(
             rect_min.x,
             rect_min.y,

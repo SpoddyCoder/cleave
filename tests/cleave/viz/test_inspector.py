@@ -443,6 +443,10 @@ def test_dynamic_effect_and_preset_rows_keep_slot_identity() -> None:
         state, layer_page_node_id("layer_1", "preset_list")
     )
     assert _headings(rows) == []
+    # The page opens on the layer's preset directory, then a divider.
+    assert rows[0].descriptor == RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1")
+    assert rows[0].navigable
+    assert rows[1].divider
     items = [
         row.descriptor
         for row in rows

@@ -1201,20 +1201,24 @@ def test_preset_row_draws_two_lines_and_fits_the_filename() -> None:
         host.navigator.visible_nodes = lambda: ()
 
         def draw_inspector(_state) -> None:
+            from cleave.viz.imgui_theme import padded_rows
+
             imgui = shell_host.imgui
-            top = imgui.get_cursor_pos().y
-            host.inspector.draw_row(view, preset)
-            middle = imgui.get_cursor_pos().y
-            host.inspector.draw_row(view, stem)
-            heights["preset"] = middle - top
-            heights["stem"] = imgui.get_cursor_pos().y - middle
-            # The stem row ends on its full-width selectable; the list item
-            # ends on its narrow leading drag handle.
-            heights["right"] = imgui.get_item_rect_max().x
-            before_item = imgui.get_cursor_pos().y
-            host.inspector.draw_row(view, item)
-            heights["item"] = imgui.get_cursor_pos().y - before_item
-            heights["line"] = imgui.get_text_line_height()
+            # The inspector draws its rows with the padded row spacing.
+            with padded_rows():
+                top = imgui.get_cursor_pos().y
+                host.inspector.draw_row(view, preset)
+                middle = imgui.get_cursor_pos().y
+                host.inspector.draw_row(view, stem)
+                heights["preset"] = middle - top
+                heights["stem"] = imgui.get_cursor_pos().y - middle
+                # The stem row ends on its full-width selectable; the list item
+                # ends on its narrow leading drag handle.
+                heights["right"] = imgui.get_item_rect_max().x
+                before_item = imgui.get_cursor_pos().y
+                host.inspector.draw_row(view, item)
+                heights["item"] = imgui.get_cursor_pos().y - before_item
+                heights["line"] = imgui.get_text_line_height()
 
         host.inspector.draw = draw_inspector
         _paint_shell(host, menu, CommandContext(), frames=1)
@@ -1226,8 +1230,10 @@ def test_preset_row_draws_two_lines_and_fits_the_filename() -> None:
         del lists, content
     finally:
         host.imgui.destroy()
-    assert heights["preset"] == pytest.approx(heights["stem"] + heights["line"])
+    # Each line of a two-line row is a full row.
+    assert heights["preset"] == pytest.approx(2 * heights["stem"])
     assert heights["item"] == pytest.approx(heights["preset"])
+    assert heights["stem"] > heights["line"]
     assert bounds is not None
     assert bounds[2] <= heights["right"]
 

@@ -15,7 +15,14 @@ from cleave.viz.commands import command_by_id, command_context, CommandContext
 from cleave.viz.drag_reorder import DRAG_PRESET
 from cleave.viz.icon_button import box_contains, icon_box, icon_gap
 from cleave.viz.imgui_icon_button import glyph_drop, paint_box
-from cleave.viz.imgui_theme import padded_row_spacing_y, padded_rows, rgba
+from cleave.viz.imgui_theme import (
+    first_line_band,
+    padded_row_spacing_y,
+    padded_rows,
+    rgba,
+    second_line_drop,
+    two_line_row_height,
+)
 from cleave.viz.inspector import build_inspector_rows, InspectorRow, page_title_command
 from cleave.viz.inspector_controls import (
     inspector_command_enabled,
@@ -279,8 +286,7 @@ def _draw_two_line_row_text(
         pad,
     ) - cluster_reserve
     if problem is not None:
-        line = imgui.get_text_line_height()
-        band = (imgui.get_item_rect_min().y, imgui.get_item_rect_max().y - line)
+        band = first_line_band(imgui.get_item_rect_min().y)
         side = band[1] - band[0]
         cluster_x -= side + icon_gap()
         box = icon_box(cluster_x, band)
@@ -311,7 +317,7 @@ def _draw_two_line_row_text(
         return on_marker
     _draw_path_value(
         origin_x + lead_x,
-        origin_y + imgui.get_text_line_height(),
+        origin_y + second_line_drop(),
         right_x - pad,
         value,
         value_color,
@@ -674,7 +680,7 @@ class InspectorPanel:
     def _draw_row_selectable(self, look: _RowLook) -> _RowItem:
         """The row's label as a selectable, with its wash and focus ring."""
         desc = look.desc
-        row_height = 2.0 * imgui.get_text_line_height() if look.two_line else 0.0
+        row_height = two_line_row_height() if look.two_line else 0.0
         imgui.push_style_color(imgui.Col_.text, rgba(look.label_color))
         try:
             with row_band(RowState.FOCUSED if look.selected else None) as mark_band:
@@ -815,8 +821,12 @@ class InspectorPanel:
         buttons_reserve = 0.0
         if spec.nav_buttons and spec.nav_buttons_before_value:
             rect_min, rect_max = imgui.get_item_rect_min(), imgui.get_item_rect_max()
-            line = imgui.get_text_line_height()
-            side = rect_max.y - rect_min.y - (line if look.two_line else 0.0)
+            top, bottom = (
+                first_line_band(rect_min.y)
+                if look.two_line
+                else (rect_min.y, rect_max.y)
+            )
+            side = bottom - top
             buttons_end_x = nudge_cluster_origin_x(
                 rect_max.x,
                 cluster_widths(parts),

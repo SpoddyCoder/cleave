@@ -555,7 +555,12 @@ HARD_CUT_ENABLED = ConditionalRowsDef(
 TRACK_PRESET_LIST_SECTION = SectionDef(
     header_kind=RowKind.TRACK_PRESET_LIST,
     context="per_slot",
-    children=(),
+    # The layer's preset directory, as on the Milkdrop Preset page: the
+    # folder Populate list fills the list from.
+    children=(
+        SectionNode(leaf_kind=RowKind.TRACK_PRESET_DIR),
+        SectionNode(divider=True),
+    ),
     append_dynamic_children=_append_preset_list_rows,
     title_command="layers.populate_presets",
 )

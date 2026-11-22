@@ -156,6 +156,25 @@ def row_band_side() -> float:
     return imgui.get_text_line_height() + padded_row_spacing_y()
 
 
+def two_line_row_height() -> float:
+    """Selectable height for a two-line row: each line gets a full padded row,
+    so the row is as tall as two single rows."""
+    return imgui.get_text_line_height() + row_band_side()
+
+
+def second_line_drop() -> float:
+    """How far a two-line row's second line sits below its first: one padded row."""
+    return row_band_side()
+
+
+def first_line_band(item_min_y: float) -> tuple[float, float]:
+    """Top and bottom of a two-line row's first line, from the item rect's top.
+
+    Icons and arrows on the first line are this tall, as on a single row.
+    """
+    return item_min_y, item_min_y + row_band_side()
+
+
 @contextmanager
 def padded_rows() -> Iterator[None]:
     """Push the padded row spacing for a list of rows, then pop."""

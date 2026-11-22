@@ -138,12 +138,13 @@ def test_preset_switching_row_order() -> None:
     ]
 
 
-def test_preset_list_page_holds_the_list() -> None:
+def test_preset_list_page_holds_the_directory_and_the_list() -> None:
     assert _page_kinds(
         layer_page_node_id("layer_1", "preset_list"),
         preset_switching_trigger="off",
         preset_list=["a.milk", "b.milk"],
     ) == [
+        RowKind.TRACK_PRESET_DIR,
         RowKind.TRACK_PRESET_LIST_ITEM,
         RowKind.TRACK_PRESET_LIST_ITEM,
     ]
