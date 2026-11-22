@@ -4,13 +4,14 @@ The directory row offers Browse presets and a Jump to directory submenu of the
 library collections (favourites, roles, blacklisted). A preset list entry
 offers Audition; Cut, Copy, a Paste submenu (over, before, after), and
 Duplicate; Replace with (the browser), a Current preset submenu (replace this
-entry, insert after it, add to the end of the list), and Populate; Move up and
-down and Remove; then Favourite, Blacklist, and a Role submenu. The layer's
-current preset row offers Browse presets, Copy and Paste, Add to preset list,
-and the same curation items. A preset in the browser offers Copy and the
-curation items. A right-click on the Preset List page away from any entry
-(the only way in while the list is empty) offers Paste at the end of the
-list, Add current preset, and Populate. Each item calls the same path as its key, and a disabled item
+entry, insert after it, add to the end of the list); Populate and Clear list
+(after a confirmation); Move up and down, and Remove; then Favourite,
+Blacklist, and a Role submenu. The layer's current preset row offers Browse
+presets, Copy and Paste, Add to preset list, and the same curation items. A
+preset in the browser offers Copy and the curation items. A right-click on the
+Preset List page away from any entry (the only way in while the list is
+empty) offers Paste at the end of the list, Add current preset, Populate, and
+Clear list. Each item calls the same path as its key, and a disabled item
 says why in its hint.
 """
 
@@ -70,6 +71,7 @@ def preset_row_menu_entries(
                 (_audition_item(controls, slot, index),),
                 _clipboard_items(controls, desc, slot, index),
                 _fill_items(controls, desc, slot, index),
+                _whole_list_items(controls, desc, slot),
                 _list_edit_items(controls, desc, slot, index),
                 _curate_items(controls, desc, slot),
             ]
@@ -105,7 +107,6 @@ def preset_list_page_menu(
             paste_hint: str | None = _LOCK_HINT
         else:
             paste_hint = clipboard.paste_hint()
-        fill_hint = _fill_hint(controls, desc)
         return join_groups(
             [
                 (
@@ -117,16 +118,8 @@ def preset_list_page_menu(
                         hint=paste_hint,
                     ),
                 ),
-                (
-                    _add_item(controls, desc, slot, label="Add current preset"),
-                    ContextMenuItem(
-                        id="preset.populate",
-                        label="Populate list…",
-                        run=lambda: controls.preset_list.prompt_populate(slot),
-                        enabled=fill_hint is None,
-                        hint=fill_hint,
-                    ),
-                ),
+                (_add_item(controls, desc, slot, label="Add current preset"),),
+                _whole_list_items(controls, desc, slot),
             ]
         )
 
@@ -244,6 +237,24 @@ def _list_edit_items(
     )
 
 
+def _clear_item(
+    controls: TuningControls, desc: RowDescriptor, slot: str
+) -> ContextMenuItem:
+    if section_lock_blocks_mutation(controls.session, desc):
+        hint: str | None = _LOCK_HINT
+    elif not controls.session.layers[slot].preset_list:
+        hint = "The list is already empty"
+    else:
+        hint = None
+    return ContextMenuItem(
+        id="preset.clear",
+        label="Clear list…",
+        run=lambda: controls.preset_list.prompt_clear(slot),
+        enabled=hint is None,
+        hint=hint,
+    )
+
+
 def _clipboard_items(
     controls: TuningControls, desc: RowDescriptor, slot: str, index: int
 ) -> tuple[ContextMenuEntry, ...]:
@@ -328,7 +339,7 @@ def _paste_submenu(
 def _fill_items(
     controls: TuningControls, desc: RowDescriptor, slot: str, index: int
 ) -> tuple[ContextMenuEntry, ...]:
-    """Replace with (the browser), a Current preset submenu, and Populate."""
+    """Replace with (the browser) and a Current preset submenu."""
     hint = _fill_hint(controls, desc)
     ready = hint is None
     preset_list = controls.preset_list
@@ -364,13 +375,23 @@ def _fill_items(
             enabled=ready,
             hint=hint,
         ),
+    )
+
+
+def _whole_list_items(
+    controls: TuningControls, desc: RowDescriptor, slot: str
+) -> tuple[ContextMenuEntry, ...]:
+    """Populate list and Clear list: the items that rework the whole list."""
+    hint = _fill_hint(controls, desc)
+    return (
         ContextMenuItem(
             id="preset.populate",
             label="Populate list…",
             run=lambda: controls.preset_list.prompt_populate(slot),
-            enabled=ready,
+            enabled=hint is None,
             hint=hint,
         ),
+        _clear_item(controls, desc, slot),
     )
 
 

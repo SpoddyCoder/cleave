@@ -469,6 +469,41 @@ class PresetListController:
             self._on_focus_preset_item(slot, min(index, len(presets) - 1))
         self._notify(slot, f"{verb} preset: {removed.display_name}")
 
+    def prompt_clear(self, slot: str) -> None:
+        """Confirm, then empty the layer's preset list."""
+        count = len(self.session.layers[slot].preset_list)
+        if count == 0:
+            return
+        if self._layer_bindings is not None:
+            self._layer_bindings.lock_preset_for_modal(slot)
+        noun = "1 preset" if count == 1 else f"{count} presets"
+        self._modal.prompt_confirm(
+            "Clear preset list?",
+            "Clear",
+            lambda: self._confirm_clear(slot),
+            lambda: self._unlock_preset_after_modal(slot),
+            body=f"Removes all {noun} from the list. Undo puts them back.",
+            destructive=True,
+        )
+
+    def _confirm_clear(self, slot: str) -> None:
+        try:
+            self.clear(slot)
+        finally:
+            self._unlock_preset_after_modal(slot)
+
+    def clear(self, slot: str) -> None:
+        """Empty the layer's preset list. Undo puts it back."""
+        presets = self.session.layers[slot].preset_list
+        if not presets:
+            return
+        count = len(presets)
+        with self._record("Clear preset list", slot):
+            presets.clear()
+        self.refresh_switching(slot)
+        noun = "1 preset" if count == 1 else f"{count} presets"
+        self._notify(slot, f"Cleared {noun}")
+
     def entry(self, slot: str, index: int) -> PresetListEntry | None:
         if not self._valid(slot, index):
             return None

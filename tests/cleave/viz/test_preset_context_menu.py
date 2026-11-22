@@ -74,7 +74,9 @@ def test_list_item_menu_lists_its_items_in_order() -> None:
             None,
             "preset.replace_browse",
             "preset.current",
+            None,
             "preset.populate",
+            "preset.clear",
             None,
             "preset.move_up",
             "preset.move_down",
@@ -197,6 +199,7 @@ def test_lock_disables_edits_but_not_audition() -> None:
             "preset.insert_current",
             "preset.add_current",
             "preset.populate",
+            "preset.clear",
         ):
             assert items[item_id].enabled is False, item_id
             assert items[item_id].hint == "Locked: unlock to change"
@@ -224,6 +227,27 @@ def test_remove_runs_at_once_and_undo_restores_it() -> None:
         assert _names(controls) == ["a.milk", "b.milk", "c.milk"]
         controls.redo()
         assert _names(controls) == ["b.milk", "c.milk"]
+
+
+def test_clear_asks_first_and_undo_restores_the_list() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        controls, _paths = _controls_with_list(tmp)
+        clear = _entries(controls, _item_desc(1))["preset.clear"]
+        assert clear.label == "Clear list…"
+        clear.run()
+        modal = controls.modal_host
+        assert modal.active
+        view = modal.view_state()
+        assert view is not None
+        assert view.message == "Clear preset list?"
+        modal.cancel()
+        assert _names(controls) == ["a.milk", "b.milk", "c.milk"]
+        preset_list_page_menu(controls, "layer_1")()[-1].run()
+        modal.activate_option(0)
+        assert not modal.active
+        assert _names(controls) == []
+        controls.undo()
+        assert _names(controls) == ["a.milk", "b.milk", "c.milk"]
 
 
 def test_copy_then_paste_over_before_and_after() -> None:
@@ -267,7 +291,14 @@ def test_list_page_menu_pastes_into_an_empty_list() -> None:
         assert page["preset.paste_end"].hint == "Nothing copied"
         controls.preset_clipboard.copy_entry("layer_1", 2)
         page = _flatten(preset_list_page_menu(controls, "layer_2")())
-        assert set(page) == {"preset.paste_end", "preset.add_current", "preset.populate"}
+        assert set(page) == {
+            "preset.paste_end",
+            "preset.add_current",
+            "preset.populate",
+            "preset.clear",
+        }
+        assert page["preset.clear"].enabled is False
+        assert page["preset.clear"].hint == "The list is already empty"
         page["preset.paste_end"].run()
         page["preset.paste_end"].run()
         assert _names(controls, "layer_2") == ["c.milk", "c.milk"]
