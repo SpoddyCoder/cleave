@@ -19,7 +19,7 @@ from cleave.preset_list_fill import (
     needed_preset_count,
 )
 
-MILKDROP_ORIGINAL = Path("presets-milkdrop-original") / "Milkdrop-Original"
+MILKDROP_ORIGINAL = Path("presets-milkdrop-original")
 
 
 def _write_milk(folder: Path, count: int) -> None:

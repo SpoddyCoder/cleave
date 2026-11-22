@@ -2,7 +2,9 @@
 
 The editor offers each pack as its own line in the welcome step
 (``cleave.first_run``). This module is pygame-free: fetch a zipball, extract
-the GitHub top-level folder, and move it into place. Failed fetches raise
+the GitHub top-level folder, and move it into place. A repo that wraps its
+content in one subfolder (``Milkdrop-Original/``, ``textures/``) is hoisted
+so the pack folder holds the presets directly. Failed fetches raise
 :class:`StarterPackError`.
 """
 
@@ -145,7 +147,9 @@ def _download_one_pack(pack: PackSpec, aggregator: _DownloadProgress) -> None:
     try:
         _download_url(pack.url, zip_path, aggregator)
         unpacked = work / "unpacked"
-        inner = _extract_zip(zip_path, unpacked, pack.repo, aggregator)
+        inner = _hoist_lone_subfolder(
+            _extract_zip(zip_path, unpacked, pack.repo, aggregator)
+        )
         named = inner.parent / pack.dest_name
         if inner.resolve() != named.resolve():
             inner.rename(named)
@@ -154,6 +158,28 @@ def _download_one_pack(pack: PackSpec, aggregator: _DownloadProgress) -> None:
         os.replace(named, dest)
     finally:
         shutil.rmtree(work, ignore_errors=True)
+
+
+def _hoist_lone_subfolder(root: Path) -> Path:
+    """Return the folder that holds *root*'s content, skipping lone wrappers.
+
+    While *root* has exactly one subfolder, step into it. Loose top-level
+    files (README, LICENSE) move along with it unless the subfolder already
+    has a file of that name.
+    """
+    while True:
+        children = list(root.iterdir())
+        dirs = [child for child in children if child.is_dir()]
+        if len(dirs) != 1:
+            return root
+        inner = dirs[0]
+        for child in children:
+            if child is inner:
+                continue
+            target = inner / child.name
+            if not target.exists():
+                child.rename(target)
+        root = inner
 
 
 def _download_url(

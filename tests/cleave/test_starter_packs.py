@@ -190,3 +190,45 @@ def test_starter_pack_urls_pin_master_branch() -> None:
     for pack in STARTER_PACKS:
         assert pack.url.endswith("/refs/heads/master.zip")
         assert pack.dest_name == pack.repo
+
+
+def test_download_pack_hoists_lone_subfolder(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    pack = STARTER_PACKS[0]
+    root = f"{pack.repo}-master"
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr(f"{root}/README.md", "top readme")
+        zf.writestr(f"{root}/LICENSE", "license")
+        zf.writestr(f"{root}/Inner/README.md", "inner readme")
+        zf.writestr(f"{root}/Inner/a.milk", "// a")
+    _install_fake_urlopen(monkeypatch, {pack.url: buf.getvalue()})
+
+    download_pack(pack)
+
+    dest = tmp_path / pack.dest_parent_key / pack.dest_name
+    assert (dest / "a.milk").read_text() == "// a"
+    assert (dest / "LICENSE").read_text() == "license"
+    assert (dest / "README.md").read_text() == "inner readme"
+    assert not (dest / "Inner").exists()
+
+
+def test_download_pack_keeps_multi_folder_layout(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    pack = STARTER_PACKS[0]
+    root = f"{pack.repo}-master"
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr(f"{root}/One/a.milk", "// a")
+        zf.writestr(f"{root}/Two/b.milk", "// b")
+    _install_fake_urlopen(monkeypatch, {pack.url: buf.getvalue()})
+
+    download_pack(pack)
+
+    dest = tmp_path / pack.dest_parent_key / pack.dest_name
+    assert (dest / "One" / "a.milk").is_file()
+    assert (dest / "Two" / "b.milk").is_file()

@@ -94,7 +94,7 @@ layer_z_order:
 layers:
   layer_1:
     stem: drums
-    preset: presets-milkdrop-original/Milkdrop-Original/
+    preset: presets-milkdrop-original/
     enabled: true
     opacity: 0.5
     blend_mode: black-key
@@ -111,7 +111,7 @@ layers:
 
   layer_2:
     stem: bass
-    preset: presets-milkdrop-original/Milkdrop-Original/
+    preset: presets-milkdrop-original/
     enabled: true
     opacity: 0.6
     blend_mode: black-key
@@ -128,7 +128,7 @@ layers:
 
   layer_3:
     stem: vocals
-    preset: presets-milkdrop-original/Milkdrop-Original/
+    preset: presets-milkdrop-original/
     enabled: true
     opacity: 0.7
     blend_mode: black-key
@@ -147,7 +147,7 @@ layers:
 
   layer_4:
     stem: other
-    preset: presets-milkdrop-original/Milkdrop-Original/
+    preset: presets-milkdrop-original/
     enabled: true
     opacity: 1.0
     blend_mode: black-key
