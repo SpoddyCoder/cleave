@@ -31,6 +31,8 @@ def _make(
     pcm = np.zeros(int(FREQUENCY_HZ * duration_sec) * NUM_CHANNELS, dtype=np.float32)
     player = MixPlayer(pcm, FREQUENCY_HZ)
     player.set_audio_latency_sec(audio_latency_ms / 1000.0)
+    # Paused like PlaybackState says, so the clock does not run on wall time.
+    player.pause(True)
     playback = PlaybackState(player=player, paused=True)
     notifications: list[str] = []
     ui_log: list[str] = []

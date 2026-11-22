@@ -44,6 +44,8 @@ def _make_controls(
     frame_count = int(FREQUENCY_HZ * duration_sec)
     pcm = np.zeros(frame_count * NUM_CHANNELS, dtype=np.float32)
     player = MixPlayer(pcm, FREQUENCY_HZ)
+    # Paused like PlaybackState says, so the clock does not run on wall time.
+    player.pause(True)
     playback = PlaybackState(player=player, paused=True)
     notifications: list[str] = []
     ui_log = ui_events if ui_events is not None else []
