@@ -49,6 +49,7 @@ from cleave.viz.timeline_clip_edits import (
     snap_for_session,
     step_clip_selection,
 )
+from cleave.viz.clip_presets import start_new_clips
 from cleave.viz.edit_history import EditHistory
 
 def _next_option(options: tuple, current: object) -> object:
@@ -689,6 +690,21 @@ class TimelineControls:
                 self._refresh_visibility()
         tl.arm_flash_start_ms[slot] = pygame.time.get_ticks()
 
+    def _punch_take(
+        self, record_start: float, punch_end: float, slots: set[str]
+    ) -> None:
+        """Write the take to the lanes; its hold clips take spare presets."""
+        build_record_punch_cues(
+            self.session, record_start, punch_end, slots=slots
+        )
+        for slot in slots:
+            start_new_clips(
+                self.session,
+                slot,
+                self.duration_sec,
+                [cue.t for cue in self.session.timeline.record_buffer.get(slot, [])],
+            )
+
     def _commit_recording_slot(self, slot: str) -> None:
         tl = self.session.timeline
         record_start = tl.record_start_sec
@@ -701,12 +717,7 @@ class TimelineControls:
         punch_end = self._snap_placement(
             max(record_stop, tl.record_high_water_mark or record_stop)
         )
-        build_record_punch_cues(
-            self.session,
-            record_start,
-            punch_end,
-            slots={slot},
-        )
+        self._punch_take(record_start, punch_end, {slot})
         tl.record_baseline.pop(slot, None)
         tl.record_buffer.pop(slot, None)
         tl.record_slot_start_sec.pop(slot, None)
@@ -774,7 +785,7 @@ class TimelineControls:
         punch_end = self._snap_placement(
             max(record_stop, tl.record_high_water_mark or record_stop)
         )
-        build_record_punch_cues(self.session, record_start, punch_end)
+        self._punch_take(record_start, punch_end, set(tl.record_baseline))
         tl.recording = False
         tl.record_start_sec = None
         tl.record_buffer = {}

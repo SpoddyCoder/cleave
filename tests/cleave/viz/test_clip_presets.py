@@ -263,6 +263,56 @@ def test_dealing_a_short_list_leaves_the_last_clips_empty() -> None:
     assert clip_preset_list(controls.session, "layer_1", 100.0) == [D]
 
 
+def test_a_split_takes_the_first_spare_until_there_are_none() -> None:
+    controls = _controls(A, B, spares=(C,))
+    editor = controls.clip_editor
+    assert editor.split_at("layer_1", 5.0)
+    assert _held(controls) == _list(controls) == [A, C, B]
+    assert editor.split_at("layer_1", 25.0)
+    assert _held(controls) == _list(controls) == [A, C, B]
+    view = clip_preset_view(
+        controls.session, "layer_1", editor.selected("layer_1"), 100.0
+    )
+    assert not view.starts and not view.empty
+    controls.edit_history.undo()
+    controls.edit_history.undo()
+    assert _held(controls) == [A, B]
+    assert _list(controls) == [A, B, C]
+
+
+@pytest.mark.parametrize(
+    ("spares", "held"), [((), [A, None]), ((B,), [A, B]), ((B, C, D), [A, B, C])]
+)
+def test_a_recorded_take_gives_its_clips_spares(spares, held) -> None:
+    from cleave.viz.timeline_controls import TimelineControls
+
+    controls = _controls(spares=spares)
+    session = controls.session
+    _list(controls)[:] = [A, *spares]
+    session.timeline.lanes["layer_1"] = TimelineLane(
+        baseline=0.0, cues=[SlotCue(t=0.0, level=1.0, preset=A)]
+    )
+    timeline = TimelineControls(
+        session, controls.playback, 100.0, clip_editor=controls.clip_editor
+    )
+    # Off at 10, back on at 20, a hold at 30.
+    with controls.edit_history.recording("Record take"):
+        session.timeline.record_baseline = {"layer_1": 1.0}
+        session.timeline.record_buffer = {
+            "layer_1": [
+                SlotCue(t=10.0, level=0.0),
+                SlotCue(t=20.0, level=1.0),
+                SlotCue(t=30.0, level=1.0, anchor=True),
+            ]
+        }
+        timeline._punch_take(5.0, 40.0, {"layer_1"})
+    assert _held(controls) == held
+    clips = lane_clips(
+        session.timeline.lanes["layer_1"], inherit=1.0, duration_sec=100.0
+    )
+    assert [clip.start for clip in clips] == [0.0, 20.0, 30.0]
+
+
 def test_split_continues_and_the_view_says_so() -> None:
     controls = make_controls(("layer_1",), duration_sec=100.0)
     session = controls.session

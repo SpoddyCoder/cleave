@@ -1170,6 +1170,23 @@ def clear_clip_preset(
     )
 
 
+def start_clip_preset(
+    lane: TimelineLane,
+    start: float,
+    *,
+    inherit: float,
+    duration_sec: float,
+) -> TimelineLane:
+    """Make the butted clip at ``start`` start a preset, holding none yet."""
+    return _lane_from_cues(
+        [
+            replace(cue, recast=True, anchor=False) if cue.t == start else cue
+            for cue in _explicit_cues(lane, inherit)
+        ],
+        duration_sec,
+    )
+
+
 def should_accept_toggle(last_toggle_t: float | None, t_sec: float) -> bool:
     if last_toggle_t is None:
         return True

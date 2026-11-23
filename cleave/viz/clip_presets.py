@@ -33,6 +33,7 @@ from cleave.timeline import (
     empty_lane,
     lane_clips,
     set_clip_preset,
+    start_clip_preset,
     switching_clips,
 )
 from cleave.viz.edit_history import EditSnapshot
@@ -172,6 +173,38 @@ def set_clip_preset_and_list(
         inherit=layer_inherit(session, slot),
         duration_sec=duration_sec,
     )
+
+
+def start_new_clips(
+    session: TuningSession, slot: str, duration_sec: float, starts: Sequence[float]
+) -> None:
+    """Let the new clips at ``starts`` take spares, while there are any.
+
+    For clips that would continue the one before: the later part of a split,
+    or a hold dropped in a take. They are only marked to start a preset; the
+    spares fill them as the edit is recorded. Without a spare left they
+    continue.
+    """
+    if not is_each_clip(session, slot):
+        return
+    lane = _lane(session, slot)
+    inherit = layer_inherit(session, slot)
+    clips = lane_clips(lane, inherit=inherit, duration_sec=duration_sec)
+    starting = switching_clips(clips)
+    held = [clip.preset for clip in starting if clip.preset is not None]
+    spares = len(_without_entries(session.layers[slot].preset_list, held))
+    # Clips already waiting for a preset come first.
+    spares -= len(starting) - len(held)
+    for clip in clips:
+        if spares <= 0:
+            break
+        if clip.start not in starts or clip_starts_preset(clips, clip):
+            continue
+        lane = start_clip_preset(
+            lane, clip.start, inherit=inherit, duration_sec=duration_sec
+        )
+        spares -= 1
+    session.timeline.lanes[slot] = lane
 
 
 def _fill_empty_clips(

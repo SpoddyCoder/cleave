@@ -60,6 +60,7 @@ from cleave.viz.clip_presets import (
     first_spare,
     is_each_clip,
     set_clip_preset_and_list,
+    start_new_clips,
 )
 from cleave.viz.session import TuningSession
 from cleave.viz.edit_history import EditHistory
@@ -313,6 +314,9 @@ class ClipEditor:
     def split_at(self, slot: str, t_sec: float) -> bool:
         """Split the clip under *t_sec* in two and select the second part.
 
+        On an each-clip layer the second part takes the first spare preset,
+        or continues the first part's without one.
+
         False when edits are blocked, no clip is there, or either part would
         be too short.
         """
@@ -334,6 +338,7 @@ class ClipEditor:
                 inherit=_inherit(session, slot),
                 duration_sec=self.duration_sec,
             )
+            start_new_clips(session, slot, self.duration_sec, (t_sec,))
             select_clip(session, slot, t_sec)
         return True
 

@@ -481,7 +481,7 @@ The timer follows the song, including while the layer is off, so a preset whose 
 
 #### Choosing a preset for each clip
 
-With **each clip**, a clip either **starts** a new preset or **continues** the preset of the clip it touches before it. A clip after a gap always starts a new one. Splitting a clip gives two clips that share one preset, so the second shows a hooked arrow instead of a name, and the join between them is drawn fainter. Where clips start a new preset, the join is drawn solid.
+With **each clip**, a clip either **starts** a new preset or **continues** the preset of the clip it touches before it. A clip after a gap always starts a new one. Splitting a clip gives the second part the first spare preset. With no spares, the two parts share one preset: the second shows a hooked arrow instead of a name, and the join between them is drawn fainter. Where clips start a new preset, the join is drawn solid.
 
 Select a clip to edit its preset in the inspector:
 
@@ -495,7 +495,7 @@ The same choices are in the clip's right-click menu, under **Preset**.
 The clips and the layer's Preset List page stay in step:
 
 - **Editing the list** flows along the clips. Remove or insert an entry and the presets after it move along. Replacing or reordering entries changes the clips in place. Adding to the end of the list fills the first clip without a preset and leaves the others alone.
-- **Editing the timeline** leaves the other clips' presets alone. A deleted clip's preset becomes a spare at the end of the list. A new clip takes the first spare.
+- **Editing the timeline** leaves the other clips' presets alone. A deleted clip's preset becomes a spare at the end of the list. A new clip, whether added, recorded, or split off, takes the first spare.
 - **Too many presets** is fine: the spares wait at the end of the list, marked **spare**, and the layer shows an amber warning.
 - **Too few presets** leaves clips without one. They show a red hooked arrow and carry on with the preset before them, and the layer shows its red warning.
 

@@ -999,7 +999,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Clip Starts",
         help_entries=(("Left/Right", "continues / new preset"),),
         help_description=(
-            "Whether the clip starts a new preset or carries on the preset of the clip it touches before it. A split clip carries on. Only a clip touching the one before can carry on: after a gap, a clip always starts a new preset.",
+            "Whether the clip starts a new preset or carries on the preset of the clip it touches before it. A split clip takes the next spare preset, or carries on when there is none. Only a clip touching the one before can carry on: after a gap, a clip always starts a new preset.",
         ),
     ),
     RowKind.TIMELINE_CLIP_START: _clip_spec(
