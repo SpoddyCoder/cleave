@@ -20,6 +20,7 @@ from cleave.viz.layer import StemLayer
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.modal import FormField, FormSpec, ModalHost
 from cleave.preset_list_fill import needed_preset_count
+from cleave.viz.clip_presets import is_each_clip
 from cleave.viz.preset_list_populate import (
     browse_pool,
     catalog_has_role_presets,
@@ -43,6 +44,10 @@ from cleave.viz.user_presets import (
 
 PresetSource = PresetListEntry | Path
 
+
+
+# Why an each-clip layer's list cannot grow or shrink: it holds its clips' presets.
+EACH_CLIP_LIST_HINT = "Each clip holds one preset: add or delete clips on the timeline"
 
 class PresetListController:
     """Mutations for per-layer user preset lists."""
@@ -208,8 +213,8 @@ class PresetListController:
                     (
                         "clip roles",
                         "cue_roles",
-                        "one preset for each time the layer turns on, picked at "
-                        "random from presets with that clip's role.",
+                        "one preset for each clip, picked at random from "
+                        "presets with that clip's role.",
                     )
                 )
         else:
@@ -220,7 +225,15 @@ class PresetListController:
             )
             available = len(browse_pool(layer.playlist))
             populate_count = min(needed, available)
-        noun = "1 preset" if populate_count == 1 else f"{populate_count} presets"
+        if self.length_fixed(slot):
+            body = (
+                "Gives the layer's clip a new preset."
+                if populate_count == 1
+                else f"Gives each of the layer's {populate_count} clips a new preset."
+            )
+        else:
+            noun = "1 preset" if populate_count == 1 else f"{populate_count} presets"
+            body = f"Replaces the whole list with {noun}."
         sources.append(
             (
                 "shuffled (current directory)",
@@ -238,7 +251,7 @@ class PresetListController:
         self._modal.prompt_form(
             FormSpec(
                 title="Populate preset list",
-                body=f"Replaces the whole list with {noun}.",
+                body=body,
                 fields=(
                     FormField(
                         "source",
@@ -430,7 +443,7 @@ class PresetListController:
     ) -> bool:
         """Insert *source* before entry *index* (the list length appends)."""
         presets = self.session.layers[slot].preset_list
-        if not 0 <= index <= len(presets):
+        if not 0 <= index <= len(presets) or self._refuse_length_change(slot):
             return False
         entry = self._adopt(source)
         if entry is None:
@@ -442,7 +455,7 @@ class PresetListController:
 
     def duplicate(self, slot: str, index: int) -> None:
         """Insert a second copy of entry *index* right after it."""
-        if not self._valid(slot, index):
+        if not self._valid(slot, index) or self._refuse_length_change(slot):
             return
         presets = self.session.layers[slot].preset_list
         entry = presets[index]
@@ -459,7 +472,7 @@ class PresetListController:
         verb: str = "Removed",
     ) -> None:
         """Take entry *index* out of the list. Undo puts it back."""
-        if not self._valid(slot, index):
+        if not self._valid(slot, index) or self._refuse_length_change(slot):
             return
         presets = self.session.layers[slot].preset_list
         with self._record(label, slot):
@@ -472,7 +485,7 @@ class PresetListController:
     def prompt_clear(self, slot: str) -> None:
         """Confirm, then empty the layer's preset list."""
         count = len(self.session.layers[slot].preset_list)
-        if count == 0:
+        if count == 0 or self._refuse_length_change(slot):
             return
         if self._layer_bindings is not None:
             self._layer_bindings.lock_preset_for_modal(slot)
@@ -495,7 +508,7 @@ class PresetListController:
     def clear(self, slot: str) -> None:
         """Empty the layer's preset list. Undo puts it back."""
         presets = self.session.layers[slot].preset_list
-        if not presets:
+        if not presets or self._refuse_length_change(slot):
             return
         count = len(presets)
         with self._record("Clear preset list", slot):
@@ -503,6 +516,16 @@ class PresetListController:
         self.refresh_switching(slot)
         noun = "1 preset" if count == 1 else f"{count} presets"
         self._notify(slot, f"Cleared {noun}")
+
+    def length_fixed(self, slot: str) -> bool:
+        """True when the list holds one preset per clip, so entries cannot be added or removed."""
+        return is_each_clip(self.session, slot)
+
+    def _refuse_length_change(self, slot: str) -> bool:
+        if not self.length_fixed(slot):
+            return False
+        self._notify(slot, EACH_CLIP_LIST_HINT)
+        return True
 
     def entry(self, slot: str, index: int) -> PresetListEntry | None:
         if not self._valid(slot, index):

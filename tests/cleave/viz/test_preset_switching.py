@@ -237,17 +237,17 @@ def test_advance_timer_uses_floor_playhead() -> None:
     assert layer.list_switch_index == 1
 
 
-def test_advance_timeline_uses_on_transition_count() -> None:
+def test_advance_timeline_plays_each_clips_preset() -> None:
     layer = _stem_layer()
     session = _session(trigger="timeline", timeline_enabled=True)
     session.timeline.lanes["layer_1"] = TimelineLane(
         baseline=0.0,
         cues=(
-            SlotCue(t=1.0, level=1.0),
+            SlotCue(t=1.0, level=1.0, preset=_LIST[0]),
             SlotCue(t=2.0, level=0.0),
-            SlotCue(t=3.0, level=1.0),
+            SlotCue(t=3.0, level=1.0, preset=_LIST[1]),
             SlotCue(t=4.0, level=0.0),
-            SlotCue(t=5.0, level=1.0),
+            SlotCue(t=5.0, level=1.0, preset=_LIST[2]),
         ),
     )
     apply_preset_switching(
@@ -263,7 +263,7 @@ def test_advance_timeline_uses_on_transition_count() -> None:
     layer.pm.load_preset.assert_not_called()
     assert layer.list_switch_index == 0
     assert layer.auto_preset_path == _MILK[0].resolve()
-    # First on-section: still list[0] (on-transition count 1 -> index 0).
+    # First clip: its own preset, list[0].
     advance_preset_switching(session, {"layer_1": layer}, 1.5)
     layer.pm.load_preset.assert_not_called()
     assert layer.list_switch_index == 0
@@ -285,8 +285,12 @@ def test_advance_timeline_counts_an_opening_clip_as_the_first() -> None:
     layer = _stem_layer()
     session = _session(trigger="timeline", timeline_enabled=True)
     session.timeline.lanes["layer_1"] = TimelineLane(
-        baseline=1.0,
-        cues=(SlotCue(t=2.0, level=0.0), SlotCue(t=3.0, level=1.0)),
+        baseline=0.0,
+        cues=(
+            SlotCue(t=0.0, level=1.0, preset=_LIST[0]),
+            SlotCue(t=2.0, level=0.0),
+            SlotCue(t=3.0, level=1.0, preset=_LIST[1]),
+        ),
     )
     apply_preset_switching(
         layer,
@@ -431,9 +435,9 @@ def test_advance_timeline_while_paused_moves_index_without_loading() -> None:
     session.timeline.lanes["layer_1"] = TimelineLane(
         baseline=0.0,
         cues=(
-            SlotCue(t=1.0, level=1.0),
+            SlotCue(t=1.0, level=1.0, preset=_LIST[0]),
             SlotCue(t=2.0, level=0.0),
-            SlotCue(t=3.0, level=1.0),
+            SlotCue(t=3.0, level=1.0, preset=_LIST[1]),
         ),
     )
     apply_preset_switching(

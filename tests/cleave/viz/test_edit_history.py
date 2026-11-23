@@ -20,7 +20,11 @@ def _session() -> SimpleNamespace:
         timeline=SimpleNamespace(
             lanes={"layer_1": _lane(1.0)}, enabled=True, selected_clip_t={}
         ),
-        layers={"layer_1": SimpleNamespace(preset_list=entries("a.milk"))},
+        layers={
+            "layer_1": SimpleNamespace(
+                preset_list=entries("a.milk"), preset_switching_trigger="off"
+            )
+        },
         pattern_mask=SimpleNamespace(
             enabled=False, type="stripes", feather_pct=5, transition=2.0
         ),

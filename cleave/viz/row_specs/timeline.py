@@ -30,6 +30,7 @@ from cleave.choice import choice_index
 from cleave.cue_roles import CUE_ROLE_HELP_BLURB, CUE_ROLES, CueRole
 from cleave.cut_types import CUT_TYPES, CutType
 from cleave.timeline import ClipEdge, TimelineClip
+from cleave.viz.clip_presets import CONTINUES_GLYPH, ClipPresetView, preset_label
 from cleave.viz.commands import command_by_id
 from cleave.viz.playback import format_mmss
 from cleave.viz.timeline_clip_edits import ClipEditor
@@ -470,6 +471,18 @@ def _clip_field_text(
     return text
 
 
+def _clip_field_text_from(
+    read: Callable[[TuningViewState, RowDescriptor], T],
+    display: Callable[[T], str],
+) -> Callable[[TuningViewState, RowDescriptor], str]:
+    def text(state: TuningViewState, desc: RowDescriptor) -> str:
+        if _clip_preset_view(state, desc) is None:
+            return "-"
+        return display(read(state, desc))
+
+    return text
+
+
 def _clip_option_rows(
     options: Sequence[T],
     read: Callable[[TimelineClip | None], T],
@@ -514,6 +527,79 @@ _apply_clip_role, _jump_clip_role = _clip_option_rows(
 )
 
 
+def _clip_preset_view(
+    state: TuningViewState, desc: RowDescriptor
+) -> ClipPresetView | None:
+    if desc.slot is None:
+        return None
+    return state.timeline.selected_clip_presets.get(desc.slot)
+
+
+def _format_clip_preset(state: TuningViewState, desc: RowDescriptor) -> str:
+    view = _clip_preset_view(state, desc)
+    if view is None or view.name is None:
+        return "none"
+    name = preset_label(view.name)
+    return name if view.starts else f"{CONTINUES_GLYPH} {name}"
+
+
+def _clip_preset_tooltip(state: TuningViewState, desc: RowDescriptor) -> str:
+    """The full preset name, which the row shortens to fit."""
+    view = _clip_preset_view(state, desc)
+    if view is None or view.name is None:
+        return ""
+    return view.name if view.starts else f"Continues {view.name}"
+
+
+def _clip_preset_available(state: TuningViewState, desc: RowDescriptor) -> bool:
+    view = _clip_preset_view(state, desc)
+    return view is not None and view.starts and _clip_edits_available(state, desc)
+
+
+def _clip_starts_available(state: TuningViewState, desc: RowDescriptor) -> bool:
+    """Only a clip touching the one before can continue its preset."""
+    view = _clip_preset_view(state, desc)
+    return view is not None and view.butted and _clip_edits_available(state, desc)
+
+
+def _apply_clip_preset(
+    controls: TuningControls, desc: RowDescriptor, _forward: bool, _large: bool
+) -> None:
+    assert desc.slot is not None
+    controls.clip_editor.pick_another_preset(desc.slot)
+
+
+def _browse_clip_preset(controls: TuningControls, desc: RowDescriptor) -> None:
+    """Enter opens the preset browser to replace the clip's preset."""
+    assert desc.slot is not None
+    controls.browse_clip_preset(desc.slot)
+
+
+def _clip_starts(state: TuningViewState, desc: RowDescriptor) -> bool:
+    view = _clip_preset_view(state, desc)
+    return view is not None and view.starts
+
+
+def _clip_starts_display(starts: bool) -> str:
+    return "new preset" if starts else "continues"
+
+
+def _set_clip_starts(controls: TuningControls, desc: RowDescriptor, delta: int) -> None:
+    assert desc.slot is not None
+    # Options run continues, new preset: Right starts a new one.
+    controls.clip_editor.set_starts_preset(desc.slot, delta > 0)
+
+
+def _apply_clip_starts(
+    controls: TuningControls, desc: RowDescriptor, forward: bool, _large: bool
+) -> None:
+    _set_clip_starts(controls, desc, 1 if forward else -1)
+
+
+def _jump_clip_starts(controls: TuningControls, desc: RowDescriptor, delta: int) -> None:
+    _set_clip_starts(controls, desc, delta)
+
+
 def _clip_spec(
     label: str,
     format_value: Callable[[TuningViewState, RowDescriptor], str],
@@ -528,6 +614,7 @@ def _clip_spec(
     apply_action: Callable[[TuningControls, RowDescriptor], None] | None = None,
     repeatable: bool = False,
     blocked_by_section_lock: bool = True,
+    tooltip: Callable[[TuningViewState, RowDescriptor], str] | None = None,
 ) -> RowSpec:
     """One field of the selected strip clip. Edits match the strip's clip keys."""
     return RowSpec(
@@ -545,6 +632,7 @@ def _clip_spec(
         help_description=help_description,
         help_mode_entries=help_mode_entries,
         blocked_by_section_lock=blocked_by_section_lock,
+        tooltip=tooltip,
     )
 
 
@@ -878,6 +966,39 @@ SPECS: dict[RowKind, RowSpec] = {
         format_label=_format_clip_heading,
         fit_strategy=FitStrategy.NONE,
         navigable=False,
+    ),
+    RowKind.TIMELINE_CLIP_PRESET: _clip_spec(
+        "preset",
+        _format_clip_preset,
+        _apply_clip_preset,
+        _clip_preset_available,
+        apply_action=_browse_clip_preset,
+        tooltip=_clip_preset_tooltip,
+        help_title="Clip Preset",
+        help_entries=(
+            ("Enter", "choose a preset in the browser"),
+            ("Left/Right", "pick another preset"),
+        ),
+        help_description=(
+            "The preset this clip plays. Left/Right picks another with the clip's role, or from the layer's preset folder when no preset has that role. A clip that continues the clip before it shows that clip's preset after an arrow.",
+        ),
+    ),
+    RowKind.TIMELINE_CLIP_STARTS: _clip_spec(
+        "starts",
+        _clip_field_text_from(_clip_starts, _clip_starts_display),
+        _apply_clip_starts,
+        _clip_starts_available,
+        choice=options_choice(
+            (False, True),
+            _clip_starts,
+            _clip_starts_display,
+            jump=_jump_clip_starts,
+        ),
+        help_title="Clip Starts",
+        help_entries=(("Left/Right", "continues / new preset"),),
+        help_description=(
+            "Whether the clip starts a new preset or carries on the preset of the clip it touches before it. A split clip carries on. Only a clip touching the one before can carry on: after a gap, a clip always starts a new preset.",
+        ),
     ),
     RowKind.TIMELINE_CLIP_START: _clip_spec(
         "start",

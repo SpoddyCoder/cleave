@@ -18,6 +18,7 @@ from cleave.stems import stem_control_label
 from cleave.viz.commands import command_by_id
 from cleave.viz.material_icons import ADD_GLYPH, ARROW_DOWNWARD_GLYPH, ARROW_UPWARD_GLYPH
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
+from cleave.song_markers import format_marker_time
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.row_spec import FitStrategy, RowNavButton, RowPresentStyle, RowSpec
 from cleave.viz.row_specs.common import lock_text, noop_horizontal, on_off_text
@@ -314,8 +315,12 @@ def _format_track_preset_list_item_position(
     state: TuningViewState, desc: RowDescriptor
 ) -> str:
     assert desc.preset_index is not None
-    total = len(_track_block(state, desc).preset_list_labels)
-    return f"{desc.preset_index + 1}/{total}"
+    block = _track_block(state, desc)
+    starts = block.preset_list_clip_starts
+    if desc.preset_index < len(starts):
+        # Each entry belongs to a clip: show where that clip starts.
+        return format_marker_time(starts[desc.preset_index])
+    return f"{desc.preset_index + 1}/{len(block.preset_list_labels)}"
 
 def _format_track_preset_list_item_markers(
     state: TuningViewState, desc: RowDescriptor
@@ -727,15 +732,15 @@ SPECS: dict[RowKind, RowSpec] = {
     ),
     RowKind.TRACK_PRESET_SWITCHING_TRIGGER: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
-        panel_label="trigger",
+        panel_label="change presets",
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_track_preset_switching_trigger,
         apply_horizontal=_apply_track_preset_switching_trigger,
         choice=options_choice(PRESET_SWITCHING_TRIGGERS, lambda s, d: _track_block(s, d).runtime.preset_switching_trigger, preset_switching_trigger_display, jump=_jump_track_preset_switching_trigger),
-        help_title="Trigger",
-        help_entries=(("Left/Right", "choose trigger"),),
+        help_title="Change Presets",
+        help_entries=(("Left/Right", "choose when presets change"),),
         help_description=(
-            "What advances the layer to the next preset in its list.",
+            "When the layer moves on to another preset. The timeline decides when a layer is on screen; this decides which preset it shows.",
         ),
         help_mode_entries=PRESET_SWITCHING_TRIGGER_HELP_ENTRIES,
         repeatable=True,
@@ -766,7 +771,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Preset List Entry",
         help_description=(
-            "A preset in this layer's switching list. The highlighted entry is the one scheduled for this point in the song; while you preview another preset, it is where switching goes back to. Enter previews this entry; on the scheduled entry it does nothing, or resumes switching during a preview. A double-click (or Replace with in the right-click menu) opens the preset browser in this entry's folder, and the preset you pick there takes this entry's place. Right-click also has Cut, Copy, Paste (over, before, or after this entry), and Duplicate. Ctrl+Z undoes any change to the list. With the timeline trigger, inserting an entry moves every later preset on to the next clip. Tags after the name mark its curation status and role; hover over one for a reminder:",
+            "A preset in this layer's switching list. The highlighted entry is the one scheduled for this point in the song; while you preview another preset, it is where switching goes back to. Enter previews this entry; on the scheduled entry it does nothing, or resumes switching during a preview. A double-click (or Replace with in the right-click menu) opens the preset browser in this entry's folder, and the preset you pick there takes this entry's place. Right-click also has Cut, Copy, Paste (over, before, or after this entry), and Duplicate. Ctrl+Z undoes any change to the list. When presets change on each clip, each entry is a clip's preset, shown with the time the clip starts: replace or reorder entries here, and add or delete clips on the timeline. Tags after the name mark its curation status and role; hover over one for a reminder:",
         ),
         help_mode_entries=_PRESET_LIST_MARKER_HELP_ENTRIES,
         can_enter_move_mode=True,

@@ -1,8 +1,8 @@
 """Undo and redo for timeline and preset list edits.
 
-Each entry holds the timeline and every layer's preset list before and after
-one edit: a bulk command, a hand edit to a clip, a recorded take, or a preset
-list edit. Undo runs only while that state still matches what the edit left
+Each entry holds the timeline and every layer's preset list and switching
+trigger before and after one edit: a bulk command, a hand edit to a clip, a
+recorded take, or a preset list edit. Undo runs only while that state still matches what the edit left
 behind, so a change made outside the history is never thrown away. Layer
 changes count, since lanes and preset lists are keyed by slot.
 
@@ -21,6 +21,7 @@ from collections.abc import Callable, Hashable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
 
+from cleave.config_schema.layers import preset_switching_mode_for_trigger
 from cleave.preset_list_entry import PresetListEntry
 from cleave.timeline import TimelineLane, copy_lane
 from cleave.viz.session import TuningSession
@@ -49,6 +50,9 @@ class _Snapshot:
     lanes: dict[str, TimelineLane]
     timeline_enabled: bool
     preset_lists: dict[str, list[PresetListEntry]]
+    # Each layer's switching trigger: entering or leaving "each clip" moves
+    # presets between the list and the clips in the same step.
+    triggers: dict[str, str]
     pattern_mask: tuple[bool, str, int, float]
     # Restored with the rest, but never counts as a change.
     selected_clip_t: dict[str, float]
@@ -58,6 +62,7 @@ class _Snapshot:
             self.lanes == other.lanes
             and self.timeline_enabled == other.timeline_enabled
             and self.preset_lists == other.preset_lists
+            and self.triggers == other.triggers
             and self.pattern_mask == other.pattern_mask
         )
 
@@ -89,10 +94,17 @@ class EditHistory:
         *,
         on_preset_list_change: Callable[[str], None] | None = None,
         scope_locked: Callable[[EditScope], bool] | None = None,
+        before_commit: Callable[[dict[str, list[PresetListEntry]]], None]
+        | None = None,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
+        """``before_commit`` runs as each edit finishes, before it is recorded,
+        with the preset lists from before the edit. Changes it makes join the
+        same undo step (each-clip layers keep their clips and list in step).
+        """
         self.session = session
         self._on_preset_list_change = on_preset_list_change
+        self._before_commit = before_commit
         self._scope_locked = scope_locked
         self._clock = clock
         self._undo: list[_Entry] = []
@@ -140,6 +152,8 @@ class EditHistory:
         if pending is None:
             return
         self._pending = None
+        if self._before_commit is not None:
+            self._before_commit(pending.before.preset_lists)
         after = self._capture()
         if after.same_content(pending.before):
             return
@@ -258,6 +272,7 @@ class EditHistory:
             and len(session.layers) == len(snapshot.preset_lists)
             and all(
                 layer.preset_list == snapshot.preset_lists.get(slot)
+                and layer.preset_switching_trigger == snapshot.triggers.get(slot)
                 for slot, layer in session.layers.items()
             )
         )
@@ -270,6 +285,10 @@ class EditHistory:
             timeline_enabled=bool(session.timeline.enabled),
             preset_lists={
                 slot: list(layer.preset_list)
+                for slot, layer in session.layers.items()
+            },
+            triggers={
+                slot: layer.preset_switching_trigger
                 for slot, layer in session.layers.items()
             },
             pattern_mask=(mask.enabled, mask.type, mask.feather_pct, mask.transition),
@@ -289,8 +308,16 @@ class EditHistory:
         )
         for slot, preset_list in snapshot.preset_lists.items():
             layer = session.layers[slot]
-            if layer.preset_list == preset_list:
+            trigger = snapshot.triggers.get(slot, layer.preset_switching_trigger)
+            if (
+                layer.preset_list == preset_list
+                and layer.preset_switching_trigger == trigger
+            ):
                 continue
             layer.preset_list[:] = preset_list
+            layer.preset_switching_trigger = trigger  # type: ignore[assignment]
+            layer.preset_switching = preset_switching_mode_for_trigger(
+                layer.preset_switching_trigger
+            )
             if self._on_preset_list_change is not None:
                 self._on_preset_list_change(slot)

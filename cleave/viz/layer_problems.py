@@ -134,14 +134,20 @@ def layer_problems(session: TuningSession, slot: str) -> tuple[LayerProblem, ...
     health = session.preset_health
     folder = _preset_dir_problem(layer, health)
     problems: list[LayerProblem] = [] if folder is None else [folder]
+    each_clip = (
+        layer.preset_switching == "on"
+        and layer.preset_switching_trigger == "timeline"
+    )
     if layer.preset_switching == "on":
         if not layer.preset_list:
-            problems.append(
-                LayerProblem(
-                    "Preset switching is on, but the preset list is empty",
-                    ProblemPage.PRESET_LIST,
+            # Each-clip layers say which clips lack a preset instead.
+            if not each_clip:
+                problems.append(
+                    LayerProblem(
+                        "Preset switching is on, but the preset list is empty",
+                        ProblemPage.PRESET_LIST,
+                    )
                 )
-            )
         else:
             entry_problems = health.list_problems(slot, layer)
             bad = sum(1 for problem in entry_problems if problem is not None)
@@ -168,13 +174,17 @@ def layer_problems(session: TuningSession, slot: str) -> tuple[LayerProblem, ...
                         ),
                     )
                 )
-        if layer.preset_switching_trigger == "timeline":
-            from cleave.viz.preset_list_populate import on_segment_count
+        if each_clip:
+            from cleave.viz.preset_list_populate import (
+                clips_missing_preset_count,
+                on_segment_count,
+            )
 
+            missing = clips_missing_preset_count(session, slot)
             if not session.timeline.enabled:
                 problems.append(
                     LayerProblem(
-                        "Switching follows the timeline, but the timeline is off",
+                        "Presets change on each clip, but the timeline is off",
                         ProblemPage.PRESET_SWITCHING,
                         RowKind.TRACK_PRESET_SWITCHING_TRIGGER,
                     )
@@ -182,9 +192,17 @@ def layer_problems(session: TuningSession, slot: str) -> tuple[LayerProblem, ...
             elif on_segment_count(session, slot) == 0:
                 problems.append(
                     LayerProblem(
-                        "Switching follows the timeline, but this layer has no clips on it",
+                        "Presets change on each clip, but this layer has no clips",
                         ProblemPage.PRESET_SWITCHING,
                         RowKind.TRACK_PRESET_SWITCHING_TRIGGER,
+                    )
+                )
+            elif missing:
+                noun = "clip has" if missing == 1 else "clips have"
+                problems.append(
+                    LayerProblem(
+                        f"{missing} {noun} no preset",
+                        ProblemPage.PRESET_LIST,
                     )
                 )
     elif folder is None:
@@ -235,31 +253,10 @@ def _layer_preset_problem(layer: LayerRuntime, health: PresetHealth) -> LayerPro
 
 def layer_notices(session: TuningSession, slot: str) -> tuple[LayerNotice, ...]:
     """What the user should know about the layer at *slot* that does not stop it working."""
-    layer = session.layers[slot]
-    notices: list[LayerNotice] = []
-    if (
-        layer.preset_switching == "on"
-        and layer.preset_switching_trigger == "timeline"
-        and session.timeline.enabled
-    ):
-        from cleave.viz.preset_list_populate import on_segment_count
-
-        clips = on_segment_count(session, slot)
-        extra = len(layer.preset_list) - clips
-        if clips and extra > 0:
-            clip_noun = "clip" if clips == 1 else "clips"
-            unused = "the last one never plays" if extra == 1 else f"the last {extra} never play"
-            notices.append(
-                LayerNotice(
-                    "Preset switching is on, following the timeline\n"
-                    f"{len(layer.preset_list)} presets in the list but only {clips} "
-                    f"{clip_noun} on the timeline: {unused}",
-                    ProblemPage.PRESET_LIST,
-                    RowKind.TRACK_PRESET_LIST_ITEM,
-                    clips,
-                )
-            )
-    return tuple(notices)
+    # No notice is raised at present; the amber sign and menu lines stay for
+    # issues that should not stop a layer.
+    del session, slot
+    return ()
 
 
 @dataclass(frozen=True)

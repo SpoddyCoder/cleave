@@ -37,7 +37,8 @@ never value, so a light panel can carry dark text and a strong fill light text:
 Accent colors for modes and icons (not label/value roles):
   highlight, error_notification, notification_on_fill, move_mode, lock_icon,
   preset_icon, preset_file_icon,
-  timeline_track_colors, timeline_off_segment, bar_grid, song_bound, playhead, playhead_flash,
+  timeline_track_colors, timeline_off_segment, timeline_clip_text, bar_grid, song_bound,
+  playhead, playhead_flash,
   song_marker, song_marker_selected, calibration_flash
 
 Buttons (fills, not text roles). Each tone has a rest fill, a lit hover fill
@@ -420,6 +421,8 @@ class Palette:
     timeline_track_colors: tuple[RGB, ...]
     # Fill of a timeline track's level bar where the layer is off.
     timeline_off_segment: RGB
+    # A clip's preset name, drawn on the track colours.
+    timeline_clip_text: RGB
     bar_grid: RGB
     # Song start and end lines below the ruler, through the timeline rows.
     song_bound: RGB
@@ -549,6 +552,7 @@ def _ultraviolet() -> Palette:
             (128, 232, 216),  # aqua
         ),
         timeline_off_segment=(40, 40, 40),
+        timeline_clip_text=(16, 16, 20),
         bar_grid=(70, 95, 130),
         song_bound=song_bound,
         playhead=(90, 50, 130),
@@ -665,6 +669,7 @@ def _chocolate() -> Palette:
             (136, 208, 234),
         ),
         timeline_off_segment=(40, 40, 40),
+        timeline_clip_text=(16, 16, 20),
         bar_grid=(106, 76, 54),
         song_bound=(74, 52, 38),
         playhead=(122, 66, 32),
@@ -779,6 +784,7 @@ def _mint() -> Palette:
             (230, 255, 244),
         ),
         timeline_off_segment=(40, 40, 40),
+        timeline_clip_text=(16, 16, 20),
         bar_grid=(46, 90, 78),
         song_bound=(36, 68, 60),
         playhead=(26, 106, 84),
@@ -904,6 +910,7 @@ def _daylight() -> Palette:
             (0, 150, 140),  # aqua
         ),
         timeline_off_segment=(220, 223, 230),
+        timeline_clip_text=(255, 255, 255),
         bar_grid=(190, 200, 220),
         song_bound=song_bound,
         playhead=(120, 80, 200),

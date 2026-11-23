@@ -55,7 +55,7 @@ Every key a theme can set, grouped by where it appears:
 | Menus, dialogs, and progress bars | `surface_bg`, `surface_edge`, `surface_text`, `accent_from`, `accent_to` |
 | Rows | `hover`, `hover_bg_alpha`, `row_select_tint`, `row_selected_alpha`, `row_selected_bar`, `row_focused_alpha`, `row_focused_bar`, `row_focus_edge` |
 | Icon hover | `icon_hover_fg`, `icon_hover_bg`, `icon_hover_bg_alpha`, `icon_hover_edge`, `icon_lit_hover_lift`, `icon_lit_hover_edge_lift` |
-| Timeline strip | `timeline_track_colors`, `timeline_off_segment`, `bar_grid`, `song_bound`, `playhead`, `playhead_flash`, `song_marker`, `song_marker_selected`, `timeline_scroll_rail`, `timeline_scroll_thumb` |
+| Timeline strip | `timeline_track_colors`, `timeline_off_segment`, `timeline_clip_text`, `bar_grid`, `song_bound`, `playhead`, `playhead_flash`, `song_marker`, `song_marker_selected`, `timeline_scroll_rail`, `timeline_scroll_thumb` |
 | Calibration | `calibration_flash` |
 | Scrollbars | `scrollbar_track`, `scrollbar_thumb`, `scrollbar_thumb_hover` |
 
@@ -177,6 +177,7 @@ timeline_track_colors:
   - "#d4ee8a"
   - "#80e8d8"
 timeline_off_segment: "#282828"
+timeline_clip_text: "#101014"
 bar_grid: "#465f82"
 song_bound: "#3a4254"
 playhead: "#5a3282"

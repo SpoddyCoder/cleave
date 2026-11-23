@@ -966,7 +966,7 @@ def _strip_host(
     )
     host.context.controls.session = SimpleNamespace(
         layer_z_order=(),
-        timeline=SimpleNamespace(panel_open=True, strip_hover=hover),
+        timeline=SimpleNamespace(panel_open=True, strip_hover=hover, strip_hover_clip=None),
     )
     return host
 

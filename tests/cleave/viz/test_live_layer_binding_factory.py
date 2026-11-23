@@ -210,9 +210,9 @@ def test_browse_while_timeline_on_blocks_later_advance_load() -> None:
     ctx.session.timeline.lanes["layer_1"] = TimelineLane(
         baseline=0.0,
         cues=(
-            SlotCue(t=1.0, level=1.0),
+            SlotCue(t=1.0, level=1.0, preset=runtime.preset_list[0]),
             SlotCue(t=2.0, level=0.0),
-            SlotCue(t=3.0, level=1.0),
+            SlotCue(t=3.0, level=1.0, preset=runtime.preset_list[1]),
         ),
     )
     apply_preset_switching(

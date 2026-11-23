@@ -207,17 +207,35 @@ def _preset_refs_from_viz_yaml(path: Path) -> set[Path]:
     if not isinstance(layers, dict):
         return set()
     cfg_dir = path.parent
-    refs: set[Path] = set()
+    entries: list[object] = []
     for layer_raw in layers.values():
         if not isinstance(layer_raw, dict):
             continue
         raw = layer_raw.get("preset_switching_list")
-        if not isinstance(raw, list):
+        if isinstance(raw, list):
+            entries.extend(raw)
+    entries.extend(_clip_preset_refs(data.get("timeline")))
+    return {
+        resolve_user_preset(entry["path"], cfg_dir)
+        for entry in entries
+        if isinstance(entry, dict) and isinstance(entry.get("path"), str)
+    }
+
+
+def _clip_preset_refs(timeline: object) -> list[object]:
+    """The ``preset`` mappings on every timeline clip in a viz YAML."""
+    if not isinstance(timeline, dict):
+        return []
+    lanes = timeline.get("lanes")
+    if not isinstance(lanes, dict):
+        return []
+    out: list[object] = []
+    for lane in lanes.values():
+        cues = lane.get("cues") if isinstance(lane, dict) else None
+        if not isinstance(cues, list):
             continue
-        for entry in raw:
-            if isinstance(entry, dict) and isinstance(entry.get("path"), str):
-                refs.add(resolve_user_preset(entry["path"], cfg_dir))
-    return refs
+        out.extend(cue.get("preset") for cue in cues if isinstance(cue, dict))
+    return out
 
 
 def _load_yaml_mapping(path: Path) -> dict | None:

@@ -140,6 +140,8 @@ class RowKind(Enum):
     TIMELINE_CLIP_ROLE = auto()
     TIMELINE_CLIP_CUT_IN = auto()
     TIMELINE_CLIP_CUT_OUT = auto()
+    TIMELINE_CLIP_PRESET = auto()
+    TIMELINE_CLIP_STARTS = auto()
     SONG_MARKERS_HEADER = auto()
     SONG_MARKER_ITEM = auto()
     PROJECT_MILKDROP_HEADER = auto()

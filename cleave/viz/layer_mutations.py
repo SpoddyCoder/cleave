@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from contextlib import nullcontext
 from pathlib import Path
 
 from cleave.blend_modes import BLEND_MODES
@@ -11,6 +12,7 @@ from cleave.config_schema.layers import (
     PRESET_SWITCHING_TRIGGERS,
     clamp_easter_egg,
     preset_switching_mode_for_trigger,
+    preset_switching_trigger_display,
 )
 from cleave.preset_library import PresetCollection
 from cleave.preset_playlist import (
@@ -21,14 +23,12 @@ from cleave.preset_playlist import (
     scan_preset_playlist,
 )
 from cleave.choice import step_choice
+from cleave.viz.edit_history import EditHistory
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.preset_list_fill import needed_preset_count
 from cleave.viz.preset_switching import layer_notification
 from cleave.viz.session import BrowseSnapshot, TuningSession
 
-NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT = (
-    "Timeline is disabled; enable it to switch presets"
-)
 
 
 class LayerMutations:
@@ -42,35 +42,25 @@ class LayerMutations:
         duration_sec: float,
         get_layer_bindings: Callable[[], LiveLayerBindings | None],
         on_notification: Callable[[str], None],
+        history: EditHistory | None = None,
+        on_enter_each_clip: Callable[[str], None] | None = None,
     ) -> None:
+        """``on_enter_each_clip`` gives a layer's clips presets when its
+        presets start changing on each clip; it runs inside the undo step
+        ``history`` records for the trigger change."""
         self.session = session
         self.preset_root = preset_root
         self.duration_sec = duration_sec
         self._get_layer_bindings = get_layer_bindings
         self._on_notification = on_notification
+        self._history = history
+        self._on_enter_each_clip = on_enter_each_clip
 
     def _bindings(self) -> LiveLayerBindings | None:
         return self._get_layer_bindings()
 
     def _notify(self, message: str) -> None:
         self._on_notification(message)
-
-    def _warn_if_timeline_trigger_disabled(self, slot: str) -> bool:
-        layer = self.session.layers[slot]
-        if (
-            layer.preset_switching == "on"
-            and layer.preset_switching_trigger == "timeline"
-            and not self.session.timeline.enabled
-        ):
-            self._notify(
-                layer_notification(
-                    self.session.layer_z_order,
-                    slot,
-                    NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT,
-                )
-            )
-            return True
-        return False
 
     def _publish_browse_preset(self, slot: str) -> None:
         """Point the file row at the browse playlist's current preset."""
@@ -188,27 +178,25 @@ class LayerMutations:
         )
         if trigger == previous:
             return
-        layer.preset_switching_trigger = trigger
-        layer.preset_switching = preset_switching_mode_for_trigger(
-            layer.preset_switching_trigger
+        # Entering or leaving "each clip" moves presets between the list and
+        # the clips, so it is one undo step with them.
+        follows_clips = "timeline" in (trigger, previous)
+        recording = (
+            self._history.recording(f"Change presets: {preset_switching_trigger_display(trigger)}")
+            if follows_clips and self._history is not None
+            else nullcontext()
         )
-        if previous == "off":
-            # The preset chosen with switching off stays the layer's preset;
-            # browsing from now on only previews.
-            layer.layer_preset = layer.playlist.anchor
-        if not self._warn_if_timeline_trigger_disabled(slot):
-            if (
-                previous != "off"
-                and layer.preset_switching_trigger != "off"
-                and layer.preset_list
-            ):
-                self._notify(
-                    layer_notification(
-                        self.session.layer_z_order,
-                        slot,
-                        "Preset list may need adjusting",
-                    )
-                )
+        with recording:
+            layer.preset_switching_trigger = trigger
+            layer.preset_switching = preset_switching_mode_for_trigger(
+                layer.preset_switching_trigger
+            )
+            if previous == "off":
+                # The preset chosen with switching off stays the layer's
+                # preset; browsing from now on only previews.
+                layer.layer_preset = layer.playlist.anchor
+            if trigger == "timeline" and self._on_enter_each_clip is not None:
+                self._on_enter_each_clip(slot)
         bindings = self._bindings()
         if bindings is not None:
             bindings.on_preset_switching_change(slot)

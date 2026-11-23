@@ -223,6 +223,16 @@ def test_every_builtin_theme_keeps_its_text_readable() -> None:
     assert failures == []
 
 
+def test_clip_names_read_on_every_track_colour() -> None:
+    failures = [
+        f"{p.id}: clip text on {track} is {_contrast(p.timeline_clip_text, track):.2f}"
+        for p in BUILTIN_PALETTES
+        for track in p.timeline_track_colors
+        if _contrast(p.timeline_clip_text, track) < 3.0
+    ]
+    assert failures == []
+
+
 def test_ultraviolet_on_fill_roles_match_its_panel_text() -> None:
     """Ultraviolet's split roles keep the look it had with one text colour."""
     for role in ("on_hover", "on_primary", "on_danger", "on_accent", "on_lit_icon"):

@@ -32,11 +32,11 @@ PRESET_SWITCHING_TRIGGER_HELP_ENTRIES: tuple[
 ] = (
     (
         "off",
-        "no automatic switching; the current preset stays.",
+        "the layer keeps its own preset.",
     ),
     (
         "timer",
-        "next preset after each Preset Duration.",
+        "the next preset in the list starts after each preset duration.",
     ),
     (
         "projectm",
@@ -44,7 +44,7 @@ PRESET_SWITCHING_TRIGGER_HELP_ENTRIES: tuple[
     ),
     (
         "timeline",
-        "next preset at the start of each timeline clip; needs the timeline on.",
+        "every timeline clip holds its own preset, shown on the clip. Choosing it turns the timeline on.",
     ),
 )
 DEFAULT_PRESET_SWITCHING: PresetSwitchingMode = "off"
@@ -169,12 +169,12 @@ def clamp_easter_egg(value: float) -> float:
 
 def preset_switching_trigger_display(trigger: PresetSwitchingTrigger) -> str:
     if trigger == "off":
-        return "off"
+        return "never"
     if trigger == "projectm":
-        return "projectM"
+        return "projectM decides"
     if trigger == "timeline":
-        return "timeline"
-    return "timer"
+        return "each clip"
+    return "on a timer"
 
 
 def _resolve_preset(preset: str | Path, preset_root: Path) -> Path:
@@ -208,28 +208,34 @@ def _parse_preset_switching_list(
             stacklevel=2,
         )
         return []
-    entries: list[PresetListEntry] = []
-    for index, item in enumerate(raw):
-        where = f"layers.{slot}.preset_switching_list[{index}]"
-        if not isinstance(item, dict):
-            raise ValueError(f"{where} must be a mapping with a path")
-        path = item.get("path")
-        if not isinstance(path, str):
-            raise ValueError(f"{where}.path must be a string")
-        source = item.get("source")
-        if source is not None and not isinstance(source, str):
-            raise ValueError(f"{where}.source must be a string")
-        entries.append(
-            PresetListEntry(
-                path=resolve_user_preset(path, ctx.cfg_dir).as_posix(),
-                source=(
-                    Path(os.path.expanduser(source)).as_posix()
-                    if source is not None
-                    else None
-                ),
-            )
+    return [
+        parse_preset_list_entry(
+            item, f"layers.{slot}.preset_switching_list[{index}]", ctx.cfg_dir
         )
-    return entries
+        for index, item in enumerate(raw)
+    ]
+
+
+def parse_preset_list_entry(
+    item: Any, where: str, cfg_dir: Path
+) -> PresetListEntry:
+    """One ``{path, source}`` preset mapping, with ``path`` resolved from ``cfg_dir``."""
+    if not isinstance(item, dict):
+        raise ValueError(f"{where} must be a mapping with a path")
+    path = item.get("path")
+    if not isinstance(path, str):
+        raise ValueError(f"{where}.path must be a string")
+    source = item.get("source")
+    if source is not None and not isinstance(source, str):
+        raise ValueError(f"{where}.source must be a string")
+    return PresetListEntry(
+        path=resolve_user_preset(path, cfg_dir).as_posix(),
+        source=(
+            Path(os.path.expanduser(source)).as_posix()
+            if source is not None
+            else None
+        ),
+    )
 
 
 def parse_layer_z_order_section(data: dict[str, Any], ctx: ParseCtx) -> list[str]:
@@ -393,7 +399,7 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
     return layers
 
 
-def _persist_preset_list_entry(
+def persist_preset_list_entry(
     entry: PresetListEntry, cfg_dir: Path | None
 ) -> dict[str, str]:
     path = (
@@ -471,7 +477,7 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             layer_out["preset_start_clean"] = preset_start_clean
         if preset_switching_list:
             layer_out["preset_switching_list"] = [
-                _persist_preset_list_entry(entry, ctx.cfg_dir)
+                persist_preset_list_entry(entry, ctx.cfg_dir)
                 for entry in preset_switching_list
             ]
         layers_out[slot] = layer_out

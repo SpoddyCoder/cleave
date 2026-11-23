@@ -1,6 +1,8 @@
 """Context menu section for a timeline row's selected clip.
 
-Go to the clip's start, split it from a Split submenu (at the playhead or at
+On a layer whose presets change on each clip, a Preset submenu chooses the
+clip's preset in the browser, picks another, or sets whether the clip starts
+a new preset or continues the one before. Go to the clip's start, split it from a Split submenu (at the playhead or at
 the right-clicked time), set its cut in, cut out, and role from submenus, and
 delete it. Each
 choice calls the same ``ClipEditor`` method as the strip's clip keys and the
@@ -16,8 +18,14 @@ from typing import TypeVar
 
 from cleave.cue_roles import CUE_ROLES, CueRole
 from cleave.cut_types import CUT_TYPES, CutType
-from cleave.timeline import MIN_CLIP_SEC
-from cleave.viz.context_menu import ContextMenuEntry, ContextMenuItem, ContextSubmenu
+from cleave.timeline import MIN_CLIP_SEC, TimelineClip
+from cleave.viz.clip_presets import clip_preset_view, is_each_clip
+from cleave.viz.context_menu import (
+    CONTEXT_SEPARATOR,
+    ContextMenuEntry,
+    ContextMenuItem,
+    ContextSubmenu,
+)
 from cleave.viz.session import TuningSession
 from cleave.viz.timeline_clip_edits import (
     ClipEditor,
@@ -37,6 +45,7 @@ def clip_menu_entries(
     playhead_sec: Callable[[], float],
     split_at_playhead: Callable[[], None],
     split_t: float | None = None,
+    browse_preset: Callable[[], None] | None = None,
 ) -> tuple[ContextMenuEntry, ...]:
     """Items for *slot*'s selected clip, or () when it has none.
 
@@ -66,6 +75,11 @@ def clip_menu_entries(
             else "Too close to the clip's edge"
         )
     start = clip.start
+    preset_entries: tuple[ContextMenuEntry, ...] = ()
+    if is_each_clip(session, slot):
+        preset_entries = (
+            _preset_submenu(editor, slot, clip, browse_preset, edit_hint),
+        )
     return (
         ContextMenuItem(
             id="timeline.clip.go_to",
@@ -73,6 +87,7 @@ def clip_menu_entries(
             run=lambda: seek_to(start),
             shortcut="Enter",
         ),
+        *preset_entries,
         ContextSubmenu(
             id="timeline.clip.split_menu",
             label="Split",
@@ -148,6 +163,62 @@ def clip_menu_entries(
             shortcut="Delete",
             hint=edit_hint,
         ),
+    )
+
+
+def _preset_submenu(
+    editor: ClipEditor,
+    slot: str,
+    clip: TimelineClip,
+    browse_preset: Callable[[], None] | None,
+    edit_hint: str | None,
+) -> ContextSubmenu:
+    view = clip_preset_view(editor.session, slot, clip, editor.duration_sec)
+    editable = edit_hint is None
+    own_hint = edit_hint
+    if editable and not view.starts:
+        own_hint = "This clip continues the preset before it"
+    starts_hint = edit_hint
+    if editable and not view.butted:
+        starts_hint = "A clip after a gap always starts a new preset"
+    return ContextSubmenu(
+        id="timeline.clip.preset",
+        label="Preset",
+        items=(
+            ContextMenuItem(
+                id="timeline.clip.preset.browse",
+                label="Choose preset\u2026",
+                run=browse_preset if browse_preset is not None else lambda: None,
+                enabled=editable and view.starts and browse_preset is not None,
+                hint=own_hint,
+            ),
+            ContextMenuItem(
+                id="timeline.clip.preset.pick",
+                label="Pick another",
+                run=lambda: editor.pick_another_preset(slot),
+                enabled=editable and view.starts,
+                hint=own_hint,
+            ),
+            CONTEXT_SEPARATOR,
+            ContextMenuItem(
+                id="timeline.clip.preset.starts",
+                label="Starts a new preset",
+                run=lambda: editor.set_starts_preset(slot, True),
+                checked=view.starts,
+                enabled=editable and view.butted,
+                hint=starts_hint,
+            ),
+            ContextMenuItem(
+                id="timeline.clip.preset.continues",
+                label="Continues the clip before",
+                run=lambda: editor.set_starts_preset(slot, False),
+                checked=not view.starts,
+                enabled=editable and view.butted,
+                hint=starts_hint,
+            ),
+        ),
+        enabled=editable,
+        hint=edit_hint,
     )
 
 

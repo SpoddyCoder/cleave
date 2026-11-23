@@ -40,7 +40,7 @@ from cleave.viz.layer_visibility import apply_layer_visibility
 from cleave.viz.mix_player import MixPlayer
 from cleave.viz.preset_switching import (
     reapply_projectm_preset_switching,
-    resync_timeline_preset_switching,
+    advance_preset_switching,
 )
 from cleave.stem_pcm import StemPcmBank
 from cleave.viz.playback import PlaybackState, current_sec, seek
@@ -282,6 +282,10 @@ def make_timeline_controls(
         if tuning_controls is not None:
             tuning_controls.select_song_marker(index)
 
+    def on_browse_clip_preset(slot: str) -> None:
+        if tuning_controls is not None:
+            tuning_controls.browse_clip_preset(slot)
+
     def on_seek(delta_sec: float) -> None:
         seek(playback, delta_sec, duration_sec)
         LayerFramePipeline.flush_pcm(layers)
@@ -291,7 +295,7 @@ def make_timeline_controls(
             preset_root=preset_root,
             delta_sec=delta_sec,
         )
-        resync_timeline_preset_switching(
+        advance_preset_switching(
             session,
             layers_by_slot,
             current_sec(playback, duration_sec),
@@ -306,6 +310,7 @@ def make_timeline_controls(
         on_focus_row=on_focus_row,
         on_select_song_marker=on_select_song_marker,
         on_seek=on_seek,
+        on_browse_clip_preset=on_browse_clip_preset,
         on_notification=on_notification,
         beat_times=list(signals.beat_times) if signals is not None else (),
         bar_times=list(signals.downbeat_times) if signals is not None else (),

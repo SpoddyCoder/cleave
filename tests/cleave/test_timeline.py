@@ -36,7 +36,7 @@ from cleave.timeline import (
     lane_level_at,
     lane_level_breakpoints,
     lane_level_envelope,
-    lane_on_transition_count,
+    lane_switch_cue_at,
     lane_on_transition_cues,
     lane_on_transition_trigger_times,
     punch_lane,
@@ -927,7 +927,7 @@ def test_a_lane_that_opens_on_switches_at_the_song_start() -> None:
     kwargs = {"hard_cut_fades": _OFF, "soft_cut_fades": _OFF}
     whole_song = TimelineLane(baseline=1.0, cues=[])
     assert lane_on_transition_trigger_times(whole_song, **kwargs) == [0.0]
-    assert lane_on_transition_count(whole_song, 0.0, **kwargs) == 1
+    assert lane_switch_cue_at(whole_song, 0.0, **kwargs) is not None
     reenters = TimelineLane(
         baseline=1.0, cues=[SlotCue(t=5.0, level=0.0), SlotCue(t=9.0, level=1.0)]
     )
@@ -957,35 +957,31 @@ def test_on_transition_triggers_hard_cut_vs_soft_cut() -> None:
     assert triggers == [9.0, 26.0]
 
 
-def test_on_transition_count_seek_stable() -> None:
+def test_switch_cue_at_seek_stable() -> None:
     lane = _lane(0.0, (10.0, 1.0), (20.0, 0.0), (30.0, 1.0), cut="soft")
     kwargs = dict(
         hard_cut_fades=_OFF,
         soft_cut_fades=_std(fade_in=2.0, fade_out=2.0),
     )
-    assert lane_on_transition_count(lane, 7.9, **kwargs) == 0
-    assert lane_on_transition_count(lane, 8.0, **kwargs) == 1
-    assert lane_on_transition_count(lane, 27.9, **kwargs) == 1
-    assert lane_on_transition_count(lane, 28.0, **kwargs) == 2
-    assert lane_on_transition_count(lane, 28.0, **kwargs) == 2
-    assert lane_on_transition_count(lane, 100.0, **kwargs) == 2
+
+    def start(t: float) -> float | None:
+        cue = lane_switch_cue_at(lane, t, **kwargs)
+        return None if cue is None else cue.t
+
+    assert start(7.9) is None
+    assert start(8.0) == 10.0
+    assert start(27.9) == 10.0
+    assert start(28.0) == 30.0
+    assert start(100.0) == 30.0
 
 
-def test_on_transition_count_hard_cut_uses_cue_time() -> None:
+def test_switch_cue_at_hard_cut_uses_cue_time() -> None:
     lane = _lane(0.0, (10.0, 1.0))
     zero = _std(fade_in=0.0, fade_out=2.0)
-    assert lane_on_transition_count(
-        lane,
-        9.9,
-        hard_cut_fades=_OFF,
-        soft_cut_fades=zero,
-    ) == 0
-    assert lane_on_transition_count(
-        lane,
-        10.0,
-        hard_cut_fades=_OFF,
-        soft_cut_fades=zero,
-    ) == 1
+    kwargs = dict(hard_cut_fades=_OFF, soft_cut_fades=zero)
+    assert lane_switch_cue_at(lane, 9.9, **kwargs) is None
+    cue = lane_switch_cue_at(lane, 10.0, **kwargs)
+    assert cue is not None and cue.t == 10.0
 
 
 def test_boolean_parity_zero_one_lane_levels() -> None:
@@ -1412,3 +1408,53 @@ def test_fold_lane_baseline_freezes_inherit() -> None:
     assert fold_lane_baseline(lane, 1.0) == TimelineLane(baseline=1.0, cues=[])
     explicit = _clip_lane(SlotCue(t=5.0, level=1.0), baseline=0.0)
     assert fold_lane_baseline(explicit, 1.0) == explicit
+
+
+def test_clip_operations_keep_a_clip_preset_and_split_continues() -> None:
+    from cleave.timeline import (
+        clip_shown_preset,
+        clip_starts_preset,
+        lane_clips,
+        move_clip,
+        set_clip_preset,
+        split_clip,
+        trim_clip,
+    )
+    from tests.support.preset_list import entries
+
+    a, b = entries("/p/a.milk", "/p/b.milk")
+    lane = TimelineLane(
+        baseline=0.0,
+        cues=[
+            SlotCue(t=0.0, level=1.0, preset=a),
+            SlotCue(t=10.0, level=0.0),
+            SlotCue(t=20.0, level=1.0, preset=b),
+            SlotCue(t=30.0, level=0.0),
+        ],
+    )
+    kwargs = dict(inherit=0.0, duration_sec=100.0)
+    clips = lane_clips(lane, **kwargs)
+    moved = move_clip(lane, clips[1], 40.0, **kwargs)
+    assert [(c.start, c.preset) for c in lane_clips(moved, **kwargs)] == [
+        (0.0, a),
+        (40.0, b),
+    ]
+    # Trimming the first clip up to the second keeps both presets: the
+    # second now butts it but still starts its own.
+    butted = trim_clip(lane, clips[0], "end", 20.0, **kwargs)
+    butted_clips = lane_clips(butted, **kwargs)
+    assert [c.start for c in butted_clips] == [0.0, 20.0]
+    assert clip_starts_preset(butted_clips, butted_clips[1])
+    assert butted_clips[1].preset == b
+    # A split carries the preset on.
+    split = split_clip(lane, clips[0], 5.0, **kwargs)
+    split_clips = lane_clips(split, **kwargs)
+    second = split_clips[1]
+    assert second.preset is None
+    assert not clip_starts_preset(split_clips, second)
+    assert clip_shown_preset(split_clips, second) == a
+    # Giving the second half a preset makes it start one.
+    recast = set_clip_preset(split, 5.0, b, **kwargs)
+    recast_clips = lane_clips(recast, **kwargs)
+    assert clip_starts_preset(recast_clips, recast_clips[1])
+    assert recast_clips[1].preset == b

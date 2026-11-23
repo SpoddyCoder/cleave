@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -11,6 +11,18 @@ import pygame
 from cleave.config import CleaveConfig
 from cleave.signals import Signals
 from cleave.preset_library import PresetLibrary
+from cleave.preset_list_entry import PresetListEntry
+from cleave.viz.clip_presets import (
+    ClipPresetPicker,
+    clip_preset_view,
+    fill_missing_clip_presets,
+    is_each_clip,
+    lane_untouched,
+    lay_out_list_as_clips,
+    seed_timeline_from_switching,
+    sync_each_clip_layers,
+    timeline_is_empty,
+)
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.layer_lifecycle_controls import LayerLifecycleController
 from cleave.viz.layer_mutations import LayerMutations
@@ -25,6 +37,7 @@ from cleave.viz.editor_mode_controls import (
 from cleave.viz.post_fx import sync_live_compositor_format
 from cleave.viz.preset_curation_controls import PresetCurationController
 from cleave.viz.preset_list_controls import PresetListController
+from cleave.viz.preset_switching import layer_notification, panel_layer_number
 from cleave.viz.preset_rescan_controls import PresetRescanController
 from cleave.viz.key_repeat import KeyRepeatController
 from cleave.viz.value_nudge import ValueNudgeHold
@@ -102,6 +115,39 @@ if TYPE_CHECKING:
 
 NOTIFICATION_TIMELINE_ENABLED_TEXT = "Timeline controls layer visibility"
 NOTIFICATION_TIMELINE_DISABLED_TEXT = "Layer panel controls visibility"
+
+
+def _layer_numbers(session: TuningSession, slots: Sequence[str]) -> str:
+    numbers = [str(panel_layer_number(session.layer_z_order, slot)) for slot in slots]
+    if len(numbers) == 1:
+        return f"Layer {numbers[0]}"
+    return f"Layers {', '.join(numbers[:-1])} and {numbers[-1]}"
+
+
+def timeline_enabled_notification(
+    session: TuningSession, enabled: bool, converted: Sequence[str]
+) -> str:
+    """What turning the timeline on or off did, in a toast."""
+    if enabled:
+        if converted:
+            verb = "changes" if len(converted) == 1 else "change"
+            return (
+                f"{NOTIFICATION_TIMELINE_ENABLED_TEXT}. "
+                f"{_layer_numbers(session, converted)} now {verb} preset on "
+                "each clip, at the same times"
+            )
+        return NOTIFICATION_TIMELINE_ENABLED_TEXT
+    holding = [
+        slot for slot in session.layer_z_order if is_each_clip(session, slot)
+    ]
+    if holding:
+        verb = "holds its" if len(holding) == 1 else "hold their"
+        return (
+            f"{NOTIFICATION_TIMELINE_DISABLED_TEXT}. "
+            f"{_layer_numbers(session, holding)} {verb} current preset "
+            "until the timeline is back on"
+        )
+    return NOTIFICATION_TIMELINE_DISABLED_TEXT
 LATENCY_PAGE_ID = "settings.latency"
 NOTIFICATION_TAP_LATENCY_UNCHANGED_TEXT = (
     "Existing marker and clip times unchanged"
@@ -211,10 +257,12 @@ class TuningControls:
         layers_by_slot = (
             layer_manager.layers_by_slot if layer_manager is not None else {}
         )
+        self._clip_preset_pick = ClipPresetPicker(session, project_dir, self.library)
         self.edit_history = EditHistory(
             session,
             on_preset_list_change=lambda slot: self.preset_list.refresh_switching(slot),
             scope_locked=self._edit_scope_locked,
+            before_commit=self._sync_each_clip_layers,
         )
         self.preset_list = PresetListController(
             session,
@@ -243,6 +291,7 @@ class TuningControls:
             duration_sec=duration_sec,
             beat_times=beat_times,
             bar_times=bar_times,
+            pick_preset=self._clip_preset_pick,
         )
         self._timeline_presets = TimelinePresetController(
             session,
@@ -343,6 +392,8 @@ class TuningControls:
             duration_sec=duration_sec,
             get_layer_bindings=lambda: self._layer_bindings,
             on_notification=lambda message: self.show_notification(message),
+            history=self.edit_history,
+            on_enter_each_clip=self._enter_each_clip,
         )
         self.preset_browser = PresetBrowserControls(
             session,
@@ -949,21 +1000,86 @@ class TuningControls:
         timeline.locked = not timeline.locked
 
     def set_timeline_enabled(self, enabled: bool) -> None:
-        tl = self.session.timeline
-        if tl.enabled == enabled:
+        if self.session.timeline.enabled == enabled:
             return
+        label = "Turn timeline on" if enabled else "Turn timeline off"
+        with self.edit_history.recording(label):
+            converted = self._apply_timeline_enabled(enabled)
+        self._after_timeline_enabled_change(enabled, converted)
+
+    def _apply_timeline_enabled(self, enabled: bool) -> list[str]:
+        """Switch the timeline; the first time it goes on, seed it from switching.
+
+        Returns the layers moved to "each clip" by the seed.
+        """
+        tl = self.session.timeline
         tl.enabled = enabled
+        if enabled and timeline_is_empty(self.session):
+            return seed_timeline_from_switching(self.session, self.duration_sec)
+        return []
+
+    def _after_timeline_enabled_change(
+        self, enabled: bool, converted: Sequence[str]
+    ) -> None:
         if enabled:
             self.open_timeline_panel()
         else:
             self.close_timeline_panel()
+        for slot in converted:
+            self.preset_list.refresh_switching(slot)
         if self._layer_bindings is not None:
             self._layer_bindings.on_timeline_enabled_change()
         self.show_notification(
-            NOTIFICATION_TIMELINE_ENABLED_TEXT
-            if enabled
-            else NOTIFICATION_TIMELINE_DISABLED_TEXT
+            timeline_enabled_notification(self.session, enabled, converted)
         )
+
+    def _enter_each_clip(self, slot: str) -> None:
+        """A layer's presets now change on each clip: give its clips presets.
+
+        Runs inside the trigger change's undo step. The timeline comes on if
+        it is off. An untouched row gets the preset list laid out as clips at
+        the preset duration; otherwise clips without a preset take the list's
+        presets in order, and any left over get one picked when the step ends.
+        """
+        session = self.session
+        untouched = lane_untouched(session, slot)
+        if not session.timeline.enabled:
+            converted = self._apply_timeline_enabled(True)
+            self._after_timeline_enabled_change(True, converted)
+        layer = session.layers[slot]
+        entries = list(layer.preset_list)
+        if untouched:
+            count = lay_out_list_as_clips(session, slot, self.duration_sec, entries)
+            if count:
+                self.show_notification(
+                    layer_notification(
+                        session.layer_z_order,
+                        slot,
+                        f"{count} clips laid out from the preset list, "
+                        f"{layer.preset_duration:g}s each",
+                    )
+                )
+            return
+        fill_missing_clip_presets(
+            session, slot, self.duration_sec, None, from_entries=entries
+        )
+
+    def browse_clip_preset(self, slot: str) -> None:
+        """Open the preset browser to replace the selected clip's preset."""
+        clip = self.clip_editor.selected(slot)
+        if clip is None or not is_each_clip(self.session, slot):
+            return
+        view = clip_preset_view(self.session, slot, clip, self.duration_sec)
+        if view.list_index is not None:
+            self.preset_browser.open(slot, replace_index=view.list_index)
+
+    def _sync_each_clip_layers(
+        self, lists_before: Mapping[str, Sequence[PresetListEntry]]
+    ) -> None:
+        for slot in sync_each_clip_layers(
+            self.session, self.duration_sec, lists_before, self._clip_preset_pick
+        ):
+            self.preset_list.refresh_switching(slot)
 
     def do_seek(self, delta_sec: float) -> None:
         if self._layer_bindings is not None:

@@ -64,6 +64,11 @@ class TimelineViewState:
     # Visible time window mapped onto the bar. An end of None is the song end.
     view_start_sec: float = 0.0
     view_end_sec: float | None = None
+    # Each row's preset switching trigger ("off" while switching is off), and
+    # its timer period: each-clip rows name their clips' presets, timer rows
+    # mark where presets change.
+    preset_triggers: dict[str, str] = field(default_factory=dict)
+    preset_periods: dict[str, float] = field(default_factory=dict)
 
 
 def view_window(state: TimelineViewState) -> tuple[float, float]:

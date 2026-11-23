@@ -12,6 +12,10 @@ from cleave.config_schema.descriptors import (
     as_mapping,
     require_non_negative_number,
 )
+from cleave.config_schema.layers import (
+    parse_preset_list_entry,
+    persist_preset_list_entry,
+)
 from cleave.config_schema.validators import (
     validate_blend_mode,
     validate_cue_role,
@@ -19,6 +23,7 @@ from cleave.config_schema.validators import (
 )
 from cleave.cue_roles import CueRole
 from cleave.cut_types import CutType
+from cleave.preset_list_entry import PresetListEntry
 from cleave.timeline import SlotCue, TimelineLane, canonicalize, clamp_level
 
 DEFAULT_TIMELINE_ENABLED = True
@@ -242,6 +247,13 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
                 )
             anchor = bool(cue_map.get("anchor", False))
             recast = bool(cue_map.get("recast", False))
+            preset: PresetListEntry | None = None
+            if cue_map.get("preset") is not None and ctx.cfg_dir is not None:
+                preset = parse_preset_list_entry(
+                    cue_map["preset"],
+                    f"timeline.lanes.{slot}.cues[{index}].preset",
+                    ctx.cfg_dir,
+                )
             cues.append(
                 SlotCue(
                     t=t,
@@ -251,6 +263,7 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
                     cut=cut,
                     anchor=anchor,
                     recast=recast,
+                    preset=preset,
                 )
             )
         lanes[str(slot)] = TimelineLane(
@@ -312,6 +325,10 @@ def persist_timeline(ctx: PersistCtx) -> dict[str, Any]:
                     cue_out["anchor"] = True
                 if cue.recast:
                     cue_out["recast"] = True
+                if cue.preset is not None:
+                    cue_out["preset"] = persist_preset_list_entry(
+                        cue.preset, ctx.cfg_dir
+                    )
                 cues_out.append(cue_out)
             entry["cues"] = cues_out
         lanes_out[slot] = entry

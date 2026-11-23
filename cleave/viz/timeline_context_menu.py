@@ -49,6 +49,8 @@ class TimelineRowMenuActions(Protocol):
 
     def playhead_sec(self) -> float: ...
 
+    def browse_clip_preset(self, slot: str) -> None: ...
+
 
 def timeline_row_menu(
     actions: TimelineRowMenuActions,
@@ -156,6 +158,7 @@ def timeline_row_menu_entries(
             actions.playhead_sec,
             actions.split_at_playhead,
             split_t,
+            browse_preset=lambda: actions.browse_clip_preset(slot),
         )
         if clip
         else ()

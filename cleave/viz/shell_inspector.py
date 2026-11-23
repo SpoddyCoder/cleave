@@ -20,6 +20,7 @@ from cleave.viz.imgui_theme import (
     padded_row_spacing_y,
     padded_rows,
     rgba,
+    row_band_side,
     second_line_drop,
     two_line_row_height,
 )
@@ -324,6 +325,22 @@ def _draw_two_line_row_text(
         icon,
     )
     return on_marker
+
+
+def _fit_value_after_label(look: _RowLook, cluster: str) -> str:
+    """The value, shortened with an ellipsis so it and its arrows end clear of the label.
+
+    A long value, such as a preset name, would otherwise run back over the
+    label. The full text stays in the row's tooltip.
+    """
+    origin_x, _origin_y = selectable_label_origin()
+    label_end = origin_x + imgui.calc_text_size(f"{look.lead}{look.label}  ").x
+    right = imgui.get_item_rect_max().x - imgui.get_style().frame_padding.x
+    arrows = 2 * (row_band_side() + icon_gap()) if look.stepped else 0.0
+    room = int(right - label_end - arrows)
+    if imgui.calc_text_size(cluster).x <= room:
+        return cluster
+    return fit_text_to_width(ImguiTextSizer(), cluster.strip(), max(0, room))
 
 
 def inspector_row_click_outcome(
@@ -756,6 +773,8 @@ class InspectorPanel:
         elif look.stepped and cluster and not two_line:
             cluster = self.values.fixed_width_value(desc.kind, cluster)
         icon = path_row_icon(desc.kind)
+        if cluster and not two_line and icon is None:
+            cluster = _fit_value_after_label(look, cluster)
         if icon is not None and not two_line:
             origin_x, origin_y = selectable_label_origin()
             if look.label:

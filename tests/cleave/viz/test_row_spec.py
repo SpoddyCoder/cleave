@@ -632,7 +632,7 @@ def test_format_row_value_track_and_render() -> None:
     slot_desc = RowDescriptor(RowKind.TRACK_BLEND, slot="layer_1")
     assert format_row_value(state, slot_desc) == "add"
     mode_desc = RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_TRIGGER, slot="layer_1")
-    assert format_row_value(state, mode_desc) == "timer"
+    assert format_row_value(state, mode_desc) == "on a timer"
     duration_desc = RowDescriptor(RowKind.TRACK_PRESET_DURATION, slot="layer_1")
     assert format_row_value(state, duration_desc) == "45s"
     assert format_row_value(
@@ -1273,6 +1273,7 @@ def test_two_line_row_splits_value_position_and_markers() -> None:
         preset_markers="[F] [R:B]",
         preset_list_labels=["a.milk", "b.milk"],
         preset_list_markers=["", "[B]"],
+        preset_list_clip_starts=(),
     )
     state = SimpleNamespace(tracks={"layer_1": block})
 

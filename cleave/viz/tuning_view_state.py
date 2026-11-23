@@ -10,6 +10,12 @@ from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from cleave.viz.clip_presets import (
+    ClipPresetView,
+    clip_preset_view,
+    is_each_clip,
+    row_switching_clips,
+)
 from cleave.config_schema.compositor import DEFAULT_COMPOSITOR_HDR
 from cleave.config_schema.editor import (
     DEFAULT_BEAT_SENSITIVITY,
@@ -162,6 +168,9 @@ class TrackBlock:
     preset_markers: str = ""
     preset_list_labels: list[str] = field(default_factory=list)
     preset_list_markers: list[str] = field(default_factory=list)
+    # On a layer whose presets change on each clip: where each list entry's
+    # clip starts, in list order. Empty otherwise.
+    preset_list_clip_starts: tuple[float, ...] = ()
     # Why the directory row's folder cannot be browsed (None: fine).
     preset_dir_problem: str | None = None
     # Why the preset row's file, or each list entry's, cannot play (None: fine).
@@ -399,6 +408,8 @@ class TimelineBlock:
     song_marker_types: tuple[str, ...] = ()
     # Selected strip clip per slot, for the timeline row inspector page.
     selected_clips: dict[str, TimelineClip] = field(default_factory=dict)
+    # The selected clip's preset, on layers whose presets change on each clip.
+    selected_clip_presets: dict[str, ClipPresetView] = field(default_factory=dict)
 
     @classmethod
     def from_session(
@@ -417,6 +428,13 @@ class TimelineBlock:
             song_marker_times=tuple(session.song_markers.times),
             song_marker_types=tuple(m.marker_type for m in markers),
             selected_clips=selected_timeline_clips(session, duration_sec),
+            selected_clip_presets={
+                slot: clip_preset_view(session, slot, clip, duration_sec)
+                for slot, clip in selected_timeline_clips(
+                    session, duration_sec
+                ).items()
+                if is_each_clip(session, slot)
+            },
         )
 
 
@@ -792,6 +810,15 @@ class TuningViewStateBuilder:
             return None
         return health.file_problem(layer, current)
 
+    def _preset_list_clip_starts(self, slot: str) -> tuple[float, ...]:
+        if not is_each_clip(self.session, slot):
+            return ()
+        return tuple(
+            clip.start
+            for clip in row_switching_clips(self.session, slot, self.duration_sec)
+            if clip.preset is not None
+        )
+
     def _preset_list_labels(self, entries: list[PresetListEntry]) -> list[str]:
         entries_key = tuple(entries)
         labels = self._preset_list_label_cache.get(entries_key)
@@ -889,6 +916,7 @@ class TuningViewStateBuilder:
                 visible=layer.enabled,
                 preset_list_labels=self._preset_list_labels(list(layer.preset_list)),
                 preset_list_markers=self._preset_list_markers(list(layer.preset_list)),
+                preset_list_clip_starts=self._preset_list_clip_starts(slot),
                 preset_dir_problem=self.session.preset_health.dir_problem(
                     display.current_dir
                 ),
@@ -927,6 +955,7 @@ class TuningViewStateBuilder:
                 preset_markers=self._preset_markers(layer, display),
                 preset_list_labels=self._preset_list_labels(list(layer.preset_list)),
                 preset_list_markers=self._preset_list_markers(list(layer.preset_list)),
+                preset_list_clip_starts=self._preset_list_clip_starts(slot),
                 preset_dir_problem=self.session.preset_health.dir_problem(
                     display.current_dir
                 ),

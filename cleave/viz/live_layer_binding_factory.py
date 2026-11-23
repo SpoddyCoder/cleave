@@ -30,7 +30,7 @@ from cleave.viz.preset_switching import (
     layer_notification,
     load_manual_preset_clean,
     reapply_projectm_preset_switching,
-    resync_timeline_preset_switching,
+    advance_preset_switching,
     switching_list_index,
 )
 from cleave.viz.post_fx_bindings import PostFxBindings
@@ -224,7 +224,7 @@ class LiveLayerBindingsFactory:
             preset_root=ctx.preset_root,
             delta_sec=delta_sec,
         )
-        resync_timeline_preset_switching(
+        advance_preset_switching(
             ctx.session,
             ctx.layers_by_slot,
             self._song_time(),

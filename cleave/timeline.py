@@ -12,6 +12,7 @@ from cleave.blend_modes import BlendMode
 from cleave.cue_roles import CueRole
 from cleave.cut_types import CutType
 from cleave.easing import smoothstep
+from cleave.preset_list_entry import PresetListEntry
 from cleave.stems import STEM_SOURCES, StemSource
 
 RECORD_DEBOUNCE_SEC = 0.08
@@ -44,6 +45,9 @@ class SlotCue:
     cut: CutType | None = None
     anchor: bool = False
     recast: bool = False
+    # The preset this cue's clip starts (each-clip switching). Only on cues
+    # that switch: a rise from off, or a ``recast`` on a butted clip.
+    preset: PresetListEntry | None = None
 
 
 @dataclass
@@ -137,13 +141,14 @@ def canonicalize(
     current_blend: BlendMode | None = None
     for cue in collapsed:
         if not cue_editable_for_blend_role(cue):
-            cue = replace(cue, blend=None, role=None)
+            cue = replace(cue, blend=None, role=None, preset=None)
         if (
             current_level is not None
             and levels_equal(cue.level, current_level)
             and cue.blend == current_blend
             and not cue.anchor
             and not cue.recast
+            and cue.preset is None
         ):
             continue
         result.append(cue)
@@ -478,23 +483,28 @@ def lane_on_transition_trigger_times(
     ]
 
 
-def lane_on_transition_count(
+def lane_switch_cue_at(
     lane: TimelineLane,
     t_sec: float,
     *,
     hard_cut_fades: TimelineFadeGroup,
     soft_cut_fades: TimelineFadeGroup,
-) -> int:
-    """Number of on-transition triggers at or before ``t_sec`` (seek-stable)."""
-    return sum(
-        1
-        for trigger in lane_on_transition_trigger_times(
-            lane,
-            hard_cut_fades=hard_cut_fades,
-            soft_cut_fades=soft_cut_fades,
-        )
-        if trigger <= t_sec
-    )
+) -> SlotCue | None:
+    """The last preset-switch cue whose trigger is at or before ``t_sec``.
+
+    Seek-stable: the answer depends only on ``t_sec``. ``None`` before the
+    first clip starts.
+    """
+    current: SlotCue | None = None
+    for trigger, cue in lane_on_transition_cues(
+        lane,
+        hard_cut_fades=hard_cut_fades,
+        soft_cut_fades=soft_cut_fades,
+    ):
+        if trigger > t_sec:
+            break
+        current = cue
+    return current
 
 
 def punch_lane(
@@ -630,7 +640,8 @@ class TimelineClip:
     ``cut_in`` is the start cue's cut. ``cut_out`` is the cut of the off cue
     that ends the clip, and stays ``None`` without one (``has_end_cue``
     False): the clip butts the next one (``butts_next``) or runs to the song
-    end. ``recast`` and ``anchor`` are the start cue's flags.
+    end. ``recast``, ``anchor``, and ``preset`` come from the start cue; a
+    clip that continues the one before it has no ``preset`` of its own.
     """
 
     start: float
@@ -644,6 +655,7 @@ class TimelineClip:
     has_end_cue: bool = False
     recast: bool = False
     anchor: bool = False
+    preset: PresetListEntry | None = None
 
 
 def fold_lane_baseline(lane: TimelineLane, inherit: float) -> TimelineLane:
@@ -692,9 +704,52 @@ def lane_clips(
                 has_end_cue=has_end_cue,
                 recast=cue.recast,
                 anchor=cue.anchor,
+                preset=cue.preset,
             )
         )
     return clips
+
+
+def clip_butts_previous(
+    clips: Sequence[TimelineClip], clip: TimelineClip
+) -> bool:
+    """Whether ``clip`` starts where an earlier clip ends, with no gap."""
+    return any(
+        other.butts_next and other.end == clip.start for other in clips
+    )
+
+
+def clip_starts_preset(
+    clips: Sequence[TimelineClip], clip: TimelineClip
+) -> bool:
+    """Whether ``clip`` switches preset at its start.
+
+    A clip after a gap, or at the song start, always does. A clip butting the
+    one before does when its start cue is a ``recast``.
+    """
+    return clip.recast or not clip_butts_previous(clips, clip)
+
+
+def clip_shown_preset(
+    clips: Sequence[TimelineClip], clip: TimelineClip
+) -> PresetListEntry | None:
+    """The preset playing during ``clip``: its own, or the one it continues."""
+    index = next(
+        (i for i, other in enumerate(clips) if other.start == clip.start), None
+    )
+    if index is None:
+        return clip.preset
+    while index >= 0:
+        current = clips[index]
+        if clip_starts_preset(clips, current):
+            return current.preset
+        index -= 1
+    return None
+
+
+def switching_clips(clips: Sequence[TimelineClip]) -> list[TimelineClip]:
+    """The clips that switch preset at their start, in time order."""
+    return [clip for clip in clips if clip_starts_preset(clips, clip)]
 
 
 def clip_at(clips: Sequence[TimelineClip], t_sec: float) -> TimelineClip | None:
@@ -786,8 +841,10 @@ def _lane_from_cues(cues: Sequence[SlotCue], duration_sec: float) -> TimelineLan
     """Canonical lane over an off baseline that keeps butted clips apart.
 
     An on cue that matches the on state before it would merge into it, so it
-    becomes an ``anchor`` (the same preset carries on). Cues at or past the
-    song end are dropped.
+    becomes an ``anchor`` (the same preset carries on). An on cue that holds
+    a ``preset`` and now butts an earlier clip becomes a ``recast``, so it
+    still starts its preset; a butted on cue without one continues the
+    preset before it. Cues at or past the song end are dropped.
     """
     ordered = sorted(
         (cue for cue in cues if cue.t < duration_sec), key=lambda cue: cue.t
@@ -796,9 +853,11 @@ def _lane_from_cues(cues: Sequence[SlotCue], duration_sec: float) -> TimelineLan
     level = 0.0
     blend: BlendMode | None = None
     for cue in ordered:
+        butted = float(cue.level) > LEVEL_EPS and level > LEVEL_EPS
+        if butted and cue.preset is not None and not cue.recast:
+            cue = replace(cue, recast=True, anchor=False)
         if (
-            float(cue.level) > LEVEL_EPS
-            and level > LEVEL_EPS
+            butted
             and levels_equal(cue.level, level)
             and cue.blend == blend
             and not cue.recast
@@ -849,11 +908,13 @@ def add_clip(
     cut_out: CutType | None = None,
     recast: bool = False,
     anchor: bool = False,
+    preset: PresetListEntry | None = None,
 ) -> TimelineLane:
     """Add a clip over the off span ``[start, end)``.
 
     Writes an on cue at ``start`` and, unless the span runs into the next
-    clip or the song end, an off cue at ``end`` carrying ``cut_out``.
+    clip or the song end, an off cue at ``end`` carrying ``cut_out``. A
+    ``preset`` makes the clip start it, even when it butts a clip before.
     """
     cues = _explicit_cues(lane, inherit)
     on_cue = SlotCue(
@@ -864,6 +925,7 @@ def add_clip(
         cut=cut_in,
         anchor=anchor,
         recast=recast,
+        preset=preset,
     )
     at_end = next((cue for cue in cues if cue.t == end), None)
     kept = [cue for cue in cues if not (start <= cue.t < end)]
@@ -925,6 +987,7 @@ def move_clip(
         cut_out=stored.cut_out,
         recast=stored.recast,
         anchor=stored.anchor,
+        preset=stored.preset,
     )
 
 
@@ -1052,6 +1115,33 @@ def update_clip(
             for cue in updated.cues
         ],
     )
+
+
+def set_clip_preset(
+    lane: TimelineLane,
+    start: float,
+    preset: PresetListEntry | None,
+    *,
+    inherit: float,
+    duration_sec: float,
+) -> TimelineLane:
+    """Give the clip starting at ``start`` its own ``preset``, or clear it with None.
+
+    A preset on a clip that butts the one before makes it start that preset
+    (a ``recast``); clearing it there makes the clip continue the preset
+    before it. The song-start opening becomes a real cue, so it can hold one.
+    """
+    cues = _explicit_cues(lane, inherit)
+    updated: list[SlotCue] = []
+    for cue in cues:
+        if cue.t != start or float(cue.level) <= LEVEL_EPS:
+            updated.append(cue)
+            continue
+        if preset is None:
+            updated.append(replace(cue, preset=None, recast=False))
+        else:
+            updated.append(replace(cue, preset=preset, anchor=False))
+    return _lane_from_cues(updated, duration_sec)
 
 
 def should_accept_toggle(last_toggle_t: float | None, t_sec: float) -> bool:

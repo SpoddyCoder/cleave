@@ -168,13 +168,13 @@ Many navigator rows carry icons on the right:
 - **Solo** isolates a layer so you can judge it on its own.
 - **Lock** protects settings from accidental edits. Locked settings turn red and stay fixed until you unlock them.
 - **Preview** (Overlay only) holds the credits cards on screen so you can style them without seeking.
-- **Problem** (a red exclamation mark, layers only) shows when the layer cannot do what it is set to do. An amber exclamation mark is a notice: something worth knowing that does not stop the layer working. See [When a layer has a problem](#when-a-layer-has-a-problem).
+- **Problem** (a red exclamation mark, layers only) shows when the layer cannot do what it is set to do. See [When a layer has a problem](#when-a-layer-has-a-problem).
 
 The same icons, in the same order, also sit at the right of the icon line under the inspector title, so you can solo a layer from any of its pages or preview the cards from any Overlay page. When a page, or the part it belongs to, is off or locked, its settings dim, and hovering over the icon tells you which switch is responsible.
 
 ### Undo
 
-**Edit > Undo** (Ctrl+Z) and **Edit > Redo** (Ctrl+Y) cover timeline edits (adding, moving, trimming, splitting, and deleting clips, recorded takes, and timeline commands such as Generate timeline) and preset list edits (adding, removing, moving, pasting, replacing, Populate list, and Clear list). The menu item names the step it would undo. A step on a locked layer's preset list, or on a locked timeline, waits until you unlock it. Other settings apply as you change them, so save when you are happy, or close without saving to discard your changes.
+**Edit > Undo** (Ctrl+Z) and **Edit > Redo** (Ctrl+Y) cover timeline edits (adding, moving, trimming, splitting, and deleting clips, a clip's preset, recorded takes, turning the timeline on or off, changing a layer to or from each clip, and timeline commands such as Generate timeline) and preset list edits (adding, removing, moving, pasting, replacing, Populate list, and Clear list). The menu item names the step it would undo. A step on a locked layer's preset list, or on a locked timeline, waits until you unlock it. Other settings apply as you change them, so save when you are happy, or close without saving to discard your changes.
 
 ---
 
@@ -266,14 +266,14 @@ Right-click a preset in the browser to favourite it, blacklist it, or give it a 
 
 ### Preset switching
 
-A layer can move through presets on its own. On the **Preset Switching** page, the **trigger** decides what advances it:
+A layer can move through presets on its own. Two settings work together here: the [timeline](#the-timeline) decides **when** a layer is on screen, and preset switching decides **which preset** it shows. On the **Preset Switching** page, **change presets** sets when the layer moves on to another preset:
 
-| Trigger | What happens |
+| Change presets | What happens |
 | --- | --- |
-| off | No switching; the current preset stays. |
-| timer | The next preset starts after a fixed number of seconds. |
-| projectm | projectM plays the list on its own schedule, including hard cuts on strong beats. It is live: each play and each render can switch at different moments, so the editor will not match a render exactly. Use timer or timeline when the order and timing must be the same every time. |
-| timeline | The next preset starts each time the timeline brings the layer in. |
+| never | The layer keeps its own preset. |
+| on a timer | The next preset in the list starts after a fixed number of seconds. |
+| projectM decides | projectM plays the list on its own schedule, including hard cuts on strong beats. It is live: each play and each render can switch at different moments, so the editor will not match a render exactly. Use on a timer or each clip when the order and timing must be the same every time. |
+| each clip | Every timeline clip on the layer holds its own preset, and its name shows on the clip. See [Presets on clips](#presets-on-clips). Choosing it turns the timeline on. |
 
 The rest of the page controls how long each preset plays and how it transitions into the next; the help column describes each setting.
 
@@ -291,19 +291,19 @@ Picking a preset yourself while switching is on, in the preset browser or with E
 
 Editing the list or the Preset Switching settings keeps the preview on screen. To end it, click the pause icon (or **Resume switching** on the Preset Switching page). The layer jumps straight to the entry it would be showing had you never previewed, the preset directory row goes back to the folder it showed before you started browsing, and a notification confirms that switching has resumed. If you had a list entry selected, the selection moves to the scheduled entry, so you can see where switching picked up:
 
-- **timer and timeline triggers:** the entry for the current song position, so your clips play their chosen presets in order.
-- **projectm trigger:** the entry that was playing when the preview started, since projectM's own timing can't be worked out ahead of time.
+- **on a timer and each clip:** the entry for the current song position, so your clips play their chosen presets.
+- **projectM decides:** the entry that was playing when the preview started, since projectM's own timing can't be worked out ahead of time.
 
 ### The preset list
 
-The **Preset List** page holds the presets the layer cycles through, in order. It appears whenever switching is not off.
+The **Preset List** page holds the presets the layer cycles through, in order. It appears whenever change presets is not never. On a layer whose presets change on each clip, the list is the clips' presets, one entry per clip that starts a preset, each showing the time its clip starts (see [Presets on clips](#presets-on-clips)).
 
 A new project starts with each layer's list already filled: enough presets to last the song at the layer's preset duration, shuffled from the layer's preset folder. Every layer of a new project starts on the Milkdrop Original folder, which the Welcome to Cleave step always downloads.
 
 The page opens on the layer's preset directory row, the same row as on the Milkdrop Preset page: it shows the folder (or collection) **Populate list** fills the list from, and works the same way: its arrows and clickable folders change folder, and Enter or a double-click (in a folder with no subfolders) or right-click > **Browse presets** opens the preset browser.
 
 - The **+** button on the Milkdrop Preset page's preset row, just left of its arrows (or P from any of the layer's rows), appends the preset you are looking at. The **Go to preset list** button, at the left of the icon line under the title of that page and of the Preset Switching page, opens the Preset List page.
-- **Populate list**, the button at the left of the page's icon line under its title, rebuilds the whole list. Under **pick from**, choose **shuffled (current directory)** or **in order (current directory)** to fill it from the layer's preset folder. With the timeline trigger, once at least one preset in your library has a role, you can also choose **clip roles**, which casts one preset for each of the layer's clips, picked by that clip's role.
+- **Populate list**, the button at the left of the page's icon line under its title, rebuilds the whole list. Under **pick from**, choose **shuffled (current directory)** or **in order (current directory)** to fill it from the layer's preset folder. On a layer whose presets change on each clip, Populate list gives every clip a new preset, and once at least one preset in your library has a role you can also choose **clip roles**, which picks each clip's preset by that clip's role.
 - **Enter** on an entry previews it (a click only selects it); click the layer's pause icon, or **Resume switching**, to return to the schedule. Enter on the highlighted scheduled entry does not preview it, since it is already playing; during a preview it resumes switching.
 - **Drag** an entry's handle, or press M, to reorder it, and press **Delete** to remove it (Ctrl+Z puts it back).
 - **Clear list…**, in the right-click menu of any entry or of the page itself, empties the whole list after asking you to confirm (Ctrl+Z puts it back).
@@ -325,7 +325,7 @@ Right-click an entry to rework the list without starting over:
 
 To paste into an empty list, or at the end of any list, right-click the Preset List page away from its entries: that menu has **Paste** (to the end of the list), **Add current preset**, **Populate list**, and **Clear list…**.
 
-The same commands are in the **Edit** menu, acting on the highlighted entry. You can also copy the preset on the Milkdrop Preset page's preset row, or a preset in the preset browser (right-click it). Paste on the preset row plays the copied preset as a preview without touching the list. Copy and paste work between layers and between projects: a pasted preset is copied into the project, like any other list preset. With the timeline trigger, every entry belongs to a clip in order, so inserting one moves each later preset on to the next clip, while pasting over or replacing keeps the rest in place.
+The same commands are in the **Edit** menu, acting on the highlighted entry. You can also copy the preset on the Milkdrop Preset page's preset row, or a preset in the preset browser (right-click it). Paste on the preset row plays the copied preset as a preview without touching the list. Copy and paste work between layers and between projects: a pasted preset is copied into the project, like any other list preset. On a layer whose presets change on each clip, every entry belongs to a clip, so you can paste over, replace, and reorder entries, but not add or remove them: add or delete clips on the timeline instead.
 
 Cleave keeps a copy of every preset in the list inside the project, so the project plays the same on another computer or after the original pack changes. The list still shows each preset under its own name, and previewing an entry takes the preset rows to the folder it came from, so the arrows and the preset browser carry on from there. If that file has since been moved, deleted, or edited, the preview shows the project's own copy instead, in the project's presets folder.
 
@@ -339,20 +339,15 @@ A red exclamation mark on a layer's navigator row, and in the icon line under th
 | --- | --- |
 | Preset switching is on, but the preset list is empty. | Add presets to the list, or use Populate list. |
 | Some or all of the presets in the list can't load. | Replace or remove the entries marked in the list. |
-| Switching follows the timeline, but the timeline is off, or the layer has no clips on it. | Turn the timeline on, add clips to the layer, or pick another trigger. |
+| Presets change on each clip, but the timeline is off, or the layer has no clips. | Turn the timeline on, add clips to the layer, or choose another change presets setting. |
+| Presets change on each clip, but some clips have no preset (for example, in a project from an earlier version of Cleave). | Use Populate list on the Preset List page, or choose a preset for each clip. |
 | The layer's preset folder is not found (moved, renamed, or left out of a restored project), whether or not switching is on. | Put the folder back, or choose another preset. |
 | Switching is off, and the layer's preset file is not found, or failed to load. | Put the file back, or choose another preset. |
 | The layer's stem is silent in this song (for example, vocals on an instrumental). | Pick another stem on the Compositing page. |
 
-When the layer works but there is something you should know, the exclamation mark is amber instead: a notice. Hover over it to see the notice, and click it to go to it. A red mark takes priority when a layer has both. A notice shows when:
-
-| Notice | What to do |
-| --- | --- |
-| Switching follows the timeline, but the preset list has more presets than the layer has clips, so the last ones never play. Clicking the mark selects the first of them. | Add clips to the layer, or remove the extra entries. Populate list makes one entry for each clip. |
-
 #### More than one problem
 
-When a layer has more than one problem or notice, hovering over the mark says Multiple problems (or Multiple notices) instead of naming them. A click still goes to the first one. To see them all, right-click the mark, or the layer's navigator row: **View all problems** at the top of the menu lists every problem, then every notice, each with its own red or amber mark. Choose one to go to the page and row where you fix it.
+When a layer has more than one problem, hovering over the mark says Multiple problems instead of naming them. A click still goes to the first one. To see them all, right-click the mark, or the layer's navigator row: **View all problems** at the top of the menu lists every problem. Choose one to go to the page and row where you fix it.
 
 #### Marks on preset rows
 
@@ -406,6 +401,8 @@ The timeline sequences your layers across the song. Without it, every enabled la
 
 Enable it with the on/off icon on the **Timeline** row in the navigator, and the **timeline strip** opens along the bottom of the window. While the timeline is on, it owns layer visibility and the layers' own on/off switches are ignored.
 
+The first time you turn it on, nothing on screen changes. Each layer that is on gets one clip for the whole song, and each layer whose presets change on a timer has its schedule laid out as clips at the same times, one per preset, and its presets then change on each clip (see [Presets on clips](#presets-on-clips)). A notification names the layers that changed. Ctrl+Z puts everything back.
+
 In the screenshot at the top of this guide, the strip (number 7) has a clip on layer 1 selected, with its details in the inspector.
 
 ### Generate a whole timeline
@@ -417,7 +414,7 @@ The fastest way to get started is to let Cleave build an arrangement. Choose **G
 - **density:** how busy the arrangement is.
 - **conductor:** optionally lets the stems' audio decide which layers lead each phrase and how bright each one is.
 - **snap** and **cut type:** how clip edges align to the beat grid and how layers transition.
-- **refill preset lists:** optionally rebuilds the preset list of each layer that switches on the timeline: by clip roles (offered once at least one preset in your library has a role), or shuffled or in order from each layer's preset folder.
+- **clip presets:** how each new clip gets its preset, on layers whose presets change on each clip: by clip roles (offered once at least one preset in your library has a role), or shuffled or in order from each layer's preset folder.
 
 Press H in the dialog for a full description of each option. You will get much better results if you [mark the song's structure](#song-markers) and [assign roles to your presets](#curating-your-presets) first.
 
@@ -462,6 +459,29 @@ Click a clip to select it and edit its details in the inspector.
 The pointer shows what a drag will do: a four-way arrow moves a clip, a bracket with an arrow trims one end, and a left-right arrow rolls a join.
 
 Each clip also has its own **blend** mode and **role**, set in the inspector or from the context menu.
+
+### Presets on clips
+
+When a layer's **change presets** setting is **each clip**, every clip on its row holds its own preset, and the strip writes the preset's name on the clip, shortened to fit. A clip whose opacity is too low to hold a line of text shows no name. Hover over a clip to see its full name.
+
+A clip either **starts** a new preset or **continues** the preset of the clip it touches before it. A clip after a gap always starts a new one. Splitting a clip gives two clips that share one preset, so the second shows a hooked arrow instead of a name, and the join between them is drawn fainter. Where clips start a new preset, the join is drawn solid.
+
+Select a clip to edit its preset in the inspector:
+
+| Row | What it does |
+| --- | --- |
+| preset | The preset the clip plays, shortened to fit (hover for the full name). Enter opens the preset browser to choose another; Left/Right picks another with the clip's role, or from the layer's preset folder when no preset has that role. |
+| starts | **new preset** or **continues**. Only a clip touching the one before can continue it. |
+
+The same choices are in the clip's right-click menu, under **Preset**.
+
+A new clip, whether you add it, record it, or Generate timeline builds it, starts a preset of its own: one with the clip's role, or one from the layer's preset folder. Moving, trimming, or deleting a clip never changes another clip's preset.
+
+The layer's Preset List page lists the same presets in clip order, with each clip's start time. Replacing, pasting over, or reordering entries there changes the clips' presets.
+
+When you choose **each clip** for a layer whose row has no clips of its own yet, its preset list is laid out as clips at the layer's preset duration. Otherwise, clips without a preset take the list's presets in order. Choosing it while the timeline is off turns the timeline on.
+
+On a layer whose presets change **on a timer**, the strip marks each preset change inside the clips with a faint line, so you can see where the presets change against the clips.
 
 A right-click on the time ruler offers Drop song marker, Undo, Redo, and a **Timeline** submenu holding Generate timeline, Snap clips, Snap clips to markers, Set cut type on clips, and Reset timeline.
 

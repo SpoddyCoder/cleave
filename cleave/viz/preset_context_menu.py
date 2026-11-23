@@ -32,6 +32,7 @@ from cleave.viz.context_menu import (
     ContextSubmenu,
     join_groups,
 )
+from cleave.viz.preset_list_controls import EACH_CLIP_LIST_HINT
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_spec import section_lock_blocks_mutation
 
@@ -230,9 +231,9 @@ def _list_edit_items(
             id="preset.remove",
             label="Remove from list",
             run=lambda: preset_list.remove(slot, index),
-            enabled=not locked,
+            enabled=not locked and _length_hint(controls, slot) is None,
             shortcut="Delete",
-            hint=_LOCK_HINT if locked else None,
+            hint=_LOCK_HINT if locked else _length_hint(controls, slot),
         ),
     )
 
@@ -245,7 +246,7 @@ def _clear_item(
     elif not controls.session.layers[slot].preset_list:
         hint = "The list is already empty"
     else:
-        hint = None
+        hint = _length_hint(controls, slot)
     return ContextMenuItem(
         id="preset.clear",
         label="Clear list…",
@@ -260,15 +261,16 @@ def _clipboard_items(
 ) -> tuple[ContextMenuEntry, ...]:
     """Cut, Copy, a Paste submenu, and Duplicate for list entry *index*."""
     hint = _LOCK_HINT if section_lock_blocks_mutation(controls.session, desc) else None
+    resize_hint = hint if hint is not None else _length_hint(controls, slot)
     clipboard = controls.preset_clipboard
     return (
         ContextMenuItem(
             id="preset.cut",
             label="Cut",
             run=lambda: clipboard.cut_entry(slot, index),
-            enabled=hint is None,
+            enabled=resize_hint is None,
             shortcut=CUT.shortcut,
-            hint=hint,
+            hint=resize_hint,
         ),
         ContextMenuItem(
             id="preset.copy",
@@ -281,17 +283,17 @@ def _clipboard_items(
             id="preset.duplicate",
             label="Duplicate",
             run=lambda: controls.preset_list.duplicate(slot, index),
-            enabled=hint is None,
+            enabled=resize_hint is None,
             shortcut=DUPLICATE.shortcut,
-            hint=hint,
+            hint=resize_hint,
         ),
     )
 
 
-def _insert_hint(controls: TuningControls, slot: str) -> str | None:
-    """Why an insert is worth a second look: later entries shift a place."""
-    if controls.session.layers[slot].preset_switching_trigger == "timeline":
-        return "Later presets move to the next clip"
+def _length_hint(controls: TuningControls, slot: str) -> str | None:
+    """Why the list cannot gain or lose an entry: it holds one preset per clip."""
+    if controls.preset_list.length_fixed(slot):
+        return EACH_CLIP_LIST_HINT
     return None
 
 
@@ -305,7 +307,8 @@ def _paste_submenu(
     else:
         hint = clipboard.paste_hint()
     ready = hint is None
-    insert_hint = _insert_hint(controls, slot) if ready else hint
+    insert_hint = _length_hint(controls, slot) if ready else hint
+    can_insert = insert_hint is None
     items = (
         ContextMenuItem(
             id="preset.paste_over",
@@ -319,14 +322,14 @@ def _paste_submenu(
             id="preset.paste_before",
             label="Before this entry",
             run=lambda: clipboard.paste_before(slot, index),
-            enabled=ready,
+            enabled=can_insert,
             hint=insert_hint,
         ),
         ContextMenuItem(
             id="preset.paste_after",
             label="After this entry",
             run=lambda: clipboard.paste_after(slot, index),
-            enabled=ready,
+            enabled=can_insert,
             shortcut=PASTE_AFTER.shortcut,
             hint=insert_hint,
         ),
@@ -355,8 +358,8 @@ def _fill_items(
             id="preset.insert_current",
             label="Insert after this entry",
             run=lambda: preset_list.insert_current_after(slot, index),
-            enabled=ready,
-            hint=_insert_hint(controls, slot) if ready else hint,
+            enabled=ready and _length_hint(controls, slot) is None,
+            hint=_length_hint(controls, slot) if ready else hint,
         ),
         _add_item(controls, desc, slot, label="Add to end of list"),
     )
@@ -428,6 +431,8 @@ def _add_item(
     hint = _fill_hint(controls, desc)
     if hint is None and controls.session.layers[slot].preset_switching != "on":
         hint = "Turn on preset switching first"
+    if hint is None:
+        hint = _length_hint(controls, slot)
     return ContextMenuItem(
         id="preset.add_current",
         label=label,

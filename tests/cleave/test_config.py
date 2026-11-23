@@ -1705,6 +1705,52 @@ def test_persist_timeline_cue_anchor_and_recast_round_trip() -> None:
     assert round_trip.lanes["layer_1"] == session.timeline.lanes["layer_1"]
 
 
+def test_persist_timeline_clip_preset_round_trips_relative_to_the_project(
+    tmp_path: Path,
+) -> None:
+    from cleave.preset_list_entry import PresetListEntry
+    from cleave.viz.session import TimelineRuntime
+
+    copy = tmp_path / "presets" / "a.milk"
+    preset = PresetListEntry(path=copy.as_posix(), source="/packs/a.milk")
+    session = TuningSession(
+        layer_z_order=list(DEFAULT_LAYER_SLOTS),
+        timeline=TimelineRuntime(
+            enabled=True,
+            lanes={
+                "layer_1": TimelineLane(
+                    baseline=0.0,
+                    cues=[SlotCue(t=0.0, level=1.0, preset=preset)],
+                ),
+            },
+        ),
+    )
+    cfg = CleaveConfig(
+        paths=PathsConfig(preset_root=Path("/tmp"), texture_paths=()),
+        layers={},
+        editor=EditorConfig(),
+        config_path=tmp_path / "cleave-viz.yaml",
+        user_config_path=Path("/tmp/user.yaml"),
+        layer_z_order=list(DEFAULT_LAYER_SLOTS),
+    )
+    payload = persist_timeline(
+        PersistCtx(cfg=cfg, session=session, cfg_dir=tmp_path)
+    )
+    assert payload["lanes"]["layer_1"]["cues"] == [
+        {
+            "t": 0.0,
+            "level": 1.0,
+            "preset": {"path": "presets/a.milk", "source": "/packs/a.milk"},
+        },
+    ]
+    round_trip = parse_timeline_section(
+        {"timeline": payload},
+        ParseCtx(layer_slots=DEFAULT_LAYER_SLOTS, cfg_dir=tmp_path),
+    )
+    assert round_trip is not None
+    assert round_trip.lanes["layer_1"] == session.timeline.lanes["layer_1"]
+
+
 def test_parse_timeline_reads_cue_recast() -> None:
     timeline = parse_timeline_section(
         {

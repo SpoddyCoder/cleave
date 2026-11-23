@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -27,7 +29,6 @@ from cleave.viz.menu_rows import context_menu_row_views
 from cleave.viz.navigator_context_menu import navigator_node_menu_entries
 from cleave.viz.navigator import (
     TOGGLE_ENABLED,
-    TOGGLE_NOTICE,
     TOGGLE_WARN,
     build_navigator,
     ProblemTarget,
@@ -144,19 +145,20 @@ def test_timeline_trigger_needs_the_timeline_on_and_clips_on_the_layer() -> None
     session = _session(layer)
     session.timeline.enabled = False
     assert _messages(session) == [
-        "Switching follows the timeline, but the timeline is off"
+        "Presets change on each clip, but the timeline is off"
     ]
     session.timeline.enabled = True
+    session.timeline.lanes["layer_1"] = TimelineLane(baseline=0.0, cues=[])
     assert _messages(session) == [
-        "Switching follows the timeline, but this layer has no clips on it"
+        "Presets change on each clip, but this layer has no clips"
     ]
     session.timeline.lanes["layer_1"] = TimelineLane(
-        baseline=0.0, cues=[SlotCue(t=1.0, level=1.0)]
+        baseline=0.0, cues=[SlotCue(t=1.0, level=1.0, preset=entries(GOOD)[0])]
     )
     assert layer_problems(session, "layer_1") == ()
     # A layer that is on from the start is one clip for the whole song.
     session.timeline.lanes["layer_1"] = TimelineLane(baseline=1.0, cues=[])
-    assert layer_problems(session, "layer_1") == ()
+    assert _messages(session) == ["1 clip has no preset"]
 
 
 def _timeline_layer(clip_starts: tuple[float, ...], presets: int) -> TuningSession:
@@ -173,63 +175,24 @@ def _timeline_layer(clip_starts: tuple[float, ...], presets: int) -> TuningSessi
     return session
 
 
-def test_more_presets_than_timeline_clips_is_a_notice_not_a_problem() -> None:
-    session = _timeline_layer((1.0,), presets=3)
-    assert layer_problems(session, "layer_1") == ()
-    (notice,) = layer_notices(session, "layer_1")
-    assert notice.page is ProblemPage.PRESET_LIST
-    assert notice.message == (
-        "Preset switching is on, following the timeline\n"
-        "3 presets in the list but only 1 clip on the timeline: the last 2 never play"
+def test_each_clip_counts_clips_without_a_preset() -> None:
+    session = _timeline_layer((1.0, 4.0), presets=0)
+    assert _messages(session) == ["2 clips have no preset"]
+    (problem,) = layer_problems(session, "layer_1")
+    assert problem.page is ProblemPage.PRESET_LIST
+    lane = session.timeline.lanes["layer_1"]
+    session.timeline.lanes["layer_1"] = TimelineLane(
+        baseline=0.0,
+        cues=[
+            replace(cue, preset=entries(GOOD)[0]) if cue.t == 1.0 else cue
+            for cue in lane.cues
+        ],
     )
-    assert notice.preset_index == 1
-    two = _timeline_layer((1.0, 4.0), presets=3)
-    (notice,) = layer_notices(two, "layer_1")
-    assert notice.message.endswith("3 presets in the list but only 2 clips on the timeline: the last one never plays")
+    assert _messages(session) == ["1 clip has no preset"]
 
 
-def test_a_whole_song_clip_with_a_long_list_is_a_notice() -> None:
-    session = _timeline_layer((), presets=14)
-    session.timeline.lanes["layer_1"] = TimelineLane(baseline=1.0, cues=[])
-    assert layer_problems(session, "layer_1") == ()
-    (notice,) = layer_notices(session, "layer_1")
-    assert notice.message.endswith("14 presets in the list but only 1 clip on the timeline: the last 13 never play")
-
-
-def test_no_notice_when_every_preset_gets_a_clip_or_switching_is_not_timeline() -> None:
-    assert layer_notices(_timeline_layer((1.0, 4.0), presets=2), "layer_1") == ()
-    assert layer_notices(_timeline_layer((1.0,), presets=1), "layer_1") == ()
-    session = _timeline_layer((1.0,), presets=3)
-    session.layers["layer_1"].preset_switching_trigger = "timer"
-    assert layer_notices(session, "layer_1") == ()
-    session.layers["layer_1"].preset_switching_trigger = "timeline"
-    session.timeline.enabled = False
-    assert layer_notices(session, "layer_1") == ()
-
-
-def test_a_notice_lights_an_amber_icon_that_a_problem_replaces() -> None:
-    session = _timeline_layer((1.0,), presets=3)
-    toggles = {
-        node.id: node for node in build_navigator(session, {"layers"})
-    }[layer_node_id("layer_1")].toggles
-    assert toggles[0].id == TOGGLE_NOTICE
-    assert toggles[0].detail.split("\n")[-1] == "Click to go to the first notice"
-    page = layer_page_node_id("layer_1", "preset_list")
-    assert page_toggles(session, page)[0].toggle.id == TOGGLE_NOTICE
-    assert first_problem_target(session, "layer_1") == ProblemTarget(
-        page,
-        RowDescriptor(RowKind.TRACK_PRESET_LIST_ITEM, slot="layer_1", preset_index=1),
-    )
-    session.silent_stems = frozenset({"drums"})
-    toggles = {
-        node.id: node for node in build_navigator(session, {"layers"})
-    }[layer_node_id("layer_1")].toggles
-    assert toggles[0].id == TOGGLE_WARN
-    assert toggles[0].detail.split("\n") == [
-        "Multiple problems",
-        "Click to go to the first problem",
-        "Right-click to view all",
-    ]
+def test_each_clip_has_no_extra_presets_notice() -> None:
+    assert layer_notices(_timeline_layer((1.0,), presets=3), "layer_1") == ()
 
 
 def test_a_silent_driving_stem_is_a_problem() -> None:
@@ -281,16 +244,6 @@ def test_tooltip_names_one_issue_or_says_there_are_several() -> None:
         "Click to go to the first problem",
         "Right-click to view all",
     ]
-
-
-def test_several_notices_and_no_problem_say_multiple_notices() -> None:
-    session = _timeline_layer((1.0,), presets=3)
-    one = layer_issues(session, "layer_1")
-    issues = type(one)(notices=one.notices * 2)
-    assert layer_issues_tooltip(issues).split("\n")[0] == "Multiple notices"
-    assert layer_issues_tooltip(issues).split("\n")[1] == (
-        "Click to go to the first notice"
-    )
 
 
 def test_a_missing_preset_folder_is_the_one_problem_and_marks_the_directory_row() -> None:
@@ -349,8 +302,31 @@ def test_view_state_marks_a_missing_folder_on_the_directory_row_only() -> None:
     ) is None
 
 
-def test_issue_target_reaches_any_issue_not_only_the_first() -> None:
-    session = _timeline_layer((1.0,), presets=3)
+def _with_notice(monkeypatch) -> None:
+    """Stand in a notice, as no layer state raises one at present."""
+    import cleave.viz.layer_problems as problems
+
+    monkeypatch.setattr(
+        problems,
+        "layer_notices",
+        lambda _session, _slot: (
+            problems.LayerNotice(
+                "A notice\nabout this layer",
+                ProblemPage.PRESET_LIST,
+                RowKind.TRACK_PRESET_LIST_ITEM,
+                1,
+            ),
+        ),
+    )
+
+
+def test_issue_target_reaches_any_issue_not_only_the_first(monkeypatch) -> None:
+    _with_notice(monkeypatch)
+    layer = _layer()
+    layer.preset_switching = "on"
+    layer.preset_switching_trigger = "timer"
+    layer.preset_list = entries(GOOD)
+    session = _session(layer)
     session.silent_stems = frozenset({"drums"})
     problem, notice = layer_issues(session, "layer_1").items()
     assert issue_target(session, "layer_1", problem) == ProblemTarget(
@@ -398,25 +374,14 @@ def test_view_all_problems_leads_the_layer_menu_only_with_several_issues() -> No
     assert focus.inspector_cursor == RowDescriptor(RowKind.TRACK_STEM, slot="layer_1")
 
 
-def test_notices_list_after_problems_with_an_amber_sign_on_one_line() -> None:
+def test_notices_list_after_problems_with_an_amber_sign_on_one_line(monkeypatch) -> None:
+    _with_notice(monkeypatch)
     controls = make_controls(("layer_1",))
-    layer = controls.session.layers["layer_1"]
-    layer.preset_switching = "on"
-    layer.preset_switching_trigger = "timeline"
-    layer.preset_list = entries(GOOD) * 3
-    controls.session.preset_health.check_on_disk(controls.session)
-    controls.session.timeline.enabled = True
-    controls.session.timeline.lanes["layer_1"] = TimelineLane(
-        baseline=0.0, cues=[SlotCue(t=1.0, level=1.0), SlotCue(t=2.0, level=0.0)]
-    )
     controls.session.silent_stems = frozenset({"drums"})
     submenu = _menu(controls)[0]
     assert isinstance(submenu, ContextSubmenu)
     assert [item.icon for item in submenu.items] == [MenuIcon.PROBLEM, MenuIcon.NOTICE]
-    assert submenu.items[1].label == (
-        "Preset switching is on, following the timeline: "
-        "3 presets in the list but only 1 clip on the timeline: the last 2 never play"
-    )
+    assert submenu.items[1].label == "A notice: about this layer"
 
 
 def test_a_problem_puts_a_warning_icon_first_on_the_layer_and_its_pages() -> None:

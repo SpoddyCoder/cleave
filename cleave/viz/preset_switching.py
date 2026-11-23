@@ -25,7 +25,8 @@ from cleave.projectm_playlist import ProjectMPlaylist
 from cleave.timeline import (
     TimelineFadeGroup,
     empty_lane,
-    lane_on_transition_count,
+    fold_lane_baseline,
+    lane_on_transition_cues,
 )
 from cleave.viz.layer import StemLayer
 
@@ -69,16 +70,6 @@ def _apply_projectm_timing(
 def _clear_list_rotation(layer: StemLayer) -> None:
     layer.preset_rotation = None
     layer.list_switch_index = 0
-
-
-def _timeline_list_index(on_transition_count: int) -> int:
-    """0-based list index for timeline switching.
-
-    ``lane_on_transition_count`` is how many clip switches have fired
-    (1 once the first clip starts, from ``0.0`` when the lane opens on).
-    Populate builds one preset per clip, so the first clip maps to index 0.
-    """
-    return max(0, int(on_transition_count) - 1)
 
 
 def _preset_paths(preset_list: list[PresetListEntry] | None) -> list[Path]:
@@ -342,22 +333,40 @@ def advance_preset_switching(
     _advance_timer_indexed(session, layers_by_slot, t_sec)
 
 
-def advance_timeline_preset_switching(
+def clip_switch_at(
     session,
-    layers_by_slot: dict[str, StemLayer],
+    slot: str,
     t_sec: float,
-) -> None:
-    """Compatibility alias for frame ticks; advances any list-indexed switching."""
-    advance_preset_switching(session, layers_by_slot, t_sec)
+) -> tuple[int, Path | None]:
+    """The each-clip schedule at ``t_sec``: list index and the preset to play.
 
-
-def resync_timeline_preset_switching(
-    session,
-    layers_by_slot: dict[str, StemLayer],
-    t_sec: float,
-) -> None:
-    """Resync list-indexed layers after seek."""
-    advance_preset_switching(session, layers_by_slot, t_sec)
+    The preset is the one held by the last clip that started a preset at or
+    before ``t_sec`` (or the first such clip, before any has started). The
+    index counts the clips with a preset before it, matching the layer's
+    preset list, which mirrors the clips' presets in order. A clip without
+    a preset gives ``None``, so the layer keeps what it shows.
+    """
+    hard_cut_fades, soft_cut_fades = _timeline_fade_groups(session)
+    runtime = session.layers[slot]
+    lane = fold_lane_baseline(
+        session.timeline.lanes.get(slot) or empty_lane(),
+        1.0 if runtime.enabled else 0.0,
+    )
+    switches = lane_on_transition_cues(
+        lane,
+        hard_cut_fades=hard_cut_fades,
+        soft_cut_fades=soft_cut_fades,
+    )
+    if not switches:
+        return 0, None
+    current = 0
+    for position, (trigger, _cue) in enumerate(switches):
+        if trigger > t_sec:
+            break
+        current = position
+    cue = switches[current][1]
+    index = sum(1 for _t, earlier in switches[:current] if earlier.preset is not None)
+    return index, None if cue.preset is None else cue.preset.file
 
 
 def _advance_timeline_indexed(
@@ -367,29 +376,15 @@ def _advance_timeline_indexed(
 ) -> None:
     if not session.timeline.enabled:
         return
-    hard_cut_fades, soft_cut_fades = _timeline_fade_groups(session)
-    tl = session.timeline
-
     for slot, layer in layers_by_slot.items():
         runtime = session.layers[slot]
         if runtime.preset_switching != "on":
             continue
         if runtime.preset_switching_trigger != "timeline":
             continue
-        rotation = layer.preset_rotation
-        if rotation is None:
+        if layer.preset_rotation is None:
             continue
-        lane = tl.lanes.get(slot) or empty_lane()
-        count = lane_on_transition_count(
-            lane,
-            t_sec,
-            hard_cut_fades=hard_cut_fades,
-            soft_cut_fades=soft_cut_fades,
-        )
-        index = _timeline_list_index(count)
-        if index == layer.list_switch_index:
-            continue
-        path = rotation.path_for(index)
+        index, path = clip_switch_at(session, slot, t_sec)
         layer.list_switch_index = index
         if layer.switching_paused or path is None:
             continue

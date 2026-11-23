@@ -77,7 +77,7 @@ _PATTERN_MASK_TRANSITION_SEC = 1.0
 # tidied, then what happens to the layers' preset lists.
 _ARRANGEMENT_SECTION = "Arrangement"
 _CUES_SECTION = "Clip timing and cuts"
-_PRESETS_SECTION = "Preset lists"
+_PRESETS_SECTION = "Presets"
 
 _KIND_BUILDERS = {
     "breathing": (build_breathing_cues, "Applied Breathing timeline preset"),
@@ -88,7 +88,7 @@ _KIND_BUILDERS = {
 
 
 _GENERATE_HELP = (
-    "Builds a new timeline from these settings, replacing the current clips. Arrangement decides which layers play when, clip timing and cuts then tidy every generated clip, and preset lists can be refilled to suit.",
+    "Builds a new timeline from these settings, replacing the current clips. Arrangement decides which layers play when, clip timing and cuts then tidy every generated clip, and each layer whose presets change on each clip gets a preset for every new clip.",
     "In layers mode, each crescendo song marker gets a crescendo. The project remembers these settings for next time.",
 )
 _CHARACTER_HELP = ("The shape of the arrangement: which layers play together, and when.",)
@@ -114,13 +114,12 @@ _TIMELINE_CUTS_OPTION_HELP = {
     "none": "keep the cut each clip edge was made with.",
 }
 _REPOPULATE_HELP = (
-    "Rebuilds the preset list of every layer that switches presets on the timeline trigger.",
+    "How each new clip gets its preset, on every layer whose presets change on each clip.",
 )
 _REPOPULATE_OPTION_HELP = {
-    "no": "keep the preset lists.",
-    "cue roles": "one preset per clip, picked for that clip's role.",
-    "directory random": "fill from the layer's preset directory, shuffled.",
-    "directory sequential": "fill from the layer's preset directory, in order.",
+    "cue roles": "a preset picked for each clip's role.",
+    "directory random": "presets from the layer's preset directory, shuffled.",
+    "directory sequential": "presets from the layer's preset directory, in order.",
 }
 _CONDUCTOR_HELP = (
     "Uses the stems' audio to decide which layers lead each phrase and how bright each one is. In layers mode, plain song markers also get an accent. It needs the song's audio analysis and is skipped without it.",
@@ -305,7 +304,7 @@ class TimelinePresetController:
                     ),
                     _choice_field(
                         "repopulate",
-                        "refill preset lists",
+                        "clip presets",
                         repopulate_options,
                         repopulate_current,
                         timeline_preset_repopulate_display,
@@ -482,10 +481,7 @@ class TimelinePresetController:
         self._apply_timeline_cuts(built, marker_times, tl.timeline_preset_timeline_cuts)
         for slot in slots:
             tl.lanes[slot] = built[slot]
-        if (
-            tl.timeline_preset_repopulate != "no"
-            and self._on_repopulate is not None
-        ):
+        if self._on_repopulate is not None:
             self._on_repopulate()
         if conductor_skipped:
             self._notify("No signals; conductor skipped")

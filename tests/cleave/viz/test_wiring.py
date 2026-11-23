@@ -163,7 +163,7 @@ def test_on_seek_reapplies_projectm_preset_switching() -> None:
     layer = _layer(session)
     layer.projectm_playlist = MagicMock()
     with patch(f"{_FACTORY}.reapply_projectm_preset_switching") as mock_reapply:
-        with patch(f"{_FACTORY}.resync_timeline_preset_switching"):
+        with patch(f"{_FACTORY}.advance_preset_switching"):
             controls = _make_controls(session, layer)
             bindings = controls._layer_bindings
             assert bindings is not None

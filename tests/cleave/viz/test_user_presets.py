@@ -170,6 +170,29 @@ def test_cleanup_keeps_milk_referenced_by_cleave_viz(tmp_path: Path) -> None:
     assert kept.exists()
 
 
+def test_cleanup_keeps_milk_referenced_only_by_a_timeline_clip(tmp_path: Path) -> None:
+    presets = tmp_path / "presets"
+    presets.mkdir()
+    kept = presets / "clip.milk"
+    kept.write_text("x", encoding="utf-8")
+    (tmp_path / "cleave-viz.yaml").write_text(
+        "layers:\n"
+        "  layer_1: {}\n"
+        "timeline:\n"
+        "  lanes:\n"
+        "    layer_1:\n"
+        "      cues:\n"
+        "        - t: 0.0\n"
+        "          level: 1.0\n"
+        "          preset:\n"
+        "            path: presets/clip.milk\n",
+        encoding="utf-8",
+    )
+
+    assert cleanup_unreferenced_user_presets(tmp_path) == []
+    assert kept.exists()
+
+
 def test_cleanup_keeps_milk_referenced_only_by_unnamed_yaml(tmp_path: Path) -> None:
     presets = tmp_path / "presets"
     presets.mkdir()

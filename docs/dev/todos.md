@@ -27,7 +27,6 @@ Rich cue levels, per-cue blend/role, stem conductor, visual limiter, and manual 
 The strip edits clips (move, trim, split, cut in and cut out), and record keeps authored levels: [plans-completed/timeline-clips-plan.md](plans-completed/timeline-clips-plan.md), finished. Still open from that plan:
 
 - **Bulk command names.** Snap cues, Snap cues to markers, and Set cut type on cues act on clip edges now; rename them for consistent wording.
-- **Recast toggle.** A control on butted clips for whether the boundary switches the preset.
 - **Multi-select, ripple delete, and copy/paste of clips.**
 
 ---

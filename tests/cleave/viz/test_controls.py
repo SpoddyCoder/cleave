@@ -1640,7 +1640,7 @@ def test_generate_opens_a_form_seeded_from_the_session() -> None:
         ("snap to grid", "none"),
         ("snap to song markers", "none"),
         ("cut type", "by marker"),
-        ("refill preset lists", "no, keep the lists"),
+        ("clip presets", "shuffled (each layer's directory)"),
     ]
     assert [row.heading for row in modal_view.form_rows] == [
         "Arrangement",
@@ -1650,7 +1650,7 @@ def test_generate_opens_a_form_seeded_from_the_session() -> None:
         "Clip timing and cuts",
         None,
         None,
-        "Preset lists",
+        "Presets",
     ]
     assert all(row.indented for row in modal_view.form_rows)
 
@@ -1663,10 +1663,10 @@ def test_generate_refill_omits_clip_roles_without_role_presets() -> None:
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
     refill = next(
-        row for row in modal_view.form_rows if row.label == "refill preset lists"
+        row for row in modal_view.form_rows if row.label == "clip presets"
     )
     assert "clip roles" not in refill.options
-    assert refill.options[refill.value] == "no, keep the lists"
+    assert refill.options[refill.value] == "shuffled (each layer's directory)"
 
 
 def test_generate_names_the_cues_it_replaces_under_the_title() -> None:
@@ -5130,27 +5130,41 @@ def test_timeline_trigger_hides_duration_row() -> None:
     assert RowKind.TRACK_PRESET_DURATION not in _inspector_kinds(controls, "layer_1")
 
 
-def test_timeline_trigger_while_disabled_shows_warning() -> None:
-    from cleave.viz.layer_mutations import NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT
-    from tests.support.viz import make_controls, keydown, noop_layer_bindings
+def test_each_clip_while_timeline_off_turns_it_on_and_lays_out_list() -> None:
+    from tests.support.viz import keydown, noop_layer_bindings
     import pygame
     from cleave.viz.row_kinds import RowDescriptor, RowKind
     from cleave.viz.focus_nav import MainFocus
 
-    controls = make_controls(("layer_1",))
+    controls = make_controls(("layer_1",), duration_sec=120.0)
     controls._layer_bindings = noop_layer_bindings()
-    controls.session.layers["layer_1"].preset_switching = "on"
+    layer = controls.session.layers["layer_1"]
+    layer.preset_switching = "on"
+    layer.preset_switching_trigger = "projectm"
+    layer.preset_duration = 30.0
+    layer.preset_list = entries("a.milk", "b.milk")
     controls.session.timeline.enabled = False
-    controls.focus_cursor = MainFocus(
-        RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_TRIGGER, slot="layer_1")
-    )
-    controls.session.layers["layer_1"].preset_switching_trigger = "projectm"
-    press_layer_row(controls, RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_TRIGGER, slot="layer_1"), keydown(pygame.K_RIGHT))
-    assert controls.session.layers["layer_1"].preset_switching_trigger == "timeline"
+    desc = RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_TRIGGER, slot="layer_1")
+    controls.focus_cursor = MainFocus(desc)
+    press_layer_row(controls, desc, keydown(pygame.K_RIGHT))
+    assert layer.preset_switching_trigger == "timeline"
+    assert controls.session.timeline.enabled
+    cues = controls.session.timeline.lanes["layer_1"].cues
+    assert [cue.t for cue in cues] == [0.0, 30.0, 60.0, 90.0]
+    assert [cue.preset.display_name for cue in cues] == [
+        "a.milk", "b.milk", "a.milk", "b.milk",
+    ]
+    assert [entry.display_name for entry in layer.preset_list] == [
+        "a.milk", "b.milk", "a.milk", "b.milk",
+    ]
     view = controls.build_view_state(paused=False)
     assert view.notification_message == (
-        f"Layer 1: {NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT}"
+        "Layer 1: 4 clips laid out from the preset list, 30s each"
     )
+    assert controls.edit_history.undo() is not None
+    assert layer.preset_switching_trigger == "projectm"
+    assert not controls.session.timeline.enabled
+    assert [entry.display_name for entry in layer.preset_list] == ["a.milk", "b.milk"]
 
 
 def test_populate_modal_options_keyed_by_timeline_trigger() -> None:
@@ -5163,7 +5177,7 @@ def test_populate_modal_options_keyed_by_timeline_trigger() -> None:
     view = controls.modal_host.view_state()
     assert view is not None
     assert view.message == "Populate preset list"
-    assert view.body == "Replaces the whole list with 1 preset."
+    assert view.body == "Gives the layer's clip a new preset."
     # No preset in the library has a role, so clip roles is not offered.
     labels = list(view.form_rows[0].options)
     assert labels == [
@@ -5200,7 +5214,7 @@ def test_step_preset_duration_toasts_when_list_too_short() -> None:
     assert noted == ["Layer 1: Preset list may need more presets"]
 
 
-def test_cycle_preset_switching_trigger_toasts_when_list_nonempty() -> None:
+def test_cycle_preset_switching_trigger_between_list_triggers_is_quiet() -> None:
     controls = make_controls(("layer_1",))
     layer = controls.session.layers["layer_1"]
     layer.preset_switching = "on"
@@ -5209,24 +5223,8 @@ def test_cycle_preset_switching_trigger_toasts_when_list_nonempty() -> None:
     noted: list[str] = []
     controls.show_notification = noted.append  # type: ignore[method-assign]
     controls.layer_mutations.step_preset_switching_trigger("layer_1", delta=1)
-    assert layer.preset_switching_trigger != "timer"
-    assert noted == ["Layer 1: Preset list may need adjusting"]
-
-
-def test_cycle_preset_switching_trigger_skips_list_toast_for_timeline_disabled() -> None:
-    from cleave.viz.layer_mutations import NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT
-
-    controls = make_controls(("layer_1",))
-    layer = controls.session.layers["layer_1"]
-    layer.preset_switching = "on"
-    layer.preset_switching_trigger = "projectm"
-    layer.preset_list = entries("a.milk")
-    controls.session.timeline.enabled = False
-    noted: list[str] = []
-    controls.show_notification = noted.append  # type: ignore[method-assign]
-    controls.layer_mutations.step_preset_switching_trigger("layer_1", delta=1)
-    assert layer.preset_switching_trigger == "timeline"
-    assert noted == [f"Layer 1: {NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT}"]
+    assert layer.preset_switching_trigger == "projectm"
+    assert noted == []
 
 
 def test_settings_highlight_new_page_toggles_and_writes_user_config(

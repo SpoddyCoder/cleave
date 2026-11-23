@@ -260,20 +260,6 @@ def test_repopulate_preset_lists_cue_roles(tmp_path: Path) -> None:
     assert Path(session.layers["layer_1"].preset_list[0]).name == "accent.milk"
 
 
-def test_repopulate_preset_lists_no_is_noop(tmp_path: Path) -> None:
-    session = _session(tmp_path, trigger="timeline", timeline_enabled=True)
-    browse = session.layers["layer_1"].playlist.current_dir
-    (browse / "a.milk").write_text("MILK")
-    repopulate_preset_lists(
-        session,
-        mode="no",
-        project_dir=tmp_path,
-        catalog=UNFILTERED_CATALOG,
-        rng=random.Random(0),
-    )
-    assert session.layers["layer_1"].preset_list == []
-
-
 def test_repopulate_skips_layers_with_switching_off(tmp_path: Path) -> None:
     session = _session(tmp_path, trigger="timeline", timeline_enabled=True)
     session.layers["layer_1"].preset_switching = "off"

@@ -664,10 +664,26 @@ def _timeline_clip_selected(state: TuningViewState, desc: RowDescriptor) -> bool
     return desc.slot is not None and desc.slot in state.timeline.selected_clips
 
 
+def _timeline_clip_holds_preset(state: TuningViewState, desc: RowDescriptor) -> bool:
+    return desc.slot is not None and desc.slot in state.timeline.selected_clip_presets
+
+
+# Rows for the selected clip's preset, on a layer whose presets change on
+# each clip. Starts stays listed and draws disabled on a clip after a gap.
+TIMELINE_CLIP_PRESET_ROWS = ConditionalRowsDef(
+    name="timeline_clip_holds_preset",
+    predicate=_timeline_clip_holds_preset,
+    children=(
+        SectionNode(leaf_kind=RowKind.TIMELINE_CLIP_PRESET),
+        SectionNode(leaf_kind=RowKind.TIMELINE_CLIP_STARTS),
+    ),
+)
+
 TIMELINE_CLIP_SELECTED = ConditionalRowsDef(
     name="timeline_clip_selected",
     predicate=_timeline_clip_selected,
     children=(
+        SectionNode(conditional=TIMELINE_CLIP_PRESET_ROWS),
         SectionNode(leaf_kind=RowKind.TIMELINE_CLIP_START),
         SectionNode(leaf_kind=RowKind.TIMELINE_CLIP_END),
         SectionNode(leaf_kind=RowKind.TIMELINE_CLIP_OPACITY),
@@ -850,6 +866,8 @@ TIMELINE_SECTION_KINDS = frozenset(
         RowKind.TIMELINE_CLIP_ROLE,
         RowKind.TIMELINE_CLIP_CUT_IN,
         RowKind.TIMELINE_CLIP_CUT_OUT,
+        RowKind.TIMELINE_CLIP_PRESET,
+        RowKind.TIMELINE_CLIP_STARTS,
     }
 )
 

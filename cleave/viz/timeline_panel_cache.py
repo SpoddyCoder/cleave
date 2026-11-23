@@ -22,6 +22,12 @@ if TYPE_CHECKING:
     from cleave.viz.timeline_strip_state import TimelineViewState
 
 
+# A cue's drawn fields: time, level, blend, role, cut, recast, anchor, preset.
+CueFingerprint = tuple[
+    float, float, str | None, str | None, str | None, bool, bool, str | None
+]
+
+
 @dataclass(frozen=True)
 class TimelineStaticSignature:
     """Everything affecting strip chrome except live transport/playhead.
@@ -36,7 +42,7 @@ class TimelineStaticSignature:
         tuple[
             str,
             float | None,
-            tuple[tuple[float, float, str | None, str | None, str | None], ...],
+            tuple[CueFingerprint, ...],
         ],
         ...,
     ]
@@ -55,7 +61,7 @@ class TimelineStaticSignature:
     record_slot_start_sec: tuple[tuple[str, float], ...]
     record_baseline: tuple[tuple[str, float], ...]
     record_buffer_fingerprint: tuple[
-        tuple[str, tuple[tuple[float, float, str | None, str | None, str | None], ...]],
+        tuple[str, tuple[CueFingerprint, ...]],
         ...,
     ]
     record_high_water_mark: float | None
@@ -80,6 +86,8 @@ class TimelineStaticSignature:
     locked: bool
     view_start_sec: float
     view_end_sec: float | None
+    preset_triggers: tuple[tuple[str, str], ...]
+    preset_periods: tuple[tuple[str, float], ...]
     ui_scale_generation: int
     palette_generation: int
 
@@ -97,16 +105,26 @@ class TimelinePanelCache:
     last_glyph_rects: tuple[tuple[int, int, int, int], ...] = ()
 
 
-def _slot_cues_fingerprint(
-    cues: list[SlotCue],
-) -> tuple[tuple[float, float, str | None, str | None, str | None], ...]:
-    return tuple((cue.t, cue.level, cue.blend, cue.role, cue.cut) for cue in cues)
+def _slot_cues_fingerprint(cues: list[SlotCue]) -> tuple[CueFingerprint, ...]:
+    return tuple(
+        (
+            cue.t,
+            cue.level,
+            cue.blend,
+            cue.role,
+            cue.cut,
+            cue.recast,
+            cue.anchor,
+            None if cue.preset is None else cue.preset.path,
+        )
+        for cue in cues
+    )
 
 
 def _lane_fingerprint(
     lane: TimelineLane,
 ) -> tuple[
-    float | None, tuple[tuple[float, float, str | None, str | None, str | None], ...]
+    float | None, tuple[CueFingerprint, ...]
 ]:
     return (lane.baseline, _slot_cues_fingerprint(lane.cues))
 
@@ -117,7 +135,7 @@ def _lanes_fingerprint(
     tuple[
         str,
         float | None,
-        tuple[tuple[float, float, str | None, str | None, str | None], ...],
+        tuple[CueFingerprint, ...],
     ],
     ...,
 ]:
@@ -130,7 +148,7 @@ def _lanes_fingerprint(
 def _record_buffer_fingerprint(
     record_buffer: dict[str, list[SlotCue]],
 ) -> tuple[
-    tuple[str, tuple[tuple[float, float, str | None, str | None, str | None], ...]],
+    tuple[str, tuple[CueFingerprint, ...]],
     ...,
 ]:
     return tuple(
@@ -186,6 +204,8 @@ def timeline_static_signature(
         locked=state.locked,
         view_start_sec=state.view_start_sec,
         view_end_sec=state.view_end_sec,
+        preset_triggers=tuple(sorted(state.preset_triggers.items())),
+        preset_periods=tuple(sorted(state.preset_periods.items())),
         ui_scale_generation=ui_scale_generation(),
         palette_generation=palette_generation(),
     )

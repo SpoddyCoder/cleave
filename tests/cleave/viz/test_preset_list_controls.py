@@ -254,7 +254,7 @@ def test_prompt_populate_timeline_trigger_includes_cue_roles() -> None:
         view = modal.view_state()
         assert view is not None
         assert view.message == "Populate preset list"
-        assert view.body == "Replaces the whole list with 1 preset."
+        assert view.body == "Gives the layer's clip a new preset."
         assert view.options == ("Populate", "Cancel")
         assert view.form_rows[0].options == (
             "clip roles",

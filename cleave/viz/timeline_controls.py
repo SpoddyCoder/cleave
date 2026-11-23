@@ -94,6 +94,7 @@ class TimelineControls:
         on_focus_row: Callable[[int], None] | None = None,
         on_select_song_marker: Callable[[int], None] | None = None,
         on_seek: Callable[[float], None] | None = None,
+        on_browse_clip_preset: Callable[[str], None] | None = None,
         on_notification: Callable[[str], None] | None = None,
         beat_times: Sequence[float] = (),
         bar_times: Sequence[float] = (),
@@ -101,6 +102,7 @@ class TimelineControls:
         layer_mutations: LayerMutations | None = None,
     ) -> None:
         self.session = session
+        self._on_browse_clip_preset = on_browse_clip_preset
         self.layer_mutations = (
             layer_mutations
             if layer_mutations is not None
@@ -376,6 +378,11 @@ class TimelineControls:
 
     def playhead_sec(self) -> float:
         return current_sec(self.playback, self.duration_sec)
+
+    def browse_clip_preset(self, slot: str) -> None:
+        """Open the preset browser to replace *slot*'s selected clip's preset."""
+        if self._on_browse_clip_preset is not None:
+            self._on_browse_clip_preset(slot)
 
     def split_at_playhead(self) -> None:
         """Split the focused row's clip under the playhead in two (Ctrl+K)."""

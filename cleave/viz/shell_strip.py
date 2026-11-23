@@ -10,6 +10,13 @@ from cleave.viz.shell_context import ShellContext
 from cleave.viz.shell_focus import ShellRegion
 from cleave.viz.shell_widgets import rect_has_point
 from cleave.viz.timeline_pointer import TimelinePointer
+from cleave.timeline import (
+    TimelineClip,
+    clip_shown_preset,
+    clip_starting_at,
+    clip_starts_preset,
+)
+from cleave.viz.clip_presets import is_each_clip
 from cleave.viz.tooltips import show_tooltip
 
 
@@ -36,6 +43,15 @@ def strip_eye_tooltip(*, overridden: bool, recording: bool, armed: bool) -> str:
     if overridden:
         return "Override: click to show / hide"
     return "Show / hide, taking over from the timeline"
+
+
+def clip_preset_tooltip(clips: list[TimelineClip], clip: TimelineClip) -> str:
+    """The preset an each-clip clip plays, and whether it starts or continues it."""
+    preset = clip_shown_preset(clips, clip)
+    name = "no preset" if preset is None else preset.display_name
+    if clip_starts_preset(clips, clip):
+        return f"Starts {name}"
+    return f"Continues {name}"
 
 
 def strip_release_tooltip(*, recording: bool) -> str:
@@ -116,6 +132,7 @@ class StripPointerRouter:
             return
         target, row = hover
         if target not in ("arm", "solo", "eye", "release") or row is None:
+            self._show_clip_tooltip()
             return
         z_order = session.layer_z_order
         if not 0 <= row < len(z_order):
@@ -141,6 +158,22 @@ class StripPointerRouter:
         else:
             return
         show_tooltip(text)
+
+    def _show_clip_tooltip(self) -> None:
+        """Name the hovered clip's preset on a row whose presets change on each clip."""
+        controls = self._ctx.controls
+        session = controls.session
+        hovered = session.timeline.strip_hover_clip
+        if hovered is None or hovered[2] is not None:
+            return
+        row, start = hovered[0], hovered[1]
+        z_order = session.layer_z_order
+        if not 0 <= row < len(z_order) or not is_each_clip(session, z_order[row]):
+            return
+        clips = controls.clip_editor.clips(z_order[row])
+        clip = clip_starting_at(clips, start)
+        if clip is not None:
+            show_tooltip(clip_preset_tooltip(clips, clip))
 
     def pointer_shape(self) -> PointerShape | None:
         """Hand over a strip button, left-right over the ruler, a scrub, or a clip edge, move over a clip."""

@@ -43,7 +43,7 @@ from cleave.viz.layer_pipeline import (
     paused_preset_pending,
 )
 from cleave.viz.layer_visibility import apply_layer_visibility, build_timeline_view_state
-from cleave.viz.preset_switching import advance_timeline_preset_switching
+from cleave.viz.preset_switching import advance_preset_switching
 from cleave.viz.modal import ModalHost
 from cleave.viz.overlay_draw import OverlayDrawer
 from cleave.viz.loading import LoadingWindow, open_loading_window
@@ -413,7 +413,7 @@ def tick_frame_core(
     apply_visual_limiter_gains(runtime, blank_visualizers=blank_visualizers)
 
     if not paused and not blank_visualizers:
-        advance_timeline_preset_switching(
+        advance_preset_switching(
             runtime.seed.session, runtime.layers_by_slot, t_sec
         )
 
