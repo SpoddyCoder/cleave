@@ -733,18 +733,27 @@ def clip_starts_preset(
 def clip_shown_preset(
     clips: Sequence[TimelineClip], clip: TimelineClip
 ) -> PresetListEntry | None:
-    """The preset playing during ``clip``: its own, or the one it continues."""
+    """The preset playing during ``clip``: its own, or the one it continues.
+
+    A clip that should start a preset but holds none continues the one before.
+    """
     index = next(
         (i for i, other in enumerate(clips) if other.start == clip.start), None
     )
     if index is None:
         return clip.preset
-    while index >= 0:
-        current = clips[index]
-        if clip_starts_preset(clips, current):
+    for current in reversed(clips[: index + 1]):
+        if clip_starts_preset(clips, current) and current.preset is not None:
             return current.preset
-        index -= 1
-    return None
+    # Nothing starts before it: the first preset any clip starts.
+    return next(
+        (
+            later.preset
+            for later in switching_clips(clips)
+            if later.preset is not None
+        ),
+        None,
+    )
 
 
 def switching_clips(clips: Sequence[TimelineClip]) -> list[TimelineClip]:
@@ -1142,6 +1151,23 @@ def set_clip_preset(
         else:
             updated.append(replace(cue, preset=preset, anchor=False))
     return _lane_from_cues(updated, duration_sec)
+
+
+def clear_clip_preset(
+    lane: TimelineLane,
+    start: float,
+    *,
+    inherit: float,
+    duration_sec: float,
+) -> TimelineLane:
+    """Empty the clip at ``start``: it still starts a preset, but holds none."""
+    return _lane_from_cues(
+        [
+            replace(cue, preset=None) if cue.t == start else cue
+            for cue in _explicit_cues(lane, inherit)
+        ],
+        duration_sec,
+    )
 
 
 def should_accept_toggle(last_toggle_t: float | None, t_sec: float) -> bool:

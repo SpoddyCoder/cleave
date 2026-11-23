@@ -253,10 +253,32 @@ def _layer_preset_problem(layer: LayerRuntime, health: PresetHealth) -> LayerPro
 
 def layer_notices(session: TuningSession, slot: str) -> tuple[LayerNotice, ...]:
     """What the user should know about the layer at *slot* that does not stop it working."""
-    # No notice is raised at present; the amber sign and menu lines stay for
-    # issues that should not stop a layer.
-    del session, slot
-    return ()
+    layer = session.layers[slot]
+    if (
+        layer.preset_switching != "on"
+        or layer.preset_switching_trigger != "timeline"
+        or not session.timeline.enabled
+    ):
+        return ()
+    from cleave.viz.preset_list_populate import (
+        clips_missing_preset_count,
+        on_segment_count,
+    )
+
+    clips = on_segment_count(session, slot)
+    held = clips - clips_missing_preset_count(session, slot)
+    spare = len(layer.preset_list) - held
+    if clips == 0 or spare <= 0:
+        return ()
+    noun = "preset in the list has" if spare == 1 else "presets in the list have"
+    return (
+        LayerNotice(
+            f"{spare} {noun} no clip",
+            ProblemPage.PRESET_LIST,
+            RowKind.TRACK_PRESET_LIST_ITEM,
+            held,
+        ),
+    )
 
 
 @dataclass(frozen=True)

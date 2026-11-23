@@ -359,6 +359,8 @@ class TimelineRuntime:
     # Clip under the mouse: (row, clip start, edge or None for the body).
     # Not persisted.
     strip_hover_clip: tuple[int, float, ClipGrip | None] | None = None
+    # Song time under the pointer while a clip is hovered.
+    strip_hover_t: float | None = None
     # Visible time window of the strip (zoom and pan). Not persisted.
     strip_view: StripView = field(default_factory=StripView)
     bar_phase_offset: int = DEFAULT_TIMELINE_BAR_PHASE

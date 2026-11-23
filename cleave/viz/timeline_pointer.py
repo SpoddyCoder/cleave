@@ -511,6 +511,11 @@ class TimelinePointer:
             and hit.clip_start is not None
             else None
         )
+        timeline.strip_hover_t = (
+            hit.t_sec
+            if hit is not None and timeline.strip_hover_clip is not None
+            else None
+        )
         self._over_ruler = (
             hit is not None
             and hit.row is None

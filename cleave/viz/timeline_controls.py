@@ -95,6 +95,8 @@ class TimelineControls:
         on_select_song_marker: Callable[[int], None] | None = None,
         on_seek: Callable[[float], None] | None = None,
         on_browse_clip_preset: Callable[[str], None] | None = None,
+        on_browse_list_preset: Callable[[str, int], None] | None = None,
+        on_convert_to_each_clip: Callable[[str], None] | None = None,
         on_notification: Callable[[str], None] | None = None,
         beat_times: Sequence[float] = (),
         bar_times: Sequence[float] = (),
@@ -103,6 +105,8 @@ class TimelineControls:
     ) -> None:
         self.session = session
         self._on_browse_clip_preset = on_browse_clip_preset
+        self._on_browse_list_preset = on_browse_list_preset
+        self._on_convert_to_each_clip = on_convert_to_each_clip
         self.layer_mutations = (
             layer_mutations
             if layer_mutations is not None
@@ -383,6 +387,16 @@ class TimelineControls:
         """Open the preset browser to replace *slot*'s selected clip's preset."""
         if self._on_browse_clip_preset is not None:
             self._on_browse_clip_preset(slot)
+
+    def browse_list_preset(self, slot: str, index: int) -> None:
+        """Open the preset browser to replace *slot*'s preset list entry *index*."""
+        if self._on_browse_list_preset is not None:
+            self._on_browse_list_preset(slot, index)
+
+    def convert_to_each_clip(self, slot: str) -> None:
+        """Turn *slot*'s timer presets into clips that hold their own."""
+        if self._on_convert_to_each_clip is not None:
+            self._on_convert_to_each_clip(slot)
 
     def split_at_playhead(self) -> None:
         """Split the focused row's clip under the playhead in two (Ctrl+K)."""

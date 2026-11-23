@@ -191,8 +191,17 @@ def test_each_clip_counts_clips_without_a_preset() -> None:
     assert _messages(session) == ["1 clip has no preset"]
 
 
-def test_each_clip_has_no_extra_presets_notice() -> None:
-    assert layer_notices(_timeline_layer((1.0,), presets=3), "layer_1") == ()
+def test_each_clip_says_how_many_presets_have_no_clip() -> None:
+    session = _timeline_layer((1.0,), presets=3)
+    (notice,) = layer_notices(session, "layer_1")
+    assert notice.message == "3 presets in the list have no clip"
+    assert notice.preset_index == 0
+    session.timeline.enabled = False
+    assert layer_notices(session, "layer_1") == ()
+    assert layer_notices(_timeline_layer((), presets=3), "layer_1") == ()
+    session.timeline.enabled = True
+    session.layers["layer_1"].preset_switching_trigger = "timer"
+    assert layer_notices(session, "layer_1") == ()
 
 
 def test_a_silent_driving_stem_is_a_problem() -> None:

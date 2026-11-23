@@ -10,6 +10,7 @@ from cleave.blend_modes import BLEND_MODES
 from cleave.config import clamp_beat_sensitivity, clamp_effect_pct
 from cleave.config_schema.layers import (
     PRESET_SWITCHING_TRIGGERS,
+    PresetSwitchingTrigger,
     clamp_easter_egg,
     preset_switching_mode_for_trigger,
     preset_switching_trigger_display,
@@ -43,11 +44,14 @@ class LayerMutations:
         get_layer_bindings: Callable[[], LiveLayerBindings | None],
         on_notification: Callable[[str], None],
         history: EditHistory | None = None,
-        on_enter_each_clip: Callable[[str], None] | None = None,
+        on_enter_each_clip: Callable[[str, str], None] | None = None,
+        confirm_each_clip: Callable[[str, Callable[[], None]], None] | None = None,
     ) -> None:
         """``on_enter_each_clip`` gives a layer's clips presets when its
         presets start changing on each clip; it runs inside the undo step
-        ``history`` records for the trigger change."""
+        ``history`` records for the trigger change. ``confirm_each_clip`` runs
+        the change it is given, after asking when that would lose something.
+        """
         self.session = session
         self.preset_root = preset_root
         self.duration_sec = duration_sec
@@ -55,6 +59,7 @@ class LayerMutations:
         self._on_notification = on_notification
         self._history = history
         self._on_enter_each_clip = on_enter_each_clip
+        self._confirm_each_clip = confirm_each_clip
 
     def _bindings(self) -> LiveLayerBindings | None:
         return self._get_layer_bindings()
@@ -172,12 +177,32 @@ class LayerMutations:
 
     def step_preset_switching_trigger(self, slot: str, *, delta: int) -> None:
         layer = self.session.layers[slot]
-        previous = layer.preset_switching_trigger
-        trigger = step_choice(
-            PRESET_SWITCHING_TRIGGERS, previous, delta
+        self.set_preset_switching_trigger(
+            slot,
+            step_choice(
+                PRESET_SWITCHING_TRIGGERS, layer.preset_switching_trigger, delta
+            ),
         )
+
+    def set_preset_switching_trigger(
+        self, slot: str, trigger: PresetSwitchingTrigger
+    ) -> None:
+        layer = self.session.layers[slot]
+        previous = layer.preset_switching_trigger
         if trigger == previous:
             return
+        if trigger == "timeline" and self._confirm_each_clip is not None:
+            self._confirm_each_clip(
+                slot, lambda: self._apply_preset_switching_trigger(slot, trigger)
+            )
+            return
+        self._apply_preset_switching_trigger(slot, trigger)
+
+    def _apply_preset_switching_trigger(
+        self, slot: str, trigger: PresetSwitchingTrigger
+    ) -> None:
+        layer = self.session.layers[slot]
+        previous = layer.preset_switching_trigger
         # Entering or leaving "each clip" moves presets between the list and
         # the clips, so it is one undo step with them.
         follows_clips = "timeline" in (trigger, previous)
@@ -196,7 +221,7 @@ class LayerMutations:
                 # preset; browsing from now on only previews.
                 layer.layer_preset = layer.playlist.anchor
             if trigger == "timeline" and self._on_enter_each_clip is not None:
-                self._on_enter_each_clip(slot)
+                self._on_enter_each_clip(slot, previous)
         bindings = self._bindings()
         if bindings is not None:
             bindings.on_preset_switching_change(slot)

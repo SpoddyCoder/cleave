@@ -44,7 +44,7 @@ PRESET_SWITCHING_TRIGGER_HELP_ENTRIES: tuple[
     ),
     (
         "timeline",
-        "every timeline clip holds its own preset, shown on the clip. Choosing it turns the timeline on.",
+        "every timeline clip holds its own preset. Choosing it turns the timeline on; from on a timer, the row is cut into clips where the presets change.",
     ),
 )
 DEFAULT_PRESET_SWITCHING: PresetSwitchingMode = "off"

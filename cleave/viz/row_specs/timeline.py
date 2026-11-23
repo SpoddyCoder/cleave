@@ -540,7 +540,7 @@ def _format_clip_preset(state: TuningViewState, desc: RowDescriptor) -> str:
     if view is None or view.name is None:
         return "none"
     name = preset_label(view.name)
-    return name if view.starts else f"{CONTINUES_GLYPH} {name}"
+    return name if view.starts and not view.empty else f"{CONTINUES_GLYPH} {name}"
 
 
 def _clip_preset_tooltip(state: TuningViewState, desc: RowDescriptor) -> str:
@@ -548,6 +548,8 @@ def _clip_preset_tooltip(state: TuningViewState, desc: RowDescriptor) -> str:
     view = _clip_preset_view(state, desc)
     if view is None or view.name is None:
         return ""
+    if view.empty:
+        return f"No preset of its own: plays {view.name}"
     return view.name if view.starts else f"Continues {view.name}"
 
 

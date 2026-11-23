@@ -22,6 +22,7 @@ from cleave.timeline import (
     shift_bars_by_beats,
     strip_lane_range,
 )
+from cleave.viz.preset_schedule import row_presets
 from cleave.viz.editor_mode_controls import (
     is_preset_curation_mode,
     layer_compositing_active,
@@ -338,17 +339,8 @@ def build_timeline_view_state(
             slot: list(cues) for slot, cues in tl.record_buffer.items()
         },
         record_high_water_mark=tl.record_high_water_mark,
-        preset_triggers={
-            slot: (
-                session.layers[slot].preset_switching_trigger
-                if session.layers[slot].preset_switching == "on"
-                else "off"
-            )
-            for slot in session.layer_z_order
-        },
-        preset_periods={
-            slot: float(session.layers[slot].preset_duration)
-            for slot in session.layer_z_order
+        presets={
+            slot: row_presets(session, slot) for slot in session.layer_z_order
         },
         enabled=tl.enabled,
         submenu_focused=submenu_focused,

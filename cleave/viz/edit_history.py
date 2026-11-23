@@ -46,7 +46,9 @@ def preset_list_scope_slot(scope: EditScope) -> str | None:
 
 
 @dataclass(frozen=True)
-class _Snapshot:
+class EditSnapshot:
+    """What undo restores: the state on one side of an edit."""
+
     lanes: dict[str, TimelineLane]
     timeline_enabled: bool
     preset_lists: dict[str, list[PresetListEntry]]
@@ -57,7 +59,7 @@ class _Snapshot:
     # Restored with the rest, but never counts as a change.
     selected_clip_t: dict[str, float]
 
-    def same_content(self, other: _Snapshot) -> bool:
+    def same_content(self, other: EditSnapshot) -> bool:
         return (
             self.lanes == other.lanes
             and self.timeline_enabled == other.timeline_enabled
@@ -70,8 +72,8 @@ class _Snapshot:
 @dataclass(frozen=True)
 class _Entry:
     label: str
-    before: _Snapshot
-    after: _Snapshot
+    before: EditSnapshot
+    after: EditSnapshot
     merge_key: Hashable | None
     committed_at: float
     scope: EditScope
@@ -80,7 +82,7 @@ class _Entry:
 @dataclass(frozen=True)
 class _Pending:
     label: str
-    before: _Snapshot
+    before: EditSnapshot
     merge_key: Hashable | None
     scope: EditScope
 
@@ -94,12 +96,11 @@ class EditHistory:
         *,
         on_preset_list_change: Callable[[str], None] | None = None,
         scope_locked: Callable[[EditScope], bool] | None = None,
-        before_commit: Callable[[dict[str, list[PresetListEntry]]], None]
-        | None = None,
+        before_commit: Callable[[EditSnapshot], None] | None = None,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         """``before_commit`` runs as each edit finishes, before it is recorded,
-        with the preset lists from before the edit. Changes it makes join the
+        with the state from before the edit. Changes it makes join the
         same undo step (each-clip layers keep their clips and list in step).
         """
         self.session = session
@@ -153,7 +154,7 @@ class EditHistory:
             return
         self._pending = None
         if self._before_commit is not None:
-            self._before_commit(pending.before.preset_lists)
+            self._before_commit(pending.before)
         after = self._capture()
         if after.same_content(pending.before):
             return
@@ -260,7 +261,7 @@ class EditHistory:
         self._undo.append(entry)
         return entry.label
 
-    def _matches(self, snapshot: _Snapshot) -> bool:
+    def _matches(self, snapshot: EditSnapshot) -> bool:
         """Compare in place. Menus read this every frame, so nothing is copied."""
         session = self.session
         mask = session.pattern_mask
@@ -277,10 +278,10 @@ class EditHistory:
             )
         )
 
-    def _capture(self) -> _Snapshot:
+    def _capture(self) -> EditSnapshot:
         session = self.session
         mask = session.pattern_mask
-        return _Snapshot(
+        return EditSnapshot(
             lanes={slot: copy_lane(lane) for slot, lane in session.timeline.lanes.items()},
             timeline_enabled=bool(session.timeline.enabled),
             preset_lists={
@@ -295,7 +296,7 @@ class EditHistory:
             selected_clip_t=dict(session.timeline.selected_clip_t),
         )
 
-    def _restore(self, snapshot: _Snapshot) -> None:
+    def _restore(self, snapshot: EditSnapshot) -> None:
         session = self.session
         session.timeline.lanes = {
             slot: copy_lane(lane) for slot, lane in snapshot.lanes.items()

@@ -318,8 +318,10 @@ def _format_track_preset_list_item_position(
     block = _track_block(state, desc)
     starts = block.preset_list_clip_starts
     if desc.preset_index < len(starts):
-        # Each entry belongs to a clip: show where that clip starts.
+        # A clip holds this entry: show where it starts.
         return format_marker_time(starts[desc.preset_index])
+    if block.runtime.preset_switching_trigger == "timeline":
+        return "spare"
     return f"{desc.preset_index + 1}/{len(block.preset_list_labels)}"
 
 def _format_track_preset_list_item_markers(

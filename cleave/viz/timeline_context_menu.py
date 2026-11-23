@@ -51,6 +51,10 @@ class TimelineRowMenuActions(Protocol):
 
     def browse_clip_preset(self, slot: str) -> None: ...
 
+    def browse_list_preset(self, slot: str, index: int) -> None: ...
+
+    def convert_to_each_clip(self, slot: str) -> None: ...
+
 
 def timeline_row_menu(
     actions: TimelineRowMenuActions,
@@ -159,6 +163,8 @@ def timeline_row_menu_entries(
             actions.split_at_playhead,
             split_t,
             browse_preset=lambda: actions.browse_clip_preset(slot),
+            browse_list_preset=lambda index: actions.browse_list_preset(slot, index),
+            convert_to_each_clip=lambda: actions.convert_to_each_clip(slot),
         )
         if clip
         else ()

@@ -137,6 +137,7 @@ class PresetBrowserControls:
         self._slot: str | None = None
         # The preset list entry Enter replaces, or None for a plain browse.
         self._replace_index: int | None = None
+        self._on_choose: Callable[[Path], None] | None = None
         self._snapshot: BrowseSnapshot | None = None
         self._shown: Path | None = None
         self._pending: Path | None = None
@@ -190,11 +191,18 @@ class PresetBrowserControls:
 
     # -- open / close ------------------------------------------------------
 
-    def open(self, slot: str, *, replace_index: int | None = None) -> None:
+    def open(
+        self,
+        slot: str,
+        *,
+        replace_index: int | None = None,
+        on_choose: Callable[[Path], None] | None = None,
+    ) -> None:
         """Browse *slot*'s presets from the folder or collection it is on.
 
         With *replace_index*, start at that preset list entry's folder, and
-        Enter replaces the entry with the chosen preset.
+        Enter replaces the entry with the chosen preset. *on_choose* runs with
+        the preset Enter keeps.
         """
         if slot not in self._session.layers:
             return
@@ -225,6 +233,7 @@ class PresetBrowserControls:
         )
         self._slot = slot
         self._replace_index = replace_index
+        self._on_choose = on_choose
         self._snapshot = self._mutations.browse_snapshot(slot)
         self._shown = playlist.current
         self._pending = None
@@ -256,6 +265,7 @@ class PresetBrowserControls:
         browser = self._browser
         slot = self._slot
         replace_index = self._replace_index
+        on_choose = self._on_choose
         path = browser.selected_preset() if browser is not None else None
         if path is not None and path != self._shown:
             self._show(path)
@@ -267,11 +277,14 @@ class PresetBrowserControls:
             and self._preset_list is not None
         ):
             self._preset_list.replace(slot, replace_index, path)
+        elif path is not None and on_choose is not None:
+            on_choose(path)
 
     def _close(self) -> None:
         self._browser = None
         self._slot = None
         self._replace_index = None
+        self._on_choose = None
         self._snapshot = None
         self._pending = None
         self._jobs.clear()

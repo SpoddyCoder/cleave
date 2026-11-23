@@ -1,7 +1,7 @@
 """Timeline strip static panel: rows, level bars, cue ticks, clip outlines, scrollbar.
 
-Rows whose presets change on each clip name each clip's preset on it; rows on
-a timer mark where their presets change.
+Each row names on its clips the presets its layer plays; rows on a timer also
+mark where their presets change.
 
 Drawn once per change of the static signature and cached; the live layer
 (playhead, flashes, transport, role glyphs) is patched over it each frame.
@@ -9,11 +9,11 @@ Drawn once per change of the static signature and cached; the live layer
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import pygame
 
-from cleave.viz.clip_presets import CONTINUES_GLYPH, preset_label
+from cleave.viz.preset_schedule import RowLabel, RowPresets, row_labels
 from cleave.viz.material_icons import RECORD_GLYPH, REPLAY_GLYPH, SOLO_GLYPH
 from cleave.viz.overlay_primitives import overlay_panel_surface
 from cleave.viz.row_present_renderers import (
@@ -22,7 +22,7 @@ from cleave.viz.row_present_renderers import (
 )
 from cleave.viz.theme import palette, timeline_ui_metrics
 from cleave.viz.text_fit import fit_text_to_width
-from cleave.timeline import LEVEL_EPS, TimelineClip, clip_starts_preset
+from cleave.timeline import LEVEL_EPS
 from cleave.viz.timeline_ruler import render_time_ruler, song_bound_xs
 from cleave.viz.timeline_strip_layout import (
     StripLayout,
@@ -52,7 +52,7 @@ CUE_TICK_WIDTH: int = 2
 # changes, draw fainter and thinner than a clip boundary.
 SOFT_TICK_ALPHA: int = 55
 SOFT_TICK_WIDTH: int = 1
-# Preset name on an each-clip clip: inset from the clip's start, past the
+# Preset name on a clip: inset from the clip's start, past the
 # trim handle, and from its end.
 CLIP_LABEL_INSET: int = 5
 # A clip narrower than this many pixels shows no name.
@@ -167,50 +167,20 @@ def _draw_tick(
     )
 
 
-def _timer_switch_times(
-    clips: list[TimelineClip],
-    period: float,
-    view_start_sec: float,
-    view_end_sec: float,
-) -> list[float]:
-    """Where a timer row's preset changes, inside its clips and the view."""
-    if period <= 0.0:
-        return []
-    times: list[float] = []
-    for clip in clips:
-        start = max(clip.start, view_start_sec)
-        end = min(clip.end, view_end_sec)
-        k = int(start // period) + 1
-        while k * period < end:
-            if k * period > clip.start:
-                times.append(k * period)
-            k += 1
-    return times
-
-
-def clip_label_text(clip: TimelineClip, *, continues: bool) -> str:
-    """What an each-clip clip shows: its preset's name, or the continue glyph."""
-    if continues:
-        return CONTINUES_GLYPH
-    if clip.preset is None:
-        return ""
-    return preset_label(clip.preset.display_name)
-
-
 def _draw_clip_label(
     panel: pygame.Surface,
     font: pygame.font.Font,
-    clip: TimelineClip,
+    label: RowLabel,
     *,
-    continues: bool,
     bar_rect: pygame.Rect,
     bar_left: int,
     bar_width: int,
     view_start_sec: float,
     view_end_sec: float,
 ) -> None:
+    clip = label.clip
     span = clip_bar_span(
-        clip,
+        replace(clip, start=label.start, end=label.end),
         bar_left=bar_left,
         bar_width=bar_width,
         view_start_sec=view_start_sec,
@@ -220,7 +190,7 @@ def _draw_clip_label(
         return
     left, right = span
     room = right - left - 2 * CLIP_LABEL_INSET
-    text = clip_label_text(clip, continues=continues)
+    text = label.text
     if not text or right - left < CLIP_LABEL_MIN_PX or room <= 0:
         return
     # The name sits on the clip's own colour, so it only shows where the
@@ -232,7 +202,10 @@ def _draw_clip_label(
     fitted = fit_text_to_width(font, text, room)
     if not fitted:
         return
-    surf = font.render(fitted, True, palette().timeline_clip_text)
+    color = (
+        palette().button_danger_bg if label.empty else palette().timeline_clip_text
+    )
+    surf = font.render(fitted, True, color)
     top = bar_rect.bottom - filled_h
     panel.blit(surf, (left + CLIP_LABEL_INSET, top + (filled_h - line_h) // 2))
 
@@ -370,55 +343,40 @@ def build_static_panel(
         )
 
         row_clips = row_clips_for_view(state, slot)
-        each_clip = state.preset_triggers.get(slot) == "timeline"
-        continuing = (
-            {
-                clip.start
-                for clip in row_clips
-                if not clip_starts_preset(row_clips, clip)
-            }
-            if each_clip
-            else set()
+        labels = row_labels(
+            row_clips,
+            state.presets.get(slot, RowPresets()),
+            timeline_enabled=state.enabled,
         )
-        # Cue ticks mark every clip boundary, so butted clips show a divider.
-        for cue in bar_cues_for_row(state, slot):
-            if not time_in_view(cue.t, view_start, view_end):
+        soft_starts = {label.start for label in labels if label.soft}
+        cue_times = [cue.t for cue in bar_cues_for_row(state, slot)]
+        # Cue ticks mark every clip boundary, so butted clips show a divider;
+        # timer changes inside a clip are marked too.
+        ticks = {t: t in soft_starts for t in cue_times}
+        ticks.update(
+            (label.start, True) for label in labels if label.start > label.clip.start
+        )
+        for t, soft in ticks.items():
+            if not time_in_view(t, view_start, view_end):
                 continue
-            soft = cue.t in continuing
             _draw_tick(
                 panel,
-                time_to_x(cue.t, bar_left, bar_width, view_start, view_end),
+                time_to_x(t, bar_left, bar_width, view_start, view_end),
                 bar_rect,
                 alpha=SOFT_TICK_ALPHA if soft else CUE_TICK_ALPHA,
                 width=SOFT_TICK_WIDTH if soft else CUE_TICK_WIDTH,
             )
-        if state.enabled and state.preset_triggers.get(slot) == "timer":
-            for switch_t in _timer_switch_times(
-                row_clips,
-                state.preset_periods.get(slot, 0.0),
-                view_start,
-                view_end,
-            ):
-                _draw_tick(
-                    panel,
-                    time_to_x(switch_t, bar_left, bar_width, view_start, view_end),
-                    bar_rect,
-                    alpha=SOFT_TICK_ALPHA,
-                    width=SOFT_TICK_WIDTH,
-                )
-        if each_clip:
-            for clip in row_clips:
-                _draw_clip_label(
-                    panel,
-                    font,
-                    clip,
-                    continues=clip.start in continuing,
-                    bar_rect=bar_rect,
-                    bar_left=bar_left,
-                    bar_width=bar_width,
-                    view_start_sec=view_start,
-                    view_end_sec=view_end,
-                )
+        for label in labels:
+            _draw_clip_label(
+                panel,
+                font,
+                label,
+                bar_rect=bar_rect,
+                bar_left=bar_left,
+                bar_width=bar_width,
+                view_start_sec=view_start,
+                view_end_sec=view_end,
+            )
 
         # Per-slot selection memory stays in selected_clip_t; only the
         # focused row outlines its selected clip.

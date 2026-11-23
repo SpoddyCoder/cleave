@@ -341,10 +341,10 @@ def clip_switch_at(
     """The each-clip schedule at ``t_sec``: list index and the preset to play.
 
     The preset is the one held by the last clip that started a preset at or
-    before ``t_sec`` (or the first such clip, before any has started). The
-    index counts the clips with a preset before it, matching the layer's
-    preset list, which mirrors the clips' presets in order. A clip without
-    a preset gives ``None``, so the layer keeps what it shows.
+    before ``t_sec``, passing over empty clips (or the first such clip, before
+    any has started). The index is its place in the layer's preset list,
+    which leads with the clips' presets in order. ``None`` when no clip holds
+    a preset.
     """
     hard_cut_fades, soft_cut_fades = _timeline_fade_groups(session)
     runtime = session.layers[slot]
@@ -357,16 +357,16 @@ def clip_switch_at(
         hard_cut_fades=hard_cut_fades,
         soft_cut_fades=soft_cut_fades,
     )
-    if not switches:
+    held = [(trigger, cue) for trigger, cue in switches if cue.preset is not None]
+    if not held:
         return 0, None
-    current = 0
-    for position, (trigger, _cue) in enumerate(switches):
+    index = 0
+    for position, (trigger, _cue) in enumerate(held):
         if trigger > t_sec:
             break
-        current = position
-    cue = switches[current][1]
-    index = sum(1 for _t, earlier in switches[:current] if earlier.preset is not None)
-    return index, None if cue.preset is None else cue.preset.file
+        index = position
+    preset = held[index][1].preset
+    return index, None if preset is None else preset.file
 
 
 def _advance_timeline_indexed(

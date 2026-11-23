@@ -334,9 +334,7 @@ def test_paste_is_disabled_once_the_copied_file_is_gone() -> None:
         assert paste.hint == "Copied preset file is missing"
 
 
-def test_an_each_clip_list_cannot_gain_or_lose_entries() -> None:
-    from cleave.viz.preset_list_controls import EACH_CLIP_LIST_HINT
-
+def test_an_each_clip_list_can_gain_and_lose_entries() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         controls, _paths = _controls_with_list(tmp)
         layer = controls.session.layers["layer_1"]
@@ -344,19 +342,15 @@ def test_an_each_clip_list_cannot_gain_or_lose_entries() -> None:
         layer.preset_switching_trigger = "timeline"
         controls.preset_clipboard.copy_entry("layer_1", 0)
         items = _entries(controls, _item_desc(1))
-        assert items["preset.paste_over"].enabled is True
         for item_id in (
             "preset.paste_after",
-            "preset.insert_current",
             "preset.remove",
             "preset.cut",
             "preset.duplicate",
         ):
-            assert items[item_id].enabled is False, item_id
-            assert items[item_id].hint == EACH_CLIP_LIST_HINT, item_id
-        assert items["preset.move_down"].enabled is True
-        controls.preset_list.remove("layer_1", 0)
-        assert _names(controls) == ["a.milk", "b.milk", "c.milk"]
+            assert items[item_id].enabled is True, item_id
+        items["preset.remove"].run()
+        assert _names(controls) == ["a.milk", "c.milk"]
 
 
 def test_current_preset_row_offers_add_and_curate() -> None:

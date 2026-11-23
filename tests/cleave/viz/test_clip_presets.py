@@ -1,155 +1,266 @@
-"""Presets held on timeline clips: seeding, laying out, and keeping list and clips in step."""
+"""Presets held on timeline clips: seeding, and keeping list and clips in step."""
 
 from __future__ import annotations
 
-import math
+from pathlib import Path
+
+import pytest
 
 from cleave.timeline import SlotCue, TimelineLane, lane_clips
 from cleave.viz.clip_presets import (
     clip_preset_list,
     clip_preset_view,
-    fill_missing_clip_presets,
-    lay_out_list_as_clips,
-    seed_timeline_from_switching,
-    sync_each_clip_layers,
-    timeline_is_empty,
+    deal_list_onto_clips,
+    row_switching_clips,
+    spare_preset_count,
 )
 from cleave.viz.preset_switching import clip_switch_at
 from tests.support.preset_list import entries
 from tests.support.viz import make_controls
 
-A, B, C = entries("/p/a.milk", "/p/b.milk", "/p/c.milk")
+A, B, C, D = entries("/p/a.milk", "/p/b.milk", "/p/c.milk", "/p/d.milk")
 
 
-def _timer_controls(duration_sec: float = 100.0):
-    controls = make_controls(("layer_1", "layer_2"), duration_sec=duration_sec)
-    timer = controls.session.layers["layer_1"]
-    timer.preset_switching = "on"
-    timer.preset_switching_trigger = "timer"
-    timer.preset_duration = 30.0
-    timer.preset_list = [A, B]
-    controls.session.timeline.enabled = False
-    controls.session.timeline.lanes = {}
-    return controls
-
-
-def test_seeding_keeps_the_timer_schedule_exactly() -> None:
-    controls = _timer_controls()
-    session = controls.session
-    timer = session.layers["layer_1"]
-    before = {
-        t: timer.preset_list[math.floor(t / 30.0) % 2].file
-        for t in (0.0, 29.9, 30.0, 59.0, 61.0, 99.0)
-    }
-    converted = seed_timeline_from_switching(session, 100.0)
-    assert converted == ["layer_1"]
-    assert timer.preset_switching_trigger == "timeline"
-    lane = session.timeline.lanes["layer_1"]
-    assert [cue.t for cue in lane.cues] == [0.0, 30.0, 60.0, 90.0]
-    assert all(cue.cut == "none" for cue in lane.cues)
-    session.timeline.enabled = True
-    for t, path in before.items():
-        assert clip_switch_at(session, "layer_1", t)[1] == path, t
-    # The other layer is one whole-song clip and keeps its switching.
-    other = session.timeline.lanes["layer_2"]
-    assert other.baseline == 1.0 and other.cues == []
-    assert not timeline_is_empty(session)
-
-
-def test_seeding_leaves_a_disabled_layer_off() -> None:
-    controls = _timer_controls()
-    controls.session.layers["layer_1"].enabled = False
-    assert seed_timeline_from_switching(controls.session, 100.0) == []
-    assert controls.session.timeline.lanes["layer_1"].baseline == 0.0
-
-
-def test_turning_the_timeline_on_seeds_once_and_undo_restores_the_timer() -> None:
-    controls = _timer_controls()
-    controls.set_timeline_enabled(True)
-    layer = controls.session.layers["layer_1"]
-    assert layer.preset_switching_trigger == "timeline"
-    assert [entry.file for entry in layer.preset_list] == [
-        A.file, B.file, A.file, B.file,
-    ]
-    assert controls.build_view_state(paused=True).notification_message == (
-        "Timeline controls layer visibility. Layer 1 now changes preset on "
-        "each clip, at the same times"
-    )
-    controls.edit_history.undo()
-    assert layer.preset_switching_trigger == "timer"
-    assert layer.preset_list == [A, B]
-    assert not controls.session.timeline.enabled
-
-
-def test_lay_out_runs_the_last_clip_to_the_song_end() -> None:
-    controls = _timer_controls(duration_sec=45.0)
-    assert lay_out_list_as_clips(controls.session, "layer_1", 45.0, [A, B, C]) == 2
-    clips = lane_clips(
-        controls.session.timeline.lanes["layer_1"], inherit=1.0, duration_sec=45.0
-    )
-    assert [(clip.start, clip.end) for clip in clips] == [(0.0, 30.0), (30.0, 45.0)]
-    assert clip_preset_list(controls.session, "layer_1", 45.0) == [A, B]
-
-
-def _each_clip_session(*cues: SlotCue):
+def _controls(*presets, spares=()):
+    """One each-clip layer: a 10 s clip every 20 s, holding ``presets``."""
     controls = make_controls(("layer_1",), duration_sec=100.0)
     session = controls.session
     layer = session.layers["layer_1"]
     layer.preset_switching = "on"
     layer.preset_switching_trigger = "timeline"
+    layer.preset_list = [*(p for p in presets if p is not None), *spares]
     session.timeline.enabled = True
-    session.timeline.lanes["layer_1"] = TimelineLane(baseline=0.0, cues=list(cues))
-    return session
+    cues = []
+    for index, preset in enumerate(presets):
+        cues += [
+            SlotCue(t=index * 20.0, level=1.0, preset=preset),
+            SlotCue(t=index * 20.0 + 10.0, level=0.0),
+        ]
+    session.timeline.lanes["layer_1"] = TimelineLane(baseline=0.0, cues=cues)
+    return controls
 
 
-def test_fill_missing_takes_list_presets_in_order_then_picks() -> None:
-    session = _each_clip_session(
-        SlotCue(t=0.0, level=1.0, preset=A),
-        SlotCue(t=10.0, level=0.0),
-        SlotCue(t=20.0, level=1.0),
-        SlotCue(t=30.0, level=0.0),
-        SlotCue(t=40.0, level=1.0),
+def _held(controls):
+    return [
+        clip.preset
+        for clip in row_switching_clips(controls.session, "layer_1", 100.0)
+    ]
+
+
+def _list(controls):
+    return controls.session.layers["layer_1"].preset_list
+
+
+@pytest.mark.parametrize(
+    ("index", "held"),
+    [(0, [B, C, None]), (1, [A, C, None]), (2, [A, B, None])],
+)
+def test_removing_an_entry_moves_the_later_presets_up(index, held) -> None:
+    controls = _controls(A, B, C)
+    controls.preset_list.remove("layer_1", index)
+    assert _held(controls) == held
+    assert _list(controls) == [p for p in held if p is not None]
+    controls.edit_history.undo()
+    assert _held(controls) == _list(controls) == [A, B, C]
+    controls.edit_history.redo()
+    assert _held(controls) == held
+
+
+def test_duplicating_mid_list_flows_and_leaves_a_spare() -> None:
+    controls = _controls(A, B)
+    controls.preset_list.duplicate("layer_1", 0)
+    assert _held(controls) == [A, A]
+    assert _list(controls) == [A, A, B]
+    assert spare_preset_count(controls.session, "layer_1", 100.0) == 1
+
+
+def test_duplicate_presets_each_keep_their_clip() -> None:
+    controls = _controls(A, A, B)
+    controls.preset_list.remove("layer_1", 0)
+    assert _held(controls) == [A, B, None]
+
+
+def test_reordering_changes_presets_in_place_and_keeps_empty_clips() -> None:
+    controls = _controls(A, None, B)
+    controls.preset_list.move_item("layer_1", 0, 1)
+    assert _held(controls) == [B, None, A]
+
+
+def test_appending_fills_the_empty_clip_and_moves_no_other() -> None:
+    controls = _controls(A, None, B)
+    with controls.edit_history.recording("Add"):
+        _list(controls).append(C)
+    assert _held(controls) == [A, C, B]
+    assert _list(controls) == [A, C, B]
+
+
+def test_removing_a_spare_changes_no_clip() -> None:
+    controls = _controls(A, B, spares=(C, D))
+    controls.preset_list.remove("layer_1", 2)
+    assert _held(controls) == [A, B]
+    assert _list(controls) == [A, B, D]
+
+
+def test_clearing_empties_every_clip() -> None:
+    controls = _controls(A, B)
+    controls.preset_list.clear("layer_1")
+    assert _held(controls) == [None, None]
+    controls.edit_history.undo()
+    assert _held(controls) == [A, B]
+
+
+def test_deleting_a_clip_makes_its_preset_the_last_spare() -> None:
+    controls = _controls(A, B, C, spares=(D,))
+    controls.session.timeline.selected_clip_t["layer_1"] = 20.0
+    controls.clip_editor.delete_selected("layer_1")
+    assert _held(controls) == [A, C]
+    assert _list(controls) == [A, C, D, B]
+    controls.edit_history.undo()
+    assert _held(controls) == [A, B, C]
+    assert _list(controls) == [A, B, C, D]
+
+
+def test_a_new_clip_takes_the_first_spare_else_stays_empty() -> None:
+    controls = _controls(A, B, spares=(C,))
+    assert controls.clip_editor.add_clip_at("layer_1", 12.0)
+    assert _held(controls) == [A, C, B]
+    assert _list(controls) == [A, C, B]
+    assert controls.clip_editor.add_clip_at("layer_1", 40.0)
+    assert _held(controls) == [A, C, B, None]
+    view = clip_preset_view(
+        controls.session, "layer_1", controls.clip_editor.selected("layer_1"), 100.0
     )
-    picked: list[str] = []
+    assert view.empty and view.name == "b.milk"
 
-    def pick(slot, role):
-        picked.append(slot)
-        return C
 
-    filled = fill_missing_clip_presets(
-        session, "layer_1", 100.0, pick, from_entries=[B]
+def test_choosing_a_clip_preset_leaves_no_spare() -> None:
+    controls = _controls(A, None, B)
+    controls.session.timeline.selected_clip_t["layer_1"] = 0.0
+    controls.clip_editor.set_preset("layer_1", C)
+    assert _held(controls) == [C, None, B]
+    assert _list(controls) == [C, B]
+    controls.session.timeline.selected_clip_t["layer_1"] = 20.0
+    controls.clip_editor.set_preset("layer_1", D)
+    assert _held(controls) == [C, D, B]
+    assert _list(controls) == [C, D, B]
+
+
+def test_browsing_an_empty_clip_assigns_the_chosen_preset() -> None:
+    controls = _controls(A, None)
+    controls.session.timeline.selected_clip_t["layer_1"] = 20.0
+    controls.preset_list.adopt = lambda _path: C  # type: ignore[method-assign]
+    controls._choose_clip_preset("layer_1", Path("/p/c.milk"))
+    assert _held(controls) == [A, C]
+
+
+def test_an_empty_butted_clip_still_starts_a_preset() -> None:
+    controls = _controls()
+    session = controls.session
+    session.timeline.lanes["layer_1"] = TimelineLane(
+        baseline=0.0,
+        cues=[
+            SlotCue(t=0.0, level=1.0, preset=A),
+            SlotCue(t=10.0, level=1.0, recast=True, preset=B),
+        ],
     )
-    assert filled == 2
-    assert picked == ["layer_1"]
-    assert clip_preset_list(session, "layer_1", 100.0) == [A, B, C]
+    _list(controls)[:] = [A, B]
+    controls.preset_list.remove("layer_1", 1)
+    assert _held(controls) == [A, None]
+    # Continuing on purpose is not empty, and starting again takes the spare.
+    with controls.edit_history.recording("Add"):
+        _list(controls).append(C)
+    session.timeline.selected_clip_t["layer_1"] = 10.0
+    controls.clip_editor.set_starts_preset("layer_1", False)
+    assert _held(controls) == [A]
+    assert _list(controls) == [A, C]
+    controls.clip_editor.set_starts_preset("layer_1", True)
+    assert _held(controls) == [A, C]
+    assert _list(controls) == [A, C]
 
 
-def test_sync_pushes_a_list_edit_onto_the_clips() -> None:
-    session = _each_clip_session(
-        SlotCue(t=0.0, level=1.0, preset=A),
-        SlotCue(t=10.0, level=1.0, recast=True, preset=B),
-    )
+def test_empty_clips_play_the_preset_before_them_from_any_seek() -> None:
+    session = _controls(None, A, None, B).session
+    assert clip_switch_at(session, "layer_1", 5.0) == (0, A.file)
+    assert clip_switch_at(session, "layer_1", 45.0) == (0, A.file)
+    assert clip_switch_at(session, "layer_1", 65.0) == (1, B.file)
+    assert clip_switch_at(session, "layer_1", 45.0) == (0, A.file)
+
+
+def test_seeding_gives_whole_song_clips_and_keeps_the_timer() -> None:
+    controls = make_controls(("layer_1", "layer_2"), duration_sec=100.0)
+    session = controls.session
     layer = session.layers["layer_1"]
+    layer.preset_switching = "on"
+    layer.preset_switching_trigger = "timer"
     layer.preset_list = [A, B]
-    before = {"layer_1": [A, B]}
-    layer.preset_list[1] = C
-    assert sync_each_clip_layers(session, 100.0, before, None) == ["layer_1"]
-    assert clip_preset_list(session, "layer_1", 100.0) == [A, C]
-
-
-def test_sync_gives_a_new_clip_a_preset_and_mirrors_the_list() -> None:
-    session = _each_clip_session(
-        SlotCue(t=0.0, level=1.0, preset=A),
-        SlotCue(t=10.0, level=0.0),
-        SlotCue(t=20.0, level=1.0),
-    )
-    layer = session.layers["layer_1"]
-    layer.preset_list = [A]
-    changed = sync_each_clip_layers(
-        session, 100.0, {"layer_1": [A]}, lambda _slot, _role: B
-    )
-    assert changed == ["layer_1"]
+    session.layers["layer_2"].enabled = False
+    session.timeline.enabled = False
+    session.timeline.lanes = {}
+    controls.set_timeline_enabled(True)
+    assert layer.preset_switching_trigger == "timer"
     assert layer.preset_list == [A, B]
+    assert session.timeline.lanes["layer_1"].baseline == 1.0
+    assert session.timeline.lanes["layer_2"].baseline == 0.0
+
+
+@pytest.mark.parametrize("previous", ["off", "projectm"])
+def test_entering_each_clip_deals_the_list_onto_the_clips_there_are(previous) -> None:
+    controls = _controls(D, None)
+    layer = controls.session.layers["layer_1"]
+    layer.preset_switching_trigger = previous
+    layer.preset_list = [A, B, C]
+    controls.layer_mutations.set_preset_switching_trigger("layer_1", "timeline")
+    view = controls.modal_host.view_state()
+    assert view is not None and view.body == (
+        "This layer's clips are not cut.\n1 clip loses its earlier preset.\n"
+        "1 preset in the list has no clip.\nUndo puts everything back."
+    )
+    controls.modal_host.activate_option(0)
+    assert _held(controls) == [A, B]
+    assert _list(controls) == [A, B, C]
+    controls.edit_history.undo()
+    assert layer.preset_switching_trigger == previous
+    assert _held(controls) == [D, None]
+
+
+def test_entering_each_clip_from_the_timer_cuts_the_row_in_one_undo_step() -> None:
+    controls = _controls()
+    session = controls.session
+    layer = session.layers["layer_1"]
+    layer.preset_switching_trigger = "timer"
+    layer.preset_duration = 30.0
+    layer.preset_list = [A, B]
+    session.timeline.lanes["layer_1"] = TimelineLane(baseline=1.0, cues=[])
+    controls.convert_to_each_clip("layer_1")
+    view = controls.modal_host.view_state()
+    assert view is not None and view.body == (
+        "1 clip on this layer is cut into 4, where the timer changes preset.\n"
+        "Undo puts everything back."
+    )
+    # Asking changes nothing, and Cancel leaves the layer on its timer.
+    assert layer.preset_switching_trigger == "timer"
+    assert layer.preset_list == [A, B]
+    assert session.timeline.lanes["layer_1"] == TimelineLane(baseline=1.0, cues=[])
+    controls.modal_host.cancel()
+    assert layer.preset_switching_trigger == "timer"
+    controls.convert_to_each_clip("layer_1")
+    controls.modal_host.activate_option(0)
+    assert _held(controls) == _list(controls) == [A, B, A, B]
+    clips = lane_clips(
+        session.timeline.lanes["layer_1"], inherit=1.0, duration_sec=100.0
+    )
+    assert [clip.start for clip in clips] == [0.0, 30.0, 60.0, 90.0]
+    controls.edit_history.undo()
+    assert layer.preset_switching_trigger == "timer"
+    assert layer.preset_list == [A, B]
+
+
+def test_dealing_a_short_list_leaves_the_last_clips_empty() -> None:
+    controls = _controls(A, B, C)
+    _list(controls)[:] = [D]
+    deal_list_onto_clips(controls.session, "layer_1", 100.0)
+    assert _held(controls) == [D, None, None]
+    assert clip_preset_list(controls.session, "layer_1", 100.0) == [D]
 
 
 def test_split_continues_and_the_view_says_so() -> None:
@@ -170,22 +281,41 @@ def test_split_continues_and_the_view_says_so() -> None:
     assert clip_switch_at(session, "layer_1", 60.0)[1] == A.file
 
 
-def test_a_new_clip_against_another_starts_its_own_preset() -> None:
-    controls = make_controls(("layer_1",), duration_sec=100.0)
+def test_entering_each_clip_asks_nothing_when_nothing_is_lost() -> None:
+    controls = _controls(None, None)
+    layer = controls.session.layers["layer_1"]
+    layer.preset_switching_trigger = "projectm"
+    layer.preset_list = [A, B]
+    controls.layer_mutations.set_preset_switching_trigger("layer_1", "timeline")
+    assert not controls.modal_host.active
+    assert _held(controls) == [A, B]
+
+
+def test_the_prompt_says_which_presets_and_timeline_state_change() -> None:
+    controls = _controls()
     session = controls.session
     layer = session.layers["layer_1"]
-    layer.preset_switching = "on"
-    layer.preset_switching_trigger = "timeline"
-    session.timeline.enabled = True
-    session.timeline.lanes["layer_1"] = TimelineLane(
-        baseline=0.0,
-        cues=[SlotCue(t=0.0, level=1.0, preset=A), SlotCue(t=10.0, level=0.0)],
+    layer.preset_switching_trigger = "timer"
+    layer.preset_duration = 60.0
+    layer.preset_list = [A, B, C]
+    session.timeline.enabled = False
+    session.timeline.lanes = {}
+    controls.convert_to_each_clip("layer_1")
+    view = controls.modal_host.view_state()
+    assert view is not None and view.body == (
+        "The timeline turns on and decides when every layer shows.\n"
+        "1 clip on this layer is cut into 2, where the timer changes preset.\n"
+        "1 preset the timer never shows leaves the preset list.\n"
+        "Undo puts everything back."
     )
-    controls._clip_preset_pick = lambda _slot, _role: B  # type: ignore[assignment]
-    controls.clip_editor._pick_preset = controls._clip_preset_pick
-    assert controls.clip_editor.add_clip_at("layer_1", 10.0)
-    added = controls.clip_editor.selected("layer_1")
-    assert added is not None
-    assert clip_preset_view(session, "layer_1", added, 100.0).starts is True
-    assert clip_preset_list(session, "layer_1", 100.0) == [A, B]
-    assert layer.preset_list == [A, B]
+    assert session.timeline.lanes == {} and not session.timeline.enabled
+
+
+def test_entering_from_an_empty_timer_list_clears_old_clip_presets() -> None:
+    controls = _controls(A, B)
+    layer = controls.session.layers["layer_1"]
+    layer.preset_switching_trigger = "timer"
+    layer.preset_list = []
+    controls.convert_to_each_clip("layer_1")
+    controls.modal_host.activate_option(0)
+    assert _held(controls) == [None, None] and _list(controls) == []

@@ -1274,6 +1274,7 @@ def test_two_line_row_splits_value_position_and_markers() -> None:
         preset_list_labels=["a.milk", "b.milk"],
         preset_list_markers=["", "[B]"],
         preset_list_clip_starts=(),
+        runtime=SimpleNamespace(preset_switching_trigger="timer"),
     )
     state = SimpleNamespace(tracks={"layer_1": block})
 
@@ -1293,6 +1294,8 @@ def test_two_line_row_splits_value_position_and_markers() -> None:
     assert format_row_value(state, item) == "b.milk"
     assert format_row_position(state, item) == "2/2"
     assert format_row_markers(state, item) == "[B]"
+    block.runtime.preset_switching_trigger = "timeline"
+    assert format_row_position(state, item) == "spare"
 
 
 def test_navigator_expand_click_steps_and_writes_user_config(tmp_path) -> None:

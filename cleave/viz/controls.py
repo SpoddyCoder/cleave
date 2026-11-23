@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -15,14 +15,12 @@ from cleave.preset_list_entry import PresetListEntry
 from cleave.viz.clip_presets import (
     ClipPresetPicker,
     clip_preset_view,
-    fill_missing_clip_presets,
     is_each_clip,
-    lane_untouched,
-    lay_out_list_as_clips,
-    seed_timeline_from_switching,
+    seed_timeline,
     sync_each_clip_layers,
     timeline_is_empty,
 )
+from cleave.viz.preset_schedule import each_clip_change, enter_each_clip
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.layer_lifecycle_controls import LayerLifecycleController
 from cleave.viz.layer_mutations import LayerMutations
@@ -125,17 +123,10 @@ def _layer_numbers(session: TuningSession, slots: Sequence[str]) -> str:
 
 
 def timeline_enabled_notification(
-    session: TuningSession, enabled: bool, converted: Sequence[str]
+    session: TuningSession, enabled: bool
 ) -> str:
     """What turning the timeline on or off did, in a toast."""
     if enabled:
-        if converted:
-            verb = "changes" if len(converted) == 1 else "change"
-            return (
-                f"{NOTIFICATION_TIMELINE_ENABLED_TEXT}. "
-                f"{_layer_numbers(session, converted)} now {verb} preset on "
-                "each clip, at the same times"
-            )
         return NOTIFICATION_TIMELINE_ENABLED_TEXT
     holding = [
         slot for slot in session.layer_z_order if is_each_clip(session, slot)
@@ -394,6 +385,7 @@ class TuningControls:
             on_notification=lambda message: self.show_notification(message),
             history=self.edit_history,
             on_enter_each_clip=self._enter_each_clip,
+            confirm_each_clip=self._confirm_each_clip,
         )
         self.preset_browser = PresetBrowserControls(
             session,
@@ -1004,64 +996,49 @@ class TuningControls:
             return
         label = "Turn timeline on" if enabled else "Turn timeline off"
         with self.edit_history.recording(label):
-            converted = self._apply_timeline_enabled(enabled)
-        self._after_timeline_enabled_change(enabled, converted)
+            self._apply_timeline_enabled(enabled)
+        self._after_timeline_enabled_change(enabled)
 
-    def _apply_timeline_enabled(self, enabled: bool) -> list[str]:
-        """Switch the timeline; the first time it goes on, seed it from switching.
-
-        Returns the layers moved to "each clip" by the seed.
-        """
-        tl = self.session.timeline
-        tl.enabled = enabled
+    def _apply_timeline_enabled(self, enabled: bool) -> None:
+        """Switch the timeline; the first time it goes on, seed it."""
+        self.session.timeline.enabled = enabled
         if enabled and timeline_is_empty(self.session):
-            return seed_timeline_from_switching(self.session, self.duration_sec)
-        return []
+            seed_timeline(self.session)
 
-    def _after_timeline_enabled_change(
-        self, enabled: bool, converted: Sequence[str]
-    ) -> None:
+    def _after_timeline_enabled_change(self, enabled: bool) -> None:
         if enabled:
             self.open_timeline_panel()
         else:
             self.close_timeline_panel()
-        for slot in converted:
-            self.preset_list.refresh_switching(slot)
         if self._layer_bindings is not None:
             self._layer_bindings.on_timeline_enabled_change()
-        self.show_notification(
-            timeline_enabled_notification(self.session, enabled, converted)
-        )
+        self.show_notification(timeline_enabled_notification(self.session, enabled))
 
-    def _enter_each_clip(self, slot: str) -> None:
+    def _enter_each_clip(self, slot: str, previous: str) -> None:
         """A layer's presets now change on each clip: give its clips presets.
 
         Runs inside the trigger change's undo step. The timeline comes on if
-        it is off. An untouched row gets the preset list laid out as clips at
-        the preset duration; otherwise clips without a preset take the list's
-        presets in order, and any left over get one picked when the step ends.
+        it is off.
         """
         session = self.session
-        untouched = lane_untouched(session, slot)
         if not session.timeline.enabled:
-            converted = self._apply_timeline_enabled(True)
-            self._after_timeline_enabled_change(True, converted)
-        layer = session.layers[slot]
-        entries = list(layer.preset_list)
-        if untouched:
-            count = lay_out_list_as_clips(session, slot, self.duration_sec, entries)
-            if count:
-                self.show_notification(
-                    layer_notification(
-                        session.layer_z_order,
-                        slot,
-                        f"{count} clips laid out from the preset list, "
-                        f"{layer.preset_duration:g}s each",
-                    )
-                )
+            self._apply_timeline_enabled(True)
+            self._after_timeline_enabled_change(True)
+        enter_each_clip(session, slot, previous, self.duration_sec)
+
+    def _confirm_each_clip(self, slot: str, apply: Callable[[], None]) -> None:
+        """Run ``apply`` to move the layer to each clip, asking first when it
+        would change clips, presets, or the timeline the user has set up."""
+        change = each_clip_change(self.session, slot, self.duration_sec)
+        if not change.destructive:
+            apply()
             return
-        fill_missing_clip_presets(
-            session, slot, self.duration_sec, None, from_entries=entries
+        number = panel_layer_number(self.session.layer_z_order, slot)
+        self._modal_host.prompt_confirm(
+            f"Change layer {number}'s presets on each clip?",
+            "Change",
+            apply,
+            body=change.summary(),
         )
 
     def browse_clip_preset(self, slot: str) -> None:
@@ -1070,15 +1047,28 @@ class TuningControls:
         if clip is None or not is_each_clip(self.session, slot):
             return
         view = clip_preset_view(self.session, slot, clip, self.duration_sec)
-        if view.list_index is not None:
+        if view.empty:
+            self.preset_browser.open(
+                slot, on_choose=lambda path: self._choose_clip_preset(slot, path)
+            )
+        elif view.list_index is not None:
             self.preset_browser.open(slot, replace_index=view.list_index)
 
-    def _sync_each_clip_layers(
-        self, lists_before: Mapping[str, Sequence[PresetListEntry]]
-    ) -> None:
-        for slot in sync_each_clip_layers(
-            self.session, self.duration_sec, lists_before, self._clip_preset_pick
-        ):
+    def _choose_clip_preset(self, slot: str, path: Path) -> None:
+        entry = self.preset_list.adopt(path)
+        if entry is not None:
+            self.clip_editor.set_preset(slot, entry)
+
+    def browse_list_preset(self, slot: str, index: int) -> None:
+        """Open the preset browser to replace the layer's list entry *index*."""
+        self.preset_browser.open(slot, replace_index=index)
+
+    def convert_to_each_clip(self, slot: str) -> None:
+        """Cut a timer layer's row into clips and let each hold its preset."""
+        self.layer_mutations.set_preset_switching_trigger(slot, "timeline")
+
+    def _sync_each_clip_layers(self, before: EditSnapshot) -> None:
+        for slot in sync_each_clip_layers(self.session, self.duration_sec, before):
             self.preset_list.refresh_switching(slot)
 
     def do_seek(self, delta_sec: float) -> None:

@@ -9,6 +9,7 @@ import pygame
 
 from cleave.config_schema.layers import MAX_LAYER_COUNT
 from cleave.timeline import SlotCue, TimelineLane
+from cleave.viz.preset_schedule import RowPresets
 from cleave.viz.overlay_primitives import overlay_font, visibility_bucket
 from cleave.viz.overlay_upload import OverlayGpuState, UploadSignature
 from cleave.viz.theme import (
@@ -86,8 +87,7 @@ class TimelineStaticSignature:
     locked: bool
     view_start_sec: float
     view_end_sec: float | None
-    preset_triggers: tuple[tuple[str, str], ...]
-    preset_periods: tuple[tuple[str, float], ...]
+    presets: tuple[tuple[str, RowPresets], ...]
     ui_scale_generation: int
     palette_generation: int
 
@@ -204,8 +204,7 @@ def timeline_static_signature(
         locked=state.locked,
         view_start_sec=state.view_start_sec,
         view_end_sec=state.view_end_sec,
-        preset_triggers=tuple(sorted(state.preset_triggers.items())),
-        preset_periods=tuple(sorted(state.preset_periods.items())),
+        presets=tuple(sorted(state.presets.items(), key=lambda item: item[0])),
         ui_scale_generation=ui_scale_generation(),
         palette_generation=palette_generation(),
     )

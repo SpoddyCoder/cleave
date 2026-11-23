@@ -286,6 +286,14 @@ def make_timeline_controls(
         if tuning_controls is not None:
             tuning_controls.browse_clip_preset(slot)
 
+    def on_browse_list_preset(slot: str, index: int) -> None:
+        if tuning_controls is not None:
+            tuning_controls.browse_list_preset(slot, index)
+
+    def on_convert_to_each_clip(slot: str) -> None:
+        if tuning_controls is not None:
+            tuning_controls.convert_to_each_clip(slot)
+
     def on_seek(delta_sec: float) -> None:
         seek(playback, delta_sec, duration_sec)
         LayerFramePipeline.flush_pcm(layers)
@@ -311,6 +319,8 @@ def make_timeline_controls(
         on_select_song_marker=on_select_song_marker,
         on_seek=on_seek,
         on_browse_clip_preset=on_browse_clip_preset,
+        on_browse_list_preset=on_browse_list_preset,
+        on_convert_to_each_clip=on_convert_to_each_clip,
         on_notification=on_notification,
         beat_times=list(signals.beat_times) if signals is not None else (),
         bar_times=list(signals.downbeat_times) if signals is not None else (),

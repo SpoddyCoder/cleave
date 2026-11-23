@@ -5130,7 +5130,7 @@ def test_timeline_trigger_hides_duration_row() -> None:
     assert RowKind.TRACK_PRESET_DURATION not in _inspector_kinds(controls, "layer_1")
 
 
-def test_each_clip_while_timeline_off_turns_it_on_and_lays_out_list() -> None:
+def test_each_clip_while_timeline_off_turns_it_on_and_keeps_the_clip() -> None:
     from tests.support.viz import keydown, noop_layer_bindings
     import pygame
     from cleave.viz.row_kinds import RowDescriptor, RowKind
@@ -5147,20 +5147,14 @@ def test_each_clip_while_timeline_off_turns_it_on_and_lays_out_list() -> None:
     desc = RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_TRIGGER, slot="layer_1")
     controls.focus_cursor = MainFocus(desc)
     press_layer_row(controls, desc, keydown(pygame.K_RIGHT))
+    assert layer.preset_switching_trigger == "projectm"
+    controls.modal_host.activate_option(0)
     assert layer.preset_switching_trigger == "timeline"
     assert controls.session.timeline.enabled
     cues = controls.session.timeline.lanes["layer_1"].cues
-    assert [cue.t for cue in cues] == [0.0, 30.0, 60.0, 90.0]
-    assert [cue.preset.display_name for cue in cues] == [
-        "a.milk", "b.milk", "a.milk", "b.milk",
-    ]
-    assert [entry.display_name for entry in layer.preset_list] == [
-        "a.milk", "b.milk", "a.milk", "b.milk",
-    ]
-    view = controls.build_view_state(paused=False)
-    assert view.notification_message == (
-        "Layer 1: 4 clips laid out from the preset list, 30s each"
-    )
+    assert [cue.t for cue in cues] == [0.0]
+    assert cues[0].preset.display_name == "a.milk"
+    assert [entry.display_name for entry in layer.preset_list] == ["a.milk", "b.milk"]
     assert controls.edit_history.undo() is not None
     assert layer.preset_switching_trigger == "projectm"
     assert not controls.session.timeline.enabled

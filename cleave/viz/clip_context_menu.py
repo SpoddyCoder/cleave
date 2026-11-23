@@ -2,7 +2,9 @@
 
 On a layer whose presets change on each clip, a Preset submenu chooses the
 clip's preset in the browser, picks another, or sets whether the clip starts
-a new preset or continues the one before. Go to the clip's start, split it from a Split submenu (at the playhead or at
+a new preset or continues the one before. On a timer layer, Replace preset
+changes the list entry that plays at the clicked time, and Convert to each
+clip makes the timer's presets clips. Go to the clip's start, split it from a Split submenu (at the playhead or at
 the right-clicked time), set its cut in, cut out, and role from submenus, and
 delete it. Each
 choice calls the same ``ClipEditor`` method as the strip's clip keys and the
@@ -26,6 +28,7 @@ from cleave.viz.context_menu import (
     ContextMenuItem,
     ContextSubmenu,
 )
+from cleave.viz.preset_schedule import label_at, row_labels, row_presets
 from cleave.viz.session import TuningSession
 from cleave.viz.timeline_clip_edits import (
     ClipEditor,
@@ -46,6 +49,8 @@ def clip_menu_entries(
     split_at_playhead: Callable[[], None],
     split_t: float | None = None,
     browse_preset: Callable[[], None] | None = None,
+    browse_list_preset: Callable[[int], None] | None = None,
+    convert_to_each_clip: Callable[[], None] | None = None,
 ) -> tuple[ContextMenuEntry, ...]:
     """Items for *slot*'s selected clip, or () when it has none.
 
@@ -79,6 +84,19 @@ def clip_menu_entries(
     if is_each_clip(session, slot):
         preset_entries = (
             _preset_submenu(editor, slot, clip, browse_preset, edit_hint),
+        )
+    elif (
+        session.layers[slot].preset_switching_trigger == "timer"
+        and browse_list_preset is not None
+        and convert_to_each_clip is not None
+    ):
+        preset_entries = _timer_preset_entries(
+            editor,
+            slot,
+            clip.start if split_t is None else split_t,
+            browse_list_preset,
+            convert_to_each_clip,
+            edit_hint,
         )
     return (
         ContextMenuItem(
@@ -162,6 +180,48 @@ def clip_menu_entries(
             enabled=editable,
             shortcut="Delete",
             hint=edit_hint,
+        ),
+    )
+
+
+def _timer_preset_entries(
+    editor: ClipEditor,
+    slot: str,
+    t_sec: float,
+    browse_list_preset: Callable[[int], None],
+    convert_to_each_clip: Callable[[], None],
+    edit_hint: str | None,
+) -> tuple[ContextMenuEntry, ...]:
+    """Replace the preset the timer plays at *t_sec*, or make the presets clips."""
+    session = editor.session
+    label = label_at(
+        row_labels(
+            editor.clips(slot),
+            row_presets(session, slot),
+            timeline_enabled=session.timeline.enabled,
+        ),
+        t_sec,
+    )
+    index = None if label is None else label.index
+    layer_hint = "Unlock the layer first" if session.layers[slot].locked else None
+    replace_hint = layer_hint
+    if replace_hint is None and index is None:
+        replace_hint = "No preset plays here"
+    convert_hint = layer_hint if layer_hint is not None else edit_hint
+    return (
+        ContextMenuItem(
+            id="timeline.clip.replace_preset",
+            label="Replace preset\u2026",
+            run=lambda: browse_list_preset(index) if index is not None else None,
+            enabled=replace_hint is None,
+            hint=replace_hint,
+        ),
+        ContextMenuItem(
+            id="timeline.clip.convert_to_each_clip",
+            label="Convert to each clip",
+            run=convert_to_each_clip,
+            enabled=convert_hint is None,
+            hint=convert_hint,
         ),
     )
 

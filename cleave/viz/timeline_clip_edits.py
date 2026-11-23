@@ -55,7 +55,12 @@ from cleave.timeline import (
     update_clip,
 )
 from cleave.preset_list_entry import PresetListEntry
-from cleave.viz.clip_presets import ClipPresetPick, is_each_clip
+from cleave.viz.clip_presets import (
+    ClipPresetPick,
+    first_spare,
+    is_each_clip,
+    set_clip_preset_and_list,
+)
 from cleave.viz.session import TuningSession
 from cleave.viz.edit_history import EditHistory
 
@@ -274,8 +279,8 @@ class ClipEditor:
                 inherit=_inherit(session, slot),
                 duration_sec=self.duration_sec,
                 # On an each-clip layer a new clip starts a preset of its
-                # own, even against the clip before; one is picked as the
-                # edit is recorded.
+                # own, even against the clip before; the first spare fills it
+                # as the edit is recorded.
                 recast=is_each_clip(session, slot),
             )
             select_clip(session, slot, start)
@@ -382,8 +387,9 @@ class ClipEditor:
     def set_starts_preset(self, slot: str, starts: bool) -> None:
         """Make the selected clip start a preset of its own, or continue the one before.
 
-        Only a clip butting the one before can continue it. Starting one picks
-        a preset by the clip's role, else from the layer's folder.
+        Only a clip butting the one before can continue it. Starting one takes
+        the list's first spare, else picks a preset by the clip's role, else
+        from the layer's folder.
         """
         clip = self._editable(slot)
         if clip is None:
@@ -393,19 +399,20 @@ class ClipEditor:
             return
         if clip_starts_preset(clips, clip) == starts:
             return
-        preset = None
-        if starts:
-            if self._pick_preset is None:
-                return
-            preset = self._pick_preset(slot, clip.role)
-            if preset is None:
-                return
-        self._set_preset(
-            slot,
-            clip,
-            preset,
-            "Clip starts new preset" if starts else "Clip continues preset",
-        )
+        if not starts:
+            with self.history.recording("Clip continues preset"):
+                self._write_preset(slot, clip, None)
+            return
+        label = "Clip starts new preset"
+        spare = first_spare(self.session, slot, self.duration_sec)
+        if spare is not None:
+            # Only the clip changes: the spare is already in the list.
+            with self.history.recording(label):
+                self._write_preset(slot, clip, spare)
+            return
+        preset = None if self._pick_preset is None else self._pick_preset(slot, clip.role)
+        if preset is not None:
+            self._set_preset(slot, clip, preset, label)
 
     def pick_another_preset(self, slot: str) -> None:
         """Give the selected clip another preset, by its role, else from the layer's folder."""
@@ -420,28 +427,30 @@ class ClipEditor:
         self._set_preset(slot, clip, preset, "Pick clip preset")
 
     def set_preset(self, slot: str, preset: PresetListEntry) -> None:
-        """Give the selected clip *preset* (Paste)."""
+        """Give the selected clip *preset* (Paste, or chosen in the browser)."""
         clip = self._editable(slot)
         if clip is None or clip.preset == preset:
             return
         self._set_preset(slot, clip, preset, "Paste clip preset")
 
     def _set_preset(
-        self,
-        slot: str,
-        clip: TimelineClip,
-        preset: PresetListEntry | None,
-        label: str,
+        self, slot: str, clip: TimelineClip, preset: PresetListEntry, label: str
     ) -> None:
-        session = self.session
         with self.history.recording(label):
-            session.timeline.lanes[slot] = set_clip_preset(
-                _lane(session, slot),
-                clip.start,
-                preset,
-                inherit=_inherit(session, slot),
-                duration_sec=self.duration_sec,
+            set_clip_preset_and_list(
+                self.session, slot, clip.start, preset, self.duration_sec
             )
+
+    def _write_preset(
+        self, slot: str, clip: TimelineClip, preset: PresetListEntry | None
+    ) -> None:
+        self.session.timeline.lanes[slot] = set_clip_preset(
+            _lane(self.session, slot),
+            clip.start,
+            preset,
+            inherit=_inherit(self.session, slot),
+            duration_sec=self.duration_sec,
+        )
 
     def trim_step(
         self, slot: str, edge: ClipEdge, *, forward: bool, large: bool
