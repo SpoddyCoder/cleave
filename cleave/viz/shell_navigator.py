@@ -279,7 +279,7 @@ def selection_after_nav_collapse(
 def _navigator_content_height_px() -> int:
     """Outer height of the navigator list just drawn in the current window.
 
-    The cursor sits one item-spacing past the last row. Adding the bottom
+    The cursor sits one item-spacing past the end of the list. Adding the bottom
     padding matches the window size that fits the rows. The top border sits
     inside the top padding, so the bottom border sits inside the bottom
     padding too and the rows centre between the two. Scroll is
@@ -334,8 +334,8 @@ def navigator_height_for_rows(
 
     The window is sized a frame after the rows change, so the tree is
     resized from the last measurement to avoid one frame of overflow, which
-    draws a scrollbar. *chrome_px* is the window padding top and bottom and
-    *spacing_px* the gap between rows. Rows are uniform.
+    draws a scrollbar. *chrome_px* is the space outside the first and last
+    rows' text and *spacing_px* the gap between rows. Rows are uniform.
     """
     if measured_px <= 0 or measured_rows <= 0 or rows == measured_rows:
         return measured_px
@@ -436,7 +436,7 @@ class NavigatorPanel:
             self._content_height_px,
             self._measured_rows,
             len(self.visible_nodes()),
-            chrome_px=2.0 * float(style.window_padding.y),
+            chrome_px=2.0 * float(style.window_padding.y) + padded_row_spacing_y(),
             spacing_px=padded_row_spacing_y(),
         )
 
@@ -458,8 +458,16 @@ class NavigatorPanel:
         try:
             with padded_rows():
                 self.row_rects = {}
+                # A row's band reaches half the spacing past its text, and the
+                # list is clipped at the window padding, so the first and last
+                # rows are kept that far inside it.
+                half = 0.5 * padded_row_spacing_y()
+                imgui.set_cursor_pos_y(imgui.get_cursor_pos_y() + half)
                 for node, rails in zip(nodes, navigator_tree_rails(nodes)):
                     self._draw_node(node, rails)
+                imgui.set_cursor_pos_y(imgui.get_cursor_pos_y() - half)
+                # An empty item, so the space below the last row scrolls into view.
+                imgui.dummy(imgui.ImVec2(0.0, 0.0))
                 self._content_height_px = _navigator_content_height_px()
         finally:
             imgui.pop_style_color()

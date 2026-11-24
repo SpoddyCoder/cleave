@@ -619,6 +619,32 @@ def test_navigator_content_height_is_measured_for_the_next_frame() -> None:
         assert host.nav_content_height_px == measured
 
 
+def test_navigator_end_row_bands_stay_inside_the_clipped_margins() -> None:
+    from cleave.viz import shell_navigator
+    from cleave.viz.commands import command_context
+    from cleave.viz.shell_host import draw_shell_frame
+
+    controls = make_controls(("layer_1",))
+    with _host() as host:
+        host.context.controls = controls
+        host.imgui.display_size = (1280, 720)
+        spans: list[tuple[float, float]] = []
+        bounds: list[tuple[float, float]] = []
+        real = shell_navigator.drawn_row_rect
+
+        def record(left_x):
+            spans.append((imgui.get_item_rect_min().y, imgui.get_item_rect_max().y))
+            pos_y = imgui.get_window_pos().y
+            bounds.append((pos_y, imgui.get_style().window_padding.y))
+            return real(left_x)
+
+        with patch.object(shell_navigator, "drawn_row_rect", record):
+            draw_shell_frame(host, MenuBarState(), command_context(controls), 1 / 60)
+        window_top, pad = bounds[0]
+        assert spans[0][0] == window_top + pad
+        assert spans[-1][1] == window_top + host.nav_content_height_px - pad
+
+
 def test_navigator_height_follows_rows_opened_before_the_next_draw() -> None:
     from cleave.viz.commands import command_context
     from cleave.viz.shell_host import draw_shell_frame

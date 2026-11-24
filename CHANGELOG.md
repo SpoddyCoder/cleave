@@ -87,6 +87,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Populate list and Generate timeline's clip presets no longer offer clip roles when no preset in your library has a role. Before, choosing it left the preset list empty.
 - Stem separation uses the GPU straight after the Welcome to Cleave step downloads the CUDA Toolkit, instead of running on the CPU until Cleave is restarted.
 - Resuming preset switching after browsing to another preset folder now takes the preset directory row back to the folder it showed before the preview, as it already did for the preset row. Before, the directory row stayed on the browsed folder, so the arrows stepped through a folder unrelated to what was playing.
+- The highlight on the navigator's first and last rows is no longer cut off at the top and bottom of the list.
 
 ## [0.4.0] - 2026-11-19
 
