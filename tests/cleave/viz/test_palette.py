@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import dataclasses
+import math
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -194,6 +195,8 @@ def _text_pairs(p: Palette) -> list[tuple[str, str, float]]:
         ("highlight", "background", body),
         ("surface_text", "surface_bg", body),
         ("muted", "background", 3.0),
+        ("subheading", "background", body),
+        ("subheading", "surface_bg", body),
         ("disabled", "background", 3.0),
         ("on_hover", "button_hover_bg", fill),
         ("on_hover", "button_active_bg", fill),
@@ -220,6 +223,57 @@ def test_every_builtin_theme_keeps_its_text_readable() -> None:
         for text, fill, floor in _text_pairs(p)
         if _contrast(getattr(p, text), getattr(p, fill)) < floor
     ]
+    assert failures == []
+
+
+# Machado et al. 2009, full severity, on linear RGB.
+_RED_GREEN_BLINDNESS = {
+    "deuteranopia": (
+        (0.367322, 0.860646, -0.227968),
+        (0.280085, 0.672501, 0.047413),
+        (-0.011820, 0.042940, 0.968881),
+    ),
+    "protanopia": (
+        (0.152286, 1.052583, -0.204868),
+        (0.114503, 0.786281, 0.099216),
+        (-0.003882, -0.048116, 1.051998),
+    ),
+}
+
+
+def _simulated_lab(rgb: tuple[int, int, int], vision: str) -> tuple[float, ...]:
+    """CIE Lab of *rgb* as seen with *vision*."""
+
+    def channel(v: int) -> float:
+        c = v / 255.0
+        return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+    linear = [channel(v) for v in rgb]
+    r, g, b = (
+        min(1.0, max(0.0, sum(k * v for k, v in zip(row, linear))))
+        for row in _RED_GREEN_BLINDNESS[vision]
+    )
+
+    def f(t: float) -> float:
+        return t ** (1 / 3) if t > 0.008856 else 7.787 * t + 16 / 116
+
+    x = f((0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.9505)
+    y = f(0.2126 * r + 0.7152 * g + 0.0722 * b)
+    z = f((0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.089)
+    return (116 * y - 16, 500 * (x - y), 200 * (y - z))
+
+
+def test_subheadings_stand_apart_with_red_green_colour_blindness() -> None:
+    failures = []
+    for p in BUILTIN_PALETTES:
+        for role in ("label", "disabled"):
+            for vision in _RED_GREEN_BLINDNESS:
+                gap = math.dist(
+                    _simulated_lab(p.subheading, vision),
+                    _simulated_lab(getattr(p, role), vision),
+                )
+                if gap < 30.0:
+                    failures.append(f"{p.id}: {role}, {vision} is {gap:.0f}")
     assert failures == []
 
 

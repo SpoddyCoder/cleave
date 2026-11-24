@@ -480,7 +480,7 @@ def _draw_form_rows(
         if row.heading is not None:
             heading_h = form_heading_height(line_h, first=index == 0)
             heading_y = y + heading_h - form_row_height(line_h) + form_row_pad_y()
-            _text(draw, left, heading_y, row.heading, palette().muted)
+            _text(draw, left, heading_y, row.heading, palette().subheading)
             y += heading_h
         height = form_field_height(line_h, row)
         row_left = left + (form_section_indent() if row.indented else 0)

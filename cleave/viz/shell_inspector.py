@@ -655,7 +655,7 @@ class InspectorPanel:
             label = row_label(state, desc)
             if row.is_heading:
                 value = format_row_value(state, desc) if spec.format_value else ""
-                imgui.text_colored(rgba(palette().muted), f"{label} {value}".rstrip())
+                imgui.text_colored(rgba(palette().subheading), f"{label} {value}".rstrip())
                 return
             selected = _inspector_row_selected(self._ctx.controls.shell_focus, desc)
             label_color, value_color = inspector_field_colors(state, desc)

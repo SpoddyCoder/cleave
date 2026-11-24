@@ -21,6 +21,7 @@ button_bg: "#202040"
   - Keys ending in `_alpha` take 0 to 255, except the row bands, which take a pair of values from 0 to 1.
   - `button_sheen` and `button_shade` take 0 to 1.
   - `icon_lit_hover_lift` and `icon_lit_hover_edge_lift` take -1 to 1: positive values lighten a lit icon under the pointer, negative values darken it.
+- `subheading` is the heading over a group of rows, in the inspector and in dialogs.
 - `timeline_track_colors` is a list of up to eight colours, one per timeline row.
 
 ## Text on panels and text on fills
@@ -48,7 +49,7 @@ Every key a theme can set, grouped by where it appears:
 | Area | Colour names |
 | --- | --- |
 | Window and panels | `background`, `background_alpha`, `modal_scrim`, `modal_scrim_alpha`, `transport_rule`, `panel_edge`, `panel_focus_edge`, `navigator_tree_line`, `inspector_divider` |
-| Text | `label`, `value`, `disabled`, `off_control_text`, `off_control_muted`, `muted`, `highlight`, `error_notification`, `notification_on_fill` |
+| Text | `label`, `value`, `disabled`, `off_control_text`, `off_control_muted`, `muted`, `subheading`, `highlight`, `error_notification`, `notification_on_fill` |
 | Text on fills | `on_hover`, `on_hover_muted`, `on_primary`, `on_danger`, `on_accent`, `on_lit_icon` |
 | Icons and modes | `preset_icon`, `preset_file_icon`, `move_mode`, `lock_icon`, `locked`, `locked_muted`, `solo_bg`, `override_bg`, `nav_on_bg`, `nav_lock_bg`, `nav_lock_glyph`, `notice_bg`, `on_notice`, `config_dirty`, `armed_bg`, `override_glyph`, `override_glyph_off`, `rec_bg` |
 | Buttons | `button_bg`, `button_border`, `button_hover_bg`, `button_hover_border`, `button_active_bg`, `button_primary_bg`, `button_primary_border`, `button_primary_hover_bg`, `button_primary_hover_border`, `button_primary_active_bg`, `button_off_bg`, `button_off_border`, `button_off_chosen_bg`, `button_off_chosen_border`, `button_danger_bg`, `button_danger_border`, `button_danger_hover_bg`, `button_danger_hover_border`, `button_danger_active_bg`, `button_sheen`, `button_shade`, `button_glow_alpha` |
@@ -85,6 +86,7 @@ disabled: "#7c8294"
 off_control_text: "#aab1c4"
 off_control_muted: "#7c8294"
 muted: "#8c97b0"
+subheading: "#e29854"
 highlight: "#ffeb82"
 error_notification: "#ff8c8c"
 notification_on_fill: "#000000"

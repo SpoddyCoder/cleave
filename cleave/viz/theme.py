@@ -15,7 +15,10 @@ Typography roles for the live tuning overlay (text on the panel background):
   value    — emphasised text (white) for values and state indicators, and text
              on a selected or focused row, whose band is see-through
   label    — periwinkle text for row labels and prefixes
-  muted    — blue-grey text for headings, shortcuts, and unchosen options
+  muted    — blue-grey text for shortcuts, placeholders, and unchosen options
+  subheading — apricot text for the heading over a group of inspector or dialog
+             rows; never a grey, and set apart from label on the blue-yellow
+             axis, so red-green colour blindness does not merge them
   disabled — cool grey text when a row, icon, or value on the panel is inactive
   off_control_text — the label, value, or chosen option on a switched-off,
              refused, or dimmed control (on button_off_bg / button_off_chosen_bg)
@@ -334,6 +337,7 @@ class Palette:
     off_control_text: RGB
     off_control_muted: RGB
     muted: RGB
+    subheading: RGB
     highlight: RGB
     error_notification: RGB
     notification_on_fill: RGB
@@ -473,6 +477,7 @@ def _ultraviolet() -> Palette:
         off_control_text=(170, 177, 196),
         off_control_muted=(124, 130, 148),
         muted=muted,
+        subheading=(226, 152, 84),
         highlight=highlight,
         error_notification=(255, 140, 140),
         notification_on_fill=(0, 0, 0),
@@ -588,6 +593,7 @@ def _chocolate() -> Palette:
         off_control_text=(196, 176, 156),
         off_control_muted=(140, 120, 104),
         muted=(171, 146, 124),
+        subheading=(120, 170, 245),
         highlight=(255, 220, 138),
         error_notification=(255, 143, 134),
         notification_on_fill=(0, 0, 0),
@@ -705,6 +711,7 @@ def _mint() -> Palette:
         off_control_text=(168, 196, 188),
         off_control_muted=(108, 138, 130),
         muted=(134, 168, 158),
+        subheading=(92, 200, 232),
         highlight=(255, 240, 138),
         error_notification=(255, 143, 140),
         notification_on_fill=(0, 0, 0),
@@ -831,6 +838,7 @@ def _daylight() -> Palette:
         off_control_text=off_text,
         off_control_muted=disabled,
         muted=muted,
+        subheading=(176, 84, 0),
         highlight=highlight,
         error_notification=(190, 30, 30),
         notification_on_fill=white,
