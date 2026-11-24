@@ -777,7 +777,10 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Preset List Entry",
         help_description=(
-            "A preset in this layer's switching list. The highlighted entry is the one scheduled for this point in the song; while you preview another preset, it is where switching goes back to. Enter previews this entry; on the scheduled entry it does nothing, or resumes switching during a preview. A double-click (or Replace with in the right-click menu) opens the preset browser in this entry's folder, and the preset you pick there takes this entry's place. Right-click also has Cut, Copy, Paste (over, before, or after this entry), and Duplicate. Ctrl+Z undoes any change to the list. When presets change on each clip, each entry is a clip's preset, shown with the time the clip starts: replace or reorder entries here, and add or delete clips on the timeline. On a timer, each entry shows when it first plays, or not shown when its time always falls where the layer is off. Tags after the name mark its curation status and role; hover over one for a reminder:",
+            "A preset in this layer's switching list. The highlighted entry is the one scheduled for this point in the song.",
+            "On a timer, the time is when the entry first plays. On each clip, it is when its clip starts; a spare is on no clip.",
+            "Right-click for more ways to edit the list.",
+            "Tags after the name mark its curation status and role; hover over one for a reminder:",
         ),
         help_mode_entries=_PRESET_LIST_MARKER_HELP_ENTRIES,
         can_enter_move_mode=True,

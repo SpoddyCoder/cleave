@@ -67,6 +67,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Right-clicking a clip on the timeline now offers Drop song marker after the clip's own items, the same as a gap, or a song marker's items when one is under the pointer. The clip stays selected, so Delete still deletes the clip.
 - Clicking a song marker in a gap on a timeline row now moves the playhead to the marker, as clicking it on the time ruler does, and a double-click there lands on the marker instead of beside it.
 - Locks cover presets on clips. A locked timeline refuses list edits that would change its clips, and switching a layer to each clip. A locked layer refuses timeline edits that would free or take its presets (deleting a clip, recording, Generate timeline, Reset timeline). A message says which lock to open.
+- The help for a preset list entry is shorter, with the detail in the user guide, and help descriptions leave a small gap between paragraphs.
 
 ### Removed
 

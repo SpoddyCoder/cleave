@@ -42,7 +42,10 @@ def draw_help_column(sections: tuple[HelpContent, ...]) -> None:
             imgui.dummy(imgui.ImVec2(0.0, imgui.get_text_line_height()))
         _draw_heading(section.title, wrap_x)
         if isinstance(section, DescriptionSection):
-            for line in section.lines:
+            for position, line in enumerate(section.lines):
+                if position:
+                    # Half a line between paragraphs.
+                    imgui.dummy(imgui.ImVec2(0.0, imgui.get_text_line_height() * 0.5))
                 _draw_wrapped(line, palette().value, wrap_x)
             if section.lines and section.entries:
                 imgui.dummy(imgui.ImVec2(0.0, imgui.get_text_line_height()))
