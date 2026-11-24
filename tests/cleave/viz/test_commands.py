@@ -95,6 +95,7 @@ _OFF_MENU_IDS = (
     "timeline.generate",
     "timeline.reset",
     "timeline.snap_cues",
+    "timeline.snap_song_markers",
     "timeline.set_cut_type",
 )
 
@@ -844,10 +845,16 @@ def test_timeline_actions_share_run_with_the_inspector() -> None:
     controls.prompt_generate_timeline = MagicMock()
     controls.prompt_reset_timeline = MagicMock()
     controls.prompt_snap_cues = MagicMock()
+    controls.prompt_snap_song_markers = MagicMock()
     actions = (
         ("timeline.generate", RowKind.TIMELINE_GENERATE, controls.prompt_generate_timeline),
         ("timeline.reset", RowKind.TIMELINE_RESET, controls.prompt_reset_timeline),
         ("timeline.snap_cues", RowKind.TIMELINE_SNAP_CUES, controls.prompt_snap_cues),
+        (
+            "timeline.snap_song_markers",
+            RowKind.TIMELINE_SNAP_SONG_MARKERS,
+            controls.prompt_snap_song_markers,
+        ),
     )
     visualizer = CommandContext()
     locked = CommandContext(timeline_locked=True)
@@ -866,7 +873,12 @@ def test_timeline_actions_share_run_with_the_inspector() -> None:
         *build_inspector_rows(view, "timeline.grid"),
     )
     by_id = {command: row for row in rows for command in row.command_ids}
-    assert set(by_id) == {"timeline.generate", "timeline.reset", "timeline.snap_cues"}
+    assert set(by_id) == {
+        "timeline.generate",
+        "timeline.reset",
+        "timeline.snap_cues",
+        "timeline.snap_song_markers",
+    }
     assert all(row.descriptor is None for row in by_id.values())
     descriptor_kinds = {
         row.descriptor.kind for row in rows if row.descriptor is not None
@@ -874,6 +886,7 @@ def test_timeline_actions_share_run_with_the_inspector() -> None:
     assert RowKind.TIMELINE_GENERATE not in descriptor_kinds
     assert RowKind.TIMELINE_RESET not in descriptor_kinds
     assert RowKind.TIMELINE_SNAP_CUES not in descriptor_kinds
+    assert RowKind.TIMELINE_SNAP_SONG_MARKERS not in descriptor_kinds
 
     controls.shell_focus.region = ShellRegion.INSPECTOR
     controls.shell_focus.selected_id = "timeline"

@@ -225,6 +225,7 @@ _INSPECTOR_COMMAND_KINDS = {
     "timeline.reset": RowKind.TIMELINE_RESET,
     "timeline.snap_cues": RowKind.TIMELINE_SNAP_CUES,
     "timeline.snap_to_markers": RowKind.TIMELINE_SNAP_CUES,
+    "timeline.snap_song_markers": RowKind.TIMELINE_SNAP_SONG_MARKERS,
     "timeline.set_cut_type": RowKind.TIMELINE_SET_CUT_TYPE,
     "settings.open_crash_log_folder": RowKind.SETTINGS_DEV_TOOLS_OPEN_CRASH_LOG_FOLDER,
     "settings.open_themes_folder": RowKind.SETTINGS_UI_OPEN_THEMES_FOLDER,

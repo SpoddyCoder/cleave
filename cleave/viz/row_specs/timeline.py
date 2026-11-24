@@ -309,6 +309,12 @@ def _apply_timeline_snap_cues(controls: TuningControls, _desc: RowDescriptor) ->
     command_by_id("timeline.snap_cues").run(controls)
 
 
+def _apply_timeline_snap_song_markers(
+    controls: TuningControls, _desc: RowDescriptor
+) -> None:
+    command_by_id("timeline.snap_song_markers").run(controls)
+
+
 def _always_available(_state: TuningViewState, _desc: RowDescriptor) -> bool:
     return True
 
@@ -784,6 +790,19 @@ SPECS: dict[RowKind, RowSpec] = {
         help_entries=(("Enter", "open snap dialog"),),
         help_description=(
             "Quantises existing clips to the beat or bar grid, or pulls them onto nearby song markers.",
+        ),
+        blocked_by_section_lock=True,
+    ),
+    RowKind.TIMELINE_SNAP_SONG_MARKERS: RowSpec(
+        affordance=RowAffordance.COMMAND,
+        panel_label="Snap song markers…",
+        present_style=RowPresentStyle.FULL_LINE,
+        apply_action=_apply_timeline_snap_song_markers,
+        fit_strategy=FitStrategy.NONE,
+        help_title="Snap Song Markers",
+        help_entries=(("Enter", "open snap dialog"),),
+        help_description=(
+            "Moves existing song markers to the nearest beat or bar.",
         ),
         blocked_by_section_lock=True,
     ),

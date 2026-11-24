@@ -137,7 +137,7 @@ The whole editor works with the mouse:
 - **Click** a row to select it, and click a setting's options or arrows to change it.
 - **Drag** a number sideways for quick, coarse changes.
 - **Right-click** a navigator row, a preset, the preview, or anything on the timeline strip for a context menu.
-  On a sub-row (a card, a Post-FX effect, a layer's page, or a Timeline or Pattern Mask page), the menu has the switches that act for that page, such as Solo and Locked for its layer, with the owner's name in brackets when it belongs to the row above, then the page's own buttons: Go to preset list on a layer's Milkdrop Preset and Preset Switching pages, the list's Paste, Populate list, and Clear list on Preset List, Snap clips on Beat / Bar Grid, Set cut type on clips on Clip Fades, and Drop song marker at playhead and Snap clips to markers on Song Markers.
+  On a sub-row (a card, a Post-FX effect, a layer's page, or a Timeline or Pattern Mask page), the menu has the switches that act for that page, such as Solo and Locked for its layer, with the owner's name in brackets when it belongs to the row above, then the page's own buttons: Go to preset list on a layer's Milkdrop Preset and Preset Switching pages, the list's Paste, Populate list, and Clear list on Preset List, Snap clips and Snap song markers on Beat / Bar Grid, Set cut type on clips on Clip Fades, and Drop song marker at playhead and Snap clips to markers on Song Markers.
 - **Drag** the borders between panels to resize them, including the divider between the navigator and the inspector. **Double-click** a border to reset it, or use **View > Reset panel layout** to reset them all. Above 100% UI scale, the navigator and inspector column resets to a wider width so the larger text fits.
 - **Scroll** long lists with the mouse wheel.
 
@@ -572,7 +572,9 @@ Cleave detects the beat and bar grid when it first prepares a song. On **Timelin
 - **placement snap** quantises new clips and markers to the nearest beat or bar. It is off in a new project; leave it off if detection got the song wrong.
 - **bar phase** shifts the grid by one beat, for when the downbeat has been detected in the wrong place.
 
-For bulk clean-up, use **Snap clips** on this page, **Snap clips to markers** on the Song Markers page, and **Set cut type on clips** on the Clip Fades page.
+**Snap song markers** on this page moves the markers you have already placed to the nearest beat or bar, which helps when you dropped them with placement snap off. The dialog says how many will move, and how many will merge because they land on the same time. Markers before or after the detected beats stay put, and Ctrl+Z does not undo it.
+
+For bulk clean-up of clips, use **Snap clips** on this page, **Snap clips to markers** on the Song Markers page, and **Set cut type on clips** on the Clip Fades page.
 
 ---
 

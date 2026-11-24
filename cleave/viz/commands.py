@@ -449,6 +449,10 @@ def _run_snap_to_markers(controls: TuningControls) -> None:
     controls.prompt_snap_cues_to_song_markers()
 
 
+def _run_snap_song_markers(controls: TuningControls) -> None:
+    controls.prompt_snap_song_markers()
+
+
 def _run_set_cut_type(controls: TuningControls) -> None:
     controls.prompt_set_cut_type()
 
@@ -761,6 +765,14 @@ _SNAP_TO_MARKERS = Command(
     kind="command",
     enabled=_timeline_actions_enabled,
     run=_when_enabled(_timeline_actions_enabled, _run_snap_to_markers),
+    locked=_timeline_locked,
+)
+_SNAP_SONG_MARKERS = Command(
+    id="timeline.snap_song_markers",
+    label="Snap song markers…",
+    kind="command",
+    enabled=_timeline_actions_enabled,
+    run=_when_enabled(_timeline_actions_enabled, _run_snap_song_markers),
     locked=_timeline_locked,
 )
 _SET_CUT_TYPE = Command(
@@ -1140,6 +1152,7 @@ _INSPECTOR_COMMANDS: tuple[Command, ...] = (
     _GENERATE,
     _RESET,
     _SNAP,
+    _SNAP_SONG_MARKERS,
     _SET_CUT_TYPE,
     _SNAP_TO_MARKERS,
     _GO_TO_PRESET_LIST,

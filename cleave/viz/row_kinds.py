@@ -122,6 +122,7 @@ class RowKind(Enum):
     TIMELINE_BAR_GRID = auto()
     TIMELINE_PLACEMENT_SNAP = auto()
     TIMELINE_SNAP_CUES = auto()
+    TIMELINE_SNAP_SONG_MARKERS = auto()
     TIMELINE_CUTS_HEADER = auto()
     TIMELINE_HARD_CUTS = auto()
     TIMELINE_HARD_CUT_FADE_IN = auto()

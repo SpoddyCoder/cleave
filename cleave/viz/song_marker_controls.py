@@ -1,4 +1,4 @@
-"""Song-marker drop and delete for live tuning."""
+"""Song-marker drop, snap, and delete for live tuning."""
 
 from __future__ import annotations
 
@@ -12,13 +12,28 @@ from cleave.song_markers import (
     format_marker_time,
     marker_index_near,
     place_marker,
+    snap_markers,
     song_marker_gesture_warning,
 )
 from cleave.timeline import snap_placement_time
-from cleave.viz.modal import ModalHost
+from cleave.viz.modal import FormField, FormSpec, FormValues, ModalHost
 from cleave.viz.playback import PlaybackState, tap_sec
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.session import TuningSession
+
+_TARGET_BEATS = "beats"
+_TARGET_BARS = "bars"
+_SNAP_TARGETS = (_TARGET_BEATS, _TARGET_BARS)
+_SNAP_HELP = (
+    "Moves the song markers you have already placed onto the grid. Markers before or after the detected beats stay put, and markers that land on the same time merge. Clips do not move. Ctrl+Z does not undo this.",
+)
+_SNAP_TARGET_HELP = ("Where the song markers move to.",)
+_SNAP_TARGET_OPTION_HELP = {
+    _TARGET_BEATS: "each marker moves to the nearest beat.",
+    _TARGET_BARS: "each marker moves to the nearest bar.",
+}
+# A marker closer than this to its grid point counts as already there.
+_SNAP_EPS_SEC = 1e-6
 
 
 class SongMarkerController:
@@ -44,6 +59,7 @@ class SongMarkerController:
         self._duration_sec = duration_sec
         self._on_notification = on_notification
         self._on_focus_marker = on_focus_marker
+        self._last_snap_target = _TARGET_BARS
 
     def sync_focus(self, descriptor: RowDescriptor) -> None:
         if (
@@ -134,6 +150,100 @@ class SongMarkerController:
             )
         else:
             self._on_notification(f"Song marker {format_marker_time(t)}")
+
+    def prompt_snap(self) -> None:
+        """Open Snap song markers: move the placed markers to beats or bars."""
+        if self.session.timeline.locked or self.session.timeline.recording:
+            return
+        if not self.session.song_markers.markers:
+            self._notify("No song markers to snap")
+            return
+        targets = tuple(t for t in _SNAP_TARGETS if self._grid_for(t))
+        if not targets:
+            self._notify("No beats available; re-run separate")
+            return
+        target = (
+            self._last_snap_target if self._last_snap_target in targets else targets[0]
+        )
+
+        def confirm(values: FormValues) -> None:
+            self._last_snap_target = targets[values["target"]]
+            self._snap(self._last_snap_target)
+
+        self._modal.prompt_form(
+            FormSpec(
+                title="Snap song markers",
+                fields=(
+                    FormField(
+                        "target",
+                        "snap to",
+                        targets,
+                        targets.index(target),
+                        help=_SNAP_TARGET_HELP,
+                        option_help=tuple(
+                            _SNAP_TARGET_OPTION_HELP[option] for option in targets
+                        ),
+                    ),
+                ),
+                confirm_label="Snap markers",
+                on_confirm=confirm,
+                info=lambda values: self._snap_info(targets[values["target"]]),
+                help=_SNAP_HELP,
+            )
+        )
+
+    def _grid_for(self, target: str) -> tuple[float, ...]:
+        return self._bar_times if target == _TARGET_BARS else self._beat_times
+
+    def _snapped(
+        self, target: str
+    ) -> tuple[tuple[SongMarker, ...], tuple[int, ...], int]:
+        """The markers on *target*'s grid, their new indices, and how many move."""
+        bar_phase = self.session.timeline.bar_phase_offset
+        mode = "bar" if target == _TARGET_BARS else "beat"
+        markers = self.session.song_markers.markers
+        snapped, new_indices = snap_markers(
+            markers,
+            lambda t: snap_placement_time(
+                t,
+                mode,
+                beat_times=self._beat_times,
+                bar_times=self._bar_times,
+                bar_phase=bar_phase,
+            ),
+        )
+        moved = sum(
+            1
+            for marker, index in zip(markers, new_indices)
+            if abs(snapped[index].time - marker.time) > _SNAP_EPS_SEC
+        )
+        return snapped, new_indices, moved
+
+    def _snap_info(self, target: str) -> str:
+        total = len(self.session.song_markers.markers)
+        snapped, _new_indices, moved = self._snapped(target)
+        merged = total - len(snapped)
+        merges = f", merges {merged}" if merged else ""
+        return f"(moves {moved} of {total} song markers{merges})"
+
+    def _snap(self, target: str) -> None:
+        markers = self.session.song_markers
+        snapped, new_indices, moved = self._snapped(target)
+        if moved == 0:
+            self._notify(f"No song markers to move onto {target}")
+            return
+        selected = markers.selected_index
+        if selected is not None:
+            markers.selected_index = (
+                new_indices[selected] if 0 <= selected < len(new_indices) else None
+            )
+        markers.markers = list(snapped)
+        noun = "song marker" if moved == 1 else "song markers"
+        self._notify(f"Snapped {moved} {noun} to {target}")
+
+    def _notify(self, message: str) -> None:
+        if self._on_notification is not None:
+            self._on_notification(message)
 
     def marker_near(self, t_sec: float, tolerance_sec: float) -> int | None:
         """Index of the marker nearest *t_sec* within *tolerance_sec*, or None."""

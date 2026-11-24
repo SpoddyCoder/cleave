@@ -324,7 +324,10 @@ def test_beat_bar_grid_page() -> None:
         RowKind.TIMELINE_BAR_GRID,
         RowKind.TIMELINE_BAR_PHASE,
     ]
-    assert rows[-1].command_ids == ("timeline.snap_cues",)
+    assert rows[-1].command_ids == (
+        "timeline.snap_cues",
+        "timeline.snap_song_markers",
+    )
 
 
 def test_timeline_page_ends_with_generate_and_reset() -> None:

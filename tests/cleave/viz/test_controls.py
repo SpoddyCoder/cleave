@@ -2864,6 +2864,7 @@ def test_timeline_sub_rows_dim_when_disabled() -> None:
         RowKind.TIMELINE_BAR_GRID,
         RowKind.TIMELINE_PLACEMENT_SNAP,
         RowKind.TIMELINE_SNAP_CUES,
+        RowKind.TIMELINE_SNAP_SONG_MARKERS,
         RowKind.TIMELINE_CUTS_HEADER,
         RowKind.TIMELINE_HARD_CUTS,
         RowKind.TIMELINE_HARD_CUT_FADE_IN,

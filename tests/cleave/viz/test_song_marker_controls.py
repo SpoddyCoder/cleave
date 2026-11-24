@@ -199,3 +199,91 @@ def test_drop_with_negative_tap_latency_lands_later() -> None:
     player.set_tap_latency_sec(-0.05)
     controller.drop()
     assert session.song_markers.times == [15.05]
+
+
+def _open_snap(modal: ModalHost, target: str) -> None:
+    row = modal.view_state().form_rows[0]
+    modal.set_form_value(0, row.options.index(target))
+
+
+def _snap_controller():
+    notes: list[str] = []
+    controller, session, modal = _make_controller(
+        beat_times=tuple(float(t) for t in range(0, 17)),
+        bar_times=(0.0, 4.0, 8.0, 12.0, 16.0),
+        on_notification=notes.append,
+    )
+    return controller, session, modal, notes
+
+
+def test_snap_moves_markers_to_bars_and_keeps_types_and_selection() -> None:
+    controller, session, modal, notes = _snap_controller()
+    session.song_markers.markers = [
+        SongMarker(4.3, "begin"),
+        SongMarker(8.0),
+        SongMarker(60.0),
+    ]
+    session.song_markers.selected_index = 1
+    controller.prompt_snap()
+    view = modal.view_state()
+    assert view.form_rows[0].options == ("beats", "bars")
+    assert view.form_info == "(moves 1 of 3 song markers)"
+    modal.activate_option(0)
+    assert session.song_markers.markers == [
+        SongMarker(4.0, "begin"),
+        SongMarker(8.0),
+        SongMarker(60.0),
+    ]
+    assert session.song_markers.selected_index == 1
+    assert notes == ["Snapped 1 song marker to bars"]
+
+
+def test_snap_to_beats_and_remembers_target() -> None:
+    controller, session, modal, notes = _snap_controller()
+    session.song_markers.times = [4.3, 6.6]
+    controller.prompt_snap()
+    _open_snap(modal, "beats")
+    modal.activate_option(0)
+    assert session.song_markers.times == [4.0, 7.0]
+    controller.prompt_snap()
+    row = modal.view_state().form_rows[0]
+    assert row.options[row.value] == "beats"
+
+
+def test_snap_to_bars_follows_bar_phase() -> None:
+    controller, session, modal, _notes = _snap_controller()
+    session.timeline.bar_phase_offset = 1
+    session.song_markers.times = [4.3]
+    controller.prompt_snap()
+    modal.activate_option(0)
+    assert session.song_markers.times == [5.0]
+
+
+def test_snap_merge_follows_selection() -> None:
+    controller, session, modal, _notes = _snap_controller()
+    session.song_markers.times = [3.9, 4.2, 8.1]
+    session.song_markers.selected_index = 2
+    controller.prompt_snap()
+    assert modal.view_state().form_info == "(moves 3 of 3 song markers, merges 1)"
+    modal.activate_option(0)
+    assert session.song_markers.times == [4.0, 8.0]
+    assert session.song_markers.selected_index == 1
+
+
+def test_snap_refused_without_markers_grid_or_while_locked_or_recording() -> None:
+    controller, session, modal, notes = _snap_controller()
+    controller.prompt_snap()
+    assert notes == ["No song markers to snap"]
+    session.song_markers.times = [4.3]
+    session.timeline.recording = True
+    controller.prompt_snap()
+    session.timeline.recording = False
+    session.timeline.locked = True
+    controller.prompt_snap()
+    assert not modal.active
+
+    gridless, session, modal = _make_controller(on_notification=notes.append)
+    session.song_markers.times = [4.3]
+    gridless.prompt_snap()
+    assert not modal.active
+    assert notes[-1] == "No beats available; re-run separate"

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import bisect
 from dataclasses import dataclass
-from typing import Literal, Sequence
+from typing import Callable, Literal, Sequence
 
 from cleave.choice import step_choice
 
@@ -134,6 +134,29 @@ def place_marker(
     updated = list(markers)
     bisect.insort(updated, SongMarker(t), key=lambda m: m.time)
     return tuple(updated), None, None
+
+
+def snap_markers(
+    markers: Sequence[SongMarker],
+    snap: Callable[[float], float],
+) -> tuple[tuple[SongMarker, ...], tuple[int, ...]]:
+    """Move every marker to ``snap(time)``, merging markers that land together.
+
+    A merged marker keeps the first type that is not standard. Returns
+    ``(new_markers, new_indices)``, where ``new_indices[i]`` is where
+    ``markers[i]`` ended up in ``new_markers``.
+    """
+    snapped = [float(snap(m.time)) for m in markers]
+    merged: dict[float, SongMarker] = {}
+    for marker, t in zip(markers, snapped):
+        held = merged.get(t)
+        if held is None or held.marker_type == DEFAULT_SONG_MARKER_TYPE:
+            merged[t] = SongMarker(t, marker.marker_type)
+    times = sorted(merged)
+    return (
+        tuple(merged[t] for t in times),
+        tuple(times.index(t) for t in snapped),
+    )
 
 
 def format_marker_time(t: float) -> str:

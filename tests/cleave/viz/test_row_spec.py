@@ -487,6 +487,7 @@ def test_render_value_children_blocked_by_section_lock() -> None:
     assert row_blocked_by_section_lock(RowKind.TIMELINE_GENERATE) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_BAR_PHASE) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_SNAP_CUES) is True
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_SNAP_SONG_MARKERS) is True
     assert row_blocked_by_section_lock(RowKind.SONG_MARKER_ITEM) is True
     assert row_blocked_by_section_lock(RowKind.SONG_MARKERS_HEADER) is False
     assert row_blocked_by_section_lock(RowKind.TIMELINE_BEAT_BAR_GRID_HEADER) is False

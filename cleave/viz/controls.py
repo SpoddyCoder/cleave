@@ -1141,6 +1141,9 @@ class TuningControls:
     def prompt_snap_cues_to_song_markers(self) -> None:
         self._timeline_snap.prompt_song_markers()
 
+    def prompt_snap_song_markers(self) -> None:
+        self.song_markers.prompt_snap()
+
     def prompt_set_cut_type(self) -> None:
         self._timeline_cuts.prompt()
 

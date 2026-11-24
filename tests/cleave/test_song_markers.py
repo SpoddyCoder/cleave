@@ -10,6 +10,7 @@ from cleave.song_markers import (
     format_marker_time,
     nearest_index,
     place_marker,
+    snap_markers,
     song_marker_gesture_warning,
 )
 
@@ -166,3 +167,12 @@ def test_song_marker_gesture_warning_diminuendo_info() -> None:
         song_marker_gesture_warning(markers, 1)
         == "diminuendo is not generated yet"
     )
+
+
+def test_snap_markers_merges_and_maps_indices() -> None:
+    markers, indices = snap_markers(
+        (SongMarker(3.9), SongMarker(4.2, "crescendo"), SongMarker(9.0, "begin")),
+        lambda t: round(t / 4.0) * 4.0,
+    )
+    assert markers == (SongMarker(4.0, "crescendo"), SongMarker(8.0, "begin"))
+    assert indices == (0, 0, 1)

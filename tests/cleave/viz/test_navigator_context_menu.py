@@ -132,7 +132,10 @@ def test_post_fx_effect_owns_its_switch_and_names_the_parent_lock() -> None:
 def test_timeline_pages_offer_their_buttons() -> None:
     controls = make_controls(("layer_1",))
     _open(controls, "timeline")
-    assert _labels(controls, "timeline.grid")[-1] == "Snap clips…"
+    assert _labels(controls, "timeline.grid")[-2:] == [
+        "Snap clips…",
+        "Snap song markers…",
+    ]
     markers = _entries(controls, "timeline.song_markers")
     assert "navigator.drop_marker" in markers
     assert markers["navigator.drop_marker"].shortcut == "Ctrl+Enter"
