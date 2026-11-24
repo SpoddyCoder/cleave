@@ -12,6 +12,9 @@ NOTIFICATION_ATTENTION_SWIPE_IN_SEC = 0.25
 NOTIFICATION_ATTENTION_HOLD_SEC = 1.0
 NOTIFICATION_ATTENTION_SWIPE_OUT_SEC = 0.25
 
+# The inspector title's bar swipes in slower than a notification's.
+TITLE_ATTENTION_SWIPE_IN_SEC = 0.5
+
 NOTIFICATION_ATTENTION_DURATION_SEC = (
     NOTIFICATION_ATTENTION_SWIPE_IN_SEC
     + NOTIFICATION_ATTENTION_HOLD_SEC
@@ -56,11 +59,14 @@ class PanelNotificationActive(NamedTuple):
 
 
 def notification_attention(
-    elapsed_sec: float, *, hold_sec: float = NOTIFICATION_ATTENTION_HOLD_SEC
+    elapsed_sec: float,
+    *,
+    hold_sec: float = NOTIFICATION_ATTENTION_HOLD_SEC,
+    swipe_in_sec: float = NOTIFICATION_ATTENTION_SWIPE_IN_SEC,
 ) -> NotificationAttention:
     """Return swipe/hold visuals for *elapsed_sec* since the notification appeared."""
     t = max(0.0, elapsed_sec)
-    swipe_in = NOTIFICATION_ATTENTION_SWIPE_IN_SEC
+    swipe_in = swipe_in_sec
     hold = hold_sec
     swipe_out = NOTIFICATION_ATTENTION_SWIPE_OUT_SEC
 
@@ -113,7 +119,11 @@ def attention_scroll_hold_sec(scroll_sec: float) -> float:
 
 
 def attention_scroll_offset(
-    elapsed_sec: float, overflow_px: float, scroll_sec: float
+    elapsed_sec: float,
+    overflow_px: float,
+    scroll_sec: float,
+    *,
+    swipe_in_sec: float = NOTIFICATION_ATTENTION_SWIPE_IN_SEC,
 ) -> float:
     """Leftward text offset in pixels, *elapsed_sec* into the attention swipe.
 
@@ -123,9 +133,8 @@ def attention_scroll_offset(
     """
     if overflow_px <= 0.0 or scroll_sec <= 0.0:
         return 0.0
-    swipe_in = NOTIFICATION_ATTENTION_SWIPE_IN_SEC
-    swipe_out_at = swipe_in + attention_scroll_hold_sec(scroll_sec)
-    t = elapsed_sec - swipe_in - ATTENTION_SCROLL_LEAD_SEC
+    swipe_out_at = swipe_in_sec + attention_scroll_hold_sec(scroll_sec)
+    t = elapsed_sec - swipe_in_sec - ATTENTION_SCROLL_LEAD_SEC
     if t <= 0.0 or elapsed_sec >= swipe_out_at:
         return 0.0
     return overflow_px * smoothstep(min(1.0, t / scroll_sec))

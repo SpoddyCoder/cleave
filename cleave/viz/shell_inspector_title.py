@@ -30,6 +30,7 @@ from cleave.viz.navigator import (
     timeline_row_title,
 )
 from cleave.viz.panel_notification import (
+    TITLE_ATTENTION_SWIPE_IN_SEC,
     attention_scroll_offset,
     attention_scroll_sec,
     notification_attention,
@@ -264,7 +265,9 @@ def draw_inspector_title(
     overflow = title_w - title_room
     scroll_sec = attention_scroll_sec(overflow, space_w)
     # The bar swipes in and stays. An infinite elapsed (highlight off) draws no bar.
-    attention = notification_attention(elapsed_sec, hold_sec=math.inf)
+    attention = notification_attention(
+        elapsed_sec, hold_sec=math.inf, swipe_in_sec=TITLE_ATTENTION_SWIPE_IN_SEC
+    )
     # The bar, title, and icons run into the window padding, past the
     # window's own clip rect, so only the window's edge clips them (and
     # bounds the icons' hover).
@@ -293,7 +296,12 @@ def draw_inspector_title(
                 right,
                 left,
             )
-        offset = attention_scroll_offset(elapsed_sec, overflow, scroll_sec)
+        offset = attention_scroll_offset(
+            elapsed_sec,
+            overflow,
+            scroll_sec,
+            swipe_in_sec=TITLE_ATTENTION_SWIPE_IN_SEC,
+        )
         draw.push_clip_rect(
             imgui.ImVec2(start.x, bar_y0),
             imgui.ImVec2(start.x + title_room, bar_y1),
