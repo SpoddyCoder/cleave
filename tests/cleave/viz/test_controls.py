@@ -2167,6 +2167,53 @@ def test_timeline_snap_bars_mutates_cues() -> None:
     assert view.notification_message == "Snapped timeline clips to bars"
 
 
+def test_timeline_snap_bars_follows_bar_phase() -> None:
+    controls = make_controls(
+        ("layer_1", "layer_2"),
+        beat_times=tuple(float(i) for i in range(12)),
+        bar_times=(0.0, 4.0, 8.0),
+    )
+    # Shifted bars are 1, 5, 9, so one cue is already on the grid.
+    controls.session.timeline.bar_phase_offset = 1
+    controls.session.timeline.lanes = {
+        "layer_1": _lane(None, (1.0, True), (4.4, False)),
+        "layer_2": _lane(None, (8.4, True)),
+    }
+    _focus_timeline_snap_cues(controls)
+    _press_focused(controls, keydown(pygame.K_RETURN))
+    _set_form_field(controls, "snap to", "bars")
+    modal_view = controls.modal_host.view_state()
+    assert modal_view is not None
+    assert modal_view.form_info == "(moves 2 of 3 clip edges)"
+    _snap_to(controls, "bars")
+    assert controls.session.timeline.lanes["layer_1"].cues == [
+        SlotCue(t=1.0, level=1.0),
+        SlotCue(t=5.0, level=0.0),
+    ]
+    assert controls.session.timeline.lanes["layer_2"].cues == [
+        SlotCue(t=9.0, level=1.0),
+    ]
+
+
+def test_timeline_snap_bars_with_bar_phase_past_last_beat() -> None:
+    controls = make_controls(
+        ("layer_1",),
+        beat_times=(0.0, 1.0, 2.0),
+        bar_times=(0.0, 2.0),
+    )
+    # Both bars clamp to the last beat.
+    controls.session.timeline.bar_phase_offset = 3
+    controls.session.timeline.lanes = {
+        "layer_1": _lane(None, (0.4, True)),
+    }
+    _focus_timeline_snap_cues(controls)
+    _press_focused(controls, keydown(pygame.K_RETURN))
+    _snap_to(controls, "bars")
+    assert controls.session.timeline.lanes["layer_1"].cues == [
+        SlotCue(t=2.0, level=1.0),
+    ]
+
+
 def test_timeline_snap_beats_recording_blocks() -> None:
     controls = make_controls(
         ("layer_1",),

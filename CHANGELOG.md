@@ -79,6 +79,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Snap clips > bars follows bar phase, so clip edges move onto the bars the timeline draws, and the dialog counts the edges it will move the same way. Before, with a bar phase other than +0, they moved onto the wrong beats.
 - Help for a song marker no longer says Enter opens a list (it seeks to the marker), and help while recording now says Esc stops the recording instead of closing the timeline.
 - Measure audio latency and Calibrate tap timing no longer leave the song further on than where they started. The song kept moving silently under the click track, so it picked up as far past where you left it as the test had taken.
 - With presets changing on each clip, a layer that is on from the start of the song now counts that opening stretch as its first clip. Before, the next clip played the first preset in the list again, and Populate made one preset too few.
