@@ -745,7 +745,7 @@ SPECS: dict[RowKind, RowSpec] = {
             ("Left/Right", "move grid and clips -1 / +1 beat"),
         ),
         help_description=(
-            "Shifts the bar grid, and every clip with it, by one beat, to fix a downbeat detected in the wrong place. Re-snap clips to song markers afterwards.",
+            "Shifts the bar grid, and any clips with it, by one beat, to fix a downbeat detected in the wrong place. Re-snap clips to song markers afterwards.",
         ),
         repeatable=True,
         blocked_by_section_lock=True,

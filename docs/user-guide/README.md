@@ -174,7 +174,7 @@ The same icons, in the same order, also sit at the right of the icon line under 
 
 ### Undo
 
-**Edit > Undo** (Ctrl+Z) and **Edit > Redo** (Ctrl+Y) cover timeline edits (adding, moving, trimming, splitting, and deleting clips, a clip's preset, recorded takes, turning the timeline on or off, and timeline commands such as Generate timeline) and preset list edits (adding, removing, moving, pasting, replacing, Populate list, and Clear list), and any change to a layer's change presets setting (a quick run of arrow presses is one step). The menu item names the step it would undo. A step that changes a locked layer's presets, or a locked timeline, waits until you unlock it; one that changes both waits for both. Ctrl+Z then tells you which to unlock. Other settings apply as you change them, so save when you are happy, or close without saving to discard your changes.
+**Edit > Undo** (Ctrl+Z) and **Edit > Redo** (Ctrl+Y) cover timeline edits (adding, moving, trimming, splitting, and deleting clips, a clip's preset, recorded takes, turning the timeline on or off, bar phase, and timeline commands such as Generate timeline) and preset list edits (adding, removing, moving, pasting, replacing, Populate list, and Clear list), and any change to a layer's change presets setting (a quick run of arrow presses is one step). The menu item names the step it would undo. A step that changes a locked layer's presets, or a locked timeline, waits until you unlock it; one that changes both waits for both. Ctrl+Z then tells you which to unlock. Other settings apply as you change them, so save when you are happy, or close without saving to discard your changes.
 
 ---
 
@@ -570,7 +570,7 @@ Cleave detects the beat and bar grid when it first prepares a song. On **Timelin
 
 - **bar grid** draws the bars on the strip.
 - **placement snap** quantises new clips and markers to the nearest beat or bar. It is off in a new project; leave it off if detection got the song wrong.
-- **bar phase** shifts the grid by one beat, for when the downbeat has been detected in the wrong place.
+- **bar phase** shifts the grid, and any clips with it, by one beat, for when the downbeat has been detected in the wrong place. Set it before you record, if you can, so new clips land on the right bars. Ctrl+Z undoes it, clips included.
 
 **Snap song markers** on this page moves the markers you have already placed to the nearest beat or bar, which helps when you dropped them with placement snap off. The dialog says how many will move, and how many will merge because they land on the same time. Markers before or after the detected beats stay put, and Ctrl+Z does not undo it.
 

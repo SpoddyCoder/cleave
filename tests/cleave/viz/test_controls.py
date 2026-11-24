@@ -2309,6 +2309,61 @@ def test_timeline_bar_phase_left_wraps_offset() -> None:
     assert view.notification_message == "Bar phase +3"
 
 
+def test_timeline_bar_phase_nudges_without_clips() -> None:
+    controls = make_controls(
+        ("layer_1",),
+        beat_times=(0.0, 1.0, 2.0, 3.0),
+        bar_times=(0.0,),
+    )
+    controls.session.timeline.lanes = {"layer_1": _lane(None)}
+    _focus_timeline_bar_phase(controls)
+    assert _press_focused(controls, keydown(pygame.K_RIGHT)) is True
+    assert controls.session.timeline.bar_phase_offset == 1
+    assert controls.session.timeline.lanes["layer_1"].cues == []
+    view = controls.build_view_state(paused=False)
+    assert view.notification_message == "Bar phase +1"
+
+
+def test_timeline_bar_phase_undo_and_redo_restore_clips_and_offset() -> None:
+    controls = make_controls(
+        ("layer_1",),
+        beat_times=(0.0, 1.0, 2.0, 3.0),
+        bar_times=(0.0,),
+    )
+    tl = controls.session.timeline
+    tl.lanes = {"layer_1": _lane(None, (1.0, True))}
+    _focus_timeline_bar_phase(controls)
+    _press_focused(controls, keydown(pygame.K_RIGHT))
+    _press_focused(controls, keydown(pygame.K_RIGHT))
+    assert (tl.bar_phase_offset, tl.lanes["layer_1"].cues[0].t) == (2, 3.0)
+    controls.undo()
+    assert (tl.bar_phase_offset, tl.lanes["layer_1"].cues[0].t) == (0, 1.0)
+    assert not controls.edit_history.can_undo
+    controls.redo()
+    assert (tl.bar_phase_offset, tl.lanes["layer_1"].cues[0].t) == (2, 3.0)
+
+
+def test_timeline_bar_phase_undo_steps_back_before_deleted_clips() -> None:
+    controls = make_controls(
+        ("layer_1",),
+        beat_times=(0.0, 1.0, 2.0, 3.0),
+        bar_times=(0.0,),
+    )
+    tl = controls.session.timeline
+    tl.lanes = {"layer_1": _lane(None, (1.0, True))}
+    with controls.edit_history.recording("Delete clip"):
+        tl.lanes["layer_1"] = _lane(None)
+    _focus_timeline_bar_phase(controls)
+    _press_focused(controls, keydown(pygame.K_RIGHT))
+    assert tl.bar_phase_offset == 1
+    controls.undo()
+    assert tl.bar_phase_offset == 0
+    assert tl.lanes["layer_1"].cues == []
+    controls.undo()
+    assert tl.bar_phase_offset == 0
+    assert tl.lanes["layer_1"].cues[0].t == 1.0
+
+
 def test_timeline_bar_phase_recording_blocks() -> None:
     controls = make_controls(
         ("layer_1",),

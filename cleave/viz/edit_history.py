@@ -1,10 +1,12 @@
 """Undo and redo for timeline and preset list edits.
 
-Each entry holds the timeline and every layer's preset list and switching
-trigger before and after one edit: a bulk command, a hand edit to a clip, a
-recorded take, a preset list edit, or a change of when presets change. Undo runs only while that state still matches what the edit left
-behind, so a change made outside the history is never thrown away. Layer
-changes count, since lanes and preset lists are keyed by slot.
+Each entry holds the timeline (with its bar phase) and every layer's preset
+list and switching trigger before and after one edit: a bulk command, a hand
+edit to a clip, a recorded take, a bar phase nudge, a preset list edit, or a
+change of when presets change. Undo runs only while that state still matches
+what the edit left behind, so a change made outside the history is never
+thrown away. Layer changes count, since lanes and preset lists are keyed by
+slot.
 
 Each entry names its scopes, so the Undo command can refuse one that changes
 a locked section: :data:`TIMELINE_SCOPE`, and :func:`preset_list_scope` for
@@ -54,6 +56,7 @@ class EditSnapshot:
 
     lanes: dict[str, TimelineLane]
     timeline_enabled: bool
+    bar_phase_offset: int
     preset_lists: dict[str, list[PresetListEntry]]
     # Each layer's switching trigger: entering or leaving "each clip" moves
     # presets between the list and the clips in the same step.
@@ -69,6 +72,7 @@ class EditSnapshot:
         return (
             self.lanes == other.lanes
             and self.timeline_enabled == other.timeline_enabled
+            and self.bar_phase_offset == other.bar_phase_offset
             and self.preset_lists == other.preset_lists
             and self.triggers == other.triggers
             and self.pattern_mask == other.pattern_mask
@@ -337,6 +341,7 @@ class EditHistory:
         return (
             session.timeline.lanes == snapshot.lanes
             and bool(session.timeline.enabled) == snapshot.timeline_enabled
+            and session.timeline.bar_phase_offset == snapshot.bar_phase_offset
             and (mask.enabled, mask.type, mask.feather_pct, mask.transition)
             == snapshot.pattern_mask
             and len(session.layers) == len(snapshot.preset_lists)
@@ -353,6 +358,7 @@ class EditHistory:
         return EditSnapshot(
             lanes={slot: copy_lane(lane) for slot, lane in session.timeline.lanes.items()},
             timeline_enabled=bool(session.timeline.enabled),
+            bar_phase_offset=session.timeline.bar_phase_offset,
             preset_lists={
                 slot: list(layer.preset_list)
                 for slot, layer in session.layers.items()
@@ -375,6 +381,7 @@ class EditHistory:
             slot: copy_lane(lane) for slot, lane in snapshot.lanes.items()
         }
         session.timeline.enabled = snapshot.timeline_enabled
+        session.timeline.bar_phase_offset = snapshot.bar_phase_offset
         session.timeline.selected_clip_t = dict(snapshot.selected_clip_t)
         mask = session.pattern_mask
         mask.enabled, mask.type, mask.feather_pct, mask.transition = (
@@ -411,6 +418,7 @@ def _changed_scopes(
     if (
         before.lanes != after.lanes
         or before.timeline_enabled != after.timeline_enabled
+        or before.bar_phase_offset != after.bar_phase_offset
     ):
         scopes.add(TIMELINE_SCOPE)
     for slot, preset_list in after.preset_lists.items():

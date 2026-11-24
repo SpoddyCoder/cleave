@@ -18,7 +18,10 @@ def _lane(*times: float) -> TimelineLane:
 def _session() -> SimpleNamespace:
     return SimpleNamespace(
         timeline=SimpleNamespace(
-            lanes={"layer_1": _lane(1.0)}, enabled=True, selected_clip_t={}
+            lanes={"layer_1": _lane(1.0)},
+            enabled=True,
+            bar_phase_offset=0,
+            selected_clip_t={},
         ),
         layers={
             "layer_1": SimpleNamespace(

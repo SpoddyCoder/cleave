@@ -308,6 +308,7 @@ class TuningControls:
             session,
             beat_times,
             on_notification=self.show_notification,
+            history=self.edit_history,
         )
         self._timeline_snap = TimelineSnapController(
             session,
