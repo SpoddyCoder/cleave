@@ -8,6 +8,7 @@ from dataclasses import replace
 
 from cleave.viz.modal import ModalHelpSection, ModalHost
 from cleave.viz.context_menu import ContextMenuState
+from cleave.choice import ChoiceKind
 from cleave.blend_modes import BLEND_MODE_HELP_ENTRIES, BLEND_MODES
 from cleave.cue_roles import CUE_ROLE_MARKER_HELP_ENTRIES
 from cleave.config_schema.editor import EDITOR_PREVIEW_QUALITY_HELP_ENTRIES
@@ -42,7 +43,7 @@ from cleave.viz.help_content import (
 )
 from cleave.viz.shell_focus import CycleStop, ShellFocusState, ShellRegion
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
-from cleave.viz.row_spec import ROW_SPECS, RowSpec
+from cleave.viz.row_spec import ROW_SPECS, RowSpec, row_choice_kind
 
 
 _ROW_SECTION_SKIP_TITLES = {NAVIGATION_SECTION.title, "Navigator"}
@@ -903,7 +904,7 @@ def test_timeline_strip_help_paused() -> None:
     assert entries[", / ."] == "nudge clip opacity -/+ 1%"
     assert entries["Ctrl + , / ."] == "nudge clip opacity -/+ 10%"
     keys = [key for key, _ in section.entries]
-    assert keys.index("Ctrl + Space / R") + 1 == keys.index("Space")
+    assert keys.index("A") + 1 == keys.index("Ctrl + Space / R")
 
 
 def test_timeline_strip_help_single_layer() -> None:
@@ -951,7 +952,7 @@ def test_timeline_strip_help_recording_while_playing() -> None:
     assert entries["Left/Right"] == "skip 10s, fills range"
     assert "Shift + Left/Right" not in entries
     assert "Ctrl + Left/Right" not in entries
-    assert entries["R"] == "stop record"
+    assert entries["R / Esc"] == "stop record"
     assert entries["Ctrl + Space / Space"] == "stop record and pause"
     assert "Space" not in entries
 
@@ -1094,12 +1095,66 @@ def test_preview_stop_lists_its_menu_and_keys() -> None:
 
 def test_controls_split_into_keyboard_and_mouse() -> None:
     section = layer_section(timeline_enabled=False)
-    assert [heading for heading, _ in control_groups(section)] == ["Keyboard", "Mouse"]
+    assert [heading for heading, _ in control_groups(section)] == ["Mouse", "Keyboard"]
     keys_only = HelpSection("Edit", (("Enter", "edit"),))
     assert control_groups(keys_only) == (("Keyboard", keys_only.entries),)
     text = help_column_text((section,)).splitlines()
-    assert text.index("Keyboard") < text.index("L") < text.index("Mouse")
-    assert text.index("Mouse") < text.index("Drag handle")
+    assert text.index("Mouse") < text.index("Drag handle") < text.index("Keyboard")
+    assert text.index("Keyboard") < text.index("L")
+
+
+def test_global_help_lists_playback_and_page_keys() -> None:
+    for curation in (False, True):
+        entries = dict(navigation_section(preset_curation=curation).entries)
+        assert entries["Space"] == "play / pause"
+        assert entries["Alt + Left/Right"] == "back / forward through pages"
+        assert entries["Shift + F10 / Menu"] == "options for the highlighted item"
+        # Preset curation skips F3.
+        assert ("F3" in entries) is not curation
+
+
+def test_every_list_row_says_enter_opens_it() -> None:
+    for kind, behavior in ROW_SPECS.items():
+        if row_choice_kind(kind) is not ChoiceKind.COMBO:
+            continue
+        entries = [
+            entry
+            for section in sections_for(kind)
+            if isinstance(section, HelpSection)
+            for entry in section.entries
+        ]
+        opens = ("Enter", "open the list") in entries
+        assert opens is (behavior.apply_action is None), kind
+
+
+def test_no_control_is_listed_twice() -> None:
+    sections = [NAVIGATION_SECTION, navigation_section(preset_curation=True)]
+    sections += [PREVIEW_SECTION, *PRESET_BROWSER_SECTIONS]
+    for recording in (False, True):
+        for override in (False, True):
+            sections.append(
+                timeline_strip_section(
+                    paused=False, recording=recording, override_active=override
+                )
+            )
+    for kind in ROW_SPECS:
+        sections += sections_for(kind, preset_switching="on")
+    for section in sections:
+        if not isinstance(section, HelpSection):
+            continue
+        for entries in (section.entries, section.mouse_entries):
+            keys = [key for key, _action in entries]
+            assert len(keys) == len(set(keys)), (section.title, keys)
+
+
+def test_recording_strip_help_ends_record_with_esc() -> None:
+    entries = dict(
+        timeline_strip_section(
+            paused=False, recording=True, override_active=False
+        ).entries
+    )
+    assert entries["R / Esc"] == "stop record"
+    assert "Esc" not in entries
 
 
 def test_no_mouse_action_under_keyboard() -> None:

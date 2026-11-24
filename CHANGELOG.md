@@ -29,7 +29,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
-- Help lists keys and mouse actions apart, under Keyboard and Mouse headings, everywhere it shows controls. The Keyboard Controls title is now Controls.
+- Help lists mouse actions and keys apart, under Mouse and Keyboard headings, everywhere it shows controls, with related controls next to each other. Navigation / Global adds Space, Alt+Left/Right, Shift+F10, and F3, and every setting with a list says Enter opens it. The Keyboard Controls title is now Controls.
 - Headings over groups of rows, in the inspector and in dialogs such as Generate timeline and Download packages, have their own colour in each theme instead of a grey that looked disabled. Theme files set it as `subheading`.
 - The Preset Switching page's trigger row is now change presets, with the choices never, on a timer, projectM decides, and each clip (before: off, timer, projectm, timeline). Choosing each clip turns the timeline on; from on a timer, the row is cut into clips where the presets change, and with presets the timer never shows kept as spares, and otherwise the clips stay and take the list's presets in order, unless they already hold them. When that would cut clips, replace presets clips hold, or turn the timeline on, a dialog says exactly what will change before you go ahead.
 - Turning the timeline on for the first time no longer changes what you see: every layer that is on gets one clip for the whole song. Turning the timeline on or off, and any change to a layer's change presets setting, are now undo steps.
@@ -77,6 +77,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Help for a song marker no longer says Enter opens a list (it seeks to the marker), and help while recording now says Esc stops the recording instead of closing the timeline.
 - Measure audio latency and Calibrate tap timing no longer leave the song further on than where they started. The song kept moving silently under the click track, so it picked up as far past where you left it as the test had taken.
 - With presets changing on each clip, a layer that is on from the start of the song now counts that opening stretch as its first clip. Before, the next clip played the first preset in the list again, and Populate made one preset too few.
 - Preset switching always starts at the first preset in the list, live and in renders. Before, it started from whichever preset the layer was last browsed to before saving, so looking at a list entry and saving could move where the song's presets began.

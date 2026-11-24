@@ -68,8 +68,8 @@ def modal_help_content(
 
 
 CONTROLS_SECTION_TITLE = "Controls"
-KEYBOARD_SUBHEADING = "Keyboard"
 MOUSE_SUBHEADING = "Mouse"
+KEYBOARD_SUBHEADING = "Keyboard"
 
 
 def control_groups(
@@ -77,69 +77,62 @@ def control_groups(
 ) -> tuple[tuple[str, tuple[HelpEntry, ...]], ...]:
     """The section's sub-headings with their entries, leaving out empty ones."""
     groups = (
-        (KEYBOARD_SUBHEADING, section.entries),
         (MOUSE_SUBHEADING, section.mouse_entries),
+        (KEYBOARD_SUBHEADING, section.entries),
     )
     return tuple((heading, entries) for heading, entries in groups if entries)
 
 
-_REGION_MOVE_ENTRY = (
-    "Up/Down",
-    "move in the active region",
+# Entries run from moving, through acting on the item and editing it, to
+# leaving. Related entries sit together, and Delete and Esc come last in
+# their group.
+_MOVE_ENTRIES: tuple[HelpEntry, ...] = (
+    ("Up/Down", "move in the active region"),
+    ("Left/Right", "open/close a navigator node, or change an inspector value"),
+    ("Ctrl + Up/Down", "previous / next top-level node"),
+    (
+        "Tab / Shift+Tab",
+        "move between Menu, Navigator, Inspector, Preview, and Timeline (when the strip is open)",
+    ),
+    ("Alt + Left/Right", "back / forward through pages"),
+    ("F10 / Alt", "focus menu bar"),
+    ("Alt + underlined letter", "open that menu (F, E, V, P, S, H)"),
+    ("Shift + F10 / Menu", "options for the highlighted item"),
 )
-_NAVIGATOR_EXPAND_ENTRY = (
-    "Left/Right",
-    "open/close a navigator node, or change an inspector value",
-)
-_REGION_CYCLE_ENTRY = (
-    "Tab / Shift+Tab",
-    "move between Menu, Navigator, Inspector, Preview, and Timeline (when the strip is open)",
-)
-_TOP_LEVEL_NAV_ENTRY = (
-    "Ctrl + Up/Down",
-    "previous / next top-level node",
-)
-_SEEK_AND_QUIT_ENTRIES: tuple[HelpEntry, ...] = (
+_PLAYBACK_ENTRIES: tuple[HelpEntry, ...] = (
+    ("Space", "play / pause"),
     ("Shift + Left/Right", "skip 2s"),
     ("Ctrl + Left/Right", "skip 30s"),
+)
+_VIEW_ENTRIES: tuple[HelpEntry, ...] = (
     ("H", "show / hide help"),
     ("Ctrl + F", "play full screen (Esc returns)"),
     ("F11", "full screen editor"),
-    ("Ctrl + Q", "quit"),
 )
+_QUIT_ENTRY: HelpEntry = ("Ctrl + Q", "quit")
 
 NAVIGATION_SECTION = HelpSection(
     "Navigation / Global",
     (
-        _REGION_MOVE_ENTRY,
-        _NAVIGATOR_EXPAND_ENTRY,
-        _REGION_CYCLE_ENTRY,
-        _TOP_LEVEL_NAV_ENTRY,
-        *_SEEK_AND_QUIT_ENTRIES,
+        *_MOVE_ENTRIES,
+        *_PLAYBACK_ENTRIES,
+        ("Ctrl + Enter", "add song marker"),
+        ("Ctrl + Z / Ctrl + Y", "undo / redo"),
         ("Ctrl + N", "new project"),
         ("Ctrl + O", "open project"),
         ("Ctrl + S", "save"),
-        ("Ctrl + Z / Ctrl + Y", "undo / redo"),
-        ("Ctrl + Enter", "add song marker"),
-        ("F10 / Alt", "focus menu bar"),
-        ("Alt + underlined letter", "open that menu (F, E, V, P, S, H)"),
         ("Ctrl + R", "render"),
         ("Ctrl + ,", "open Settings > Preview"),
+        *_VIEW_ENTRIES,
+        ("F3", "show / hide the frame timer"),
+        _QUIT_ENTRY,
     ),
     (("Right-click preview", "play, solo, on/off, quality, grab still"),),
 )
 
 _CURATION_NAVIGATION_SECTION = HelpSection(
     "Navigation / Global",
-    (
-        _REGION_MOVE_ENTRY,
-        _NAVIGATOR_EXPAND_ENTRY,
-        _REGION_CYCLE_ENTRY,
-        _TOP_LEVEL_NAV_ENTRY,
-        *_SEEK_AND_QUIT_ENTRIES,
-        ("F10 / Alt", "focus menu bar"),
-        ("Alt + underlined letter", "open that menu (F, E, V, P, S, H)"),
-    ),
+    (*_MOVE_ENTRIES, *_PLAYBACK_ENTRIES, *_VIEW_ENTRIES, _QUIT_ENTRY),
     (("Right-click preview", "play, quality, grab still"),),
 )
 
@@ -153,8 +146,8 @@ def navigation_section(*, preset_curation: bool = False) -> HelpSection:
 PREVIEW_SECTION = HelpSection(
     "Preview",
     (
-        ("Shift + F10 / Menu", "preview options"),
         ("Space", "play / pause"),
+        ("Shift + F10 / Menu", "preview options"),
         ("Esc", "back to the navigator"),
     ),
     (("Right-click", "preview options"),),
@@ -174,16 +167,16 @@ PRESET_BROWSER_SECTIONS: tuple[HelpContent, ...] = (
         (
             ("Up/Down", "move; Up from the top row reaches the filter"),
             ("PgUp/PgDn, Home/End", "move further"),
-            ("Enter", "open folder / keep preset / edit the filter"),
             ("Right", "open folder"),
             ("Left/Backspace", "parent folder"),
+            ("Enter", "open folder / keep preset / edit the filter"),
             ("Esc", "clear the filter, or go back and close"),
         ),
         (
             ("Click the filter", "edit it; Enter keeps the results, Esc cancels"),
-            ("Back arrow", "close, keeping the preset that is playing"),
             ("Double-click", "open folder / keep preset"),
             ("Right-click preset", "favourite, blacklist, role"),
+            ("Back arrow", "close, keeping the preset that is playing"),
         ),
     ),
 )
@@ -193,24 +186,25 @@ _NAVIGATOR_SECTION = HelpSection(
     "Navigator",
     (
         ("Up/Down", "move across nodes"),
-        ("Left/Right", "open/close"),
         ("Ctrl + Up/Down", "previous / next top-level node"),
+        ("Left/Right", "open/close"),
         ("Shift + F10 / Menu", "options for the selected row"),
     ),
     (("Right-click row", "row options"),),
 )
 
 
-_LAYER_SECTION_BASE: tuple[tuple[str, str], ...] = (
-    ("M", "change layer order"),
-    ("L", "lock/unlock layer"),
+_LAYER_SWITCH_ENTRIES: tuple[HelpEntry, ...] = (
     ("S", "solo layer"),
+    ("L", "lock/unlock layer"),
+)
+_LAYER_ARRANGE_ENTRIES: tuple[HelpEntry, ...] = (
+    ("M", "change layer order"),
+    ("Ctrl + L", "add layer"),
     ("Delete", "delete layer"),
 )
-
 _LAYER_MOUSE_ENTRIES: tuple[HelpEntry, ...] = (("Drag handle", "change layer order"),)
 _LAYER_VISIBILITY_ENTRY = ("E", "enable/disable layer")
-_LAYER_ADD_ENTRY = ("Ctrl + L", "add layer")
 _LAYER_JUMP_ACTION = "jump to layer"
 
 _CURATION_LAYER_SECTION = HelpSection("Layer", ())
@@ -249,12 +243,13 @@ def layer_section(
 ) -> HelpSection:
     if preset_curation:
         return _CURATION_LAYER_SECTION
-    entries = list(_LAYER_SECTION_BASE)
-    if not timeline_enabled:
-        entries.append(_LAYER_VISIBILITY_ENTRY)
+    entries: list[HelpEntry] = []
     if layer_jumps:
         entries.append((_layer_key_range_label(layer_count), _LAYER_JUMP_ACTION))
-    entries.append(_LAYER_ADD_ENTRY)
+    if not timeline_enabled:
+        entries.append(_LAYER_VISIBILITY_ENTRY)
+    entries.extend(_LAYER_SWITCH_ENTRIES)
+    entries.extend(_LAYER_ARRANGE_ENTRIES)
     return HelpSection("Layer", tuple(entries), _LAYER_MOUSE_ENTRIES)
 
 
@@ -281,15 +276,14 @@ _PRESET_CURATION_SHORTCUTS = (
     ("C", "set preset role (bed/pulse/lead/accent/none)"),
 )
 
-_PRESET_SECTION = HelpSection(
-    "Edit",
-    (
-        ("Left/Right", "next/previous preset"),
-        ("PgUp/PgDn", "next/previous, large step"),
-        ("Ctrl + C", "copy this preset"),
-        ("Ctrl + V", "play the copied preset (preview)"),
-        *_PRESET_CURATION_SHORTCUTS,
-    ),
+_PRESET_BROWSE_ENTRIES: tuple[HelpEntry, ...] = (
+    ("Left/Right", "next/previous preset"),
+    ("PgUp/PgDn", "next/previous, large step"),
+)
+
+_PRESET_CLIPBOARD_ENTRIES: tuple[HelpEntry, ...] = (
+    ("Ctrl + C", "copy this preset"),
+    ("Ctrl + V", "play the copied preset (preview)"),
 )
 
 _USER_PRESET_ADD_SHORTCUT = ("P", "add current preset to switching list")
@@ -298,14 +292,14 @@ _PRESET_LIST_ITEM_SECTION = HelpSection(
     "Edit",
     (
         ("Enter", "play this preset and pause switching"),
+        *_PRESET_CURATION_SHORTCUTS,
         ("M", "reorder in list"),
-        ("Delete", "remove preset"),
         ("Ctrl + X / Ctrl + C", "cut / copy preset"),
         ("Ctrl + V", "paste over this entry"),
         ("Ctrl + Shift + V", "paste after this entry"),
         ("Ctrl + D", "duplicate entry"),
+        ("Delete", "remove preset"),
         ("Ctrl + Z", "undo a list edit"),
-        *_PRESET_CURATION_SHORTCUTS,
     ),
     (
         ("Double-click", "replace from the preset browser"),
@@ -327,10 +321,12 @@ def _preset_dir_section(*, switching_on: bool = False) -> HelpSection:
 
 
 def _preset_section(*, switching_on: bool = False) -> HelpSection:
-    entries = list(_PRESET_SECTION.entries)
+    entries = [*_PRESET_BROWSE_ENTRIES, *_PRESET_CURATION_SHORTCUTS]
     if switching_on:
         entries.append(_USER_PRESET_ADD_SHORTCUT)
-    return HelpSection(_PRESET_SECTION.title, tuple(entries))
+    entries.extend(_PRESET_CLIPBOARD_ENTRIES)
+    return HelpSection("Edit", tuple(entries))
+
 
 def _heading_section(behavior: RowSpec) -> HelpSection | None:
     """Keys for a navigator page, or None when it has only a description."""
@@ -382,63 +378,36 @@ def timeline_strip_section(
     layer_count: int = 4,
 ) -> HelpSection:
     layer_keys = _layer_key_range_label(layer_count)
-    entries: list[HelpEntry] = [("A", "arm / disarm row for recording")]
-    mouse: list[HelpEntry] = [
-        ("Right-click row", "row options; on a clip, clip options too")
-    ]
-
-    entries.append(("Shift + F10 / Menu", "row options for the focused row"))
-
-    if not recording:
-        entries.append(("Shift + Enter", "override row visibility on / off"))
-        if override_active:
-            entries.append((layer_keys, "show / hide an overridden layer"))
-            mouse.append(("Click eye", "show / hide an overridden layer"))
+    arm = ("A", "arm / disarm row for recording")
+    row_menu = ("Right-click row", "row options; on a clip, clip options too")
+    entries: list[HelpEntry] = []
+    mouse: list[HelpEntry] = []
 
     if recording:
-        entries.append((layer_keys, "show / hide an armed layer"))
-        mouse.append(("Click eye", "show / hide an armed layer"))
-        entries.append((f"Ctrl + {layer_keys}", "drop a clip edge (keep level)"))
-
-    if recording:
-        entries.append(("R", "stop record"))
-        entries.append(("Ctrl + Space / Space", "stop record and pause"))
-    else:
-        entries.append(("Ctrl + Space / R", "start record"))
-        if paused:
-            entries.append(("Space", "play"))
-        else:
-            entries.append(("Space", "pause"))
-
-    if recording:
-        entries.append(("Left/Right", "skip 10s, fills range"))
-        mouse.append(("Click/Drag ruler", "seek / scrub, fills range"))
-        mouse.append(("Dbl-click row", "seek, fills range"))
+        entries.extend(
+            (
+                ("Left/Right", "skip 10s, fills range"),
+                (layer_keys, "show / hide an armed layer"),
+                (f"Ctrl + {layer_keys}", "drop a clip edge (keep level)"),
+                arm,
+                ("R / Esc", "stop record"),
+                ("Ctrl + Space / Space", "stop record and pause"),
+            )
+        )
+        mouse.extend(
+            (
+                ("Click eye", "show / hide an armed layer"),
+                ("Dbl-click row", "seek, fills range"),
+                row_menu,
+                ("Click/Drag ruler", "seek / scrub, fills range"),
+            )
+        )
     else:
         entries.extend(
             (
                 ("Left/Right", "previous / next clip"),
                 ("Enter", "seek to clip start"),
-            )
-        )
-        mouse.extend(
-            (
-                ("Click row", "select row / clip"),
-                ("Dbl-click row", "add clip; on a clip, seek"),
-                ("Click/Drag ruler", "seek / scrub"),
-            )
-        )
-    mouse.extend(
-        (
-            ("Wheel", "zoom in / out"),
-            ("Shift + Wheel", "scroll left / right"),
-            ("Drag row / scrollbar", "scroll when zoomed"),
-        )
-    )
-
-    if not recording:
-        entries.extend(
-            (
+                ("Space", "play" if paused else "pause"),
                 (", / .", "nudge clip opacity -/+ 1%"),
                 ("Ctrl + , / .", "nudge clip opacity -/+ 10%"),
                 ("B", "cycle clip blend"),
@@ -446,10 +415,33 @@ def timeline_strip_section(
                 ("C / Shift + C", "cycle clip cut in / cut out"),
                 ("Ctrl + K", "split clip at playhead"),
                 ("Delete", "delete clip"),
+                arm,
+                ("Ctrl + Space / R", "start record"),
+                ("Shift + Enter", "override row visibility on / off"),
             )
         )
+        mouse.extend(
+            (
+                ("Click row", "select row / clip"),
+                ("Dbl-click row", "add clip; on a clip, seek"),
+                row_menu,
+                ("Click/Drag ruler", "seek / scrub"),
+            )
+        )
+        if override_active:
+            entries.append((layer_keys, "show / hide an overridden layer"))
+            mouse.insert(0, ("Click eye", "show / hide an overridden layer"))
 
-    entries.append(("Esc", "close timeline"))
+    entries.append(("Shift + F10 / Menu", "row options for the focused row"))
+    if not recording:
+        entries.append(("Esc", "close timeline"))
+    mouse.extend(
+        (
+            ("Drag row / scrollbar", "scroll when zoomed"),
+            ("Wheel", "zoom in / out"),
+            ("Shift + Wheel", "scroll left / right"),
+        )
+    )
     return HelpSection("Timeline", tuple(entries), tuple(mouse))
 
 
@@ -457,16 +449,19 @@ def _value_step_section(row_kind: RowKind) -> HelpSection:
     behavior = row_spec(row_kind)
     if behavior.help_entries is not None:
         entries = behavior.help_entries
-        if row_choice_kind(row_kind) is ChoiceKind.COMBO:
-            entries = (*entries, ("Enter", "open the list"))
-        return HelpSection(behavior.help_title or "Edit", entries)
-    if row_kind == RowKind.TRACK_EFFECT:
+    elif row_kind == RowKind.TRACK_EFFECT:
         entries = (
             ("Left/Right", "adjust depth"),
             ("PgUp/PgDn", "large step"),
         )
     else:
         entries = _EDIT_SECTION.entries
+    # A row whose Enter does something else has no key for its list.
+    if (
+        behavior.apply_action is None
+        and row_choice_kind(row_kind) is ChoiceKind.COMBO
+    ):
+        entries = (*entries, ("Enter", "open the list"))
     return HelpSection(behavior.help_title or "Edit", entries)
 
 

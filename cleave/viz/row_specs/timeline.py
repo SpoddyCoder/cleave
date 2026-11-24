@@ -952,8 +952,8 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Song Marker",
         help_entries=(
-            ("Enter", "seek to marker"),
             ("Left/Right", "choose marker type"),
+            ("Enter", "seek to marker"),
             ("Delete", "remove marker"),
         ),
         help_description=(
@@ -978,8 +978,8 @@ SPECS: dict[RowKind, RowSpec] = {
         tooltip=_clip_preset_tooltip,
         help_title="Clip Preset",
         help_entries=(
-            ("Enter", "choose a preset in the browser"),
             ("Left/Right", "pick another preset"),
+            ("Enter", "choose a preset in the browser"),
         ),
         help_description=(
             "The preset this clip plays. Left/Right picks another with the clip's role, or from the layer's preset folder when no preset has that role. A clip that continues the clip before it shows that clip's preset after an arrow.",

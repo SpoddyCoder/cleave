@@ -32,7 +32,7 @@ You don't need to read this guide cover to cover before starting. Open a song, p
 
 Press **H**, or tick **Help > Help** in the menu bar, to toggle the help column.
 
-The help column tracks your focus: move to another row, page, or panel and it updates to describe what is highlighted, what each of its options does, and which keys and mouse actions apply there, listed under **Keyboard** and **Mouse**.
+The help column tracks your focus: move to another row, page, or panel and it updates to describe what is highlighted, what each of its options does, and which keys and mouse actions apply there, listed under **Mouse** and **Keyboard**.
 
 ![Help follows the highlighted row](images/help-follows-focus.png)
 

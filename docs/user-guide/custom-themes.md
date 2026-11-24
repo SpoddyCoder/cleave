@@ -21,7 +21,7 @@ button_bg: "#202040"
   - Keys ending in `_alpha` take 0 to 255, except the row bands, which take a pair of values from 0 to 1.
   - `button_sheen` and `button_shade` take 0 to 1.
   - `icon_lit_hover_lift` and `icon_lit_hover_edge_lift` take -1 to 1: positive values lighten a lit icon under the pointer, negative values darken it.
-- `subheading` is the heading over a group of rows, in the inspector and in dialogs, and over the Keyboard and Mouse lists in help.
+- `subheading` is the heading over a group of rows, in the inspector and in dialogs, and over the Mouse and Keyboard lists in help.
 - `timeline_track_colors` is a list of up to eight colours, one per timeline row.
 
 ## Text on panels and text on fills
