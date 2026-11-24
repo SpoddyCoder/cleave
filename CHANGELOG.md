@@ -29,6 +29,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Help lists keys and mouse actions apart, under Keyboard and Mouse headings, everywhere it shows controls. The Keyboard Controls title is now Controls.
 - Headings over groups of rows, in the inspector and in dialogs such as Generate timeline and Download packages, have their own colour in each theme instead of a grey that looked disabled. Theme files set it as `subheading`.
 - The Preset Switching page's trigger row is now change presets, with the choices never, on a timer, projectM decides, and each clip (before: off, timer, projectm, timeline). Choosing each clip turns the timeline on; from on a timer, the row is cut into clips where the presets change, and with presets the timer never shows kept as spares, and otherwise the clips stay and take the list's presets in order, unless they already hold them. When that would cut clips, replace presets clips hold, or turn the timeline on, a dialog says exactly what will change before you go ahead.
 - Turning the timeline on for the first time no longer changes what you see: every layer that is on gets one clip for the whole song. Turning the timeline on or off, and any change to a layer's change presets setting, are now undo steps.

@@ -372,7 +372,7 @@ def test_help_sections_follow_the_focused_field() -> None:
     assert field.entries == (("none", "keep them."), ("bars", "to bars."))
     assert dialog.title == "Generate Timeline"
     assert dialog.lines == ("Makes a timeline.",)
-    assert ("Enter", "generate") in dialog.entries
+    assert ("Enter", "generate") in dialog.keys
 
     # A field with no help shows only the dialog.
     modal.handle_keydown(keydown(pygame.K_DOWN))
@@ -398,7 +398,7 @@ def test_destructive_help_names_the_focused_button() -> None:
     modal = ModalHost()
     _help_form(modal, destructive=True)
     (dialog,) = modal.help_sections()
-    assert ("Enter", "press the focused button") in dialog.entries
+    assert ("Enter", "press the focused button") in dialog.keys
 
 
 def test_help_sections_are_empty_without_help_or_form() -> None:
@@ -493,11 +493,11 @@ def test_help_keys_list_page_step_only_with_a_large_step_and_space_only_with_a_c
     modal = ModalHost()
     _stepper_form(modal)
     (field, dialog) = modal.help_sections()
-    keys = [key for key, _text in dialog.entries]
+    keys = [key for key, _text in dialog.keys]
     assert "PgUp/PgDn" in keys
     assert "Space" not in keys
     _help_form(modal)
-    keys = [key for key, _text in modal.help_sections()[-1].entries]
+    keys = [key for key, _text in modal.help_sections()[-1].keys]
     assert "PgUp/PgDn" not in keys
     assert "Space" not in keys
 

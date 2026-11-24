@@ -20,12 +20,17 @@ HelpEntry = tuple[str, str]
 
 @dataclass(frozen=True)
 class HelpSection:
+    """Controls: ``entries`` are keys, ``mouse_entries`` are mouse actions."""
+
     title: str
     entries: tuple[HelpEntry, ...]
+    mouse_entries: tuple[HelpEntry, ...] = ()
 
 
 @dataclass(frozen=True)
 class DescriptionSection:
+    """Prose, then the options it describes. Never holds controls."""
+
     title: str
     lines: tuple[str, ...] = ()
     entries: tuple[HelpEntry, ...] = ()
@@ -47,14 +52,36 @@ def modal_help_content(
     sections: tuple[ModalHelpSection, ...],
 ) -> tuple[HelpContent, ...]:
     """Help column sections for an open form's ``ModalHost.help_sections``."""
-    return tuple(
-        description_section(
-            section.title, lines=section.lines, mode_entries=section.entries
-        )
-        for section in sections
-    )
+    content: list[HelpContent] = []
+    for section in sections:
+        described = bool(section.lines or section.entries)
+        if described:
+            content.append(
+                description_section(
+                    section.title, lines=section.lines, mode_entries=section.entries
+                )
+            )
+        if section.keys:
+            title = CONTROLS_SECTION_TITLE if described else section.title
+            content.append(HelpSection(title, section.keys))
+    return tuple(content)
 
-KEYBOARD_CONTROLS_SECTION_TITLE = "Keyboard Controls"
+
+CONTROLS_SECTION_TITLE = "Controls"
+KEYBOARD_SUBHEADING = "Keyboard"
+MOUSE_SUBHEADING = "Mouse"
+
+
+def control_groups(
+    section: HelpSection,
+) -> tuple[tuple[str, tuple[HelpEntry, ...]], ...]:
+    """The section's sub-headings with their entries, leaving out empty ones."""
+    groups = (
+        (KEYBOARD_SUBHEADING, section.entries),
+        (MOUSE_SUBHEADING, section.mouse_entries),
+    )
+    return tuple((heading, entries) for heading, entries in groups if entries)
+
 
 _REGION_MOVE_ENTRY = (
     "Up/Down",
@@ -98,8 +125,8 @@ NAVIGATION_SECTION = HelpSection(
         ("Alt + underlined letter", "open that menu (F, E, V, P, S, H)"),
         ("Ctrl + R", "render"),
         ("Ctrl + ,", "open Settings > Preview"),
-        ("Right-click preview", "play, solo, on/off, quality, grab still"),
     ),
+    (("Right-click preview", "play, solo, on/off, quality, grab still"),),
 )
 
 _CURATION_NAVIGATION_SECTION = HelpSection(
@@ -112,8 +139,8 @@ _CURATION_NAVIGATION_SECTION = HelpSection(
         *_SEEK_AND_QUIT_ENTRIES,
         ("F10 / Alt", "focus menu bar"),
         ("Alt + underlined letter", "open that menu (F, E, V, P, S, H)"),
-        ("Right-click preview", "play, quality, grab still"),
     ),
+    (("Right-click preview", "play, quality, grab still"),),
 )
 
 
@@ -127,10 +154,10 @@ PREVIEW_SECTION = HelpSection(
     "Preview",
     (
         ("Shift + F10 / Menu", "preview options"),
-        ("Right-click", "preview options"),
         ("Space", "play / pause"),
         ("Esc", "back to the navigator"),
     ),
+    (("Right-click", "preview options"),),
 )
 
 
@@ -143,7 +170,7 @@ PRESET_BROWSER_SECTIONS: tuple[HelpContent, ...] = (
         ),
     ),
     HelpSection(
-        KEYBOARD_CONTROLS_SECTION_TITLE,
+        CONTROLS_SECTION_TITLE,
         (
             ("Up/Down", "move; Up from the top row reaches the filter"),
             ("PgUp/PgDn, Home/End", "move further"),
@@ -151,6 +178,8 @@ PRESET_BROWSER_SECTIONS: tuple[HelpContent, ...] = (
             ("Right", "open folder"),
             ("Left/Backspace", "parent folder"),
             ("Esc", "clear the filter, or go back and close"),
+        ),
+        (
             ("Click the filter", "edit it; Enter keeps the results, Esc cancels"),
             ("Back arrow", "close, keeping the preset that is playing"),
             ("Double-click", "open folder / keep preset"),
@@ -166,20 +195,20 @@ _NAVIGATOR_SECTION = HelpSection(
         ("Up/Down", "move across nodes"),
         ("Left/Right", "open/close"),
         ("Ctrl + Up/Down", "previous / next top-level node"),
-        ("Right-click row", "row options"),
         ("Shift + F10 / Menu", "options for the selected row"),
     ),
+    (("Right-click row", "row options"),),
 )
 
 
 _LAYER_SECTION_BASE: tuple[tuple[str, str], ...] = (
     ("M", "change layer order"),
-    ("Drag handle", "change layer order with the mouse"),
     ("L", "lock/unlock layer"),
     ("S", "solo layer"),
     ("Delete", "delete layer"),
 )
 
+_LAYER_MOUSE_ENTRIES: tuple[HelpEntry, ...] = (("Drag handle", "change layer order"),)
 _LAYER_VISIBILITY_ENTRY = ("E", "enable/disable layer")
 _LAYER_ADD_ENTRY = ("Ctrl + L", "add layer")
 _LAYER_JUMP_ACTION = "jump to layer"
@@ -226,7 +255,7 @@ def layer_section(
     if layer_jumps:
         entries.append((_layer_key_range_label(layer_count), _LAYER_JUMP_ACTION))
     entries.append(_LAYER_ADD_ENTRY)
-    return HelpSection("Layer", tuple(entries))
+    return HelpSection("Layer", tuple(entries), _LAYER_MOUSE_ENTRIES)
 
 
 _EDIT_SECTION = HelpSection(
@@ -269,9 +298,7 @@ _PRESET_LIST_ITEM_SECTION = HelpSection(
     "Edit",
     (
         ("Enter", "play this preset and pause switching"),
-        ("Double-click", "replace from the preset browser"),
         ("M", "reorder in list"),
-        ("Drag handle", "reorder with the mouse"),
         ("Delete", "remove preset"),
         ("Ctrl + X / Ctrl + C", "cut / copy preset"),
         ("Ctrl + V", "paste over this entry"),
@@ -279,6 +306,10 @@ _PRESET_LIST_ITEM_SECTION = HelpSection(
         ("Ctrl + D", "duplicate entry"),
         ("Ctrl + Z", "undo a list edit"),
         *_PRESET_CURATION_SHORTCUTS,
+    ),
+    (
+        ("Double-click", "replace from the preset browser"),
+        ("Drag handle", "reorder in list"),
     ),
 )
 
@@ -351,20 +382,22 @@ def timeline_strip_section(
     layer_count: int = 4,
 ) -> HelpSection:
     layer_keys = _layer_key_range_label(layer_count)
-    entries: list[tuple[str, str]] = [("A", "arm / disarm row for recording")]
+    entries: list[HelpEntry] = [("A", "arm / disarm row for recording")]
+    mouse: list[HelpEntry] = [
+        ("Right-click row", "row options; on a clip, clip options too")
+    ]
 
-    entries.append(("Right-click row", "row options; on a clip, clip options too"))
     entries.append(("Shift + F10 / Menu", "row options for the focused row"))
 
     if not recording:
         entries.append(("Shift + Enter", "override row visibility on / off"))
         if override_active:
             entries.append((layer_keys, "show / hide an overridden layer"))
-            entries.append(("Click eye", "show / hide an overridden layer"))
+            mouse.append(("Click eye", "show / hide an overridden layer"))
 
     if recording:
         entries.append((layer_keys, "show / hide an armed layer"))
-        entries.append(("Click eye", "show / hide an armed layer"))
+        mouse.append(("Click eye", "show / hide an armed layer"))
         entries.append((f"Ctrl + {layer_keys}", "drop a clip edge (keep level)"))
 
     if recording:
@@ -379,19 +412,23 @@ def timeline_strip_section(
 
     if recording:
         entries.append(("Left/Right", "skip 10s, fills range"))
-        entries.append(("Click/Drag ruler", "seek / scrub, fills range"))
-        entries.append(("Dbl-click row", "seek, fills range"))
+        mouse.append(("Click/Drag ruler", "seek / scrub, fills range"))
+        mouse.append(("Dbl-click row", "seek, fills range"))
     else:
         entries.extend(
             (
                 ("Left/Right", "previous / next clip"),
                 ("Enter", "seek to clip start"),
+            )
+        )
+        mouse.extend(
+            (
                 ("Click row", "select row / clip"),
                 ("Dbl-click row", "add clip; on a clip, seek"),
                 ("Click/Drag ruler", "seek / scrub"),
             )
         )
-    entries.extend(
+    mouse.extend(
         (
             ("Wheel", "zoom in / out"),
             ("Shift + Wheel", "scroll left / right"),
@@ -413,7 +450,7 @@ def timeline_strip_section(
         )
 
     entries.append(("Esc", "close timeline"))
-    return HelpSection("Timeline", tuple(entries))
+    return HelpSection("Timeline", tuple(entries), tuple(mouse))
 
 
 def _value_step_section(row_kind: RowKind) -> HelpSection:
@@ -455,8 +492,8 @@ def _description_section(
     )
 
 
-def _keyboard_section(primary: HelpSection) -> HelpSection:
-    return HelpSection(KEYBOARD_CONTROLS_SECTION_TITLE, primary.entries)
+def _controls_section(primary: HelpSection) -> HelpSection:
+    return replace(primary, title=CONTROLS_SECTION_TITLE)
 
 
 def sections_for(
@@ -469,7 +506,7 @@ def sections_for(
     preset_curation: bool = False,
     layer_count: int = 4,
 ) -> tuple[HelpContent, ...]:
-    """Description and keyboard sections for one row. No global navigation."""
+    """Description and controls sections for one row. No global navigation."""
     behavior = row_spec(row_kind)
 
     if not behavior.navigable:
@@ -544,7 +581,7 @@ def sections_for(
         return () if description is None else (description,)
 
     if description is not None:
-        return (description, _keyboard_section(primary))
+        return (description, _controls_section(primary))
     return (primary,)
 
 

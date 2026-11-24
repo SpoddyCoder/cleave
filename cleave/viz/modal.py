@@ -106,11 +106,13 @@ class FormSpec:
 
 @dataclass(frozen=True)
 class ModalHelpSection:
-    """One help column section for an open form: a title, lines, and entries."""
+    """One help column section for an open form: a title, lines, option
+    entries, and the dialog's keys."""
 
     title: str
     lines: tuple[str, ...] = ()
     entries: tuple[tuple[str, str], ...] = ()
+    keys: tuple[tuple[str, str], ...] = ()
 
 
 def _help_title(label: str) -> str:
@@ -733,7 +735,9 @@ class ModalHost:
         )
         keys.append(("Esc", "cancel"))
         sections.append(
-            ModalHelpSection(_help_title(spec.title.rstrip("?")), spec.help, tuple(keys))
+            ModalHelpSection(
+                _help_title(spec.title.rstrip("?")), spec.help, keys=tuple(keys)
+            )
         )
         return tuple(sections)
 

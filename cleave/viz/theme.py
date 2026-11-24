@@ -17,7 +17,7 @@ Typography roles for the live tuning overlay (text on the panel background):
   label    — periwinkle text for row labels and prefixes
   muted    — blue-grey text for shortcuts, placeholders, and unchosen options
   subheading — apricot text for the heading over a group of inspector or dialog
-             rows; never a grey, and set apart from label on the blue-yellow
+             rows, or of keys or mouse actions in help; never a grey, and set apart from label on the blue-yellow
              axis, so red-green colour blindness does not merge them
   disabled — cool grey text when a row, icon, or value on the panel is inactive
   off_control_text — the label, value, or chosen option on a switched-off,

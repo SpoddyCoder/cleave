@@ -6,7 +6,7 @@ import pytest
 
 from dataclasses import replace
 
-from cleave.viz.modal import ModalHost
+from cleave.viz.modal import ModalHelpSection, ModalHost
 from cleave.viz.context_menu import ContextMenuState
 from cleave.blend_modes import BLEND_MODE_HELP_ENTRIES, BLEND_MODES
 from cleave.cue_roles import CUE_ROLE_MARKER_HELP_ENTRIES
@@ -27,11 +27,15 @@ from cleave.viz.help_column import help_column_text
 from cleave.viz.help_content import (
     DescriptionSection,
     HelpSection,
-    KEYBOARD_CONTROLS_SECTION_TITLE,
+    CONTROLS_SECTION_TITLE,
     NAVIGATION_SECTION,
+    PRESET_BROWSER_SECTIONS,
+    PREVIEW_SECTION,
+    control_groups,
     help_sections,
     help_sections_for_stop,
     layer_section,
+    modal_help_content,
     navigation_section,
     sections_for,
     timeline_strip_section,
@@ -383,7 +387,7 @@ def test_preset_dir_help_titles() -> None:
     assert description is not None
     assert description.title == "Preset Directory"
     assert _says(description.lines, 'parent folder', 'subfolder')
-    assert keyboard.title == KEYBOARD_CONTROLS_SECTION_TITLE
+    assert keyboard.title == CONTROLS_SECTION_TITLE
     entries = dict(keyboard.entries)
     assert entries["Left/Right"] == "next/previous directory"
     assert entries["Enter"] == "open directory"
@@ -469,7 +473,7 @@ def test_timeline_presets_help_lists_characters() -> None:
         "Pulse",
     ]
     keyboard = _keyboard_section(sections)
-    assert keyboard.title == KEYBOARD_CONTROLS_SECTION_TITLE
+    assert keyboard.title == CONTROLS_SECTION_TITLE
     assert keyboard.entries == (("Enter", "open generate dialog"),)
 
 
@@ -525,13 +529,11 @@ def test_preset_list_entry_help() -> None:
         *CUE_ROLE_MARKER_HELP_ENTRIES,
     )
     assert "Delete" not in " ".join(description.lines)
-    assert keyboard.title == KEYBOARD_CONTROLS_SECTION_TITLE
+    assert keyboard.title == CONTROLS_SECTION_TITLE
     entries = dict(keyboard.entries)
     assert entries == {
         "Enter": "play this preset and pause switching",
-        "Double-click": "replace from the preset browser",
         "M": "reorder in list",
-        "Drag handle": "reorder with the mouse",
         "Delete": "remove preset",
         "Ctrl + X / Ctrl + C": "cut / copy preset",
         "Ctrl + V": "paste over this entry",
@@ -541,6 +543,10 @@ def test_preset_list_entry_help() -> None:
         "F": "favourite / unfavourite preset",
         "B": "blacklist / unblacklist preset",
         "C": "set preset role (bed/pulse/lead/accent/none)",
+    }
+    assert dict(keyboard.mouse_entries) == {
+        "Double-click": "replace from the preset browser",
+        "Drag handle": "reorder in list",
     }
 
 
@@ -604,7 +610,7 @@ def test_stem_row_help() -> None:
     section = _keyboard_section(sections)
     assert description is not None
     assert description.title == "Stem"
-    assert section.title == KEYBOARD_CONTROLS_SECTION_TITLE
+    assert section.title == CONTROLS_SECTION_TITLE
     assert dict(section.entries)["Left/Right"] == "choose stem source"
     assert _says(description.lines, "resets the layer's cleave effects")
 
@@ -624,7 +630,7 @@ def test_compositing_header_and_opacity_help() -> None:
 
 def test_cleave_effects_help() -> None:
     effect = _keyboard_section(sections_for(RowKind.TRACK_EFFECT))
-    assert effect.title == KEYBOARD_CONTROLS_SECTION_TITLE
+    assert effect.title == CONTROLS_SECTION_TITLE
     assert dict(effect.entries)["PgUp/PgDn"] == "large step"
 
 
@@ -683,7 +689,7 @@ def test_overlay_body_text_help() -> None:
 
 def test_layer_management_add_help() -> None:
     section = _keyboard_section(sections_for(RowKind.LAYER_MANAGEMENT_ADD))
-    assert section.title == KEYBOARD_CONTROLS_SECTION_TITLE
+    assert section.title == CONTROLS_SECTION_TITLE
     assert dict(section.entries)["Enter"] == "add layer"
 
 
@@ -691,7 +697,7 @@ def test_layer_management_delete_help() -> None:
     sections = sections_for(RowKind.LAYER_MANAGEMENT_DELETE)
     section = _keyboard_section(sections)
     description = _description_section(sections)
-    assert section.title == KEYBOARD_CONTROLS_SECTION_TITLE
+    assert section.title == CONTROLS_SECTION_TITLE
     entries = dict(section.entries)
     assert entries["Enter/Delete"] == "delete layer"
     assert "" not in entries
@@ -727,7 +733,7 @@ def _page_without_keys(behavior: RowSpec) -> bool:
     )
 
 
-def test_navigable_row_kinds_with_description_use_keyboard_controls_title() -> None:
+def test_navigable_row_kinds_with_description_use_controls_title() -> None:
     for row_kind, behavior in ROW_SPECS.items():
         if not behavior.navigable:
             continue
@@ -736,7 +742,7 @@ def test_navigable_row_kinds_with_description_use_keyboard_controls_title() -> N
         if row_kind == RowKind.TRACK_EFFECT or _page_without_keys(behavior):
             continue
         keyboard = _keyboard_section(sections_for(row_kind))
-        assert keyboard.title == KEYBOARD_CONTROLS_SECTION_TITLE, row_kind
+        assert keyboard.title == CONTROLS_SECTION_TITLE, row_kind
 
 
 def test_navigable_row_kinds_with_description_have_three_sections() -> None:
@@ -751,7 +757,7 @@ def test_navigable_row_kinds_with_description_have_three_sections() -> None:
         assert len(sections) == 2, f"{row_kind} expected 2 sections, got {len(sections)}"
         assert isinstance(sections[0], DescriptionSection)
         assert isinstance(sections[1], HelpSection)
-        assert sections[1].title == KEYBOARD_CONTROLS_SECTION_TITLE
+        assert sections[1].title == CONTROLS_SECTION_TITLE
 
 
 def test_description_sections_use_control_name_not_about() -> None:
@@ -881,8 +887,9 @@ def test_timeline_strip_help_paused() -> None:
     entries = dict(section.entries)
     assert entries["A"] == "arm / disarm row for recording"
     assert "1-4" not in entries
-    assert "Click eye" not in entries
-    assert entries["Right-click row"] == "row options; on a clip, clip options too"
+    mouse = dict(section.mouse_entries)
+    assert "Click eye" not in mouse
+    assert mouse["Right-click row"] == "row options; on a clip, clip options too"
     assert entries["Shift + F10 / Menu"] == "row options for the focused row"
     assert entries["Shift + Enter"] == "override row visibility on / off"
     assert "Ctrl + Enter" not in entries
@@ -921,24 +928,24 @@ def test_timeline_strip_help_playing_without_override() -> None:
 
 
 def test_timeline_strip_help_playing_with_override() -> None:
-    entries = dict(
-        timeline_strip_section(
-            paused=False, recording=False, override_active=True, layer_count=6
-        ).entries
+    section = timeline_strip_section(
+        paused=False, recording=False, override_active=True, layer_count=6
     )
+    entries = dict(section.entries)
+    mouse = dict(section.mouse_entries)
     assert entries["1-6"] == "show / hide an overridden layer"
-    assert entries["Click eye"] == "show / hide an overridden layer"
+    assert mouse["Click eye"] == "show / hide an overridden layer"
 
 
 def test_timeline_strip_help_recording_while_playing() -> None:
-    entries = dict(
-        timeline_strip_section(
-            paused=False, recording=True, override_active=False, layer_count=4
-        ).entries
+    section = timeline_strip_section(
+        paused=False, recording=True, override_active=False, layer_count=4
     )
+    entries = dict(section.entries)
+    mouse = dict(section.mouse_entries)
     assert "Ctrl + Enter" not in entries
     assert entries["1-4"] == "show / hide an armed layer"
-    assert entries["Click eye"] == "show / hide an armed layer"
+    assert mouse["Click eye"] == "show / hide an armed layer"
     assert entries["Ctrl + 1-4"] == "drop a clip edge (keep level)"
     assert "Shift + Enter" not in entries
     assert entries["Left/Right"] == "skip 10s, fills range"
@@ -1083,3 +1090,53 @@ def test_preview_stop_lists_its_menu_and_keys() -> None:
     entries = dict(sections[0].entries)
     assert entries["Shift + F10 / Menu"] == "preview options"
     assert entries["Esc"] == "back to the navigator"
+
+
+def test_controls_split_into_keyboard_and_mouse() -> None:
+    section = layer_section(timeline_enabled=False)
+    assert [heading for heading, _ in control_groups(section)] == ["Keyboard", "Mouse"]
+    keys_only = HelpSection("Edit", (("Enter", "edit"),))
+    assert control_groups(keys_only) == (("Keyboard", keys_only.entries),)
+    text = help_column_text((section,)).splitlines()
+    assert text.index("Keyboard") < text.index("L") < text.index("Mouse")
+    assert text.index("Mouse") < text.index("Drag handle")
+
+
+def test_no_mouse_action_under_keyboard() -> None:
+    sections = [NAVIGATION_SECTION, navigation_section(preset_curation=True)]
+    sections += [PREVIEW_SECTION, *PRESET_BROWSER_SECTIONS]
+    for recording in (False, True):
+        for override in (False, True):
+            sections.append(
+                timeline_strip_section(
+                    paused=False, recording=recording, override_active=override
+                )
+            )
+    for kind in ROW_SPECS:
+        sections += sections_for(kind)
+    sections += help_sections(
+        RowDescriptor(RowKind.TRACK_HEADER),
+        shell_focus=ShellFocusState(
+            region=ShellRegion.NAVIGATOR, selected_id="layer:drums"
+        ),
+    )
+    for section in sections:
+        if not isinstance(section, HelpSection):
+            continue
+        for key, _action in section.entries:
+            assert not any(
+                word in key.lower()
+                for word in ("click", "drag", "wheel", "arrow", "mouse")
+            ), (section.title, key)
+
+
+def test_dialog_keys_draw_as_controls() -> None:
+    keys = (("Enter", "ok"),)
+    described = modal_help_content((ModalHelpSection("Snap", ("Text.",), keys=keys),))
+    assert described == (
+        DescriptionSection("Snap", ("Text.",)),
+        HelpSection(CONTROLS_SECTION_TITLE, keys),
+    )
+    assert modal_help_content((ModalHelpSection("Snap", keys=keys),)) == (
+        HelpSection("Snap", keys),
+    )

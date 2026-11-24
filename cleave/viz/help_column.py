@@ -6,22 +6,40 @@ import math
 
 from imgui_bundle import imgui
 
-from cleave.viz.help_content import DescriptionSection, HelpContent
+from cleave.viz.help_content import (
+    DescriptionSection,
+    HelpContent,
+    HelpEntry,
+    HelpSection,
+    control_groups,
+)
 from cleave.viz.imgui_theme import padded_row_spacing_y, rgba
 from cleave.viz.theme import palette
 from cleave.viz.title_bar import paint_title_bar
 
 
+def _groups(
+    section: HelpContent,
+) -> tuple[tuple[str | None, tuple[HelpEntry, ...]], ...]:
+    """Entries under their sub-heading; a description's options have none."""
+    if isinstance(section, HelpSection):
+        return control_groups(section)
+    return ((None, section.entries),) if section.entries else ()
+
+
 def help_column_text(sections: tuple[HelpContent, ...]) -> str:
-    """Plain text of the titles, lines, keys, and descriptions the column draws."""
+    """Plain text of the titles, lines, sub-headings, keys, and descriptions the column draws."""
     parts: list[str] = []
     for section in sections:
         parts.append(section.title)
         if isinstance(section, DescriptionSection):
             parts.extend(section.lines)
-        for key, description in section.entries:
-            parts.append(key)
-            parts.append(description)
+        for subheading, entries in _groups(section):
+            if subheading is not None:
+                parts.append(subheading)
+            for key, description in entries:
+                parts.append(key)
+                parts.append(description)
     return "\n".join(parts)
 
 
@@ -34,8 +52,9 @@ def draw_help_column(sections: tuple[HelpContent, ...]) -> None:
     wrap_x = start_x + avail
     key_w = 0.0
     for section in sections:
-        for key, _description in section.entries:
-            key_w = max(key_w, imgui.calc_text_size(key).x)
+        for _subheading, entries in _groups(section):
+            for key, _description in entries:
+                key_w = max(key_w, imgui.calc_text_size(key).x)
     gap = imgui.calc_text_size("  ").x
     for index, section in enumerate(sections):
         if index:
@@ -49,8 +68,16 @@ def draw_help_column(sections: tuple[HelpContent, ...]) -> None:
                 _draw_wrapped(line, palette().value, wrap_x)
             if section.lines and section.entries:
                 imgui.dummy(imgui.ImVec2(0.0, imgui.get_text_line_height()))
-        for key, description in section.entries:
-            _draw_key_value(key, description, start_x, key_w, gap, wrap_x)
+        for position, (subheading, entries) in enumerate(_groups(section)):
+            if position:
+                # Half a line between sub-headings.
+                imgui.dummy(imgui.ImVec2(0.0, imgui.get_text_line_height() * 0.5))
+            key_x = start_x
+            if subheading is not None:
+                _draw_wrapped(subheading, palette().subheading, wrap_x)
+                key_x += gap
+            for key, description in entries:
+                _draw_key_value(key, description, key_x, key_w, gap, wrap_x)
 
 
 def _draw_heading(text: str, wrap_x: float) -> None:
@@ -86,12 +113,13 @@ def _draw_wrapped(text: str, color: tuple[int, int, int], wrap_x: float) -> None
 def _draw_key_value(
     key: str,
     description: str,
-    start_x: float,
+    key_x: float,
     key_w: float,
     gap: float,
     wrap_x: float,
 ) -> None:
     row_y = imgui.get_cursor_pos().y
+    imgui.set_cursor_pos(imgui.ImVec2(key_x, row_y))
     imgui.text_colored(rgba(palette().label), key)
-    imgui.set_cursor_pos(imgui.ImVec2(start_x + key_w + gap, row_y))
+    imgui.set_cursor_pos(imgui.ImVec2(key_x + key_w + gap, row_y))
     _draw_wrapped(description, palette().value, wrap_x)
