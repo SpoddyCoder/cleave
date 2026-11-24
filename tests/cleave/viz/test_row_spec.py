@@ -20,6 +20,7 @@ from cleave.config_schema.editor import (
     notification_display_label,
 )
 from cleave.config_schema.layers import hard_cut_enabled_display
+from cleave.song_markers import format_marker_time
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
 from cleave.viz.material_icons import ADD_GLYPH
 from cleave.viz.theme import (
@@ -1274,7 +1275,8 @@ def test_two_line_row_splits_value_position_and_markers() -> None:
         preset_list_labels=["a.milk", "b.milk"],
         preset_list_markers=["", "[B]"],
         preset_list_clip_starts=(),
-        runtime=SimpleNamespace(preset_switching_trigger="timer"),
+        preset_list_first_times=(),
+        runtime=SimpleNamespace(preset_switching_trigger="projectm"),
     )
     state = SimpleNamespace(tracks={"layer_1": block})
 
@@ -1293,6 +1295,10 @@ def test_two_line_row_splits_value_position_and_markers() -> None:
     )
     assert format_row_value(state, item) == "b.milk"
     assert format_row_position(state, item) == "2/2"
+    block.preset_list_first_times = (0.0, None)
+    assert format_row_position(state, item) == "not shown"
+    block.preset_list_first_times = (0.0, 30.0)
+    assert format_row_position(state, item) == format_marker_time(30.0)
     assert format_row_markers(state, item) == "[B]"
     block.runtime.preset_switching_trigger = "timeline"
     assert format_row_position(state, item) == "spare"

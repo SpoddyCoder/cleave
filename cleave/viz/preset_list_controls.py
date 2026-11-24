@@ -15,12 +15,17 @@ from pathlib import Path
 from cleave.preset_library import UNFILTERED_CATALOG, PresetCatalog
 from cleave.preset_list_entry import PresetListEntry
 from cleave.preset_playlist import scan_preset_playlist
-from cleave.viz.edit_history import EditHistory, preset_list_scope
+from cleave.viz.edit_history import EditHistory, EditOutcome, preset_list_scope
 from cleave.viz.layer import StemLayer
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.modal import FormField, FormSpec, ModalHost
 from cleave.preset_list_fill import needed_preset_count
-from cleave.viz.clip_presets import deal_list_onto_clips, is_each_clip
+from cleave.viz.clip_presets import (
+    changed_clip_count,
+    clip_preset_lock_reason,
+    deal_list_onto_clips,
+    is_each_clip,
+)
 from cleave.viz.preset_list_populate import (
     browse_pool,
     catalog_has_role_presets,
@@ -143,8 +148,12 @@ class PresetListController:
             return
         if target == index:
             return
-        with self._record("Move preset", slot, merge_key=("preset_list.move", slot)):
+        with self._record(
+            "Move preset", slot, merge_key=("preset_list.move", slot)
+        ) as edit:
             presets.insert(target, presets.pop(index))
+        if edit.refused is not None:
+            return
         self.refresh_switching(slot)
         if self._on_focus_preset_item is not None:
             self._on_focus_preset_item(slot, target)
@@ -199,8 +208,17 @@ class PresetListController:
             if self.session.layers[slot].preset_switching == "on":
                 self._layer_bindings.on_preset_switching_change(slot)
 
+    def _refuse_whole_list(self, slot: str) -> bool:
+        """Name the lock that keeps the layer's clips as they are. True when one does."""
+        reason = clip_preset_lock_reason(self.session, slot)
+        if reason is None:
+            return False
+        if self._on_notification is not None:
+            self._on_notification(reason)
+        return True
+
     def prompt_populate(self, slot: str) -> None:
-        if self.project_dir is None:
+        if self.project_dir is None or self._refuse_whole_list(slot):
             return
         if self._layer_bindings is not None:
             self._layer_bindings.lock_preset_for_modal(slot)
@@ -287,7 +305,7 @@ class PresetListController:
 
     def confirm_populate(self, slot: str, mode: str) -> None:
         try:
-            if self.project_dir is None:
+            if self.project_dir is None or self._refuse_whole_list(slot):
                 return
             layer = self.session.layers[slot]
             timeline_trigger_disabled = (
@@ -429,8 +447,10 @@ class PresetListController:
         entry = self.adopt(source)
         if entry is None:
             return False
-        with self._record(label, slot):
+        with self._record(label, slot) as edit:
             self.session.layers[slot].preset_list[index] = entry
+        if edit.refused is not None:
+            return False
         self._after_edit(slot, index, f"{verb} preset: {entry.display_name}")
         return True
 
@@ -450,9 +470,11 @@ class PresetListController:
         entry = self.adopt(source)
         if entry is None:
             return False
-        with self._record(label, slot):
+        with self._record(label, slot) as edit:
             presets.insert(index, entry)
-        self._after_edit(slot, index, f"{verb} preset: {entry.display_name}")
+        if edit.refused is not None:
+            return False
+        self._after_edit(slot, index, self._edit_message(slot, verb, entry, edit))
         return True
 
     def duplicate(self, slot: str, index: int) -> None:
@@ -461,9 +483,13 @@ class PresetListController:
             return
         presets = self.session.layers[slot].preset_list
         entry = presets[index]
-        with self._record("Duplicate preset", slot):
+        with self._record("Duplicate preset", slot) as edit:
             presets.insert(index + 1, entry)
-        self._after_edit(slot, index + 1, f"Duplicated preset: {entry.display_name}")
+        if edit.refused is not None:
+            return
+        self._after_edit(
+            slot, index + 1, self._edit_message(slot, "Duplicated", entry, edit)
+        )
 
     def remove(
         self,
@@ -477,17 +503,19 @@ class PresetListController:
         if not self._valid(slot, index):
             return
         presets = self.session.layers[slot].preset_list
-        with self._record(label, slot):
+        with self._record(label, slot) as edit:
             removed = presets.pop(index)
+        if edit.refused is not None:
+            return
         self.refresh_switching(slot)
         if presets and self._on_focus_preset_item is not None:
             self._on_focus_preset_item(slot, min(index, len(presets) - 1))
-        self._notify(slot, f"{verb} preset: {removed.display_name}")
+        self._notify(slot, self._edit_message(slot, verb, removed, edit))
 
     def prompt_clear(self, slot: str) -> None:
         """Confirm, then empty the layer's preset list."""
         count = len(self.session.layers[slot].preset_list)
-        if count == 0:
+        if count == 0 or self._refuse_whole_list(slot):
             return
         if self._layer_bindings is not None:
             self._layer_bindings.lock_preset_for_modal(slot)
@@ -513,8 +541,10 @@ class PresetListController:
         if not presets:
             return
         count = len(presets)
-        with self._record("Clear preset list", slot):
+        with self._record("Clear preset list", slot) as edit:
             presets.clear()
+        if edit.refused is not None:
+            return
         self.refresh_switching(slot)
         noun = "1 preset" if count == 1 else f"{count} presets"
         self._notify(slot, f"Cleared {noun}")
@@ -550,10 +580,25 @@ class PresetListController:
 
     def _record(
         self, label: str, slot: str, *, merge_key: Hashable | None = None
-    ) -> AbstractContextManager[None]:
+    ) -> AbstractContextManager[EditOutcome]:
         return self._history.recording(
             label, merge_key=merge_key, scope=preset_list_scope(slot)
         )
+
+    def _edit_message(
+        self, slot: str, verb: str, entry: PresetListEntry, edit: EditOutcome
+    ) -> str:
+        """Name the preset, or, when the edit moved presets along the clips,
+        how many clips it changed."""
+        changed = (
+            changed_clip_count(self.session, slot, self.duration_sec, edit.before)
+            if is_each_clip(self.session, slot)
+            else 0
+        )
+        if changed == 0:
+            return f"{verb} preset: {entry.display_name}"
+        noun = "1 clip" if changed == 1 else f"{changed} clips"
+        return f"{verb} preset: {noun} changed"
 
     def _after_edit(self, slot: str, index: int, message: str) -> None:
         self.refresh_switching(slot)

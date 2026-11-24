@@ -33,6 +33,7 @@ from cleave.viz.context_menu import (
     join_groups,
 )
 from cleave.viz.row_kinds import RowDescriptor, RowKind
+from cleave.viz.clip_presets import clip_preset_list, clip_preset_lock_reason
 from cleave.viz.row_spec import section_lock_blocks_mutation
 
 if TYPE_CHECKING:
@@ -205,6 +206,7 @@ def _list_edit_items(
     locked = section_lock_blocks_mutation(controls.session, desc)
     last = len(controls.session.layers[slot].preset_list) - 1
     preset_list = controls.preset_list
+    remove_hint = _take_out_hint(controls, desc, slot, index)
 
     def move_hint(at_end: bool, end_hint: str) -> str | None:
         if locked:
@@ -230,11 +232,23 @@ def _list_edit_items(
             id="preset.remove",
             label="Remove from list",
             run=lambda: preset_list.remove(slot, index),
-            enabled=not locked,
+            enabled=remove_hint is None,
             shortcut="Delete",
-            hint=_LOCK_HINT if locked else None,
+            hint=remove_hint,
         ),
     )
+
+
+def _take_out_hint(
+    controls: TuningControls, desc: RowDescriptor, slot: str, index: int
+) -> str | None:
+    """Why entry *index* cannot leave the list: a lock on it, or on its clip."""
+    if section_lock_blocks_mutation(controls.session, desc):
+        return _LOCK_HINT
+    held = len(clip_preset_list(controls.session, slot, controls.duration_sec))
+    if index >= held:
+        return None
+    return clip_preset_lock_reason(controls.session, slot)
 
 
 def _clear_item(
@@ -245,7 +259,7 @@ def _clear_item(
     elif not controls.session.layers[slot].preset_list:
         hint = "The list is already empty"
     else:
-        hint = None
+        hint = clip_preset_lock_reason(controls.session, slot)
     return ContextMenuItem(
         id="preset.clear",
         label="Clear list…",
@@ -260,15 +274,16 @@ def _clipboard_items(
 ) -> tuple[ContextMenuEntry, ...]:
     """Cut, Copy, a Paste submenu, and Duplicate for list entry *index*."""
     hint = _LOCK_HINT if section_lock_blocks_mutation(controls.session, desc) else None
+    cut_hint = _take_out_hint(controls, desc, slot, index)
     clipboard = controls.preset_clipboard
     return (
         ContextMenuItem(
             id="preset.cut",
             label="Cut",
             run=lambda: clipboard.cut_entry(slot, index),
-            enabled=hint is None,
+            enabled=cut_hint is None,
             shortcut=CUT.shortcut,
-            hint=hint,
+            hint=cut_hint,
         ),
         ContextMenuItem(
             id="preset.copy",

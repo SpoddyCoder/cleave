@@ -24,7 +24,7 @@ from cleave.preset_playlist import (
     scan_preset_playlist,
 )
 from cleave.choice import step_choice
-from cleave.viz.edit_history import EditHistory
+from cleave.viz.edit_history import EditHistory, preset_list_scope
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.preset_list_fill import needed_preset_count
 from cleave.viz.preset_switching import layer_notification
@@ -204,12 +204,18 @@ class LayerMutations:
         layer = self.session.layers[slot]
         previous = layer.preset_switching_trigger
         # Entering or leaving "each clip" moves presets between the list and
-        # the clips, so it is one undo step with them.
+        # the clips, so it is one undo step with them. Otherwise a run of
+        # steps folds into one, and one made during a take joins the take's.
         follows_clips = "timeline" in (trigger, previous)
+        history = self._history
         recording = (
-            self._history.recording(f"Change presets: {preset_switching_trigger_display(trigger)}")
-            if follows_clips and self._history is not None
-            else nullcontext()
+            nullcontext()
+            if history is None or (history.pending and not follows_clips)
+            else history.recording(
+                f"Change presets: {preset_switching_trigger_display(trigger)}",
+                merge_key=None if follows_clips else ("change_presets", slot),
+                scope=preset_list_scope(slot),
+            )
         )
         with recording:
             layer.preset_switching_trigger = trigger
@@ -222,14 +228,20 @@ class LayerMutations:
                 layer.layer_preset = layer.playlist.anchor
             if trigger == "timeline" and self._on_enter_each_clip is not None:
                 self._on_enter_each_clip(slot, previous)
+            if trigger == "off" and layer.layer_preset is not None:
+                # Switching off: the layer plays its own preset again.
+                layer.playlist = scan_preset_playlist(
+                    layer.layer_preset, catalog=layer.playlist.catalog
+                )
+        self.refresh_preset_switching(slot)
+
+    def refresh_preset_switching(self, slot: str) -> None:
+        """Make the live layer follow its switching trigger, changed here or by undo."""
+        layer = self.session.layers[slot]
         bindings = self._bindings()
         if bindings is not None:
             bindings.on_preset_switching_change(slot)
-        if trigger == "off" and layer.layer_preset is not None:
-            # Switching off: the layer plays its own preset again.
-            layer.playlist = scan_preset_playlist(
-                layer.layer_preset, catalog=layer.playlist.catalog
-            )
+        if layer.preset_switching_trigger == "off" and layer.layer_preset is not None:
             self._publish_browse_preset(slot)
 
     def step_preset_duration(

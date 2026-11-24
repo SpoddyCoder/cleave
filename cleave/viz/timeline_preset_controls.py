@@ -66,6 +66,11 @@ from cleave.viz.modal import (
 from cleave.viz.session import TuningSession
 from cleave.viz.timeline_clip_edits import row_clips
 from cleave.viz.timeline_cut_controls import apply_cut_to_lanes
+from cleave.viz.clip_presets import (
+    is_each_clip,
+    layers_label,
+    locked_each_clip_reason,
+)
 from cleave.viz.edit_history import EditHistory
 
 _GENERATE_TITLE = "Generate timeline"
@@ -88,7 +93,7 @@ _KIND_BUILDERS = {
 
 
 _GENERATE_HELP = (
-    "Builds a new timeline from these settings, replacing the current clips. Arrangement decides which layers play when, clip timing and cuts then tidy every generated clip, and each layer whose presets change on each clip gets a preset for every new clip.",
+    "Builds a new timeline from these settings, replacing the current clips. Arrangement decides which layers play when, clip timing and cuts then tidy every generated clip, and each layer whose presets change on each clip gets a preset for every new clip. That replaces the layer's whole preset list, spares included.",
     "In layers mode, each crescendo song marker gets a crescendo. The project remembers these settings for next time.",
 )
 _CHARACTER_HELP = ("The shape of the arrangement: which layers play together, and when.",)
@@ -221,7 +226,7 @@ class TimelinePresetController:
 
     def prompt(self, duration_sec: float) -> None:
         tl = self.session.timeline
-        if tl.locked:
+        if tl.locked or self._refuse_locked_layers():
             return
         repopulate_options = self._repopulate_options()
         repopulate_current = (
@@ -323,11 +328,29 @@ class TimelinePresetController:
             )
         )
 
+    def _refuse_locked_layers(self) -> bool:
+        """Name the locked layers whose clips hold presets. True when there are any."""
+        reason = locked_each_clip_reason(self.session)
+        if reason is None:
+            return False
+        self._notify(reason)
+        return True
+
     def _generate_info(self, duration_sec: float) -> str | None:
+        session = self.session
+        parts: list[str] = []
         count = self._clip_count(duration_sec)
-        if count == 0:
-            return None
-        return f"(replaces {_clips_label(count)} on the timeline)"
+        if count:
+            parts.append(f"{_clips_label(count)} on the timeline")
+        slots = [
+            slot
+            for slot in session.layer_z_order
+            if is_each_clip(session, slot) and session.layers[slot].preset_list
+        ]
+        if slots:
+            noun = "preset list" if len(slots) == 1 else "preset lists"
+            parts.append(f"the {noun} of {layers_label(session, slots)}")
+        return f"(replaces {' and '.join(parts)})" if parts else None
 
     def _clip_count(self, duration_sec: float) -> int:
         return sum(
@@ -342,6 +365,8 @@ class TimelinePresetController:
         duration_sec: float,
         repopulate_options: Sequence[TimelinePresetRepopulate],
     ) -> None:
+        if self._refuse_locked_layers():
+            return
         tl = self.session.timeline
         tl.timeline_preset_kind = TIMELINE_PRESET_KIND_OPTIONS[values["character"]]
         tl.timeline_preset_density = TIMELINE_PRESET_DENSITY_OPTIONS[values["density"]]
@@ -361,7 +386,7 @@ class TimelinePresetController:
             self._apply(tl.timeline_preset_kind, duration_sec)
 
     def prompt_reset(self, duration_sec: float) -> None:
-        if self.session.timeline.locked:
+        if self.session.timeline.locked or self._refuse_locked_layers():
             return
         count = self._clip_count(duration_sec)
         self._modal.prompt_form(
@@ -557,6 +582,8 @@ class TimelinePresetController:
             )
 
     def _confirm_reset(self, values: FormValues) -> None:
+        if self._refuse_locked_layers():
+            return
         self._last_reset_layers = values["layers"]
         with self._history.recording("Reset timeline"):
             self._reset(all_on=values["layers"] == 1)

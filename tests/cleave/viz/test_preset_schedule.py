@@ -15,6 +15,7 @@ from cleave.viz.preset_schedule import (
     bake_timer_slices,
     label_at,
     row_labels,
+    timer_first_times,
     timer_slices,
 )
 from cleave.viz.preset_switching import clip_switch_at
@@ -195,3 +196,48 @@ def test_the_strip_draws_names_and_redraws_when_they_change(trigger) -> None:
     else:
         # These clips hold no preset: the red hooked arrow shows either way.
         assert pixels(base) != pixels(RowPresets("off"))
+
+
+def test_baking_keeps_presets_in_gaps_as_spares() -> None:
+    controls = make_controls(("layer_1",), duration_sec=100.0)
+    session = controls.session
+    layer = session.layers["layer_1"]
+    layer.preset_switching = "on"
+    layer.preset_switching_trigger = "timer"
+    layer.preset_duration = 10.0
+    (D,) = entries("/p/d.milk")
+    layer.preset_list = [A, B, C, D]
+    session.timeline.enabled = True
+    cues = []
+    for start in (0.0, 20.0, 40.0):
+        cues += [SlotCue(t=start, level=1.0), SlotCue(t=start + 10.0, level=0.0)]
+    session.timeline.lanes["layer_1"] = TimelineLane(baseline=0.0, cues=cues)
+    bake_timer_slices(session, "layer_1", 100.0)
+    assert layer.preset_list == [A, C, A, B, D]
+
+
+@pytest.mark.parametrize("listing", [[A], [A, A, B], [A, B, C] * 5])
+@pytest.mark.parametrize("period", [5.0, 7.3, 20.0, 300.0])
+def test_first_times_match_the_timer(listing, period) -> None:
+    times = timer_first_times(
+        _clips(), period, len(listing), timeline_enabled=True, duration_sec=100.0
+    )
+    seen: dict[int, float] = {}
+    for step in range(10000):
+        t = step / 100.0 + 0.005
+        if clip_at(_clips(), t) is not None:
+            seen.setdefault(math.floor(t / period) % len(listing), t)
+    for index, first in enumerate(times):
+        assert (first is None) == (index not in seen)
+        if first is not None:
+            assert first == pytest.approx(seen[index], abs=0.02)
+
+
+def test_first_times_ignore_clips_while_the_timeline_is_off() -> None:
+    assert timer_first_times(
+        _clips(), 40.0, 4, timeline_enabled=False, duration_sec=100.0
+    ) == (0.0, 40.0, 80.0, None)
+    assert (
+        timer_first_times(_clips(), 5.0, 0, timeline_enabled=True, duration_sec=9.0)
+        == ()
+    )

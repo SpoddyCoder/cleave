@@ -453,22 +453,30 @@ def _run_set_cut_type(controls: TuningControls) -> None:
     controls.prompt_set_cut_type()
 
 
-def _undo_enabled(ctx: CommandContext) -> bool:
+def _undo_runs(ctx: CommandContext) -> bool:
+    """A locked step runs too: it names the lock instead of undoing."""
     return (
         ctx.can_undo
-        and not ctx.undo_locked
+        and not is_preset_curation_mode(ctx.editor_mode)
+        and not ctx.timeline_recording
+    )
+
+
+def _undo_enabled(ctx: CommandContext) -> bool:
+    return _undo_runs(ctx) and not ctx.undo_locked
+
+
+def _redo_runs(ctx: CommandContext) -> bool:
+    """As ``_undo_runs``, for Redo."""
+    return (
+        ctx.can_redo
         and not is_preset_curation_mode(ctx.editor_mode)
         and not ctx.timeline_recording
     )
 
 
 def _redo_enabled(ctx: CommandContext) -> bool:
-    return (
-        ctx.can_redo
-        and not ctx.redo_locked
-        and not is_preset_curation_mode(ctx.editor_mode)
-        and not ctx.timeline_recording
-    )
+    return _redo_runs(ctx) and not ctx.redo_locked
 
 
 def _browser_preset(controls: TuningControls) -> Path | None:
@@ -769,7 +777,7 @@ _UNDO = Command(
     kind="command",
     shortcut="Ctrl+Z",
     enabled=_undo_enabled,
-    run=_when_enabled(_undo_enabled, _run_undo),
+    run=_when_enabled(_undo_runs, _run_undo),
 )
 _REDO = Command(
     id="edit.redo",
@@ -777,7 +785,7 @@ _REDO = Command(
     kind="command",
     shortcut="Ctrl+Y",
     enabled=_redo_enabled,
-    run=_when_enabled(_redo_enabled, _run_redo),
+    run=_when_enabled(_redo_runs, _run_redo),
 )
 
 CUT = Command(

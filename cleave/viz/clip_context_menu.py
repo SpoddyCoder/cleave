@@ -1,7 +1,8 @@
 """Context menu section for a timeline row's selected clip.
 
 On a layer whose presets change on each clip, a Preset submenu chooses the
-clip's preset in the browser, picks another, or sets whether the clip starts
+clip's preset in the browser, picks another, gives it one of the spares, or
+sets whether the clip starts
 a new preset or continues the one before. On a timer layer, Replace preset
 changes the list entry that plays at the clicked time, and Convert to each
 clip makes the timer's presets clips. Go to the clip's start, split it from a Split submenu (at the playhead or at
@@ -21,7 +22,13 @@ from typing import TypeVar
 from cleave.cue_roles import CUE_ROLES, CueRole
 from cleave.cut_types import CUT_TYPES, CutType
 from cleave.timeline import MIN_CLIP_SEC, TimelineClip
-from cleave.viz.clip_presets import clip_preset_view, is_each_clip
+from cleave.viz.clip_presets import (
+    clip_preset_lock_reason,
+    clip_preset_view,
+    is_each_clip,
+    preset_label,
+    spare_presets,
+)
 from cleave.viz.context_menu import (
     CONTEXT_SEPARATOR,
     ContextMenuEntry,
@@ -35,6 +42,9 @@ from cleave.viz.timeline_clip_edits import (
     clip_edits_allowed,
     cut_out_unavailable_hint,
 )
+
+# The most spares the Preset submenu lists; the Preset List page has them all.
+MAX_SPARE_ITEMS = 12
 
 _ROLE_OPTIONS: tuple[CueRole | None, ...] = (None, *CUE_ROLES)
 
@@ -79,11 +89,21 @@ def clip_menu_entries(
             if split_t is None
             else "Too close to the clip's edge"
         )
+    delete_hint = edit_hint
+    if editable and clip.preset is not None:
+        # Deleting the clip would free its preset.
+        delete_hint = clip_preset_lock_reason(session, slot)
     start = clip.start
     preset_entries: tuple[ContextMenuEntry, ...] = ()
     if is_each_clip(session, slot):
         preset_entries = (
-            _preset_submenu(editor, slot, clip, browse_preset, edit_hint),
+            _preset_submenu(
+                editor,
+                slot,
+                clip,
+                browse_preset,
+                edit_hint or clip_preset_lock_reason(session, slot),
+            ),
         )
     elif (
         session.layers[slot].preset_switching_trigger == "timer"
@@ -177,9 +197,9 @@ def clip_menu_entries(
             id="timeline.clip.delete",
             label="Delete clip",
             run=lambda: editor.delete_selected(slot),
-            enabled=editable,
+            enabled=delete_hint is None,
             shortcut="Delete",
-            hint=edit_hint,
+            hint=delete_hint,
         ),
     )
 
@@ -259,6 +279,7 @@ def _preset_submenu(
                 enabled=editable and view.starts,
                 hint=own_hint,
             ),
+            *_spare_items(editor, slot, editable and view.starts, own_hint),
             CONTEXT_SEPARATOR,
             ContextMenuItem(
                 id="timeline.clip.preset.starts",
@@ -280,6 +301,41 @@ def _preset_submenu(
         enabled=editable,
         hint=edit_hint,
     )
+
+
+def _spare_items(
+    editor: ClipEditor, slot: str, enabled: bool, hint: str | None
+) -> tuple[ContextMenuEntry, ...]:
+    """The presets no clip holds, one item each, to give the clip."""
+    by_file = {
+        entry.file: entry
+        for entry in reversed(spare_presets(editor.session, slot, editor.duration_sec))
+    }
+    spares = list(reversed(by_file.values()))
+    if not spares:
+        return ()
+    items: list[ContextMenuEntry] = [CONTEXT_SEPARATOR]
+    items += [
+        ContextMenuItem(
+            id=f"timeline.clip.preset.spare.{index}",
+            label=f"Use {preset_label(entry.display_name)}",
+            run=lambda entry=entry: editor.use_spare(slot, entry),
+            enabled=enabled,
+            hint=hint,
+        )
+        for index, entry in enumerate(spares[:MAX_SPARE_ITEMS])
+    ]
+    more = len(spares) - MAX_SPARE_ITEMS
+    if more > 0:
+        items.append(
+            ContextMenuItem(
+                id="timeline.clip.preset.spare.more",
+                label=f"{more} more in the Preset List",
+                run=lambda: None,
+                enabled=False,
+            )
+        )
+    return tuple(items)
 
 
 def add_clip_entry(

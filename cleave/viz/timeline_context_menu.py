@@ -145,7 +145,11 @@ def timeline_row_menu_entries(
         enabled=can_arm,
         checked=slot in tl.armed_slots,
         shortcut="A",
-        hint=None if can_arm else "Unlock the timeline to arm",
+        hint=None
+        if can_arm
+        else "Unlock the timeline to arm"
+        if tl.locked
+        else "Unlock the layer to arm",
     )
     solo = ContextMenuItem(
         id="timeline.row.solo",

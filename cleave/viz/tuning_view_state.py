@@ -78,7 +78,8 @@ from cleave.config_schema.timeline import (
     DEFAULT_TIMELINE_SHOW_BAR_GRID,
 )
 from cleave.preset_library import PresetLibrary
-from cleave.viz.timeline_clip_edits import selected_clip
+from cleave.viz.preset_schedule import timer_first_times
+from cleave.viz.timeline_clip_edits import row_clips, selected_clip
 from cleave.viz.preset_browser import BrowserCrumb, mark_missing_crumbs
 from cleave.preset_playlist import (
     PresetPlaylist,
@@ -171,6 +172,8 @@ class TrackBlock:
     # On a layer whose presets change on each clip: where each list entry's
     # clip starts, in list order. Empty otherwise.
     preset_list_clip_starts: tuple[float, ...] = ()
+    # On a timer layer: when each list entry first shows, None for never.
+    preset_list_first_times: tuple[float | None, ...] = ()
     # Why the directory row's folder cannot be browsed (None: fine).
     preset_dir_problem: str | None = None
     # Why the preset row's file, or each list entry's, cannot play (None: fine).
@@ -810,6 +813,19 @@ class TuningViewStateBuilder:
             return None
         return health.file_problem(layer, current)
 
+    def _preset_list_first_times(self, slot: str) -> tuple[float | None, ...]:
+        layer = self.session.layers[slot]
+        if layer.preset_switching_trigger != "timer":
+            return ()
+        timeline = self.session.timeline
+        return timer_first_times(
+            row_clips(self.session, slot, self.duration_sec),
+            layer.preset_duration,
+            len(layer.preset_list),
+            timeline_enabled=timeline.enabled,
+            duration_sec=self.duration_sec,
+        )
+
     def _preset_list_clip_starts(self, slot: str) -> tuple[float, ...]:
         if not is_each_clip(self.session, slot):
             return ()
@@ -917,6 +933,7 @@ class TuningViewStateBuilder:
                 preset_list_labels=self._preset_list_labels(list(layer.preset_list)),
                 preset_list_markers=self._preset_list_markers(list(layer.preset_list)),
                 preset_list_clip_starts=self._preset_list_clip_starts(slot),
+                preset_list_first_times=self._preset_list_first_times(slot),
                 preset_dir_problem=self.session.preset_health.dir_problem(
                     display.current_dir
                 ),
@@ -956,6 +973,7 @@ class TuningViewStateBuilder:
                 preset_list_labels=self._preset_list_labels(list(layer.preset_list)),
                 preset_list_markers=self._preset_list_markers(list(layer.preset_list)),
                 preset_list_clip_starts=self._preset_list_clip_starts(slot),
+                preset_list_first_times=self._preset_list_first_times(slot),
                 preset_dir_problem=self.session.preset_health.dir_problem(
                     display.current_dir
                 ),

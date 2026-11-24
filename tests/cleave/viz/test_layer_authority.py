@@ -205,6 +205,7 @@ def test_view_state_reflects_session_mutation_without_block_writes() -> None:
         "preset_list_labels",
         "preset_list_markers",
         "preset_list_clip_starts",
+        "preset_list_first_times",
         "preset_empty",
         "visible",
         "active_preset_list_index",

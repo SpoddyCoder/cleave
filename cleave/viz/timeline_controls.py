@@ -49,7 +49,7 @@ from cleave.viz.timeline_clip_edits import (
     snap_for_session,
     step_clip_selection,
 )
-from cleave.viz.clip_presets import start_new_clips
+from cleave.viz.clip_presets import clip_preset_lock_reason, start_new_clips
 from cleave.viz.edit_history import EditHistory
 
 def _next_option(options: tuple, current: object) -> object:
@@ -519,7 +519,13 @@ class TimelineControls:
         """Whether ``toggle_arm_row`` would arm or disarm *row* right now."""
         if self.session.timeline.locked:
             return False
-        return self._slot_for_layer_index(row) is not None
+        slot = self._slot_for_layer_index(row)
+        if slot is None:
+            return False
+        return (
+            slot in self.session.timeline.armed_slots
+            or clip_preset_lock_reason(self.session, slot) is None
+        )
 
     def row_slot(self, row: int) -> str | None:
         """The layer slot drawn on strip *row*, or None past the last layer."""
@@ -672,6 +678,11 @@ class TimelineControls:
             if tl.recording and slot in tl.record_baseline:
                 self._commit_recording_slot(slot)
         else:
+            # A take gives clips presets, which a locked layer keeps.
+            reason = clip_preset_lock_reason(self.session, slot)
+            if reason is not None:
+                self._notify(reason)
+                return
             armed.add(slot)
             # Arming hands an overridden row back to the timeline.
             if slot in tl.override_slots:
@@ -741,6 +752,11 @@ class TimelineControls:
         if not tl.armed_slots:
             self._notify("Arm at least one layer to record")
             return
+        for slot in self.session.layer_z_order:
+            reason = clip_preset_lock_reason(self.session, slot)
+            if slot in tl.armed_slots and reason is not None:
+                self._notify(reason)
+                return
 
         t_sec = tap_sec(self.playback, self.duration_sec)
         snapped = self._snap_placement(t_sec)

@@ -132,20 +132,26 @@ def deal_list_onto_clips(
     )
 
 
+def spare_presets(
+    session: TuningSession, slot: str, duration_sec: float
+) -> list[PresetListEntry]:
+    """The presets at the end of the list that no clip holds."""
+    held = len(clip_preset_list(session, slot, duration_sec))
+    return list(session.layers[slot].preset_list[held:])
+
+
 def spare_preset_count(
     session: TuningSession, slot: str, duration_sec: float
 ) -> int:
     """How many presets at the end of the list no clip holds."""
-    held = len(clip_preset_list(session, slot, duration_sec))
-    return max(0, len(session.layers[slot].preset_list) - held)
+    return len(spare_presets(session, slot, duration_sec))
 
 
 def first_spare(
     session: TuningSession, slot: str, duration_sec: float
 ) -> PresetListEntry | None:
     """The first preset in the list that no clip holds."""
-    held = len(clip_preset_list(session, slot, duration_sec))
-    return next(iter(session.layers[slot].preset_list[held:]), None)
+    return next(iter(spare_presets(session, slot, duration_sec)), None)
 
 
 def set_clip_preset_and_list(
@@ -207,7 +213,7 @@ def start_new_clips(
     session.timeline.lanes[slot] = lane
 
 
-def _fill_empty_clips(
+def fill_empty_clips(
     session: TuningSession, slot: str, duration_sec: float
 ) -> None:
     """Give empty clips the spares, earliest clip first, and reorder the list to match."""
@@ -261,16 +267,117 @@ def _without_entries(
     return left
 
 
+def _all_clips(
+    session: TuningSession,
+    slot: str,
+    duration_sec: float,
+    before: EditSnapshot | None = None,
+) -> list[TimelineClip]:
+    """The row's clips now, or as they were in ``before``."""
+    lane = (
+        _lane(session, slot)
+        if before is None
+        else before.lanes.get(slot) or empty_lane()
+    )
+    return lane_clips(
+        lane, inherit=layer_inherit(session, slot), duration_sec=duration_sec
+    )
+
+
 def _clips_before(
     session: TuningSession, slot: str, before: EditSnapshot, duration_sec: float
 ) -> list[PresetListEntry]:
     """The presets the row's clips held before the edit, in clip order."""
-    clips = lane_clips(
-        before.lanes.get(slot) or empty_lane(),
-        inherit=layer_inherit(session, slot),
-        duration_sec=duration_sec,
-    )
+    clips = _all_clips(session, slot, duration_sec, before)
     return [c.preset for c in switching_clips(clips) if c.preset is not None]
+
+
+def changed_clip_count(
+    session: TuningSession, slot: str, duration_sec: float, before: EditSnapshot
+) -> int:
+    """How many of the row's clips hold another preset, or none, since ``before``."""
+    old = {
+        clip.start: clip.preset
+        for clip in _all_clips(session, slot, duration_sec, before)
+    }
+    return sum(
+        1
+        for clip in _all_clips(session, slot, duration_sec)
+        if clip.start in old and old[clip.start] != clip.preset
+    )
+
+
+def layers_label(session: TuningSession, slots: Sequence[str]) -> str:
+    """``layer 2``, or ``layers 1 and 3``, as the panel numbers them."""
+    numbers = [
+        str(index)
+        for index, slot in enumerate(session.layer_z_order, start=1)
+        if slot in slots
+    ]
+    if len(numbers) == 1:
+        return f"layer {numbers[0]}"
+    return f"layers {', '.join(numbers[:-1])} and {numbers[-1]}"
+
+
+TIMELINE_LOCK_REASON = "Unlock the timeline to change clips"
+
+
+def layer_lock_reason(session: TuningSession, slots: Sequence[str]) -> str:
+    """Why a preset change on locked ``slots`` is refused."""
+    whose = "its" if len(slots) == 1 else "their"
+    return f"Unlock {layers_label(session, slots)} to change {whose} presets"
+
+
+def locked_each_clip_reason(session: TuningSession) -> str | None:
+    """Why an edit that replaces every row cannot run: the locked each-clip
+    layers it would take presets from. None when there are none."""
+    slots = [
+        slot
+        for slot in session.layer_z_order
+        if session.layers[slot].locked and is_each_clip(session, slot)
+    ]
+    return layer_lock_reason(session, slots) if slots else None
+
+
+def clip_preset_lock_reason(session: TuningSession, slot: str) -> str | None:
+    """Why the layer's clips cannot gain or lose a preset, or None when they can."""
+    if not is_each_clip(session, slot):
+        return None
+    if session.layers[slot].locked:
+        return layer_lock_reason(session, (slot,))
+    return TIMELINE_LOCK_REASON if session.timeline.locked else None
+
+
+def edit_refusal(
+    session: TuningSession, duration_sec: float, before: EditSnapshot
+) -> str | None:
+    """Why a lock forbids the edit just made, or None when it may stand.
+
+    A locked timeline keeps each-clip layers' clips as they are. A locked
+    layer keeps its preset list, when its presets change, and, with each
+    clip, which presets its clips hold.
+    """
+    for slot in session.layer_z_order:
+        each_clip = is_each_clip(session, slot)
+        if session.timeline.locked and (
+            each_clip or before.triggers.get(slot) == "timeline"
+        ):
+            if _all_clips(session, slot, duration_sec) != _all_clips(
+                session, slot, duration_sec, before
+            ):
+                return TIMELINE_LOCK_REASON
+        layer = session.layers[slot]
+        if layer.locked and (
+            layer.preset_list != before.preset_lists.get(slot)
+            or layer.preset_switching_trigger != before.triggers.get(slot)
+            or (
+                each_clip
+                and clip_preset_list(session, slot, duration_sec)
+                != _clips_before(session, slot, before, duration_sec)
+            )
+        ):
+            return layer_lock_reason(session, (slot,))
+    return None
 
 
 def sync_each_clip_layers(
@@ -283,8 +390,8 @@ def sync_each_clip_layers(
     that adds past the held presets leaves every clip its preset; any other
     deals the list along the clips. A timeline edit leaves the other clips'
     presets alone, and a preset a clip lost joins the end of the spares.
-    Spares then fill empty clips. Returns the slots whose list changed, so
-    switching can reload.
+    Spares then fill empty clips. A layer the edit did not touch is left
+    alone. Returns the slots whose list changed, so switching can reload.
     """
     changed: list[str] = []
     for slot in session.layer_z_order:
@@ -292,6 +399,12 @@ def sync_each_clip_layers(
             continue
         layer = session.layers[slot]
         old_list = list(before.preset_lists.get(slot, []))
+        if (
+            layer.preset_list == old_list
+            and before.triggers.get(slot) == "timeline"
+            and before.lanes.get(slot) == session.timeline.lanes.get(slot)
+        ):
+            continue
         held = clip_preset_list(session, slot, duration_sec)
         entered = before.triggers.get(slot) != "timeline"
         if entered:
@@ -320,7 +433,7 @@ def sync_each_clip_layers(
             )
             lost = _without_entries(old_held, held)
             layer.preset_list[:] = [*held, *spares, *lost]
-        _fill_empty_clips(session, slot, duration_sec)
+        fill_empty_clips(session, slot, duration_sec)
         if layer.preset_list != old_list:
             changed.append(slot)
     return changed

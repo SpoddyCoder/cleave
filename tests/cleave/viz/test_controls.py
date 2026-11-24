@@ -1681,6 +1681,25 @@ def test_generate_names_the_cues_it_replaces_under_the_title() -> None:
     assert modal_view.form_info == "(replaces 1 clip on the timeline)"
 
 
+def test_generate_names_the_preset_lists_it_replaces() -> None:
+    controls = make_controls(("layer_1", "layer_2", "layer_3"))
+    controls.session.timeline.lanes["layer_1"] = TimelineLane(
+        baseline=0.0, cues=[SlotCue(t=1.0, level=1.0)]
+    )
+    for slot in ("layer_1", "layer_3"):
+        layer = controls.session.layers[slot]
+        layer.preset_switching = "on"
+        layer.preset_switching_trigger = "timeline"
+        layer.preset_list = entries("a.milk")
+    _focus_timeline_presets(controls)
+    _press_focused(controls, keydown(pygame.K_RETURN))
+    modal_view = controls.modal_host.view_state()
+    assert modal_view is not None
+    assert modal_view.form_info == (
+        "(replaces 1 clip on the timeline and the preset lists of layers 1 and 3)"
+    )
+
+
 def test_generate_hides_character_in_pattern_mask_mode() -> None:
     controls = make_controls(("layer_1", "layer_2"))
     _focus_timeline_presets(controls)

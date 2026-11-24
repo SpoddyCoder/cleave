@@ -22,7 +22,10 @@ def _session() -> SimpleNamespace:
         ),
         layers={
             "layer_1": SimpleNamespace(
-                preset_list=entries("a.milk"), preset_switching_trigger="off"
+                preset_list=entries("a.milk"),
+                preset_switching_trigger="off",
+                layer_preset=None,
+                browse_snapshot=lambda: None,
             )
         },
         pattern_mask=SimpleNamespace(
@@ -237,10 +240,10 @@ def test_preset_list_edits_carry_their_layer_scope() -> None:
     history = EditHistory(session)
     with history.recording("Remove preset", scope=preset_list_scope("layer_1")):
         session.layers["layer_1"].preset_list = []
-    assert history.undo_scope == ("preset_list", "layer_1")
+    assert history.undo_scopes == {preset_list_scope("layer_1")}
     assert history.undo() == "Remove preset"
     assert session.layers["layer_1"].preset_list == entries("a.milk")
-    assert history.redo_scope == ("preset_list", "layer_1")
+    assert history.redo_scopes == {preset_list_scope("layer_1")}
 
 
 def test_a_locked_scope_blocks_only_its_own_entries() -> None:
@@ -252,7 +255,7 @@ def test_a_locked_scope_blocks_only_its_own_entries() -> None:
     assert history.undo_locked is True
     with history.recording("Snap clips"):
         session.timeline.lanes["layer_1"] = _lane(2.0)
-    assert history.undo_scope == TIMELINE_SCOPE
+    assert history.undo_scopes == {TIMELINE_SCOPE}
     assert history.undo_locked is False
 
 
@@ -265,3 +268,39 @@ def test_edits_in_different_scopes_do_not_merge() -> None:
         session.timeline.lanes["layer_1"] = _lane(2.0)
     history.undo()
     assert session.layers["layer_1"].preset_list == entries("b.milk")
+
+
+def test_an_edit_in_two_sections_waits_on_either_lock() -> None:
+    session = _session()
+    locked: set[tuple[str, ...]] = set()
+    history = EditHistory(session, scope_locked=lambda scope: scope in locked)
+    with history.recording("Delete clip"):
+        session.timeline.lanes["layer_1"] = _lane(2.0)
+        session.layers["layer_1"].preset_list = entries("b.milk")
+    assert not history.undo_locked
+    for scope in (TIMELINE_SCOPE, preset_list_scope("layer_1")):
+        locked.clear()
+        locked.add(scope)
+        assert history.undo_locks == {scope}
+
+
+def test_a_refused_edit_is_put_back_and_not_recorded() -> None:
+    session = _session()
+    said: list[str] = []
+    history = EditHistory(
+        session, refuse=lambda _before: "Unlock it", on_refused=said.append
+    )
+    with history.recording("Move cue") as edit:
+        session.timeline.lanes["layer_1"] = _lane(2.0)
+    assert edit.refused == "Unlock it" and said == ["Unlock it"]
+    assert session.timeline.lanes["layer_1"] == _lane(1.0)
+    assert not history.can_undo
+
+
+def test_a_merged_run_that_ends_where_it_began_is_dropped() -> None:
+    session = _session()
+    history = EditHistory(session, clock=lambda: 0.0)
+    for t in (2.0, 1.0):
+        with history.recording("Trim clip", merge_key="k"):
+            session.timeline.lanes["layer_1"] = _lane(t)
+    assert not history.can_undo

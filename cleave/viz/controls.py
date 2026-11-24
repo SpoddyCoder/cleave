@@ -13,9 +13,13 @@ from cleave.signals import Signals
 from cleave.preset_library import PresetLibrary
 from cleave.preset_list_entry import PresetListEntry
 from cleave.viz.clip_presets import (
+    TIMELINE_LOCK_REASON,
     ClipPresetPicker,
     clip_preset_view,
+    clip_preset_lock_reason,
+    edit_refusal,
     is_each_clip,
+    layers_label,
     seed_timeline,
     sync_each_clip_layers,
     timeline_is_empty,
@@ -252,8 +256,13 @@ class TuningControls:
         self.edit_history = EditHistory(
             session,
             on_preset_list_change=lambda slot: self.preset_list.refresh_switching(slot),
+            on_trigger_restored=lambda slot: (
+                self.layer_mutations.refresh_preset_switching(slot)
+            ),
             scope_locked=self._edit_scope_locked,
             before_commit=self._sync_each_clip_layers,
+            refuse=lambda before: edit_refusal(session, duration_sec, before),
+            on_refused=self.show_notification,
         )
         self.preset_list = PresetListController(
             session,
@@ -972,7 +981,20 @@ class TuningControls:
         self.set_shell_region(ShellRegion.INSPECTOR)
 
     def toggle_layer_locked(self, slot: str) -> None:
-        layer = self.session.layers[slot]
+        session = self.session
+        layer = session.layers[slot]
+        timeline = session.timeline
+        if (
+            not layer.locked
+            and timeline.recording
+            and slot in timeline.armed_slots
+            and is_each_clip(session, slot)
+        ):
+            # A take gives clips presets, so it could not end on a locked layer.
+            self.show_notification(
+                f"Stop recording to lock {layers_label(session, (slot,))}"
+            )
+            return
         layer.locked = not layer.locked
 
     def toggle_overlay_locked(self) -> None:
@@ -995,8 +1017,10 @@ class TuningControls:
         if self.session.timeline.enabled == enabled:
             return
         label = "Turn timeline on" if enabled else "Turn timeline off"
-        with self.edit_history.recording(label):
+        with self.edit_history.recording(label) as edit:
             self._apply_timeline_enabled(enabled)
+        if edit.refused is not None:
+            return
         self._after_timeline_enabled_change(enabled)
 
     def _apply_timeline_enabled(self, enabled: bool) -> None:
@@ -1029,14 +1053,17 @@ class TuningControls:
     def _confirm_each_clip(self, slot: str, apply: Callable[[], None]) -> None:
         """Run ``apply`` to move the layer to each clip, asking first when it
         would change clips, presets, or the timeline the user has set up."""
+        if self.session.timeline.locked:
+            self.show_notification(TIMELINE_LOCK_REASON)
+            return
         change = each_clip_change(self.session, slot, self.duration_sec)
         if not change.destructive:
             apply()
             return
         number = panel_layer_number(self.session.layer_z_order, slot)
         self._modal_host.prompt_confirm(
-            f"Change layer {number}'s presets on each clip?",
-            "Change",
+            f"Switch layer {number} to each clip?",
+            "Switch",
             apply,
             body=change.summary(),
         )
@@ -1045,6 +1072,10 @@ class TuningControls:
         """Open the preset browser to replace the selected clip's preset."""
         clip = self.clip_editor.selected(slot)
         if clip is None or not is_each_clip(self.session, slot):
+            return
+        reason = clip_preset_lock_reason(self.session, slot)
+        if reason is not None:
+            self.show_notification(reason)
             return
         view = clip_preset_view(self.session, slot, clip, self.duration_sec)
         if view.empty:
@@ -1149,11 +1180,30 @@ class TuningControls:
         )
 
     def undo(self) -> None:
+        if self._notify_locks(self.edit_history.undo_locks, "undo"):
+            return
         label = self.edit_history.undo()
         if label is not None:
             self.show_notification(f"Undid {label}")
 
+    def _notify_locks(self, scopes: frozenset[EditScope], verb: str) -> bool:
+        """Name the locks the next undo or redo waits on. True when there are any."""
+        if not scopes:
+            return False
+        names = ["the timeline"] if TIMELINE_SCOPE in scopes else []
+        slots = [
+            slot
+            for scope in scopes
+            if (slot := preset_list_scope_slot(scope)) in self.session.layers
+        ]
+        if slots:
+            names.append(layers_label(self.session, slots))
+        self.show_notification(f"Unlock {' and '.join(names)} to {verb} this step")
+        return True
+
     def redo(self) -> None:
+        if self._notify_locks(self.edit_history.redo_locks, "redo"):
+            return
         label = self.edit_history.redo()
         if label is not None:
             self.show_notification(f"Redid {label}")

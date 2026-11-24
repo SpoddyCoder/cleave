@@ -174,7 +174,7 @@ The same icons, in the same order, also sit at the right of the icon line under 
 
 ### Undo
 
-**Edit > Undo** (Ctrl+Z) and **Edit > Redo** (Ctrl+Y) cover timeline edits (adding, moving, trimming, splitting, and deleting clips, a clip's preset, recorded takes, turning the timeline on or off, changing a layer to or from each clip, and timeline commands such as Generate timeline) and preset list edits (adding, removing, moving, pasting, replacing, Populate list, and Clear list). The menu item names the step it would undo. A step on a locked layer's preset list, or on a locked timeline, waits until you unlock it. Other settings apply as you change them, so save when you are happy, or close without saving to discard your changes.
+**Edit > Undo** (Ctrl+Z) and **Edit > Redo** (Ctrl+Y) cover timeline edits (adding, moving, trimming, splitting, and deleting clips, a clip's preset, recorded takes, turning the timeline on or off, and timeline commands such as Generate timeline) and preset list edits (adding, removing, moving, pasting, replacing, Populate list, and Clear list), and any change to a layer's change presets setting (a quick run of arrow presses is one step). The menu item names the step it would undo. A step that changes a locked layer's presets, or a locked timeline, waits until you unlock it; one that changes both waits for both. Ctrl+Z then tells you which to unlock. Other settings apply as you change them, so save when you are happy, or close without saving to discard your changes.
 
 ---
 
@@ -298,7 +298,7 @@ Editing the list or the Preset Switching settings keeps the preview on screen. T
 
 ### The preset list
 
-The **Preset List** page holds the presets the layer cycles through, in order. It appears whenever change presets is not never. On a layer whose presets change on each clip, the list is the clips' presets in clip order, each showing the time its clip starts, then any **spare** presets that no clip holds (see [Presets on clips](#presets-on-clips)).
+The **Preset List** page holds the presets the layer cycles through, in order. It appears whenever change presets is not never. On a layer whose presets change on each clip, the list is the clips' presets in clip order, each showing the time its clip starts, then any **spare** presets that no clip holds (see [Presets on clips](#presets-on-clips)). On a timer, each entry shows when it first plays, or **not shown** when its time always falls where the layer is off or after the song ends.
 
 A new project starts with each layer's list already filled: enough presets to last the song at the layer's preset duration, shuffled from the layer's preset folder. Every layer of a new project starts on the Milkdrop Original folder, which the Welcome to Cleave step always downloads.
 
@@ -422,7 +422,7 @@ The fastest way to get started is to let Cleave build an arrangement. Choose **G
 
 Press H in the dialog for a full description of each option. You will get much better results if you [mark the song's structure](#song-markers) and [assign roles to your presets](#curating-your-presets) first.
 
-Generate replaces the current timeline, but Ctrl+Z undoes it.
+Generate replaces the current timeline and, on layers whose presets change on each clip, the whole preset list, including presets you picked by hand and spares. The dialog says which layers' lists it replaces, and Ctrl+Z undoes it all. If one of those layers is locked, unlock it first; the same goes for Reset timeline.
 
 ### Reading the strip
 
@@ -490,20 +490,22 @@ Select a clip to edit its preset in the inspector:
 | preset | The preset the clip plays, shortened to fit (hover for the full name). Enter opens the preset browser to choose another; Left/Right picks another with the clip's role, or from the layer's preset folder when no preset has that role. |
 | starts | **new preset** or **continues**. Only a clip touching the one before can continue it. |
 
-The same choices are in the clip's right-click menu, under **Preset**.
+The same choices are in the clip's right-click menu, under **Preset**, which also lists the spares: choose one to give it to the clip, and the clip's own preset becomes the last spare.
 
 The clips and the layer's Preset List page stay in step:
 
-- **Editing the list** flows along the clips. Remove or insert an entry and the presets after it move along. Replacing or reordering entries changes the clips in place. Adding to the end of the list fills the first clip without a preset and leaves the others alone.
+- **Editing the list** flows along the clips. Remove or insert an entry and the presets after it move along; a message says how many clips changed. Replacing or reordering entries changes the clips in place. Adding to the end of the list fills the first clip without a preset and leaves the others alone.
 - **Editing the timeline** leaves the other clips' presets alone. A deleted clip's preset becomes a spare at the end of the list. A new clip, whether added, recorded, or split off, takes the first spare.
 - **Too many presets** is fine: the spares wait at the end of the list, marked **spare**, and the layer shows an amber warning.
 - **Too few presets** leaves clips without one. They show a red hooked arrow and carry on with the preset before them, and the layer shows its red warning.
 
 Populate list and Generate timeline give every clip a preset.
 
-When you choose each clip on a layer set to **on a timer** (or choose **Convert to each clip** from a clip's right-click menu), the row is cut into clips where the timer changes preset, so the same presets play at the same times. From **never** or **projectM decides**, your clips stay as they are and take the list's presets in order. Changing to or from each clip with the arrow keys goes through the settings in between, so to convert a timer layer, use the menu or pick each clip from the row's list. Choosing it while the timeline is off turns the timeline on.
+Locks protect both sides. While the timeline is locked, list edits that would change its clips, and switching a layer to each clip, are refused. While a layer is locked, timeline edits that would free or take one of its presets (such as deleting a clip) are refused and the layer cannot be armed for recording, but you can still move and trim its clips. A message says which lock to open.
 
-When choosing each clip would cut clips, replace presets your clips already hold, take presets off the list, or turn the timeline on, Cleave first tells you exactly what will change. Cancel leaves everything as it was, and Ctrl+Z puts it back afterwards.
+When you choose each clip on a layer set to **on a timer** (or choose **Convert to each clip** from a clip's right-click menu), the row is cut into clips where the timer changes preset, so the same presets play at the same times. Presets the timer never shows stay in the list as spares. From **never** or **projectM decides**, your clips stay as they are and take the list's presets in order; clips that already hold the start of the list, as when you come back to each clip without editing the list, keep what they hold. Changing to or from each clip with the arrow keys goes through the settings in between, so to convert a timer layer, use the menu or pick each clip from the row's list. Choosing it while the timeline is off turns the timeline on.
+
+When choosing each clip would cut clips, replace presets your clips already hold, or turn the timeline on, Cleave first tells you exactly what will change. Cancel leaves everything as it was, and Ctrl+Z puts it back afterwards.
 
 A right-click on the time ruler offers Drop song marker, Undo, Redo, and a **Timeline** submenu holding Generate timeline, Snap clips, Snap clips to markers, Set cut type on clips, and Reset timeline.
 

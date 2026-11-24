@@ -57,9 +57,11 @@ from cleave.timeline import (
 from cleave.preset_list_entry import PresetListEntry
 from cleave.viz.clip_presets import (
     ClipPresetPick,
+    clip_preset_lock_reason,
     first_spare,
     is_each_clip,
     set_clip_preset_and_list,
+    spare_presets,
     start_new_clips,
 )
 from cleave.viz.session import TuningSession
@@ -271,7 +273,7 @@ class ClipEditor:
         if end - start < MIN_CLIP_SEC or clip_at(clips, start) is not None:
             return False
         lane = _lane(session, slot)
-        with self.history.recording("Add clip"):
+        with self.history.recording("Add clip") as edit:
             session.timeline.lanes[slot] = add_clip(
                 lane,
                 start,
@@ -285,7 +287,7 @@ class ClipEditor:
                 recast=is_each_clip(session, slot),
             )
             select_clip(session, slot, start)
-        return True
+        return edit.refused is None
 
     def delete_selected(self, slot: str) -> None:
         """Turn *slot*'s selected clip off, then select the next clip, else the previous."""
@@ -330,7 +332,7 @@ class ClipEditor:
             or t_sec > clip.end - MIN_CLIP_SEC
         ):
             return False
-        with self.history.recording("Split clip"):
+        with self.history.recording("Split clip") as edit:
             session.timeline.lanes[slot] = split_clip(
                 _lane(session, slot),
                 clip,
@@ -340,7 +342,7 @@ class ClipEditor:
             )
             start_new_clips(session, slot, self.duration_sec, (t_sec,))
             select_clip(session, slot, t_sec)
-        return True
+        return edit.refused is None
 
     def nudge_level(self, slot: str, *, forward: bool, large: bool) -> None:
         """Step the selected clip's opacity by 1% (10% when *large*), clamped to its range."""
@@ -399,6 +401,8 @@ class ClipEditor:
         clip = self._editable(slot)
         if clip is None:
             return
+        if self._presets_locked(slot):
+            return
         clips = self.clips(slot)
         if not clip_butts_previous(clips, clip):
             return
@@ -424,12 +428,26 @@ class ClipEditor:
         clip = self._editable(slot)
         if clip is None or self._pick_preset is None:
             return
+        # Before a preset file is copied in.
+        if self._presets_locked(slot):
+            return
         if not clip_starts_preset(self.clips(slot), clip):
             return
         preset = self._pick_preset(slot, clip.role)
         if preset is None:
             return
         self._set_preset(slot, clip, preset, "Pick clip preset")
+
+    def use_spare(self, slot: str, spare: PresetListEntry) -> None:
+        """Give the selected clip a preset no clip holds. Its own becomes the last spare."""
+        clip = self._editable(slot)
+        if clip is None or not clip_starts_preset(self.clips(slot), clip):
+            return
+        if spare not in spare_presets(self.session, slot, self.duration_sec):
+            return
+        # Only the clip changes: the list follows as the edit is recorded.
+        with self.history.recording("Use spare preset"):
+            self._write_preset(slot, clip, spare)
 
     def set_preset(self, slot: str, preset: PresetListEntry) -> None:
         """Give the selected clip *preset* (Paste, or chosen in the browser)."""
@@ -555,6 +573,13 @@ class ClipEditor:
             lanes.pop(drag.slot, None)
         else:
             lanes[drag.slot] = copy_lane(drag.lane)
+
+    def _presets_locked(self, slot: str) -> bool:
+        """Whether a lock keeps the layer's clip presets; says which when one does."""
+        reason = clip_preset_lock_reason(self.session, slot)
+        if reason is not None:
+            self.history.report_refused(reason)
+        return reason is not None
 
     def _editable(self, slot: str) -> TimelineClip | None:
         if not clip_edits_allowed(self.session):

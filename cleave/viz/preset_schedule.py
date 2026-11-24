@@ -30,6 +30,7 @@ from cleave.viz.clip_presets import (
     CONTINUES_GLYPH,
     clip_preset_list,
     deal_list_onto_clips,
+    fill_empty_clips,
     layer_inherit,
     preset_label,
     row_switching_clips,
@@ -112,6 +113,38 @@ def timer_slices(
             start = max(start, end)
             k += 1
     return slices
+
+
+def timer_first_times(
+    clips: Sequence[TimelineClip],
+    period: float,
+    entry_count: int,
+    *,
+    timeline_enabled: bool,
+    duration_sec: float,
+) -> tuple[float | None, ...]:
+    """When the timer first shows each list entry, or None for one it never does.
+
+    With the timeline off the layer may show for the whole song.
+    """
+    first: list[float | None] = [None] * entry_count
+    left = entry_count
+    period = max(0.001, float(period))
+    spans = (
+        [(clip.start, clip.end) for clip in clips]
+        if timeline_enabled
+        else [(0.0, duration_sec)]
+    )
+    for start, end in spans:
+        k = math.floor(start / period)
+        while left and k * period < end:
+            index = k % entry_count
+            # Rounding can put a period's end on the clip's start.
+            if first[index] is None and (k + 1) * period > start:
+                first[index] = max(start, k * period)
+                left -= 1
+            k += 1
+    return tuple(first)
 
 
 def _same_throughout(
@@ -264,7 +297,8 @@ def bake_timer_slices(
 
     Clips keep their look, cuts, and the gaps between them. A change too close
     to a clip's edge to leave a clip is dropped: the part takes its
-    neighbour's preset. The layer's list becomes the presets in clip order.
+    neighbour's preset. The layer's list becomes the presets in clip order,
+    then, as spares, those no clip holds.
     """
     layer = session.layers[slot]
     inherit = layer_inherit(session, slot)
@@ -311,7 +345,12 @@ def bake_timer_slices(
             )
             playing = part.entry
     session.timeline.lanes[slot] = lane
-    layer.preset_list[:] = clip_preset_list(session, slot, duration_sec)
+    held = clip_preset_list(session, slot, duration_sec)
+    files = {entry.file for entry in held}
+    layer.preset_list[:] = [
+        *held,
+        *(entry for entry in layer.preset_list if entry.file not in files),
+    ]
 
 
 def enter_each_clip(
@@ -320,10 +359,15 @@ def enter_each_clip(
     """Give the row's clips presets as the layer moves to "each clip".
 
     From the timer, the row is cut where the timer changes preset. Otherwise
-    the clips stay and take the list's presets in order.
+    the clips stay and take the list's presets in order, unless they already
+    hold the start of the list. Spares then fill empty clips.
     """
     if previous == "timer":
         bake_timer_slices(session, slot, duration_sec)
+        return
+    held = clip_preset_list(session, slot, duration_sec)
+    if held and session.layers[slot].preset_list[: len(held)] == held:
+        fill_empty_clips(session, slot, duration_sec)
     else:
         deal_list_onto_clips(session, slot, duration_sec)
 
@@ -336,7 +380,6 @@ class EachClipChange:
     clips_before: int
     clips_after: int
     replaced: int
-    dropped: int
     spares: int
     empty: int
 
@@ -347,7 +390,6 @@ class EachClipChange:
             self.turns_timeline_on
             or self.clips_after != self.clips_before
             or self.replaced > 0
-            or self.dropped > 0
         )
 
     def summary(self) -> str:
@@ -371,15 +413,10 @@ class EachClipChange:
                 f"{'loses its' if self.replaced == 1 else 'lose their'} "
                 "earlier preset."
             )
-        if self.dropped:
-            parts.append(
-                f"{_count(self.dropped, 'preset')} the timer never shows "
-                f"{'leaves' if self.dropped == 1 else 'leave'} the preset list."
-            )
         if self.spares:
             parts.append(
-                f"{_count(self.spares, 'preset')} in the list "
-                f"{'has' if self.spares == 1 else 'have'} no clip."
+                f"{_count(self.spares, 'preset')} no clip holds "
+                f"{'stays in the list as a spare' if self.spares == 1 else 'stay in the list as spares'}."
             )
         if self.empty:
             parts.append(
@@ -419,7 +456,6 @@ def each_clip_change(
         )
         after = clips()
         starts = {clip.start: clip for clip in after}
-        kept = {entry.file for entry in layer.preset_list}
         return EachClipChange(
             turns_timeline_on=not timeline.enabled,
             clips_before=len(before),
@@ -429,7 +465,6 @@ def each_clip_change(
                 for clip in before
                 if clip.preset is not None and starts[clip.start].preset != clip.preset
             ),
-            dropped=sum(1 for entry in entries if entry.file not in kept),
             spares=spare_preset_count(session, slot, duration_sec),
             empty=sum(
                 1
