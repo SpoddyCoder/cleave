@@ -29,6 +29,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Layers is now the first section in the navigator, above Overlay, Post-FX, Pattern Mask, and Timeline.
 - Help lists mouse actions and keys apart, under Mouse and Keyboard headings, everywhere it shows controls, with related controls next to each other. Navigation / Global adds Space, Alt+Left/Right, Shift+F10, and F3, and every setting with a list says Enter opens it. The Keyboard Controls title is now Controls.
 - Headings over groups of rows, in the inspector and in dialogs such as Generate timeline and Download packages, have their own colour in each theme instead of a grey that looked disabled. Theme files set it as `subheading`.
 - The Preset Switching page's trigger row is now change presets, with the choices never, on a timer, projectM decides, and each clip (before: off, timer, projectm, timeline). Choosing each clip turns the timeline on; from on a timer, the row is cut into clips where the presets change, and with presets the timer never shows kept as spares, and otherwise the clips stay and take the list's presets in order, unless they already hold them. When that would cut clips, replace presets clips hold, or turn the timeline on, a dialog says exactly what will change before you go ahead.

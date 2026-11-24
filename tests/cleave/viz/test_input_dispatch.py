@@ -645,11 +645,11 @@ def test_ctrl_up_down_cycles_visible_top_level_ids() -> None:
     controls = runtime.controls
     ids = visible_top_level_ids(controls.session)
     assert list(ids) == [
+        "layers",
         "overlay",
         "post_fx",
         "pattern_mask",
         "timeline",
-        "layers",
     ]
     controls.shell_focus.selected_id = ids[0]
     seen = [controls.shell_focus.selected_id]

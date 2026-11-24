@@ -111,11 +111,11 @@ class NavNode:
 
 
 _TOP_LEVEL: tuple[NavNode, ...] = (
+    NavNode("layers", "Layers", 0, None, expandable=True),
     NavNode("overlay", "Overlay", 0, None, expandable=True),
     NavNode("post_fx", "Post-FX", 0, None, expandable=True),
     NavNode("pattern_mask", "Pattern Mask", 0, None, expandable=True),
     NavNode("timeline", "Timeline", 0, None, expandable=True),
-    NavNode("layers", "Layers", 0, None, expandable=True),
 )
 
 _STATIC_CHILDREN: dict[str, tuple[tuple[str, str], ...]] = {

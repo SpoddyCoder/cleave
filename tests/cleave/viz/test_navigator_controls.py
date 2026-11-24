@@ -34,10 +34,10 @@ def test_open_page_survives_reconcile_and_quick_step_leaves_it() -> None:
     assert focus.region is ShellRegion.INSPECTOR
 
     controls.navigator.quick_step(1)
-    assert focus.selected_id == "overlay"
+    assert focus.selected_id == "layers"
     controls.navigator.open_page("settings.ui")
     controls.navigator.quick_step(-1)
-    assert focus.selected_id == "layers"
+    assert focus.selected_id == "timeline"
 
 
 def test_enter_on_root_page_focuses_its_enabled_row() -> None:

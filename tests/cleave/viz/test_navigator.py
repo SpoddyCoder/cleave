@@ -115,20 +115,20 @@ def test_top_level_order_and_labels() -> None:
     )
 
     assert TOP_LEVEL_IDS == (
+        "layers",
         "overlay",
         "post_fx",
         "pattern_mask",
         "timeline",
-        "layers",
     )
     assert visible_top_level_ids(session) == TOP_LEVEL_IDS
     assert tuple(node.id for node in top) == TOP_LEVEL_IDS
     assert tuple(node.label for node in top) == (
+        "Layers",
         "Overlay",
         "Post-FX",
         "Pattern Mask",
         "Timeline",
-        "Layers",
     )
     assert tuple(node.expandable for node in top) == (
         True,
@@ -145,6 +145,18 @@ def test_full_tree_order_and_labels() -> None:
     nodes = build_navigator(session, _all_open(session) | {layer_node_id("layer_2")})
 
     assert tuple(node.label for node in nodes) == (
+        "Layers",
+        "1  DRUMS",
+        "Milkdrop Preset",
+        "Preset Switching",
+        "Preset List",
+        "Compositing",
+        "Cleave Effects",
+        "2  BASS",
+        "Milkdrop Preset",
+        "Preset Switching",
+        "Compositing",
+        "Cleave Effects",
         "Overlay",
         "Opening Card",
         "Closing Card",
@@ -160,18 +172,6 @@ def test_full_tree_order_and_labels() -> None:
         "Beat / Bar Grid",
         "Clip Fades",
         "Song Markers",
-        "Layers",
-        "1  DRUMS",
-        "Milkdrop Preset",
-        "Preset Switching",
-        "Preset List",
-        "Compositing",
-        "Cleave Effects",
-        "2  BASS",
-        "Milkdrop Preset",
-        "Preset Switching",
-        "Compositing",
-        "Cleave Effects",
     )
     assert "render" not in {node.id for node in nodes}
 
@@ -179,9 +179,13 @@ def test_full_tree_order_and_labels() -> None:
 def test_default_tree_opens_only_layers() -> None:
     nodes = build_navigator(_two_layers())
     assert tuple(node.id for node in nodes) == (
-        *TOP_LEVEL_IDS,
+        "layers",
         layer_node_id("layer_2"),
         layer_node_id("layer_1"),
+        "overlay",
+        "post_fx",
+        "pattern_mask",
+        "timeline",
     )
 
 
@@ -515,7 +519,7 @@ def test_tree_up_down_does_not_wrap() -> None:
 
     for _ in range(60):
         nav.handle_keydown(keydown(pygame.K_UP))
-    assert focus.selected_id == "overlay"
+    assert focus.selected_id == "layers"
 
     seen = [focus.selected_id]
     for _ in range(60):
@@ -526,7 +530,7 @@ def test_tree_up_down_does_not_wrap() -> None:
         assert focus.region is ShellRegion.NAVIGATOR
 
     assert seen == [node.id for node in build_navigator(controls.session, focus.nav_expanded)]
-    last = layer_node_id("layer_2")
+    last = "timeline"
     assert seen[-1] == last
     nav.handle_keydown(keydown(pygame.K_DOWN))
     assert focus.selected_id == last
@@ -592,7 +596,12 @@ def test_page_status_names_the_nearest_off_and_locked_owner() -> None:
         layers={"layer_1": _layer("drums", enabled=False, locked=True)},
     )
     compositing = layer_page_node_id("layer_1", "compositing")
-    layer_name = " ".join(build_navigator(session)[-1].label.split())
+    layer_node = next(
+        node
+        for node in build_navigator(session)
+        if node.id == layer_node_id("layer_1")
+    )
+    layer_name = " ".join(layer_node.label.split())
     # The timeline owns layer visibility, so the layer's switch does not count.
     assert page_status(session, compositing) == PageStatus(locked_by=layer_name)
     # A navigator built with the page showing answers without a rebuild; one
