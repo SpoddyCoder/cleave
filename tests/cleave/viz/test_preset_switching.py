@@ -16,7 +16,6 @@ from cleave.viz.preset_switching import (
     apply_preset_switching,
     load_manual_preset_clean,
     playing_switching_preset_path,
-    reapply_projectm_preset_switching,
     switching_list_index,
 )
 from cleave.viz.session import LayerRuntime, TuningSession
@@ -461,60 +460,6 @@ def test_playing_switching_preset_path_uses_browse_while_paused() -> None:
     layer.projectm_playlist = _mock_projectm_playlist(position=2)
     assert playing_switching_preset_path(layer) == _MILK[1].resolve()
     assert active_auto_preset_path(layer) == _MILK[1].resolve()
-
-
-def test_reapply_skips_paused_layer() -> None:
-    layer = _stem_layer()
-    playlist = _mock_projectm_playlist()
-    layer.projectm_playlist = playlist
-    layer.switching_paused = True
-    session = _session(trigger="projectm")
-    layer.pm.lock_preset.reset_mock()
-    layer.pm.load_preset.reset_mock()
-    reapply_projectm_preset_switching(
-        session, {"layer_1": layer}, preset_root=Path("/tmp/presets"), delta_sec=-1.0
-    )
-    layer.pm.lock_preset.assert_not_called()
-    layer.pm.load_preset.assert_not_called()
-    playlist.destroy.assert_not_called()
-    assert layer.switching_paused is True
-    assert layer.projectm_playlist is playlist
-
-
-@patch("cleave.viz.preset_switching.apply_preset_switching")
-def test_reapply_skips_paused_layer_without_playlist(
-    mock_apply: MagicMock,
-) -> None:
-    layer = _stem_layer()
-    layer.switching_paused = True
-    session = _session(trigger="projectm")
-    reapply_projectm_preset_switching(
-        session, {"layer_1": layer}, preset_root=Path("/tmp/presets"), delta_sec=1.0
-    )
-    mock_apply.assert_not_called()
-    assert layer.switching_paused is True
-
-
-@patch("cleave.viz.preset_switching.ProjectMPlaylist")
-def test_reapply_projectm_only_when_trigger_projectm(
-    mock_playlist_cls: MagicMock,
-) -> None:
-    layer = _stem_layer()
-    playlist = _mock_projectm_playlist()
-    mock_playlist_cls.create.return_value = playlist
-    session = _session(trigger="projectm")
-    apply_preset_switching(
-        layer,
-        mode="on",
-        trigger="projectm",
-        preset_list=_LIST,
-        session=session,
-    )
-    layer.projectm_playlist = playlist
-    reapply_projectm_preset_switching(
-        session, {"layer_1": layer}, preset_root=Path("/tmp/presets"), delta_sec=1.0
-    )
-    layer.pm.lock_preset.assert_any_call(False)
 
 
 def test_active_auto_preset_path_prefers_auto() -> None:

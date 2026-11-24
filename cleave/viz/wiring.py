@@ -38,10 +38,7 @@ from cleave.viz.layer import StemLayer
 from cleave.viz.layer_pipeline import LayerFramePipeline, apply_effect_modifiers
 from cleave.viz.layer_visibility import apply_layer_visibility
 from cleave.viz.mix_player import MixPlayer
-from cleave.viz.preset_switching import (
-    reapply_projectm_preset_switching,
-    advance_preset_switching,
-)
+from cleave.viz.preset_switching import advance_preset_switching
 from cleave.stem_pcm import StemPcmBank
 from cleave.viz.playback import PlaybackState, current_sec, seek
 
@@ -178,7 +175,6 @@ def make_tuning_controls(
     ctx = LiveLayerBindingContext(
         session=session,
         cfg=cfg,
-        preset_root=preset_root,
         project_dir=project_dir,
         layers_by_slot=layers_by_slot,
         layers=layers,
@@ -252,7 +248,6 @@ def make_timeline_controls(
     layers: list[StemLayer],
     signals: Signals | None,
     effect_runtime: EffectRuntime,
-    preset_root: Path,
     mix_player: MixPlayer | None = None,
     on_notification: Callable[[str], None] | None = None,
     tuning_controls: TuningControls | None = None,
@@ -297,12 +292,6 @@ def make_timeline_controls(
     def on_seek(delta_sec: float) -> None:
         seek(playback, delta_sec, duration_sec)
         LayerFramePipeline.flush_pcm(layers)
-        reapply_projectm_preset_switching(
-            session,
-            layers_by_slot,
-            preset_root=preset_root,
-            delta_sec=delta_sec,
-        )
         advance_preset_switching(
             session,
             layers_by_slot,

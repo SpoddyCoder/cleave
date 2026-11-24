@@ -464,7 +464,6 @@ def _bind_live_layer(
     ctx = LiveLayerBindingContext(
         session=session,
         cfg=make_test_cfg(("layer_1",), preset_root=root),
-        preset_root=root,
         project_dir=root.parent,
         layers_by_slot={"layer_1": stem},
         layers=[stem],

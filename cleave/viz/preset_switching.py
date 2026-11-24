@@ -76,56 +76,6 @@ def _preset_paths(preset_list: list[PresetListEntry] | None) -> list[Path]:
     return entry_paths(preset_list or [])
 
 
-def reapply_projectm_preset_switching(
-    session,
-    layers_by_slot: dict[str, StemLayer],
-    *,
-    preset_root: Path,
-    delta_sec: float = 0.0,
-) -> None:
-    """Re-attach projectM playlist switching after seek without reloading browse preset."""
-    del preset_root
-    from cleave.viz.editor_mode_controls import preset_switching_active
-
-    if not preset_switching_active(session.settings.editor_mode):
-        return
-    for slot, layer in layers_by_slot.items():
-        if layer.switching_paused:
-            continue
-        runtime = session.layers[slot]
-        if runtime.preset_switching != "on":
-            continue
-        if runtime.preset_switching_trigger != "projectm":
-            continue
-        if layer.projectm_playlist is None:
-            apply_preset_switching(
-                layer,
-                mode=runtime.preset_switching,
-                trigger=runtime.preset_switching_trigger,
-                preset_list=runtime.preset_list,
-                preset_duration=runtime.preset_duration,
-                soft_cut_duration=runtime.soft_cut_duration,
-                easter_egg=runtime.easter_egg,
-                preset_start_clean=runtime.preset_start_clean,
-                hard_cut_enabled=runtime.hard_cut_enabled,
-                hard_cut_duration=runtime.hard_cut_duration,
-                hard_cut_sensitivity=runtime.hard_cut_sensitivity,
-                session=session,
-            )
-            continue
-        _reapply_on_seek(
-            layer,
-            delta_sec,
-            preset_duration=runtime.preset_duration,
-            soft_cut_duration=runtime.soft_cut_duration,
-            easter_egg=runtime.easter_egg,
-            preset_start_clean=runtime.preset_start_clean,
-            hard_cut_enabled=runtime.hard_cut_enabled,
-            hard_cut_duration=runtime.hard_cut_duration,
-            hard_cut_sensitivity=runtime.hard_cut_sensitivity,
-        )
-
-
 def apply_preset_switching(
     layer: StemLayer,
     *,
@@ -460,33 +410,6 @@ def restart_projectm_preset_timer(layer: StemLayer) -> None:
     _record_auto_preset(layer, path)
 
 
-def reset_projectm_preset_timer(
-    layer: StemLayer,
-    *,
-    preset_duration: float = DEFAULT_PRESET_DURATION,
-    soft_cut_duration: float = DEFAULT_SOFT_CUT_DURATION,
-    easter_egg: float = DEFAULT_EASTER_EGG,
-    preset_start_clean: bool = DEFAULT_PRESET_START_CLEAN,
-    hard_cut_enabled: bool = DEFAULT_HARD_CUT_ENABLED,
-    hard_cut_duration: float = DEFAULT_HARD_CUT_DURATION,
-    hard_cut_sensitivity: float = DEFAULT_HARD_CUT_SENSITIVITY,
-) -> None:
-    """Reset projectM's duration timer without reloading the preset file."""
-    pm = layer.pm
-    pm.lock_preset(True)
-    pm.lock_preset(False)
-    _apply_projectm_timing(
-        pm,
-        preset_duration=preset_duration,
-        soft_cut_duration=soft_cut_duration,
-        easter_egg=easter_egg,
-        preset_start_clean=preset_start_clean,
-        hard_cut_enabled=hard_cut_enabled,
-        hard_cut_duration=hard_cut_duration,
-        hard_cut_sensitivity=hard_cut_sensitivity,
-    )
-
-
 def active_auto_preset_path(layer: StemLayer) -> Path | None:
     playing = playing_switching_preset_path(layer)
     if playing is not None:
@@ -495,49 +418,6 @@ def active_auto_preset_path(layer: StemLayer) -> Path | None:
     if current is None:
         return None
     return current.resolve()
-
-
-def _reapply_on_seek(
-    layer: StemLayer,
-    delta_sec: float,
-    *,
-    preset_duration: float = DEFAULT_PRESET_DURATION,
-    soft_cut_duration: float = DEFAULT_SOFT_CUT_DURATION,
-    easter_egg: float = DEFAULT_EASTER_EGG,
-    preset_start_clean: bool = DEFAULT_PRESET_START_CLEAN,
-    hard_cut_enabled: bool = DEFAULT_HARD_CUT_ENABLED,
-    hard_cut_duration: float = DEFAULT_HARD_CUT_DURATION,
-    hard_cut_sensitivity: float = DEFAULT_HARD_CUT_SENSITIVITY,
-) -> None:
-    playlist = layer.projectm_playlist
-    if playlist is None:
-        return
-    pm = layer.pm
-    pm.lock_preset(False)
-    _apply_projectm_timing(
-        pm,
-        preset_duration=preset_duration,
-        soft_cut_duration=soft_cut_duration,
-        easter_egg=easter_egg,
-        preset_start_clean=preset_start_clean,
-        hard_cut_enabled=hard_cut_enabled,
-        hard_cut_duration=hard_cut_duration,
-        hard_cut_sensitivity=hard_cut_sensitivity,
-    )
-    playlist.connect(pm, on_preset_loaded=_auto_preset_loaded_callback(layer))
-    if delta_sec < 0:
-        restart_projectm_preset_timer(layer)
-    else:
-        reset_projectm_preset_timer(
-            layer,
-            preset_duration=preset_duration,
-            soft_cut_duration=soft_cut_duration,
-            easter_egg=easter_egg,
-            preset_start_clean=preset_start_clean,
-            hard_cut_enabled=hard_cut_enabled,
-            hard_cut_duration=hard_cut_duration,
-            hard_cut_sensitivity=hard_cut_sensitivity,
-        )
 
 
 def _auto_preset_loaded_callback(layer: StemLayer) -> Callable[[Path], None]:

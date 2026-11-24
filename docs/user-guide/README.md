@@ -272,7 +272,7 @@ A layer can move through presets on its own. Two settings work together here: th
 | --- | --- |
 | never | The layer keeps its own preset. |
 | on a timer | The next preset in the list starts after a fixed number of seconds. |
-| projectM decides | projectM plays the list on its own schedule, including hard cuts on strong beats. It is live: each play and each render can switch at different moments, so the editor will not match a render exactly. Use on a timer or each clip when the order and timing must be the same every time. |
+| projectM decides | projectM plays the list on its own schedule, including hard cuts on strong beats. It is live: each play and each render can switch at different moments, so the editor will not match a render exactly. Moving the playhead leaves the playing preset as it is. Use on a timer or each clip when the order and timing must be the same every time. |
 | each clip | Every timeline clip on the layer holds its own preset. See [Presets on clips](#presets-on-clips). Choosing it turns the timeline on. |
 
 While the timeline is on, the timeline strip shows each layer's presets on its clips, whichever setting you choose. See [Presets on clips](#presets-on-clips).

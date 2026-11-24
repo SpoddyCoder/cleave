@@ -29,7 +29,6 @@ from cleave.viz.preset_switching import (
     apply_preset_switching,
     layer_notification,
     load_manual_preset_clean,
-    reapply_projectm_preset_switching,
     advance_preset_switching,
     switching_list_index,
 )
@@ -42,7 +41,6 @@ from cleave.viz.user_presets import USER_PRESETS_DIRNAME
 class LiveLayerBindingContext:
     session: TuningSession
     cfg: CleaveConfig
-    preset_root: Path
     project_dir: Path
     layers_by_slot: dict[str, StemLayer]
     layers: list[StemLayer]
@@ -218,12 +216,6 @@ class LiveLayerBindingsFactory:
         ctx = self.ctx
         seek(ctx.playback, delta_sec, ctx.duration_sec)
         LayerFramePipeline.flush_pcm(ctx.layers)
-        reapply_projectm_preset_switching(
-            ctx.session,
-            ctx.layers_by_slot,
-            preset_root=ctx.preset_root,
-            delta_sec=delta_sec,
-        )
         advance_preset_switching(
             ctx.session,
             ctx.layers_by_slot,

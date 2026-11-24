@@ -9,7 +9,7 @@ from cleave.preset_playlist import PresetPlaylist
 from cleave.projectm import ProjectM
 from cleave.viz.layer import StemLayer
 from cleave.viz.session import LayerRuntime, TimelineRuntime, TuningSession
-from cleave.viz.wiring import make_tuning_controls
+from cleave.viz.wiring import make_timeline_controls, make_tuning_controls
 from tests.support.viz import make_test_cfg, stub_playback_state
 from tests.support.preset_list import entries
 
@@ -113,18 +113,6 @@ def test_on_preset_switching_change_forces_off_in_curation_mode() -> None:
     assert mock_apply.call_args.kwargs["mode"] == "off"
 
 
-def test_reapply_projectm_preset_switching_noop_in_curation_mode() -> None:
-    session = _session(mode="on", trigger="projectm")
-    session.settings.editor_mode = "preset_curation"
-    layer = _layer(session)
-    with patch(f"{_FACTORY}.apply_preset_switching") as mock_apply:
-        controls = _make_controls(session, layer)
-        bindings = controls._layer_bindings
-        assert bindings is not None
-        bindings.on_seek(1.0)
-    mock_apply.assert_not_called()
-
-
 def test_on_preset_change_pauses_projectm_switching() -> None:
     session = _session(mode="on", trigger="projectm", timeline_enabled=False)
     layer = _layer(session)
@@ -158,17 +146,48 @@ def test_on_preset_change_forces_clean_boot_for_timer() -> None:
     layer.pm.lock_preset.assert_called_with(True)
 
 
-def test_on_seek_reapplies_projectm_preset_switching() -> None:
+def _assert_projectm_switching_untouched(layer: StemLayer) -> None:
+    layer.pm.load_preset.assert_not_called()
+    layer.pm.lock_preset.assert_not_called()
+    layer.pm.set_preset_start_clean.assert_not_called()
+    layer.pm.set_hard_cut_enabled.assert_not_called()
+    layer.projectm_playlist.connect.assert_not_called()
+    layer.projectm_playlist.set_position.assert_not_called()
+    layer.projectm_playlist.destroy.assert_not_called()
+
+
+def test_on_seek_leaves_projectm_switching_alone() -> None:
+    """A reload seeds the preset with its own output, so drag seeks run away to white."""
     session = _session(mode="on", trigger="projectm", timeline_enabled=False)
     layer = _layer(session)
     layer.projectm_playlist = MagicMock()
-    with patch(f"{_FACTORY}.reapply_projectm_preset_switching") as mock_reapply:
-        with patch(f"{_FACTORY}.advance_preset_switching"):
-            controls = _make_controls(session, layer)
-            bindings = controls._layer_bindings
-            assert bindings is not None
-            bindings.on_seek(1.0)
-    mock_reapply.assert_called_once()
+    controls = _make_controls(session, layer)
+    bindings = controls._layer_bindings
+    assert bindings is not None
+    for delta_sec in (-30.0, 30.0, -0.5):
+        bindings.on_seek(delta_sec)
+    _assert_projectm_switching_untouched(layer)
+
+
+def test_timeline_seek_leaves_projectm_switching_alone() -> None:
+    playback = stub_playback_state()
+    playback.player.seek(60.0)
+    session = _session(mode="on", trigger="projectm", timeline_enabled=False)
+    layer = _layer(session)
+    layer.projectm_playlist = MagicMock()
+    controls = make_timeline_controls(
+        session=session,
+        playback=playback,
+        duration_sec=120.0,
+        layers_by_slot={"layer_1": layer},
+        layers=[layer],
+        signals=None,
+        effect_runtime=MagicMock(),
+    )
+    for t_sec in (20.0, 90.0, 5.0):
+        controls.seek_to(t_sec)
+    layer.pm.flush_pcm.assert_called()
+    _assert_projectm_switching_untouched(layer)
 
 
 def test_on_preset_change_timeline_trigger_pauses_and_stays_locked() -> None:

@@ -83,7 +83,6 @@ def _make_factory(
     ctx = LiveLayerBindingContext(
         session=session,
         cfg=cfg,
-        preset_root=cfg.paths.preset_root,
         project_dir=Path("/tmp/project"),
         layers_by_slot={"layer_1": layer},
         layers=[layer],
