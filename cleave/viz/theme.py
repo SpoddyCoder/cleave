@@ -16,7 +16,7 @@ Typography roles for the live tuning overlay (text on the panel background):
              on a selected or focused row, whose band is see-through
   label    — periwinkle text for row labels and prefixes
   muted    — blue-grey text for shortcuts, placeholders, and unchosen options
-  subheading — apricot text for the heading over a group of inspector or dialog
+  subheading — yellow text for the heading over a group of inspector or dialog
              rows, or of keys or mouse actions in help; never a grey, and set apart from label on the blue-yellow
              axis, so red-green colour blindness does not merge them
   disabled — cool grey text when a row, icon, or value on the panel is inactive
@@ -477,7 +477,7 @@ def _ultraviolet() -> Palette:
         off_control_text=(170, 177, 196),
         off_control_muted=(124, 130, 148),
         muted=muted,
-        subheading=(226, 152, 84),
+        subheading=(240, 208, 72),
         highlight=highlight,
         error_notification=(255, 140, 140),
         notification_on_fill=(0, 0, 0),
