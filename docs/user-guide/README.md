@@ -548,19 +548,18 @@ Each marker has a **type**, set on **Timeline > Song Markers**:
 
 | Type | What it means |
 | --- | --- |
-| `-` | A plain marker. |
-| crescendo | The visuals build up to this point, then drop back. |
-| diminuendo | The visuals thin out to this point, then return to normal. |
-| begin | Where a crescendo or diminuendo starts. |
-| sustain | Where a crescendo or diminuendo reaches its peak or its lowest point. |
+| `-` | A plain section change. With conductor on, one layer gets an accent here. |
+| crescendo | The visuals build up to this point, then drop to one layer until the next crescendo starts or the song ends. |
+| diminuendo | A quieter moment. Only pattern mask mode thins out around it for now; in layers mode it is a plain section change. |
+| begin | Where a crescendo starts to build. |
+| sustain | Where a crescendo reaches full and holds. |
 
 ```
 CRESCENDO:   thin >>>  FULL ---- FULL ---- > solo
              begin   sustain         crescendo
-
-DIMINUENDO:  FULL >>>  thin ---- thin ---- > restore
-             begin   sustain         diminuendo
 ```
+
+Press H on the Song Markers page for what each type does in both Generate timeline modes.
 
 ![Song Markers page](images/song-markers.png)
 

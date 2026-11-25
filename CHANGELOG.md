@@ -27,6 +27,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - The first time the editor opens a project, a Set up audio latency dialog offers the two latency calibrations, Measure audio latency and Calibrate tap timing, both switched on. OK runs the ones you leave on, one after the other; Cancel skips them. The song stays paused until you finish. It shows only once, and both stay in the Settings menu.
 - On a timer, the Preset List page shows when each preset first plays, or not shown for one that never does.
 - Snap song markers on Timeline > Beat / Bar Grid (and in that row's right-click menu) moves the song markers you have already placed to the nearest beat or bar. The dialog says how many move and how many merge. Markers before or after the detected beats stay put, and undo does not cover it.
+- Help on Timeline > Song Markers, and on each marker, has a table of the marker types: what each one means and what Generate timeline does there.
 
 ### Changed
 

@@ -15,6 +15,7 @@ from cleave.config_schema.timeline import (
 )
 from cleave.song_markers import (
     DEFAULT_SONG_MARKER_TYPE,
+    SONG_MARKER_TYPE_HELP,
     SONG_MARKER_TYPES,
     SongMarkerType,
     step_song_marker_type,
@@ -231,6 +232,11 @@ def _song_marker_type_display(marker_type: str) -> str:
     if marker_type == DEFAULT_SONG_MARKER_TYPE:
         return "-"
     return marker_type
+
+SONG_MARKER_TYPE_HELP_ENTRIES: tuple[tuple[str, str], ...] = tuple(
+    (_song_marker_type_display(marker_type), SONG_MARKER_TYPE_HELP[marker_type])
+    for marker_type in SONG_MARKER_TYPES
+)
 
 def _song_marker_type(state: TuningViewState, desc: RowDescriptor) -> str:
     assert desc.marker_index is not None
@@ -949,7 +955,9 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Song Markers",
         help_description=(
             "Markers for the song's structure, such as drops, breakdowns, and builds. Ctrl+Enter drops one at the playhead.",
+            "Each marker's type says what Generate timeline does there:",
         ),
+        help_mode_entries=SONG_MARKER_TYPE_HELP_ENTRIES,
     ),
     RowKind.SONG_MARKER_ITEM: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
@@ -976,8 +984,9 @@ SPECS: dict[RowKind, RowSpec] = {
             ("Delete", "remove marker"),
         ),
         help_description=(
-            "A marker's time and type. Generate Timeline builds a crescendo at each crescendo marker.",
+            "A marker's time and type. The type says what Generate timeline does there:",
         ),
+        help_mode_entries=SONG_MARKER_TYPE_HELP_ENTRIES,
         blocked_by_section_lock=True,
     ),
     RowKind.TIMELINE_CLIP_HEADER: RowSpec(

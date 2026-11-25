@@ -22,6 +22,24 @@ SONG_MARKER_TYPES: tuple[SongMarkerType, ...] = (
     "diminuendo",
 )
 
+SONG_MARKER_TYPE_HELP: dict[SongMarkerType, str] = {
+    "standard": (
+        "a plain section change. Generated layers start a new phrase here, and with conductor on one layer gets an accent. The pattern mask swaps its layers."
+    ),
+    "begin": (
+        "where a crescendo starts to build. Without one, the build starts two markers before the crescendo. The pattern mask drops to one layer."
+    ),
+    "sustain": (
+        "where a crescendo reaches full and holds. Without one, it is full from the marker just before the crescendo. A plain section change for the pattern mask."
+    ),
+    "crescendo": (
+        "the end of a build. Layers fade in up to here, then drop to one until the next crescendo starts or the song ends. The pattern mask tends to fill up before it, then drops to one."
+    ),
+    "diminuendo": (
+        "a quieter moment. Layers are not thinned out yet, so it is only a section change. The pattern mask uses fewer layers on either side of it."
+    ),
+}
+
 _GESTURE_PEAK_TYPES = frozenset({"crescendo", "diminuendo"})
 
 

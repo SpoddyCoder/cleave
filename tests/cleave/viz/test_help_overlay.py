@@ -787,6 +787,15 @@ def test_settings_preview_quality_description_separated_from_keyboard() -> None:
     assert _says(description.lines, "renders are unaffected")
 
 
+def test_song_marker_help_lists_every_marker_type() -> None:
+    for row_kind in (RowKind.SONG_MARKERS_HEADER, RowKind.SONG_MARKER_ITEM):
+        description = _description_section(sections_for(row_kind))
+        assert description is not None, row_kind
+        assert [label for label, _ in description.entries] == [
+            "-", "begin", "sustain", "crescendo", "diminuendo"
+        ]
+
+
 def test_timeline_stop_help_is_the_strip_only() -> None:
     sections = help_sections_for_stop(
         CycleStop.TIMELINE,
