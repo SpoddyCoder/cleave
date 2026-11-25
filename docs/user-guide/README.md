@@ -413,14 +413,17 @@ In the screenshot at the top of this guide, the strip (number 7) has a clip on l
 
 The fastest way to get started is to let Cleave build an arrangement. Choose **Generate timeline** on the Timeline page, and the dialog offers:
 
-- **mode:** either switch whole layers in and out, or swap them through the [Pattern Mask](#pattern-mask).
-- **character:** the shape of the arrangement. Breathing is mostly one layer, sometimes two; Dialogue has the layers answer each other; Arc builds to a single climax (in the last drop, else the last chorus, if you marked one) and then settles; Pulse runs one layer at a time with short pairs.
+- **mode:** either bring whole layers in and out, or swap them through the [Pattern Mask](#pattern-mask).
 - **density:** how busy the arrangement is.
-- **conductor:** optionally lets the stems' audio decide which layers lead each phrase and how bright each one is.
+- **conductor:** optionally lets the stems' audio decide which layer leads each phrase and give the layers roles, which set their blend modes. Without it, layers take turns leading and keep their own blend modes.
+- **layer opacity:** set every layer to 100%, or leave it. A layer's own opacity multiplies its clips', so the brightness Generate plans shows as planned only at 100%.
 - **snap** and **cut type:** how clip edges align to the beat grid and how layers transition.
+- **change presets:** switch every layer to change presets on each clip, or leave them. Generate plans new presets at song markers and every few bars, and they play only on layers set to each clip.
 - **clip presets:** how each new clip gets its preset, on layers whose presets change on each clip: by clip roles (offered once at least one preset in your library has a role), or shuffled or in order from each layer's preset folder.
 
-Press H in the dialog for a full description of each option. You will get much better results if you [mark the song's sections](#song-markers) and [assign roles to your presets](#curating-your-presets) first.
+The line under the dialog's title says what Generate replaces, and which layers will still be below 100% or without preset changes. Locked layers keep their opacity and presets. Press H in the dialog for a full description of each option. You will get much better results if you [mark the song's sections](#song-markers) and [assign roles to your presets](#curating-your-presets) first.
+
+In layers mode one layer leads at full opacity and the others sit back, so the picture stays clear rather than washing out. Layers come in, leave, brighten, and dim one at a time, a bar or two apart, except at song markers, where several may change together. Layers that stay on change preset at markers and every few bars, each on its own beat. The section types and intensities below set how many layers play and how bright they are.
 
 Generate replaces the current timeline and, on layers whose presets change on each clip, the whole preset list, including presets you picked by hand and spares. The dialog says which layers' lists it replaces, and Ctrl+Z undoes it all. If one of those layers is locked, unlock it first; the same goes for Reset timeline. If Generate fails, a message says why and the timeline stays as it was.
 
@@ -525,6 +528,8 @@ Each clip begins and ends with a **cut**:
 
 Fade lengths for hard and soft cuts are set on **Timeline > Clip Fades**.
 
+When two touching clips on one layer have different opacity, the layer glides from one to the other instead of jumping, whatever their cut. **glide** on the same page sets how long that takes (4 seconds to start with; 0 jumps). A rise ends on the clip edge, so a drop still lands on its marker, and a fall starts there.
+
 ### Recording a take
 
 You can also perform the timeline live, bringing layers in and out by hand as the song plays:
@@ -546,19 +551,19 @@ Sometimes you want to see a layer the timeline has switched off. Click the row's
 
 Markers pay off in three ways: clips snap to them, you can jump between them, and Generate timeline builds its arrangement around them.
 
-Each marker starts a section that runs to the next marker, or to the end of the song. Its **type** says what kind of section it is. Set it on **Timeline > Song Markers** or from the marker's right-click menu, or right-click where a section starts and choose **Drop section here**:
+Each marker starts a section that runs to the next marker, or to the end of the song. The first marker you drop also adds a plain one at 0:00, so the song opens with a section too; you can change or delete it like any other. A marker's **type** says what kind of section it is. Set it on **Timeline > Song Markers** or from the marker's right-click menu, or right-click where a section starts and choose **Drop section here**:
 
 | Type | What Generate timeline does |
 | --- | --- |
-| `-` | A plain section change. It ends the section before it, and the character sets how busy this one is. With conductor on, one layer gets an accent in layers mode. |
-| intro | One calm layer. |
-| verse | One or two layers, changing slowly. |
-| build | Rises from one layer to the full stack by the next marker. |
-| chorus | Three or four layers, with an accent in layers mode when conductor is on. |
-| drop | Four layers at once, changing fast, with an accent in layers mode when conductor is on. |
-| breakdown | One layer. |
-| bridge | One or two layers, led by a different layer than before. |
-| outro | Two layers, then one from halfway. |
+| `-` | A plain section. How busy it is follows how loud the music is there. |
+| intro | One layer, joined by a second as it goes. |
+| verse | Two or three layers, changing slowly. |
+| build | Rises from one layer to the full stack, brightening as it goes. |
+| chorus | Three layers, with an accent in layers mode when conductor is on. |
+| drop | Three or four layers, changing fast, with an accent in layers mode when conductor is on. |
+| breakdown | One or two layers. |
+| bridge | Two or three layers, led by a different layer than before. |
+| outro | Winds down from two layers to one. |
 
 A build works best straight before a drop or a chorus:
 
@@ -567,9 +572,23 @@ thin >>>>>>> FULL | FULL ----------
 build              drop
 ```
 
-Layer counts are for normal **density** and depend on how many layers you have. Denser or sparser settings move verse, chorus, drop, bridge, and the start of an outro up or down. You do not have to give every marker a type: plain ones still cut the arrangement.
+Back-to-back markers of one type make one longer section. Three build markers in a row give one build that rises across all three, and two outro markers one wind-down; each marker in between is still a point where layers and presets change, and keeps its own intensity. Layer counts are for normal **density** and intensity, and depend on how many layers you have; denser or sparser settings move them up or down by about one. You do not have to give every marker a type: plain ones still cut the arrangement.
 
-On the timeline strip, each section with a type shows its name on the time ruler when there is room, and a faint tint on its rows.
+A marker also has an **intensity**, so a small first chorus and a huge last one need not look alike. Plain markers have one too:
+
+| Intensity | Layers | What it looks like |
+| --- | --- | --- |
+| very calm | 1 | One layer, below full opacity. |
+| calm | 1 or 2 | Below full; the second layer further back. |
+| normal | 1 to 4 | One layer leads at full and the rest sit back, at half to most of full. |
+| intense | 2 to 4 | Two layers at full, the rest close behind. |
+| very intense | 3 or 4 | Three layers at full. The only time most of the stack is. |
+
+These are for four layers; with six or more, very intense can use five. In a build, a calm marker lowers the rise for its stretch and the next marker carries on from where the build has got to. Under a hard-edged pattern mask every layer shows at full opacity, so there intensity changes only how many layers play.
+
+Set it with the second dropdown on a marker's row on **Timeline > Song Markers**, by pressing **I** on the row, or from **Intensity** in the marker's right-click menu. It takes effect the next time you generate.
+
+On the timeline strip, each section with a type shows its name on the time ruler when there is room, and a tint on its rows that is fainter the calmer it is and stronger the more intense.
 
 Projects saved with the marker types of earlier versions (begin, sustain, crescendo, diminuendo) do not open. The message names the marker; change its `type` in the project's `project.yaml` to one of the types above, or to `standard` for a plain marker.
 
@@ -742,6 +761,7 @@ These work anywhere in the editor. Press H to see the keys for whatever you are 
 | Ctrl+Z / Ctrl+Y | Undo / redo. |
 | Ctrl+X / Ctrl+C / Ctrl+V | Cut, copy, or paste a preset on a preset list entry or the preset row. Ctrl+Shift+V pastes after the entry, Ctrl+D duplicates it. |
 | Ctrl+Enter | Drop a song marker. |
+| I | Open the intensity list of the song marker row you are on. |
 | Ctrl+L | Add a layer. |
 | 1 to 8 | Jump to a layer. |
 | Ctrl+R | Render. |

@@ -133,6 +133,7 @@ class RowKind(Enum):
     TIMELINE_SOFT_CUT_FADE_IN = auto()
     TIMELINE_SOFT_CUT_FADE_OUT = auto()
     TIMELINE_SOFT_CUT_CROSSFADE = auto()
+    TIMELINE_GLIDE = auto()
     TIMELINE_SET_CUT_TYPE = auto()
     TIMELINE_CLIP_HEADER = auto()
     TIMELINE_CLIP_START = auto()

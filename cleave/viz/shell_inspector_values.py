@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Hashable
 from typing import TYPE_CHECKING
 
 from imgui_bundle import imgui
@@ -34,6 +35,7 @@ from cleave.viz.inspector import InspectorRow
 from cleave.viz.pointer_cursor import PointerShape, request_pointer
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.row_spec import (
+    second_choice_target,
     apply_field_choice,
     apply_field_horizontal,
     apply_field_nav_button,
@@ -73,6 +75,8 @@ if TYPE_CHECKING:
 # Extra space between the menu-bar rule and the first popup row.
 # Space above and below a segment or combo box, around the row's text line.
 _CHOICE_PAD_Y = 1.0
+# Space between a row's two dropdowns.
+_CHOICE_GAP_X = 6
 _SWATCH_ASPECT = 1.6
 _SWATCH_GAP = 6.0
 _PICKER_FLAGS = (
@@ -134,7 +138,7 @@ class ValueControls:
 
     def __init__(self, context: ShellContext) -> None:
         self._ctx = context
-        self.choice_rects: dict[RowDescriptor, tuple[int, int, int, int]] = {}
+        self.choice_rects: dict[Hashable, tuple[int, int, int, int]] = {}
         self.choice_list_rows: tuple[tuple[int, int, int, int], ...] = ()
         self.value_drag_accum = 0.0
         self.value_drag_crossed = False
@@ -465,15 +469,19 @@ class ValueControls:
         tone: ChoiceTone,
         activated: bool,
         after_label: str | None = None,
+        second: bool = False,
     ) -> None:
         """Segments or a combo at the row's right edge, and their clicks.
 
         With *after_label*, the control sits just after that label instead.
+        With *second*, it is the row's second dropdown, just after the first.
         A segment click chooses that option; a combo click opens its list. Either
         press skips the row's own click.
         """
         spec = row_spec(desc.kind)
-        assert spec.choice is not None
+        choice = spec.second_choice if second else spec.choice
+        assert choice is not None
+        target = second_choice_target(desc) if second else desc
         measure = ImguiTextSizer()
         rect_min = imgui.get_item_rect_min()
         rect_max = imgui.get_item_rect_max()
@@ -481,25 +489,28 @@ class ValueControls:
         pad_y = max(1, int(round(ui_chrome_px(_CHOICE_PAD_Y))))
         # A combo shows the row's value, which can add to the label (a font's
         # place in the list), so it fits that too.
-        kind = choice_kind(len(labels), combo=spec.choice.combo)
-        width = choice_width(measure, labels, combo=spec.choice.combo)
+        kind = choice_kind(len(labels), combo=choice.combo)
+        width = choice_width(measure, labels, combo=choice.combo)
         if kind is ChoiceKind.COMBO:
             width = max(width, combo_width(measure, (value,)))
-        if after_label is None:
+        first = self.choice_rects.get(desc) if second else None
+        if first is not None:
+            left = first[0] + first[2] + int(round(ui_chrome_px(_CHOICE_GAP_X)))
+        elif after_label is None:
             left = int(rect_max.x - imgui.get_style().frame_padding.x) - width
         else:
             origin_x, _origin_y = selectable_label_origin()
             left = int(origin_x + imgui.calc_text_size(f"{after_label}  ").x)
         top = int(row_text_y(rect_min.y)) - pad_y
         rect = (left, top, width, int(line) + pad_y * 2)
-        index = spec.choice.index(state, desc)
+        index = choice.index(state, desc)
         draw = imgui.get_window_draw_list()
         inline = self._ctx.controls.inline_edit
         list_view = inline.choice_view
-        open_here = list_view is not None and list_view.target == desc
+        open_here = list_view is not None and list_view.target == target
         hover = list_view is None and not self._ctx.input_blocked()
         hand = not row_inert(state, desc)
-        self.choice_rects[desc] = rect
+        self.choice_rects[target] = rect
         if open_here and activated:
             # A press anywhere on the open row closes its list. Swallow it so
             # the release does not activate the row and open the list again.
@@ -544,7 +555,7 @@ class ValueControls:
                 return
             if not rect_contains(rect, mouse.x, mouse.y):
                 return
-            self._ctx.controls.inspector.open_choice(row)
+            self._ctx.controls.inspector.open_choice(row, second=second)
         self.clear_value_drag()
         self.press_swallowed = True
 

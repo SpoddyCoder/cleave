@@ -105,6 +105,8 @@ class RowSpec:
     format_position: Callable[[TuningViewState, RowDescriptor], str] | None = None
     format_markers: Callable[[TuningViewState, RowDescriptor], str] | None = None
     nav_buttons: tuple[RowNavButton, ...] = ()
+    # A second dropdown just after ``choice``, on a list item. It needs ``jump``.
+    second_choice: RowChoice | None = None
     # Icon buttons sit just left of the right-aligned value cluster, not after the label.
     nav_buttons_before_value: bool = False
     # Hover text for the row (empty for none): a gesture its label does not
@@ -413,6 +415,27 @@ def apply_field_choice(
     assert spec.apply_horizontal is not None
     for _ in range(abs(delta)):
         spec.apply_horizontal(controls, desc, delta > 0, False)
+    return True
+
+
+def second_choice_target(desc: RowDescriptor) -> tuple[RowDescriptor, str]:
+    """What an open list of a row's second dropdown is keyed by."""
+    return (desc, "second")
+
+
+def apply_field_second_choice(
+    controls: TuningControls,
+    desc: RowDescriptor,
+    delta: int,
+) -> bool:
+    """Move the row's second dropdown ``delta`` options."""
+    spec = ROW_SPECS.get(desc.kind)
+    if spec is None or spec.second_choice is None or delta == 0:
+        return False
+    if section_lock_blocks_mutation(controls.session, desc):
+        return False
+    assert spec.second_choice.jump is not None
+    spec.second_choice.jump(controls, desc, delta)
     return True
 
 

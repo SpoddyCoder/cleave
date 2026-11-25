@@ -285,8 +285,13 @@ def lane_level_breakpoints(
     hard_cut_fades: TimelineFadeGroup,
     soft_cut_fades: TimelineFadeGroup,
     duration_sec: float,
+    glide: float = 0.0,
 ) -> list[tuple[float, float]]:
     """Build a monotone ``(t, level)`` polyline for the lane envelope.
+
+    A change between two visible levels (touching clips) glides over
+    ``glide`` seconds whatever its cut: a rise ends at the cue and a fall
+    starts there, and neither reaches past the cue on its other side.
 
     For a transition at ``t`` from level ``a`` to ``b``, fade durations act as
     slopes: a full-scale move takes the configured duration. By default, rise
@@ -305,11 +310,26 @@ def lane_level_breakpoints(
 
     breakpoints: list[tuple[float, float]] = []
     previous = float(level)
-    for cue in lane.cues:
+    for index, cue in enumerate(lane.cues):
         a = previous
         b = float(cue.level)
         t = float(cue.t)
         if levels_equal(a, b):
+            previous = b
+            continue
+        if glide > 0.0 and a > LEVEL_EPS and b > LEVEL_EPS:
+            if b > a:
+                start = t - glide
+                if breakpoints and start < breakpoints[-1][0]:
+                    start = breakpoints[-1][0]
+                _append_breakpoint(breakpoints, max(start, 0.0) if start < t else t, a)
+                _append_breakpoint(breakpoints, t, b)
+            else:
+                end = t + glide
+                if index + 1 < len(lane.cues):
+                    end = min(end, float(lane.cues[index + 1].t))
+                _append_breakpoint(breakpoints, t, a)
+                _append_breakpoint(breakpoints, max(end, t), b)
             previous = b
             continue
         group = _fade_group_for_edge(

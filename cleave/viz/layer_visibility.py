@@ -232,7 +232,10 @@ def timeline_level_multiplier(
         inherit=_inherit_for_slot(session, slot),
         hard_cut_fades=hard_cut_fades,
         soft_cut_fades=soft_cut_fades,
-        duration_sec=_level_eval_duration(lane, t_sec, max_fade_out),
+        duration_sec=_level_eval_duration(
+            lane, t_sec, max(max_fade_out, tl.glide)
+        ),
+        glide=tl.glide,
     )
     return lane_level_envelope(t_sec, breakpoints)
 
@@ -347,6 +350,7 @@ def build_timeline_view_state(
         arm_flash_start_ms=dict(tl.arm_flash_start_ms),
         show_bar_grid=tl.show_bar_grid,
         show_preset_names=tl.show_preset_names,
+        glide=tl.glide,
         bar_grid_times=phased_bar_times(
             bar_times, beat_times, tl.bar_phase_offset
         ),
@@ -354,6 +358,9 @@ def build_timeline_view_state(
         song_marker_times=tuple(session.song_markers.times),
         song_marker_types=tuple(
             marker.marker_type for marker in session.song_markers.markers
+        ),
+        song_marker_intensities=tuple(
+            marker.intensity for marker in session.song_markers.markers
         ),
         selected_song_marker_index=selected_marker,
         song_marker_flash_start_ms=(

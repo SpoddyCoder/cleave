@@ -77,6 +77,7 @@ from cleave.config_schema.timeline import (
     DEFAULT_TIMELINE_BAR_PHASE,
     DEFAULT_TIMELINE_PLACEMENT_SNAP,
     DEFAULT_TIMELINE_SHOW_BAR_GRID,
+    DEFAULT_TIMELINE_GLIDE,
     DEFAULT_TIMELINE_SHOW_PRESET_NAMES,
     TimelinePlacementSnap,
 )
@@ -90,7 +91,6 @@ from cleave.timeline import ClipGrip, SlotCue, TimelineLane, copy_lane, empty_la
 from cleave.viz.layer_problems import PresetHealth
 from cleave.viz.timeline_view import StripView
 from cleave.blend_modes import BlendMode
-from cleave.timeline_presets.characters import DEFAULT_TIMELINE_PRESET_KIND
 from cleave.timeline_presets.conductor import DEFAULT_TIMELINE_PRESET_CONDUCTOR
 from cleave.timeline_presets.mode import (
     DEFAULT_TIMELINE_PRESET_MODE,
@@ -103,6 +103,10 @@ from cleave.timeline_presets.cue_snap import (
 from cleave.timeline_presets.density import (
     DEFAULT_TIMELINE_PRESET_DENSITY,
     TimelinePresetDensity,
+)
+from cleave.timeline_presets.layer_setup import (
+    DEFAULT_TIMELINE_PRESET_EACH_CLIP,
+    DEFAULT_TIMELINE_PRESET_FULL_OPACITY,
 )
 from cleave.timeline_presets.repopulate import (
     DEFAULT_TIMELINE_PRESET_REPOPULATE,
@@ -367,8 +371,8 @@ class TimelineRuntime:
     bar_phase_offset: int = DEFAULT_TIMELINE_BAR_PHASE
     show_bar_grid: bool = DEFAULT_TIMELINE_SHOW_BAR_GRID
     show_preset_names: bool = DEFAULT_TIMELINE_SHOW_PRESET_NAMES
+    glide: float = DEFAULT_TIMELINE_GLIDE
     placement_snap: TimelinePlacementSnap = DEFAULT_TIMELINE_PLACEMENT_SNAP
-    timeline_preset_kind: str = DEFAULT_TIMELINE_PRESET_KIND
     timeline_preset_density: TimelinePresetDensity = DEFAULT_TIMELINE_PRESET_DENSITY
     timeline_preset_cue_snap: TimelinePresetCueSnap = DEFAULT_TIMELINE_PRESET_CUE_SNAP
     timeline_preset_song_marker_snap: TimelinePresetSongMarkerSnap = (
@@ -381,6 +385,8 @@ class TimelineRuntime:
         DEFAULT_TIMELINE_PRESET_REPOPULATE
     )
     timeline_preset_conductor: bool = DEFAULT_TIMELINE_PRESET_CONDUCTOR
+    timeline_preset_full_opacity: bool = DEFAULT_TIMELINE_PRESET_FULL_OPACITY
+    timeline_preset_each_clip: bool = DEFAULT_TIMELINE_PRESET_EACH_CLIP
     timeline_preset_mode: TimelinePresetMode = DEFAULT_TIMELINE_PRESET_MODE
     hard_cut_fades: TimelineFadeGroupRuntime = field(
         default_factory=default_hard_timeline_fade_group_runtime
@@ -730,6 +736,7 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
         if timeline is None
         else timeline.show_preset_names
     )
+    glide = DEFAULT_TIMELINE_GLIDE if timeline is None else timeline.glide
     lanes: dict[str, TimelineLane] = {}
     for slot in cfg.layer_z_order:
         if slot in source_lanes:
@@ -746,6 +753,7 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
             bar_phase_offset=bar_phase,
             show_bar_grid=show_bar_grid,
             show_preset_names=show_preset_names,
+            glide=glide,
         )
     return TimelineRuntime(
         enabled=enabled,
@@ -756,6 +764,7 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
         bar_phase_offset=bar_phase,
         show_bar_grid=show_bar_grid,
         show_preset_names=show_preset_names,
+        glide=glide,
         hard_cut_fades=_fade_group_runtime_from_cfg(cuts.hard),
         soft_cut_fades=_fade_group_runtime_from_cfg(cuts.soft),
     )

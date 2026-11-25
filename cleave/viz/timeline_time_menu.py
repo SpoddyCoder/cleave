@@ -3,7 +3,7 @@
 A right-click on the ruler, or on a row away from any cue, gets a Drop song
 marker submenu: at the playhead (the Ctrl+Enter path), or at the clicked
 time. On a song marker the marker's items replace them: seek to it, play
-from it, set its type, and delete it. The ruler also
+from it, set its type and intensity, and delete it. The ruler also
 lists Undo and Redo and a Timeline submenu of the timeline commands
 (Generate, Snap, Set cut type, Reset); a row keeps its menu short and leaves
 them out. Commands come
@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Protocol
 
 from cleave.song_markers import (
     DEFAULT_SONG_MARKER_TYPE,
+    SONG_INTENSITIES,
     SONG_MARKER_TYPES,
     format_marker_time,
     song_marker_type_display,
@@ -154,7 +155,7 @@ class TimelineTimeMenu:
     def _marker_items(
         self, index: int, selected: bool
     ) -> tuple[ContextMenuEntry, ...] | None:
-        """Seek, play, type, and delete for song marker *index*; None when gone."""
+        """Seek, play, type, intensity, and delete for song marker *index*; None when gone."""
         session_markers = self._controls.session.song_markers.markers
         if not 0 <= index < len(session_markers):
             return None
@@ -176,6 +177,19 @@ class TimelineTimeMenu:
             )
             for marker_type in SONG_MARKER_TYPES
         )
+        intensity_items = tuple(
+            ContextMenuItem(
+                id=f"timeline.marker.intensity.{intensity}",
+                label=intensity,
+                run=lambda intensity=intensity: markers.set_intensity(
+                    index, intensity
+                ),
+                enabled=not recording,
+                checked=intensity == marker.intensity,
+                hint=hint,
+            )
+            for intensity in SONG_INTENSITIES
+        )
         return (
             ContextMenuItem(
                 id="timeline.marker.seek",
@@ -192,6 +206,13 @@ class TimelineTimeMenu:
                 id="timeline.marker.type",
                 label="Type",
                 items=type_items,
+                enabled=not recording,
+                hint=hint,
+            ),
+            ContextSubmenu(
+                id="timeline.marker.intensity",
+                label="Intensity",
+                items=intensity_items,
                 enabled=not recording,
                 hint=hint,
             ),

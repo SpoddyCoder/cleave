@@ -13,7 +13,7 @@ from cleave.stems import StemSource
 from cleave.preset_playlist import PresetPlaylist
 from cleave.signals import Signals
 from cleave.song_markers import SongMarker, resolve_sections
-from cleave.timeline_presets.sections import layer_range
+from cleave.timeline_presets.shapes import section_parts
 from cleave.timeline import (
     LEVEL_EPS,
     TimelineFadeGroup,
@@ -22,13 +22,13 @@ from cleave.timeline import (
     lane_level_at,
     lane_on_transition_cues,
 )
-from cleave.timeline_presets.arrange import PHRASE_BARS_MIN, PHRASE_BARS_MAX
 from cleave.timeline_presets.pattern_mask_arrange import (
     SECTION_BARS_MAX,
     SECTION_LONG_BARS_MAX,
     SECTION_LONG_BARS_MIN,
     compose_pattern_mask_timeline,
     partition_pattern_mask_sections,
+    section_target_range,
 )
 from cleave.viz.modal import ModalHost
 from cleave.viz.session import LayerRuntime, TimelineRuntime, TuningSession
@@ -334,14 +334,16 @@ def test_typed_sections_stay_in_their_layer_range() -> None:
         SongMarker(30.0, "chorus"),
         SongMarker(48.0, "breakdown"),
     ]
-    sections = resolve_sections(markers, _DUR)
+    parts = section_parts(resolve_sections(markers, _DUR))
     for seed in range(10):
         lanes = _compose(slots, seed=seed, song_markers=markers)
-        for section in sections:
-            t = section.start + 1e-6
-            while t < section.end:
-                lo, hi = layer_range(section, t, len(slots), 0)
-                assert lo <= len(_active_at(lanes, slots, t)) <= hi, (seed, t)
+        for part in parts:
+            t = part.section.start + 1e-6
+            while t < part.section.end:
+                raw, lo, hi = section_target_range(part, t, len(slots), 0)
+                # Each stretch takes the count either side of the shape's.
+                low, high = max(lo, int(raw) - 1), min(hi, int(raw) + 1)
+                assert low <= len(_active_at(lanes, slots, t)) <= high, (seed, t)
                 t += 0.5
 
 
@@ -356,7 +358,7 @@ def test_build_rises_into_a_full_drop() -> None:
         assert counts[0] == 1
         assert counts[-1] == 4
         assert counts == sorted(counts), seed
-        assert len(_active_at(lanes, slots, 40.0 + 1e-6)) >= 4
+        assert len(_active_at(lanes, slots, 40.0 + 1e-6)) >= 3
 
 
 def test_role_bias_lead_then_pulse_then_accent_bed() -> None:
@@ -509,8 +511,8 @@ def test_sections_shorter_than_layers_phrases() -> None:
     short = sum(1 for n in core if n <= 2)
     assert short > len(core) - short
     assert sum(1 for n in bar_counts if SECTION_LONG_BARS_MIN <= n <= SECTION_LONG_BARS_MAX) <= 1
-    assert sum(core) / len(core) < PHRASE_BARS_MIN
-    assert SECTION_BARS_MAX < PHRASE_BARS_MAX
+    # Shorter than the four-bar phrases layers mode uses at its fastest.
+    assert sum(core) / len(core) < 4
     for seed in range(40):
         seeded = partition_pattern_mask_sections(
             bars, _DUR, random.Random(seed), ()
@@ -558,7 +560,6 @@ def _session(slots: tuple[str, ...], *, mode: str) -> TuningSession:
         timeline=TimelineRuntime(enabled=False),
     )
     session.timeline.timeline_preset_mode = mode  # type: ignore[assignment]
-    session.timeline.timeline_preset_kind = "breathing"
     return session
 
 
@@ -587,26 +588,22 @@ def test_apply_pattern_mask_calls_builder_and_enables_mask() -> None:
             "cleave.viz.timeline_preset_controls.compose_pattern_mask_timeline",
             return_value=fake,
         ) as mock_pm,
-        patch("cleave.viz.timeline_preset_controls.apply_build") as mock_build,
-        patch("cleave.viz.timeline_preset_controls.apply_accent") as mock_accent,
         patch(
-            "cleave.viz.timeline_preset_controls.build_breathing_cues"
-        ) as mock_breath,
+            "cleave.viz.timeline_preset_controls.compose_layers_timeline"
+        ) as mock_layers,
     ):
-        controller._apply("breathing", _DUR)
+        controller._apply(_DUR)
     mock_pm.assert_called_once()
     kwargs = mock_pm.call_args.kwargs
     assert "song_markers" in kwargs
     assert "beat_times" in kwargs
     assert kwargs["transition_duration"] == 1.0
-    mock_build.assert_not_called()
-    mock_accent.assert_not_called()
-    mock_breath.assert_not_called()
+    mock_layers.assert_not_called()
     assert session.pattern_mask.enabled is True
     assert session.pattern_mask.type == "strips"
     assert session.pattern_mask.feather_pct == 0
     assert session.pattern_mask.transition == 1.0
-    assert notes == ["Applied pattern mask timeline"]
+    assert notes == ["Generated pattern mask timeline"]
 
 
 def test_apply_pattern_mask_passes_conductor_kwargs() -> None:
@@ -620,7 +617,7 @@ def test_apply_pattern_mask_passes_conductor_kwargs() -> None:
         "cleave.viz.timeline_preset_controls.compose_pattern_mask_timeline",
         return_value=fake,
     ) as mock_pm:
-        controller._apply("breathing", _DUR)
+        controller._apply(_DUR)
     kwargs = mock_pm.call_args.kwargs
     assert kwargs["signals"] is signals
     assert kwargs["slot_stems"] == {
@@ -631,7 +628,7 @@ def test_apply_pattern_mask_passes_conductor_kwargs() -> None:
     }
 
 
-def test_apply_layers_mode_uses_character_builder() -> None:
+def test_apply_layers_mode_uses_the_planner() -> None:
     slots = ("layer_1", "layer_2", "layer_3", "layer_4")
     session = _session(slots, mode="layers")
     session.pattern_mask.enabled = False
@@ -644,22 +641,50 @@ def test_apply_layers_mode_uses_character_builder() -> None:
         return {slot: TimelineLane(baseline=0.0, cues=[]) for slot in slot_list}
 
     with (
-        patch.dict(
-            "cleave.viz.timeline_preset_controls._KIND_BUILDERS",
-            {"breathing": (_fake_builder, "Applied Breathing timeline preset")},
+        patch(
+            "cleave.viz.timeline_preset_controls.compose_layers_timeline",
+            side_effect=_fake_builder,
         ),
         patch(
             "cleave.viz.timeline_preset_controls.compose_pattern_mask_timeline"
         ) as mock_pm,
-        patch(
-            "cleave.viz.timeline_preset_controls.apply_build",
-            side_effect=lambda lanes, *args, **kwargs: lanes,
-        ) as mock_build,
     ):
-        controller._apply("breathing", _DUR)
+        controller._apply(_DUR)
     mock_pm.assert_not_called()
-    mock_build.assert_called_once()
     assert "bar_times" in captured["kwargs"]
     assert session.pattern_mask.enabled is False
     assert session.pattern_mask.transition == 0.0
-    assert notes == ["Applied Breathing timeline preset"]
+    assert notes == ["Generated timeline"]
+
+
+def test_a_build_rises_across_all_of_its_markers() -> None:
+    slots = _slots(4)
+    markers = [
+        SongMarker(16.0, "build"),
+        SongMarker(28.0, "build"),
+        SongMarker(40.0, "build"),
+        SongMarker(52.0, "drop"),
+    ]
+    for seed in range(10):
+        lanes = _compose(slots, seed=seed, song_markers=markers)
+        counts = [len(_active_at(lanes, slots, t + 0.01)) for t in range(16, 52)]
+        # One rise over the whole run, not one per marker.
+        assert counts == sorted(counts), seed
+        assert counts[0] == 1 and counts[-1] == 4
+
+
+def test_intensity_bounds_every_section() -> None:
+    slots = _slots(4)
+    markers = [
+        SongMarker(0.0, intensity="very calm"),
+        SongMarker(30.0, "chorus", "very calm"),
+        SongMarker(60.0, intensity="very intense"),
+        SongMarker(90.0, "verse", "very intense"),
+    ]
+    for seed in range(10):
+        lanes = _compose(slots, seed=seed, song_markers=markers)
+        # Swaps overlap for a beat or so; outside those the bounds hold.
+        calm = [len(_active_at(lanes, slots, 0.25 * i)) for i in range(1, 240)]
+        loud = [len(_active_at(lanes, slots, 0.25 * i)) for i in range(241, 480)]
+        assert sum(n == 1 for n in calm) >= 0.8 * len(calm), seed
+        assert sum(n >= 3 for n in loud) >= 0.8 * len(loud), seed

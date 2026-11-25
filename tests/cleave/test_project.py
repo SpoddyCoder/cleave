@@ -247,9 +247,9 @@ def test_manifest_round_trip_with_song_markers(tmp_path: Path) -> None:
         data = yaml.safe_load(handle)
     assert data["version"] == 1
     assert data["song-markers"] == [
-        {"time": 8.25, "type": "standard"},
-        {"time": 64.5, "type": "chorus"},
-        {"time": 120.0, "type": "breakdown"},
+        {"time": 8.25, "type": "standard", "intensity": "normal"},
+        {"time": 64.5, "type": "chorus", "intensity": "normal"},
+        {"time": 120.0, "type": "breakdown", "intensity": "normal"},
     ]
     assert data["restored-from"] == "original-slug"
     assert data["ingest"]["demucs_model"] == "htdemucs"
@@ -364,8 +364,8 @@ def test_save_song_markers_preserves_ingest(tmp_path: Path) -> None:
     }
     assert data["restored-from"] == "archived-slug"
     assert data["song-markers"] == [
-        {"time": 10.0, "type": "chorus"},
-        {"time": 42.5, "type": "breakdown"},
+        {"time": 10.0, "type": "chorus", "intensity": "normal"},
+        {"time": 42.5, "type": "breakdown", "intensity": "normal"},
     ]
 
 
@@ -792,7 +792,7 @@ def test_unknown_song_marker_type_names_the_marker_and_the_types(
     )
     data = {
         **manifest.to_dict(),
-        "song-markers": [{"time": 64.5, "type": "crescendo"}],
+        "song-markers": [{"time": 64.5, "type": "crescendo", "intensity": "normal"}],
     }
     with (tmp_path / PROJECT_FILENAME).open("w", encoding="utf-8") as handle:
         yaml.safe_dump(data, handle, sort_keys=False)
@@ -802,3 +802,35 @@ def test_unknown_song_marker_type_names_the_marker_and_the_types(
     assert "01:04.50" in message
     assert "'crescendo'" in message
     assert "chorus, drop" in message
+
+
+def _write_markers(project: Path, markers: list) -> None:
+    project.mkdir()
+    manifest = ProjectManifest(
+        version=1,
+        slug="song",
+        mix_filename="song.flac",
+        original_path="/tmp/source.flac",
+        separated_at="2026-06-08T20:15:00+00:00",
+        demucs_model="htdemucs",
+    )
+    data = manifest.to_dict()
+    data["song-markers"] = markers
+    with (project / PROJECT_FILENAME).open("w", encoding="utf-8") as handle:
+        yaml.safe_dump(data, handle, sort_keys=False)
+
+
+def test_song_marker_intensity_round_trips(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    _write_markers(project, [{"time": 4.0, "type": "chorus"}])
+    assert load_manifest(project).song_markers == (SongMarker(4.0, "chorus"),)
+    markers = (SongMarker(4.0, "chorus", "calm"), SongMarker(9.0, intensity="intense"))
+    save_song_markers(project, markers)
+    assert load_manifest(project).song_markers == markers
+
+
+def test_bad_song_marker_intensity_names_the_marker(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    _write_markers(project, [{"time": 4.0, "type": "drop", "intensity": "loud"}])
+    with pytest.raises(ValueError, match=r"song marker at 00:04.00: invalid song marker intensity 'loud'"):
+        load_manifest(project)

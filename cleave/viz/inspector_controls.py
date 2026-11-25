@@ -16,10 +16,13 @@ from cleave.viz.row_spec import (
     apply_field_action,
     apply_field_choice,
     apply_field_horizontal,
+    apply_field_second_choice,
     row_available,
     row_spec,
+    second_choice_target,
     section_lock_blocks_mutation,
 )
+from cleave.viz.row_kinds import RowDescriptor
 from cleave.viz.shell_focus import ShellFocusState, ShellRegion
 
 if TYPE_CHECKING:
@@ -116,13 +119,17 @@ class InspectorControls:
             return
         self.open_choice(row)
 
-    def open_choice(self, row: InspectorRow) -> None:
-        """Focus a combo row and open its list. Other rows only take focus."""
+    def open_choice(self, row: InspectorRow, *, second: bool = False) -> None:
+        """Focus a combo row and open its list. Other rows only take focus.
+
+        With *second*, the list is the row's second dropdown.
+        """
         desc = row.descriptor
         if desc is None:
             return
         self.focus_row(row)
-        choice = row_spec(desc.kind).choice
+        spec = row_spec(desc.kind)
+        choice = spec.second_choice if second else spec.choice
         if choice is None or section_lock_blocks_mutation(self._controls.session, desc):
             return
         view = self._view()
@@ -132,16 +139,25 @@ class InspectorControls:
         if choice.kind() is not ChoiceKind.COMBO:
             return
         start = choice.index(view, desc)
+        apply = apply_field_second_choice if second else apply_field_choice
         self._controls.inline_edit.begin_choice(
             ChoiceListState(
-                target=desc,
+                target=second_choice_target(desc) if second else desc,
                 options=labels,
                 start=start,
-                on_pick=lambda index: apply_field_choice(
-                    self._controls, desc, index - start
-                ),
+                on_pick=lambda index: apply(self._controls, desc, index - start),
             )
         )
+
+    def open_second_choice(self, desc: RowDescriptor) -> bool:
+        """Open the second dropdown of the focused row *desc*. False without one."""
+        if row_spec(desc.kind).second_choice is None:
+            return False
+        row = self._current_row()
+        if row is None or row.descriptor != desc:
+            return False
+        self.open_choice(row, second=True)
+        return True
 
     def _horizontal(
         self,

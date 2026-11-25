@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import pygame
 
 from cleave.config_schema.layers import MAX_LAYER_COUNT
-from cleave.song_markers import SongMarkerType
+from cleave.song_markers import SongIntensity, SongMarkerType
 from cleave.timeline import SlotCue, TimelineLane
 from cleave.viz.preset_schedule import RowPresets
 from cleave.viz.overlay_primitives import overlay_font, visibility_bucket
@@ -74,10 +74,12 @@ class TimelineStaticSignature:
     visibility_bucket: int
     show_bar_grid: bool
     show_preset_names: bool
+    glide: float
     bar_grid_times: tuple[float, ...]
     beat_grid_times: tuple[float, ...]
     song_marker_times: tuple[float, ...]
     song_marker_types: tuple[SongMarkerType, ...]
+    song_marker_intensities: tuple[SongIntensity, ...]
     selected_song_marker_index: int | None
     hard_cut_fades_enabled: bool
     hard_cut_fade_in: float
@@ -194,10 +196,12 @@ def timeline_static_signature(
         visibility_bucket=visibility_bucket(visibility),
         show_bar_grid=state.show_bar_grid,
         show_preset_names=state.show_preset_names,
+        glide=state.glide,
         bar_grid_times=state.bar_grid_times,
         beat_grid_times=state.beat_grid_times,
         song_marker_times=state.song_marker_times,
         song_marker_types=state.song_marker_types,
+        song_marker_intensities=state.song_marker_intensities,
         selected_song_marker_index=state.selected_song_marker_index,
         hard_cut_fades_enabled=state.hard_cut_fades.enabled,
         hard_cut_fade_in=state.hard_cut_fades.fade_in,

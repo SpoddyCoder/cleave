@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import bisect
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Callable, Literal, Sequence
 
 from cleave.choice import step_choice
@@ -22,6 +22,18 @@ SongMarkerType = Literal[
 
 DEFAULT_SONG_MARKER_TYPE: SongMarkerType = "standard"
 
+SongIntensity = Literal["very calm", "calm", "normal", "intense", "very intense"]
+
+DEFAULT_SONG_INTENSITY: SongIntensity = "normal"
+
+SONG_INTENSITIES: tuple[SongIntensity, ...] = (
+    "very calm",
+    "calm",
+    "normal",
+    "intense",
+    "very intense",
+)
+
 SONG_MARKER_TYPES: tuple[SongMarkerType, ...] = (
     "standard",
     "intro",
@@ -36,22 +48,29 @@ SONG_MARKER_TYPES: tuple[SongMarkerType, ...] = (
 
 SONG_MARKER_TYPE_HELP: dict[SongMarkerType, str] = {
     "standard": (
-        "a plain section change. It ends the section before it, and the character sets how busy this one is. With conductor on, one layer gets an accent in layers mode."
+        "a plain section change. How busy it is follows how loud the music is there."
     ),
-    "intro": "a calm opening on one layer.",
-    "verse": "one or two layers, changing slowly.",
+    "intro": "one layer, joined by a second as it goes.",
+    "verse": "two or three layers, changing slowly.",
     "build": (
-        "rises from one layer to the full stack by the next marker. Follow it with a drop or a chorus."
+        "rises from one layer to the full stack, brightening as it goes. Several build markers in a row make one longer build. Follow it with a drop or a chorus."
     ),
-    "chorus": (
-        "high energy, three or four layers. With conductor on, one layer gets an accent in layers mode."
-    ),
+    "chorus": "three layers, with an accent when the conductor is on.",
     "drop": (
-        "the biggest moment: four layers at once, changing fast. With conductor on, one layer gets an accent in layers mode."
+        "the biggest moment: three or four layers, changing fast, with an accent when the conductor is on."
     ),
-    "breakdown": "the music strips back, down to one layer.",
-    "bridge": "one or two layers, led by a different layer than before.",
-    "outro": "winds down from two layers to one.",
+    "breakdown": "the music strips back, to one or two layers.",
+    "bridge": "two or three layers, led by a different layer than before.",
+    "outro": "winds down from two layers to one, across all its outro markers.",
+}
+
+
+SONG_INTENSITY_HELP: dict[SongIntensity, str] = {
+    "very calm": "one layer, softly.",
+    "calm": "one or two layers, below full.",
+    "normal": "as the type says: one layer leads at full and the rest sit back.",
+    "intense": "more layers, brighter, with two of them at full.",
+    "very intense": "three or four layers at or near full; the only time most of the stack is at full.",
 }
 
 
@@ -62,10 +81,11 @@ def song_marker_type_display(marker_type: str) -> str:
 
 @dataclass(frozen=True)
 class SongMarker:
-    """One project-scoped song marker (time plus structural type)."""
+    """One project-scoped song marker (time, structural type, and intensity)."""
 
     time: float
     marker_type: SongMarkerType = DEFAULT_SONG_MARKER_TYPE
+    intensity: SongIntensity = DEFAULT_SONG_INTENSITY
 
 
 def step_song_marker_type(
@@ -83,6 +103,15 @@ def parse_song_marker_type(raw: object) -> SongMarkerType:
     )
 
 
+def parse_song_intensity(raw: object) -> SongIntensity:
+    if raw in SONG_INTENSITIES:
+        return raw  # type: ignore[return-value]
+    raise ValueError(
+        f"invalid song marker intensity {raw!r}; "
+        f"expected one of: {', '.join(SONG_INTENSITIES)}"
+    )
+
+
 @dataclass(frozen=True)
 class SongSection:
     """A stretch of the song, from one marker to the next."""
@@ -90,6 +119,7 @@ class SongSection:
     start: float
     end: float
     section_type: SongMarkerType = DEFAULT_SONG_MARKER_TYPE
+    intensity: SongIntensity = DEFAULT_SONG_INTENSITY
 
     @property
     def typed(self) -> bool:
@@ -109,15 +139,17 @@ def resolve_sections(
     """
     if duration_sec <= 0.0:
         return ()
-    by_time: dict[float, SongMarkerType] = {}
+    by_time: dict[float, SongMarker] = {}
     for marker in markers:
         t = float(marker.time)
         if 0.0 <= t < duration_sec:
-            by_time.setdefault(t, marker.marker_type)
-    by_time.setdefault(0.0, DEFAULT_SONG_MARKER_TYPE)
+            by_time.setdefault(t, marker)
+    by_time.setdefault(0.0, SongMarker(0.0))
     times = sorted(by_time)
     return tuple(
-        SongSection(start, end, by_time[start])
+        SongSection(
+            start, end, by_time[start].marker_type, by_time[start].intensity
+        )
         for start, end in zip(times, [*times[1:], float(duration_sec)])
     )
 
@@ -169,7 +201,9 @@ def place_marker(
     If any existing marker lies within ``window`` of ``t``, the nearest one is
     replaced (earlier marker on a tie). Otherwise ``t`` is inserted in sorted
     order. ``marker_type`` sets the type; without it a replaced marker keeps its
-    own and an inserted one is standard.
+    own and an inserted one is standard. A replaced marker keeps its intensity.
+    The first marker of a song also adds a plain one at ``0.0``, so every
+    section starts at a marker; it can be deleted like any other.
 
     Returns ``(new_markers, replaced_index, replaced_time)``. On replace,
     ``replaced_index`` is the index of the new marker in ``new_markers`` and
@@ -177,14 +211,17 @@ def place_marker(
     """
     t = float(t)
     if not markers:
-        return (SongMarker(t, marker_type or DEFAULT_SONG_MARKER_TYPE),), None, None
+        placed = SongMarker(t, marker_type or DEFAULT_SONG_MARKER_TYPE)
+        return ((SongMarker(0.0), placed) if t > 0.0 else (placed,)), None, None
 
     times = [m.time for m in markers]
     idx = nearest_index(times, t)
     if abs(times[idx] - t) <= window:
         old = float(markers[idx].time)
         updated = list(markers)
-        updated[idx] = SongMarker(t, marker_type or markers[idx].marker_type)
+        updated[idx] = replace(
+            markers[idx], time=t, marker_type=marker_type or markers[idx].marker_type
+        )
         updated.sort(key=lambda m: m.time)
         new_idx = next(i for i, m in enumerate(updated) if m.time == t)
         return tuple(updated), new_idx, old
@@ -204,7 +241,8 @@ def snap_markers(
 ) -> tuple[tuple[SongMarker, ...], tuple[int, ...]]:
     """Move every marker to ``snap(time)``, merging markers that land together.
 
-    A merged marker keeps the first type that is not standard. Returns
+    A merged marker keeps the first type that is not standard, and the first
+    intensity that is not normal. Returns
     ``(new_markers, new_indices)``, where ``new_indices[i]`` is where
     ``markers[i]`` ended up in ``new_markers``.
     """
@@ -212,8 +250,14 @@ def snap_markers(
     merged: dict[float, SongMarker] = {}
     for marker, t in zip(markers, snapped):
         held = merged.get(t)
-        if held is None or held.marker_type == DEFAULT_SONG_MARKER_TYPE:
-            merged[t] = SongMarker(t, marker.marker_type)
+        if held is None:
+            merged[t] = replace(marker, time=t)
+            continue
+        if held.marker_type == DEFAULT_SONG_MARKER_TYPE:
+            held = replace(held, marker_type=marker.marker_type)
+        if held.intensity == DEFAULT_SONG_INTENSITY:
+            held = replace(held, intensity=marker.intensity)
+        merged[t] = held
     times = sorted(merged)
     return (
         tuple(merged[t] for t in times),

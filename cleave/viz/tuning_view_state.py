@@ -76,6 +76,7 @@ from cleave.config_schema.timeline import (
     DEFAULT_TIMELINE_BAR_PHASE,
     DEFAULT_TIMELINE_PLACEMENT_SNAP,
     DEFAULT_TIMELINE_SHOW_BAR_GRID,
+    DEFAULT_TIMELINE_GLIDE,
     DEFAULT_TIMELINE_SHOW_PRESET_NAMES,
 )
 from cleave.preset_library import PresetLibrary
@@ -401,6 +402,7 @@ class TimelineBlock:
     bar_phase_offset: int = DEFAULT_TIMELINE_BAR_PHASE
     show_bar_grid: bool = DEFAULT_TIMELINE_SHOW_BAR_GRID
     show_preset_names: bool = DEFAULT_TIMELINE_SHOW_PRESET_NAMES
+    glide: float = DEFAULT_TIMELINE_GLIDE
     placement_snap: str = DEFAULT_TIMELINE_PLACEMENT_SNAP
     hard_cut_fades: TimelineFadeGroupBlock = field(
         default_factory=default_hard_timeline_fade_group_block
@@ -411,6 +413,7 @@ class TimelineBlock:
     locked: bool = DEFAULT_TIMELINE_LOCKED
     song_marker_times: tuple[float, ...] = ()
     song_marker_types: tuple[str, ...] = ()
+    song_marker_intensities: tuple[str, ...] = ()
     # Selected strip clip per slot, for the timeline row inspector page.
     selected_clips: dict[str, TimelineClip] = field(default_factory=dict)
     # The selected clip's preset, on layers whose presets change on each clip.
@@ -427,12 +430,14 @@ class TimelineBlock:
             bar_phase_offset=tl.bar_phase_offset,
             show_bar_grid=tl.show_bar_grid,
             show_preset_names=tl.show_preset_names,
+            glide=tl.glide,
             placement_snap=tl.placement_snap,
             hard_cut_fades=TimelineFadeGroupBlock.from_runtime(tl.hard_cut_fades),
             soft_cut_fades=TimelineFadeGroupBlock.from_runtime(tl.soft_cut_fades),
             locked=tl.locked,
             song_marker_times=tuple(session.song_markers.times),
             song_marker_types=tuple(m.marker_type for m in markers),
+            song_marker_intensities=tuple(m.intensity for m in markers),
             selected_clips=selected_timeline_clips(session, duration_sec),
             selected_clip_presets={
                 slot: clip_preset_view(session, slot, clip, duration_sec)

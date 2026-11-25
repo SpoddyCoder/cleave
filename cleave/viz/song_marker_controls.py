@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from dataclasses import replace
 
 import pygame
 
 from cleave.song_markers import (
+    SongIntensity,
     SongMarker,
     SongMarkerType,
     format_marker_time,
@@ -85,7 +87,13 @@ class SongMarkerController:
         current = markers.markers[index]
         if marker_type == current.marker_type:
             return
-        markers.markers[index] = SongMarker(current.time, marker_type)
+        markers.markers[index] = replace(current, marker_type=marker_type)
+
+    def set_intensity(self, index: int, intensity: SongIntensity) -> None:
+        """Give marker *index* *intensity*."""
+        markers = self.session.song_markers.markers
+        if 0 <= index < len(markers):
+            markers[index] = replace(markers[index], intensity=intensity)
 
     def drop(self) -> None:
         """Drop or replace a song marker where the user tapped (session until Save)."""
@@ -115,6 +123,7 @@ class SongMarkerController:
             and 0 <= markers.selected_index < len(markers.markers)
         ):
             prior_selected_time = markers.markers[markers.selected_index].time
+        markers_before = bool(markers.markers)
         new_markers, replaced_index, replaced_time = place_marker(
             markers.markers, t, marker_type=marker_type
         )
@@ -149,6 +158,12 @@ class SongMarkerController:
                 f"Song marker replaced "
                 f"{format_marker_time(replaced_time)} -> "
                 f"{format_marker_time(new_markers[replaced_index].time)}"
+            )
+        elif not markers_before:
+            self._on_notification(
+                f"Song markers {format_marker_time(0.0)} and {format_marker_time(t)}"
+                if len(new_markers) == 2
+                else f"Song marker {format_marker_time(t)}"
             )
         else:
             self._on_notification(f"Song marker {format_marker_time(t)}")

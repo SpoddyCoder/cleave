@@ -25,9 +25,11 @@ from cleave.config_schema.project_resolution import (
     clamp_resolution_width,
 )
 from cleave.song_markers import (
+    DEFAULT_SONG_INTENSITY,
     DEFAULT_SONG_MARKER_TYPE,
     SongMarker,
     format_marker_time,
+    parse_song_intensity,
     parse_song_marker_type,
 )
 
@@ -51,21 +53,24 @@ def _parse_song_markers(raw_markers: object) -> tuple[SongMarker, ...]:
             raise ValueError("invalid project manifest: song-markers entry time")
         time = float(item["time"])
         marker_type = DEFAULT_SONG_MARKER_TYPE
-        if "type" in item:
-            try:
+        intensity = DEFAULT_SONG_INTENSITY
+        try:
+            if "type" in item:
                 marker_type = parse_song_marker_type(item["type"])
-            except ValueError as exc:
-                raise ValueError(
-                    f"{PROJECT_FILENAME}: song marker at "
-                    f"{format_marker_time(time)}: {exc}"
-                ) from exc
-        markers.append(SongMarker(time, marker_type))
+            if "intensity" in item:
+                intensity = parse_song_intensity(item["intensity"])
+        except ValueError as exc:
+            raise ValueError(
+                f"{PROJECT_FILENAME}: song marker at "
+                f"{format_marker_time(time)}: {exc}"
+            ) from exc
+        markers.append(SongMarker(time, marker_type, intensity))
     return tuple(markers)
 
 
 def _song_markers_to_yaml(markers: Sequence[SongMarker]) -> list[dict]:
     return [
-        {"time": float(m.time), "type": m.marker_type}
+        {"time": float(m.time), "type": m.marker_type, "intensity": m.intensity}
         for m in markers
     ]
 

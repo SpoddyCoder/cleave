@@ -15,25 +15,19 @@ from cleave.timeline import (
     snap_lane_to_beats,
     snap_lanes_to_song_markers,
 )
-from cleave.timeline_presets import (
-    build_arc_cues,
-    build_breathing_cues,
-    build_dialogue_cues,
-    build_pulse_cues,
-    compose_pattern_mask_timeline,
+from cleave.config_schema.layers import preset_switching_mode_for_trigger
+from cleave.timeline_presets.lanes import compose_layers_timeline
+from cleave.timeline_presets.layer_setup import (
+    FULL_OPACITY_PCT,
+    change_presets_display,
+    layer_opacity_display,
 )
-from cleave.timeline_presets.characters import (
-    CHARACTER_HELP,
-    TIMELINE_PRESET_KIND_OPTIONS,
-    timeline_preset_kind_display,
-)
+from cleave.timeline_presets.pattern_mask_arrange import compose_pattern_mask_timeline
 from cleave.timeline_presets.conductor import timeline_preset_conductor_display
 from cleave.timeline_presets.mode import (
     TIMELINE_PRESET_MODE_OPTIONS,
     timeline_preset_mode_display,
 )
-from cleave.timeline_presets.accent import apply_accent
-from cleave.timeline_presets.build import apply_build
 from cleave.timeline_presets.cue_snap import (
     TIMELINE_PRESET_CUE_SNAP_OPTIONS,
     timeline_preset_cue_snap_display,
@@ -85,19 +79,10 @@ _ARRANGEMENT_SECTION = "Arrangement"
 _CUES_SECTION = "Clip timing and cuts"
 _PRESETS_SECTION = "Presets"
 
-_KIND_BUILDERS = {
-    "breathing": (build_breathing_cues, "Applied Breathing timeline preset"),
-    "dialogue": (build_dialogue_cues, "Applied Dialogue timeline preset"),
-    "arc": (build_arc_cues, "Applied Arc timeline preset"),
-    "pulse": (build_pulse_cues, "Applied Pulse timeline preset"),
-}
-
-
 _GENERATE_HELP = (
     "Builds a new timeline from these settings, replacing the current clips. Arrangement decides which layers play when, clip timing and cuts then tidy every generated clip, and each layer whose presets change on each clip gets a preset for every new clip. That replaces the layer's whole preset list, spares included.",
-    "Sections marked with a type, such as verse, build, or drop, are arranged to suit it, whatever the character. The project remembers these settings for next time.",
+    "Each section is arranged to suit its song marker's type and intensity: how many layers play, which one leads, how bright each is, and how often presets change. Back-to-back markers of one type make one longer section, such as a build that rises across all of them. Settings are kept for the rest of the session.",
 )
-_CHARACTER_HELP = ("The shape of the arrangement: which layers play together, and when.",)
 _DENSITY_HELP = (
     "How many layers tend to play at once: sparse favours solos, dense keeps more of the stack in.",
 )
@@ -128,19 +113,34 @@ _REPOPULATE_OPTION_HELP = {
     "directory sequential": "presets from the layer's preset directory, in order.",
 }
 _CONDUCTOR_HELP = (
-    "Uses the stems' audio to decide which layers lead each phrase and how bright each one is. In layers mode, plain, chorus, and drop song markers also get an accent. It needs the song's audio analysis and is skipped without it.",
+    "Uses the stems' audio to decide which layer leads each phrase and to give layers roles, which set their blend modes. In layers mode a chorus or drop opens with an accent on one layer. It needs the song's audio analysis and is skipped without it.",
 )
 _CONDUCTOR_OPTION_HELP = {
-    False: "levels come from the character alone.",
-    True: "levels follow the music.",
+    False: "layers take turns leading, and keep their own blend modes.",
+    True: "the busiest stem leads, and layers get roles.",
 }
 _MODE_HELP = ("How the arrangement brings layers in and out.",)
 _MODE_OPTION_HELP = {
-    "layers": "clips turn whole layers on and off, shaped by the character.",
+    "layers": "clips bring whole layers in and out, at the opacity each section calls for.",
     "pattern_mask": (
         "short sections swap layers through the pattern mask; "
-        "turns the mask on with strips. It has no character."
+        "turns the mask on with strips."
     ),
+}
+_ON_OFF = (False, True)
+_LAYER_OPACITY_HELP = (
+    "Each layer's own opacity multiplies the opacity of its clips, so the brightness Generate plans shows as planned only on layers at 100%.",
+)
+_LAYER_OPACITY_OPTION_HELP = {
+    False: "keep each layer's opacity; layers below 100% look dimmer than planned.",
+    True: "set every unlocked layer to 100%.",
+}
+_CHANGE_PRESETS_HELP = (
+    "Generate plans a new preset at song markers and every few bars, on layers that stay on. Those changes play only on layers whose presets change on each clip.",
+)
+_CHANGE_PRESETS_OPTION_HELP = {
+    False: "keep how each layer changes presets.",
+    True: "every unlocked layer changes presets on each clip, and every clip gets a preset as clip presets says.",
 }
 _RESET_HELP = ("Removes every clip on the timeline.",)
 _RESET_LAYERS_HELP = ("What every layer does for the whole song after the reset.",)
@@ -176,11 +176,6 @@ def _choice_field(
         visible=visible,
         vertical=vertical,
     )
-
-
-def _layers_mode(values: FormValues) -> bool:
-    """Character only shapes layers mode; pattern mask ignores it."""
-    return TIMELINE_PRESET_MODE_OPTIONS[values["mode"]] == "layers"
 
 
 def _clips_label(count: int) -> str:
@@ -250,17 +245,6 @@ class TimelinePresetController:
                         section=_ARRANGEMENT_SECTION,
                     ),
                     _choice_field(
-                        "character",
-                        "character",
-                        TIMELINE_PRESET_KIND_OPTIONS,
-                        tl.timeline_preset_kind,
-                        timeline_preset_kind_display,
-                        help=_CHARACTER_HELP,
-                        option_help=CHARACTER_HELP,
-                        section=_ARRANGEMENT_SECTION,
-                        visible=_layers_mode,
-                    ),
-                    _choice_field(
                         "density",
                         "density",
                         TIMELINE_PRESET_DENSITY_OPTIONS,
@@ -277,6 +261,16 @@ class TimelinePresetController:
                         timeline_preset_conductor_display,
                         help=_CONDUCTOR_HELP,
                         option_help=_CONDUCTOR_OPTION_HELP,
+                        section=_ARRANGEMENT_SECTION,
+                    ),
+                    _choice_field(
+                        "layer_opacity",
+                        "layer opacity",
+                        _ON_OFF,
+                        tl.timeline_preset_full_opacity,
+                        layer_opacity_display,
+                        help=_LAYER_OPACITY_HELP,
+                        option_help=_LAYER_OPACITY_OPTION_HELP,
                         section=_ARRANGEMENT_SECTION,
                     ),
                     _choice_field(
@@ -309,6 +303,16 @@ class TimelinePresetController:
                         section=_CUES_SECTION,
                     ),
                     _choice_field(
+                        "change_presets",
+                        "change presets",
+                        _ON_OFF,
+                        tl.timeline_preset_each_clip,
+                        change_presets_display,
+                        help=_CHANGE_PRESETS_HELP,
+                        option_help=_CHANGE_PRESETS_OPTION_HELP,
+                        section=_PRESETS_SECTION,
+                    ),
+                    _choice_field(
                         "repopulate",
                         "clip presets",
                         repopulate_options,
@@ -324,7 +328,11 @@ class TimelinePresetController:
                 on_confirm=lambda values: self._confirm_generate(
                     values, duration_sec, repopulate_options
                 ),
-                info=lambda _values: self._generate_info(duration_sec),
+                info=lambda values: self._generate_info(
+                    duration_sec,
+                    each_clip=_ON_OFF[values["change_presets"]],
+                    full_opacity=_ON_OFF[values["layer_opacity"]],
+                ),
                 help=_GENERATE_HELP,
             )
         )
@@ -337,21 +345,74 @@ class TimelinePresetController:
         self._notify(reason)
         return True
 
-    def _generate_info(self, duration_sec: float) -> str | None:
+    def _generate_info(
+        self,
+        duration_sec: float,
+        *,
+        each_clip: bool = False,
+        full_opacity: bool = False,
+    ) -> str | None:
         session = self.session
         parts: list[str] = []
         count = self._clip_count(duration_sec)
         if count:
             parts.append(f"{_clips_label(count)} on the timeline")
+        converting = self._layers_to_convert() if each_clip else []
         slots = [
             slot
             for slot in session.layer_z_order
-            if is_each_clip(session, slot) and session.layers[slot].preset_list
+            if (is_each_clip(session, slot) and session.layers[slot].preset_list)
+            or slot in converting
         ]
         if slots:
             noun = "preset list" if len(slots) == 1 else "preset lists"
             parts.append(f"the {noun} of {layers_label(session, slots)}")
-        return f"(replaces {' and '.join(parts)})" if parts else None
+        notes = [f"replaces {' and '.join(parts)}"] if parts else []
+        # What stays as it is after the layer options: locked layers always do.
+        others = [
+            slot
+            for slot in session.layer_z_order
+            if not is_each_clip(session, slot) and slot not in converting
+        ]
+        if others:
+            notes.append(f"no preset changes on {layers_label(session, others)}")
+        dim = [
+            slot
+            for slot in session.layer_z_order
+            if session.layers[slot].opacity_pct < FULL_OPACITY_PCT
+            and not (full_opacity and not session.layers[slot].locked)
+        ]
+        if dim:
+            notes.append(f"{layers_label(session, dim)} below 100%")
+        return f"({'; '.join(notes)})" if notes else None
+
+    def _layers_to_convert(self) -> list[str]:
+        """Unlocked layers whose presets do not yet change on each clip."""
+        session = self.session
+        return [
+            slot
+            for slot in session.layer_z_order
+            if not session.layers[slot].locked and not is_each_clip(session, slot)
+        ]
+
+    def _set_up_layers(self) -> None:
+        """Apply the dialog's layer opacity and change presets choices."""
+        tl = self.session.timeline
+        for slot in self.session.layer_z_order:
+            layer = self.session.layers[slot]
+            if layer.locked:
+                continue
+            if tl.timeline_preset_full_opacity:
+                layer.opacity_pct = FULL_OPACITY_PCT
+        if not tl.timeline_preset_each_clip:
+            return
+        for slot in self._layers_to_convert():
+            layer = self.session.layers[slot]
+            if layer.preset_switching_trigger == "off":
+                # The preset chosen with switching off stays the layer's own.
+                layer.layer_preset = layer.playlist.anchor
+            layer.preset_switching_trigger = "timeline"
+            layer.preset_switching = preset_switching_mode_for_trigger("timeline")
 
     def _clip_count(self, duration_sec: float) -> int:
         return sum(
@@ -369,7 +430,6 @@ class TimelinePresetController:
         if self._refuse_locked_layers():
             return
         tl = self.session.timeline
-        tl.timeline_preset_kind = TIMELINE_PRESET_KIND_OPTIONS[values["character"]]
         tl.timeline_preset_density = TIMELINE_PRESET_DENSITY_OPTIONS[values["density"]]
         tl.timeline_preset_cue_snap = TIMELINE_PRESET_CUE_SNAP_OPTIONS[
             values["cue_snap"]
@@ -383,9 +443,11 @@ class TimelinePresetController:
         tl.timeline_preset_repopulate = repopulate_options[values["repopulate"]]
         tl.timeline_preset_conductor = _CONDUCTOR_OPTIONS[values["conductor"]]
         tl.timeline_preset_mode = TIMELINE_PRESET_MODE_OPTIONS[values["mode"]]
+        tl.timeline_preset_full_opacity = _ON_OFF[values["layer_opacity"]]
+        tl.timeline_preset_each_clip = _ON_OFF[values["change_presets"]]
         before = self._history.begin("Generate timeline")
         try:
-            self._apply(tl.timeline_preset_kind, duration_sec)
+            self._apply(duration_sec)
             self._history.commit()
         except Exception as exc:
             # A failed generate must not end the session and lose unsaved work.
@@ -419,18 +481,13 @@ class TimelinePresetController:
             )
         )
 
-    def _apply(
-        self,
-        kind: str,
-        duration_sec: float,
-    ) -> None:
+    def _apply(self, duration_sec: float) -> None:
         if not self._bar_times:
             self._notify("No bars available; re-run separate")
             return
         if not self._beat_times:
             self._notify("No beats available; re-run separate")
             return
-        builder, message = _KIND_BUILDERS[kind]
         grid = shift_bars_by_beats(
             self._bar_times,
             self._beat_times,
@@ -468,42 +525,10 @@ class TimelinePresetController:
                 transition_duration=self.session.pattern_mask.transition,
                 **builder_kwargs,
             )
-            message = "Applied pattern mask timeline"
+            message = "Generated pattern mask timeline"
         else:
-            built = builder(
-                slots,
-                duration_sec,
-                rng,
-                **builder_kwargs,
-            )
-            after_build = apply_build(
-                built,
-                slots,
-                duration_sec=duration_sec,
-                bar_times=grid,
-                song_markers=markers,
-                rng=rng,
-            )
-            if after_build is not built:
-                built = after_build
-                message = f"{message} (build)"
-            if tl.timeline_preset_conductor and self._signals is not None:
-                after_accent = apply_accent(
-                    built,
-                    slots,
-                    duration_sec=duration_sec,
-                    bar_times=grid,
-                    song_markers=markers,
-                    signals=self._signals,
-                    slot_stems={
-                        slot: self.session.layers[slot].stem for slot in slots
-                    },
-                    density_bias=density_bias_for(tl.timeline_preset_density),
-                    rng=rng,
-                )
-                if after_accent is not built:
-                    built = after_accent
-                    message = f"{message} (accent)"
+            built = compose_layers_timeline(slots, duration_sec, rng, **builder_kwargs)
+            message = "Generated timeline"
         built = {
             slot: copy_lane(built.get(slot, empty_lane())) for slot in slots
         }
@@ -514,6 +539,7 @@ class TimelinePresetController:
         tl.enabled = True
         for slot in slots:
             tl.lanes[slot] = built[slot]
+        self._set_up_layers()
         if self._on_repopulate is not None:
             self._on_repopulate()
         if conductor_skipped:
@@ -528,17 +554,20 @@ class TimelinePresetController:
         pm.feather_pct = 0
         pm.transition = _PATTERN_MASK_TRANSITION_SEC
 
+    def _cue_snap_grid(self, bar_grid: Sequence[float]) -> Sequence[float]:
+        """The grid clip edges snap to; empty when snap to grid is off."""
+        cue_snap = self.session.timeline.timeline_preset_cue_snap
+        if cue_snap == "beats":
+            return self._beat_times
+        return bar_grid if cue_snap == "bars" else ()
+
     def _apply_cue_snap(
         self,
         lanes: dict[str, TimelineLane],
         bar_grid: Sequence[float],
     ) -> None:
-        cue_snap = self.session.timeline.timeline_preset_cue_snap
-        if cue_snap == "beats":
-            grid = self._beat_times
-        elif cue_snap == "bars":
-            grid = bar_grid
-        else:
+        grid = self._cue_snap_grid(bar_grid)
+        if not grid:
             return
         for slot in list(lanes):
             lanes[slot] = snap_lane_to_beats(lanes[slot], grid)

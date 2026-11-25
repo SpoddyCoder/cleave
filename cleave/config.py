@@ -154,6 +154,7 @@ from cleave.config_schema.timeline import (
     DEFAULT_TIMELINE_BAR_PHASE,
     DEFAULT_TIMELINE_PLACEMENT_SNAP,
     DEFAULT_TIMELINE_SHOW_BAR_GRID,
+    DEFAULT_TIMELINE_GLIDE,
     DEFAULT_TIMELINE_SHOW_PRESET_NAMES,
     TimelinePlacementSnap,
     parse_timeline_section,
@@ -397,6 +398,7 @@ class TimelineConfig:
     bar_phase: int = DEFAULT_TIMELINE_BAR_PHASE
     show_bar_grid: bool = DEFAULT_TIMELINE_SHOW_BAR_GRID
     show_preset_names: bool = DEFAULT_TIMELINE_SHOW_PRESET_NAMES
+    glide: float = DEFAULT_TIMELINE_GLIDE
 
 
 @dataclass

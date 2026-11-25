@@ -769,6 +769,19 @@ class InspectorPanel:
                 activated=item.activated,
                 after_label=look.label if list_item else None,
             )
+            second = spec.second_choice
+            if second is not None:
+                self.values.draw_choice_value(
+                    state,
+                    row,
+                    desc,
+                    second.labels(),
+                    second.labels()[second.index(state, desc)],
+                    enabled=look.stepped,
+                    tone=choice_tone(look.value_color),
+                    activated=item.activated,
+                    second=True,
+                )
             cluster = ""
         elif look.stepped and cluster and not two_line:
             cluster = self.values.fixed_width_value(desc.kind, cluster)

@@ -14,19 +14,20 @@ from cleave.config_schema.timeline import (
     timeline_crossfade_display,
 )
 from cleave.song_markers import (
+    DEFAULT_SONG_INTENSITY,
     DEFAULT_SONG_MARKER_TYPE,
+    SONG_INTENSITIES,
+    SONG_INTENSITY_HELP,
     SONG_MARKER_TYPE_HELP,
     SONG_MARKER_TYPES,
     SongMarkerType,
     song_marker_type_display,
     step_song_marker_type,
     format_marker_time,
+    parse_song_intensity,
     parse_song_marker_type,
 )
-from cleave.timeline_presets import (
-    TIMELINE_PRESET_HELP_ENTRIES,
-    TIMELINE_RESET_HELP_ENTRIES,
-)
+from cleave.timeline_presets import TIMELINE_RESET_HELP_ENTRIES
 from cleave.blend_modes import BLEND_MODE_HELP_ENTRIES, BLEND_MODES, BlendMode
 from cleave.choice import choice_index
 from cleave.cue_roles import CUE_ROLE_HELP_BLURB, CUE_ROLES, CueRole
@@ -202,6 +203,21 @@ def _apply_timeline_soft_cut_fade_out(
     delta = TIMELINE_FADE_DURATION_STEP if forward else -TIMELINE_FADE_DURATION_STEP
     group.fade_out = clamp_timeline_fade_duration(round(group.fade_out + delta, 1))
 
+def _format_timeline_glide(state: TuningViewState, _desc: RowDescriptor) -> str:
+    glide = state.timeline.glide
+    return "off" if glide <= 0.0 else f"{glide:.1f}s"
+
+def _apply_timeline_glide(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    large: bool,
+) -> None:
+    timeline = controls.session.timeline
+    step = 1.0 if large else TIMELINE_FADE_DURATION_STEP
+    delta = step if forward else -step
+    timeline.glide = clamp_timeline_fade_duration(round(timeline.glide + delta, 1))
+
 def _format_timeline_hard_cut_crossfade(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
@@ -245,6 +261,10 @@ def _format_song_markers_count(state: TuningViewState, _desc: RowDescriptor) -> 
 SONG_MARKER_TYPE_HELP_ENTRIES: tuple[tuple[str, str], ...] = tuple(
     (song_marker_type_display(marker_type), SONG_MARKER_TYPE_HELP[marker_type])
     for marker_type in SONG_MARKER_TYPES
+)
+
+SONG_INTENSITY_HELP_ENTRIES: tuple[tuple[str, str], ...] = tuple(
+    (intensity, SONG_INTENSITY_HELP[intensity]) for intensity in SONG_INTENSITIES
 )
 
 def _song_marker_type(state: TuningViewState, desc: RowDescriptor) -> str:
@@ -337,6 +357,27 @@ def _always_available(_state: TuningViewState, _desc: RowDescriptor) -> bool:
 def _delete_song_marker(controls: TuningControls, desc: RowDescriptor) -> None:
     if desc.marker_index is not None:
         controls.song_markers.prompt_delete(desc.marker_index)
+
+
+def _song_marker_intensity(state: TuningViewState, desc: RowDescriptor) -> str:
+    intensities = state.timeline.song_marker_intensities
+    index = desc.marker_index
+    if index is None or not 0 <= index < len(intensities):
+        return DEFAULT_SONG_INTENSITY
+    return intensities[index]
+
+
+def _jump_song_marker_intensity(
+    controls: TuningControls, desc: RowDescriptor, delta: int
+) -> None:
+    index = desc.marker_index
+    markers = controls.session.song_markers.markers
+    if index is None or not 0 <= index < len(markers):
+        return
+    current = parse_song_intensity(markers[index].intensity)
+    controls.song_markers.set_intensity(
+        index, step_choice(SONG_INTENSITIES, current, delta)
+    )
 
 
 def _apply_song_marker_item(controls: TuningControls, desc: RowDescriptor) -> None:
@@ -725,9 +766,8 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Generate Timeline",
         help_entries=(("Enter", "open generate dialog"),),
         help_description=(
-            "Builds a complete timeline from the arrangement style you pick in a dialog, replacing the current clips. Song markers with a type, such as verse, build, or drop, shape their sections, and the project remembers your choices for next time.",
+            "Builds a complete timeline from the settings in a dialog, replacing the current clips. Each section is arranged for its song marker's type and intensity.",
         ),
-        help_mode_entries=TIMELINE_PRESET_HELP_ENTRIES,
         blocked_by_section_lock=True,
     ),
     RowKind.TIMELINE_SET_CUT_TYPE: RowSpec(
@@ -958,6 +998,23 @@ SPECS: dict[RowKind, RowSpec] = {
         repeatable=True,
         blocked_by_section_lock=True,
     ),
+    RowKind.TIMELINE_GLIDE: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="glide",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_timeline_glide,
+        apply_horizontal=_apply_timeline_glide,
+        help_title="Glide",
+        help_entries=(
+            ("Left/Right", "decrease / increase"),
+            ("PgUp/PgDn", "by a second"),
+        ),
+        help_description=(
+            "How many seconds a layer takes to change opacity between two clips that touch. A rise ends at the edge, so a drop still lands on its marker, and a fall starts there. Whatever the cut type; 0 changes at once. Fades still apply where a layer comes in or goes out.",
+        ),
+        repeatable=True,
+        blocked_by_section_lock=True,
+    ),
     RowKind.TIMELINE_SOFT_CUT_CROSSFADE: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="shift for crossfade",
@@ -982,9 +1039,9 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Song Markers",
         help_description=(
             "Markers for the song's structure, such as drops, breakdowns, and builds. Ctrl+Enter drops one at the playhead.",
-            "A marker starts a section that runs to the next marker. Its type says how Generate timeline arranges that section:",
+            "A marker starts a section that runs to the next marker. Its type says how Generate timeline arranges that section, and its intensity, the second dropdown, how calm or intense it is:",
         ),
-        help_mode_entries=SONG_MARKER_TYPE_HELP_ENTRIES,
+        help_mode_entries=SONG_MARKER_TYPE_HELP_ENTRIES + SONG_INTENSITY_HELP_ENTRIES,
     ),
     RowKind.SONG_MARKER_ITEM: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
@@ -1003,10 +1060,17 @@ SPECS: dict[RowKind, RowSpec] = {
             song_marker_type_display,
             jump=_jump_song_marker_type,
         ),
+        second_choice=options_choice(
+            SONG_INTENSITIES,
+            _song_marker_intensity,
+            str,
+            jump=_jump_song_marker_intensity,
+        ),
         fit_strategy=FitStrategy.NONE,
         help_title="Song Marker",
         help_entries=(
             ("Left/Right", "choose marker type"),
+            ("I", "choose intensity"),
             ("Enter", "seek to marker"),
             ("Delete", "remove marker"),
         ),

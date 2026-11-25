@@ -60,9 +60,9 @@ def test_drop_inserts_without_selecting() -> None:
     controller._playback.player.seek(15.0)
     controller.drop()
     markers = session.song_markers
-    assert markers.times == [15.0]
+    assert markers.times == [0.0, 15.0]
     assert markers.selected_index is None
-    assert notes == ["Song marker 00:15.00"]
+    assert notes == ["Song markers 00:00.00 and 00:15.00"]
 
 
 def test_drop_refused_while_recording() -> None:
@@ -118,7 +118,7 @@ def test_drop_snaps_to_beat() -> None:
     session.timeline.placement_snap = "beat"
     controller._playback.player.seek(11.0)
     controller.drop()
-    assert session.song_markers.times == [10.0]
+    assert session.song_markers.times == [0.0, 10.0]
 
 
 def test_drop_at_places_at_the_given_time_not_the_playhead() -> None:
@@ -177,7 +177,7 @@ def test_drop_while_playing_subtracts_tap_latency() -> None:
     player.seek(15.25)
     player.set_tap_latency_sec(0.25)
     controller.drop()
-    assert session.song_markers.times == [15.0]
+    assert session.song_markers.times == [0.0, 15.0]
 
 
 def test_drop_while_paused_ignores_tap_latency() -> None:
@@ -187,7 +187,7 @@ def test_drop_while_paused_ignores_tap_latency() -> None:
     player.set_tap_latency_sec(0.25)
     player.pause(True)
     controller.drop()
-    assert session.song_markers.times == [15.0]
+    assert session.song_markers.times == [0.0, 15.0]
 
 
 def test_drop_with_negative_tap_latency_lands_later() -> None:
@@ -196,7 +196,7 @@ def test_drop_with_negative_tap_latency_lands_later() -> None:
     player.seek(15.0)
     player.set_tap_latency_sec(-0.05)
     controller.drop()
-    assert session.song_markers.times == [15.05]
+    assert session.song_markers.times == [0.0, 15.05]
 
 
 def _open_snap(modal: ModalHost, target: str) -> None:
@@ -285,3 +285,13 @@ def test_snap_refused_without_markers_grid_or_while_locked_or_recording() -> Non
     gridless.prompt_snap()
     assert not modal.active
     assert notes[-1] == "No beats available; re-run separate"
+
+
+def test_type_and_intensity_keep_each_other() -> None:
+    controller, session, _modal = _make_controller()
+    session.song_markers.markers = [SongMarker(10.0)]
+    controller.set_intensity(0, "intense")
+    controller.set_type(0, "drop")
+    assert session.song_markers.markers == [SongMarker(10.0, "drop", "intense")]
+    controller.set_intensity(5, "calm")
+    assert session.song_markers.markers == [SongMarker(10.0, "drop", "intense")]

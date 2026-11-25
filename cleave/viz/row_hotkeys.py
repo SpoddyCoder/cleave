@@ -253,6 +253,13 @@ def _hotkey_for_descriptor(
             return True
         return False
 
+    if event.key == pygame.K_i and not mod_ctrl(event.mod):
+        if kind != RowKind.SONG_MARKER_ITEM or desc.marker_index is None:
+            return False
+        if not section_lock_blocks_mutation(controls.session, desc):
+            controls.inspector.open_second_choice(desc)
+        return True
+
     if event.key == pygame.K_l:
         return toggle_header_locked(controls, desc)
 

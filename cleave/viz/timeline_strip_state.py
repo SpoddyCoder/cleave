@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 
 from cleave.stems import StemSource
 from cleave.viz.preset_schedule import RowPresets
-from cleave.song_markers import SongMarkerType
+from cleave.song_markers import SongIntensity, SongMarkerType
 from cleave.timeline import (
     ClipGrip,
     SlotCue,
@@ -55,10 +55,12 @@ class TimelineViewState:
     show_bar_grid: bool = False
     bar_grid_times: tuple[float, ...] = ()
     show_preset_names: bool = True
+    glide: float = 0.0
     beat_grid_times: tuple[float, ...] = ()
     song_marker_times: tuple[float, ...] = ()
     # Type of each marker, in step with the times.
     song_marker_types: tuple[SongMarkerType, ...] = ()
+    song_marker_intensities: tuple[SongIntensity, ...] = ()
     selected_song_marker_index: int | None = None
     song_marker_flash_start_ms: int | None = None
     hard_cut_fades: TimelineFadeGroup = field(default_factory=TimelineFadeGroup)
@@ -179,6 +181,7 @@ def _span_breakpoints_for_lane(
         hard_cut_fades=state.hard_cut_fades,
         soft_cut_fades=state.soft_cut_fades,
         duration_sec=duration_sec,
+        glide=state.glide,
     )
     if not breakpoints:
         level = inherit if lane.baseline is None else float(lane.baseline)

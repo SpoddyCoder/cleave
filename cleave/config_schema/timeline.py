@@ -38,6 +38,8 @@ DEFAULT_TIMELINE_CROSSFADE = False
 TIMELINE_FADE_DURATION_MIN = 0.0
 TIMELINE_FADE_DURATION_MAX = 30.0
 TIMELINE_FADE_DURATION_STEP = 0.1
+# Seconds an opacity change between touching clips takes; 0 steps at once.
+DEFAULT_TIMELINE_GLIDE = 4.0
 
 TimelinePlacementSnap = Literal["off", "beat", "bar"]
 TIMELINE_PLACEMENT_SNAP_OPTIONS: tuple[TimelinePlacementSnap, ...] = (
@@ -164,6 +166,11 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
     show_preset_names = bool(
         timeline_map.get("show_preset_names", DEFAULT_TIMELINE_SHOW_PRESET_NAMES)
     )
+    glide = clamp_timeline_fade_duration(
+        require_non_negative_number(
+            timeline_map.get("glide", DEFAULT_TIMELINE_GLIDE), "timeline.glide"
+        )
+    )
     cuts_raw = timeline_map.get("cuts")
     if cuts_raw is None:
         cuts = TimelineCutsConfig()
@@ -194,6 +201,7 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
             bar_phase=bar_phase,
             show_bar_grid=show_bar_grid,
             show_preset_names=show_preset_names,
+            glide=glide,
         )
     lanes_map = as_mapping(lanes_raw, "timeline.lanes")
     if ctx.layer_slots is None:
@@ -284,6 +292,7 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
         bar_phase=bar_phase,
         show_bar_grid=show_bar_grid,
         show_preset_names=show_preset_names,
+        glide=glide,
     )
 
 
@@ -305,6 +314,7 @@ def persist_timeline(ctx: PersistCtx) -> dict[str, Any]:
         "bar_phase": runtime.bar_phase_offset,
         "show_bar_grid": runtime.show_bar_grid,
         "show_preset_names": runtime.show_preset_names,
+        "glide": runtime.glide,
         "cuts": {
             "hard": _persist_timeline_fade_group(runtime.hard_cut_fades),
             "soft": _persist_timeline_fade_group(runtime.soft_cut_fades),

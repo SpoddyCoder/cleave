@@ -62,6 +62,9 @@ class EditSnapshot:
     # presets between the list and the clips in the same step.
     triggers: dict[str, str]
     pattern_mask: tuple[bool, str, int, float]
+    # Each layer's opacity, which Generate timeline may set. Restored with the
+    # rest, but a later opacity change does not stop undo.
+    opacities: dict[str, int]
     # Restored with the rest, but never counts as a change.
     selected_clip_t: dict[str, float]
     # Each layer's own preset and browse position. Restored for a layer whose
@@ -76,6 +79,7 @@ class EditSnapshot:
             and self.preset_lists == other.preset_lists
             and self.triggers == other.triggers
             and self.pattern_mask == other.pattern_mask
+            and self.opacities == other.opacities
         )
 
 
@@ -373,6 +377,7 @@ class EditHistory:
                 for slot, layer in session.layers.items()
             },
             pattern_mask=(mask.enabled, mask.type, mask.feather_pct, mask.transition),
+            opacities={slot: layer.opacity_pct for slot, layer in session.layers.items()},
             selected_clip_t=dict(session.timeline.selected_clip_t),
             browse={
                 slot: (layer.layer_preset, layer.browse_snapshot())
@@ -392,6 +397,9 @@ class EditHistory:
         mask.enabled, mask.type, mask.feather_pct, mask.transition = (
             snapshot.pattern_mask
         )
+        for slot, opacity in snapshot.opacities.items():
+            if slot in session.layers:
+                session.layers[slot].opacity_pct = opacity
         for slot, preset_list in snapshot.preset_lists.items():
             layer = session.layers[slot]
             trigger = snapshot.triggers.get(slot, layer.preset_switching_trigger)

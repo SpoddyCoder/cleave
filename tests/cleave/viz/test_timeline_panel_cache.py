@@ -123,6 +123,18 @@ def test_static_signature_changes_on_song_marker_types() -> None:
     assert _static_sig(plain) != _static_sig(typed)
 
 
+def test_static_signature_changes_on_song_marker_intensities() -> None:
+    normal, calm = (
+        strip_view_state(
+            song_marker_times=(10.0,),
+            song_marker_types=("drop",),
+            song_marker_intensities=(intensity,),
+        )
+        for intensity in ("normal", "calm")
+    )
+    assert _static_sig(normal) != _static_sig(calm)
+
+
 def test_static_signature_changes_on_song_marker_times() -> None:
     empty = strip_view_state(song_marker_times=())
     with_markers = strip_view_state(song_marker_times=(10.0, 40.0))

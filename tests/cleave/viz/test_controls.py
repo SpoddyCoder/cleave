@@ -364,6 +364,7 @@ _CUT_INSPECTOR_KINDS = {
     RowKind.TIMELINE_SOFT_CUT_FADE_IN,
     RowKind.TIMELINE_SOFT_CUT_FADE_OUT,
     RowKind.TIMELINE_SOFT_CUT_CROSSFADE,
+    RowKind.TIMELINE_GLIDE,
 }
 _SONG_INSPECTOR_KINDS = {
     RowKind.SONG_MARKERS_HEADER,
@@ -1621,7 +1622,6 @@ def _set_cut_type(controls: TuningControls, cut: str, scope: str) -> None:
 
 def test_generate_opens_a_form_seeded_from_the_session() -> None:
     controls = make_controls(("layer_1", "layer_2", "layer_3", "layer_4"))
-    controls.session.timeline.timeline_preset_kind = "arc"
     controls.session.timeline.timeline_preset_conductor = True
     _focus_timeline_presets(controls)
     assert _press_focused(controls, keydown(pygame.K_RETURN)) is True
@@ -1634,12 +1634,13 @@ def test_generate_opens_a_form_seeded_from_the_session() -> None:
         (row.label, row.options[row.value]) for row in modal_view.form_rows
     ] == [
         ("mode", "layers"),
-        ("character", "arc"),
         ("density", "normal"),
         ("conductor", "on"),
+        ("layer opacity", "leave as it is"),
         ("snap to grid", "none"),
         ("snap to song markers", "none"),
         ("cut type", "by marker"),
+        ("change presets", "leave as they are"),
         ("clip presets", "shuffled (each layer's directory)"),
     ]
     assert [row.heading for row in modal_view.form_rows] == [
@@ -1651,6 +1652,7 @@ def test_generate_opens_a_form_seeded_from_the_session() -> None:
         None,
         None,
         "Presets",
+        None,
     ]
     assert all(row.indented for row in modal_view.form_rows)
 
@@ -1678,7 +1680,10 @@ def test_generate_names_the_cues_it_replaces_under_the_title() -> None:
     _press_focused(controls, keydown(pygame.K_RETURN))
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
-    assert modal_view.form_info == "(replaces 1 clip on the timeline)"
+    assert modal_view.form_info == (
+        "(replaces 1 clip on the timeline; no preset changes on layer 1; "
+        "layer 1 below 100%)"
+    )
 
 
 def test_generate_names_the_preset_lists_it_replaces() -> None:
@@ -1696,8 +1701,43 @@ def test_generate_names_the_preset_lists_it_replaces() -> None:
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
     assert modal_view.form_info == (
-        "(replaces 1 clip on the timeline and the preset lists of layers 1 and 3)"
+        "(replaces 1 clip on the timeline and the preset lists of layers 1 and 3; "
+        "no preset changes on layer 2; layers 1, 2 and 3 below 100%)"
     )
+
+
+def test_generate_can_set_up_every_layer_for_its_plan() -> None:
+    beats = tuple(float(i) for i in range(241))
+    controls = make_controls(
+        ("layer_1", "layer_2", "layer_3"),
+        beat_times=beats,
+        bar_times=beats[::4],
+        duration_sec=240.0,
+    )
+    session = controls.session
+    session.layers["layer_3"].locked = True
+    before = {slot: (l.opacity_pct, l.preset_switching_trigger) for slot, l in session.layers.items()}
+    _focus_timeline_presets(controls)
+    _press_focused(controls, keydown(pygame.K_RETURN))
+    _set_form_field(controls, "layer opacity", "set to 100%")
+    _set_form_field(controls, "change presets", "each clip, on every layer")
+    assert controls.modal_host.view_state().form_info == (
+        "(replaces the preset lists of layers 1 and 2; no preset changes on layer 3; "
+        "layer 3 below 100%)"
+    )
+    choose_modal_option(controls, "Generate")
+    for slot in ("layer_1", "layer_2"):
+        layer = session.layers[slot]
+        assert layer.opacity_pct == 100
+        assert layer.preset_switching_trigger == "timeline"
+        assert layer.preset_switching == "on"
+    # A locked layer is left as it was.
+    locked = session.layers["layer_3"]
+    assert (locked.opacity_pct, locked.preset_switching_trigger) == before["layer_3"]
+    controls.edit_history.undo()
+    assert {
+        slot: (l.opacity_pct, l.preset_switching_trigger) for slot, l in session.layers.items()
+    } == before
 
 
 def test_generate_hides_character_in_pattern_mask_mode() -> None:
@@ -1744,7 +1784,6 @@ def test_timeline_presets_cuts_none_keeps_cut_none() -> None:
         beat_times=beats,
         bar_times=bars,
     )
-    controls.session.timeline.timeline_preset_kind = "breathing"
     controls.session.timeline.timeline_preset_timeline_cuts = "none"
     _focus_timeline_presets(controls)
     _confirm_timeline_preset(controls)
@@ -1763,7 +1802,6 @@ def test_timeline_presets_by_marker_cuts_assign_soft_or_hard() -> None:
         duration_sec=240.0,
     )
     controls.session.song_markers.times = [30.0, 90.0, 150.0]
-    controls.session.timeline.timeline_preset_kind = "breathing"
     controls.session.timeline.timeline_preset_timeline_cuts = "by marker"
     _focus_timeline_presets(controls)
     _confirm_timeline_preset(controls)
@@ -1800,7 +1838,7 @@ def _confirm_timeline_preset(controls: TuningControls) -> None:
     choose_modal_option(controls, "Generate")
 
 
-def test_timeline_presets_breathing_clears_and_applies() -> None:
+def test_timeline_presets_clear_and_apply() -> None:
     beats = tuple(float(i) for i in range(241))
     bars = tuple(float(i) for i in range(0, 241, 4))
     controls = make_controls(
@@ -1816,7 +1854,6 @@ def test_timeline_presets_breathing_clears_and_applies() -> None:
     controls.session.timeline.enabled = False
     controls.session.timeline.recording = True
     controls.session.timeline.armed_slots.add("layer_1")
-    controls.session.timeline.timeline_preset_kind = "breathing"
     _focus_timeline_presets(controls)
     _confirm_timeline_preset(controls)
     assert not controls.modal_host.active
@@ -1833,7 +1870,7 @@ def test_timeline_presets_breathing_clears_and_applies() -> None:
     )
 
 
-def test_timeline_presets_arc_clears_and_applies() -> None:
+def test_timeline_presets_apply_with_the_timeline_off() -> None:
     beats = tuple(float(i) for i in range(241))
     bars = tuple(float(i) for i in range(0, 241, 4))
     controls = make_controls(
@@ -1843,7 +1880,6 @@ def test_timeline_presets_arc_clears_and_applies() -> None:
     )
     controls.session.timeline.lanes = {"layer_1": _lane(True, (5.0, False))}
     controls.session.timeline.enabled = False
-    controls.session.timeline.timeline_preset_kind = "arc"
     _focus_timeline_presets(controls)
     _confirm_timeline_preset(controls)
     assert not controls.modal_host.active
@@ -1879,7 +1915,7 @@ def test_failed_generate_keeps_the_session_and_the_timeline(
 
     if stage == "build":
         monkeypatch.setattr(
-            "cleave.viz.timeline_preset_controls.apply_build", fail
+            "cleave.viz.timeline_preset_controls.compose_layers_timeline", fail
         )
     else:
         monkeypatch.setattr(controls._timeline_presets, "_on_repopulate", fail)
@@ -1907,7 +1943,7 @@ def test_failed_generate_keeps_the_session_and_the_timeline(
         assert controls.edit_history.can_undo
 
 
-def test_timeline_presets_build_when_typed_marker() -> None:
+def test_timeline_presets_generate_with_a_typed_marker() -> None:
     from cleave.song_markers import SongMarker
 
     beats = tuple(float(i) for i in range(241))
@@ -1924,15 +1960,14 @@ def test_timeline_presets_build_when_typed_marker() -> None:
         SongMarker(150.0),
         SongMarker(200.0, "build"),
     ]
-    controls.session.timeline.timeline_preset_kind = "breathing"
     _focus_timeline_presets(controls)
     _confirm_timeline_preset(controls)
     assert not controls.modal_host.active
     view = controls.build_view_state(paused=False)
-    assert view.notification_message == "Applied Breathing timeline preset (build)"
+    assert view.notification_message == "Generated timeline"
 
 
-def test_timeline_presets_skips_build_without_typed_marker() -> None:
+def test_timeline_presets_generate_with_plain_markers() -> None:
     beats = tuple(float(i) for i in range(241))
     bars = tuple(float(i) for i in range(0, 241, 4))
     controls = make_controls(
@@ -1942,12 +1977,11 @@ def test_timeline_presets_skips_build_without_typed_marker() -> None:
         duration_sec=240.0,
     )
     controls.session.song_markers.times = [30.0, 90.0, 150.0, 200.0]
-    controls.session.timeline.timeline_preset_kind = "pulse"
     _focus_timeline_presets(controls)
     _confirm_timeline_preset(controls)
     assert not controls.modal_host.active
     view = controls.build_view_state(paused=False)
-    assert view.notification_message == "Applied Pulse timeline preset"
+    assert view.notification_message == "Generated timeline"
 
 
 def _focus_timeline_reset(controls: TuningControls) -> None:
@@ -2037,7 +2071,6 @@ def test_timeline_presets_refuse_without_bars() -> None:
         "layer_2": _lane(True, (3.0, False)),
     }
     controls.session.timeline.lanes = dict(prior)
-    controls.session.timeline.timeline_preset_kind = "breathing"
     _focus_timeline_presets(controls)
     _confirm_timeline_preset(controls)
     assert not controls.modal_host.active
@@ -2072,7 +2105,6 @@ def test_timeline_presets_conductor_passes_signals_to_builder() -> None:
         bar_times=bars,
         signals=signals,
     )
-    controls.session.timeline.timeline_preset_kind = "breathing"
     controls.session.timeline.timeline_preset_conductor = True
     captured: dict = {}
 
@@ -2080,9 +2112,9 @@ def test_timeline_presets_conductor_passes_signals_to_builder() -> None:
         captured["kwargs"] = kwargs
         return {slot: TimelineLane(baseline=1.0, cues=[]) for slot in slots}
 
-    with patch.dict(
-        "cleave.viz.timeline_preset_controls._KIND_BUILDERS",
-        {"breathing": (_fake_builder, "Applied Breathing timeline preset")},
+    with patch(
+        "cleave.viz.timeline_preset_controls.compose_layers_timeline",
+        side_effect=_fake_builder,
     ):
         _focus_timeline_presets(controls)
         _confirm_timeline_preset(controls)
@@ -2094,7 +2126,7 @@ def test_timeline_presets_conductor_passes_signals_to_builder() -> None:
         "layer_4": "other",
     }
     view = controls.build_view_state(paused=False)
-    assert view.notification_message == "Applied Breathing timeline preset"
+    assert view.notification_message == "Generated timeline"
 
 
 def test_timeline_presets_conductor_skips_without_signals() -> None:
@@ -2106,7 +2138,6 @@ def test_timeline_presets_conductor_skips_without_signals() -> None:
         bar_times=bars,
         signals=None,
     )
-    controls.session.timeline.timeline_preset_kind = "breathing"
     controls.session.timeline.timeline_preset_conductor = True
     captured: dict = {}
 
@@ -2114,9 +2145,9 @@ def test_timeline_presets_conductor_skips_without_signals() -> None:
         captured["kwargs"] = kwargs
         return {slot: TimelineLane(baseline=1.0, cues=[]) for slot in slots}
 
-    with patch.dict(
-        "cleave.viz.timeline_preset_controls._KIND_BUILDERS",
-        {"breathing": (_fake_builder, "Applied Breathing timeline preset")},
+    with patch(
+        "cleave.viz.timeline_preset_controls.compose_layers_timeline",
+        side_effect=_fake_builder,
     ):
         _focus_timeline_presets(controls)
         _confirm_timeline_preset(controls)
@@ -3055,6 +3086,7 @@ def test_timeline_sub_rows_dim_when_disabled() -> None:
         RowKind.TIMELINE_SOFT_CUT_FADE_IN,
         RowKind.TIMELINE_SOFT_CUT_FADE_OUT,
         RowKind.TIMELINE_SOFT_CUT_CROSSFADE,
+        RowKind.TIMELINE_GLIDE,
         RowKind.TIMELINE_GENERATE,
         RowKind.TIMELINE_RESET,
     ):
@@ -4905,8 +4937,8 @@ def test_drop_song_marker_does_not_select_or_steal_focus() -> None:
     controls.playback.player.seek(15.0)
     controls.song_markers.drop()
     markers = controls.session.song_markers
-    assert markers.times == [15.0]
-    assert markers.markers == [SongMarker(15.0, "standard")]
+    assert markers.times == [0.0, 15.0]
+    assert markers.markers == [SongMarker(0.0), SongMarker(15.0, "standard")]
     assert markers.selected_index is None
     assert controls.focus_descriptor == prior_focus
 
@@ -5137,7 +5169,7 @@ def test_marker_only_edit_marks_dirty_and_save_clears(tmp_path: Path) -> None:
     save_now(controls)
 
     assert not controls.config_dirty
-    assert load_manifest(project).song_markers == _song_markers(12.5)
+    assert load_manifest(project).song_markers == _song_markers(0.0, 12.5)
 
 
 def test_save_flushes_song_markers(tmp_path: Path) -> None:
@@ -5196,7 +5228,7 @@ def test_save_flushes_markers_to_project_yaml(tmp_path: Path) -> None:
     controls.song_markers.drop()
     save_now(controls)
 
-    assert load_manifest(project).song_markers == _song_markers(3.0)
+    assert load_manifest(project).song_markers == _song_markers(0.0, 3.0)
     assert not controls.config_dirty
 
 
@@ -5225,7 +5257,7 @@ def test_drop_song_marker_snaps_to_beat_by_default() -> None:
     assert controls.session.timeline.placement_snap == "beat"
     controls.playback.player.seek(0.6)
     controls.song_markers.drop()
-    assert controls.session.song_markers.times == [1.0]
+    assert controls.session.song_markers.times == [0.0, 1.0]
 
 
 def test_drop_song_marker_placement_snap_off_keeps_audible_time() -> None:
@@ -5236,7 +5268,7 @@ def test_drop_song_marker_placement_snap_off_keeps_audible_time() -> None:
     controls.session.timeline.placement_snap = "off"
     controls.playback.player.seek(0.6)
     controls.song_markers.drop()
-    assert controls.session.song_markers.times == [0.6]
+    assert controls.session.song_markers.times == [0.0, 0.6]
 
 
 def test_drop_song_marker_snaps_to_bar() -> None:

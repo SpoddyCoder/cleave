@@ -27,6 +27,7 @@ def _session() -> SimpleNamespace:
             "layer_1": SimpleNamespace(
                 preset_list=entries("a.milk"),
                 preset_switching_trigger="off",
+                opacity_pct=50,
                 layer_preset=None,
                 browse_snapshot=lambda: None,
             )
@@ -90,8 +91,10 @@ def test_undo_restores_everything_generate_touches() -> None:
         session.pattern_mask.type = "strips"
         session.pattern_mask.feather_pct = 0
         session.pattern_mask.transition = 1.0
+        session.layers["layer_1"].opacity_pct = 100
     history.undo()
     assert session.timeline.enabled is True
+    assert session.layers["layer_1"].opacity_pct == 50
     assert session.layers["layer_1"].preset_list == entries("a.milk")
     assert changed == ["layer_1"]
     mask = session.pattern_mask

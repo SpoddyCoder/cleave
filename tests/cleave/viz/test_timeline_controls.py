@@ -1069,15 +1069,15 @@ def test_stop_record_preserves_unarmed_slots_in_preset_style_cues() -> None:
     assert session.timeline.lanes["layer_4"] == lanes["layer_4"]
 
 
-def test_stop_record_preserves_unarmed_after_breathing_preset() -> None:
+def test_stop_record_preserves_unarmed_after_a_generated_timeline() -> None:
     """End-to-end: punch through a real preset must leave unarmed tracks alone."""
     import random
 
-    from cleave.timeline_presets import build_breathing_cues
+    from cleave.timeline_presets.lanes import compose_layers_timeline
     from cleave.viz.layer_visibility import timeline_committed_level
 
     slots = list(DEFAULT_LAYER_SLOTS)
-    lanes = build_breathing_cues(slots, 60.0, random.Random(42))
+    lanes = compose_layers_timeline(slots, 60.0, random.Random(42))
     controls, session, _, _, _, _ = make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=5.0,

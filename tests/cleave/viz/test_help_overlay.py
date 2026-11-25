@@ -21,7 +21,6 @@ from cleave.config_schema.render import (
     HIGHLIGHT_ROLLOFF_CURVE_HELP_ENTRIES,
     HIGHLIGHT_ROLLOFF_CURVES,
 )
-from cleave.timeline_presets import TIMELINE_PRESET_HELP_ENTRIES
 from unittest.mock import MagicMock
 from cleave.viz.inline_edit import InlineEditController
 from cleave.viz.help_column import help_column_text
@@ -460,23 +459,12 @@ def test_switching_page_help_is_description_only() -> None:
 
 
 
-def test_timeline_presets_help_lists_characters() -> None:
+def test_timeline_generate_help_describes_the_dialog() -> None:
     sections = sections_for(RowKind.TIMELINE_GENERATE)
     description = _description_section(sections)
     assert description is not None
     assert description.title == "Generate Timeline"
-    assert _says(description.lines, 'replacing the current clips', 'verse')
-    assert description.entries == TIMELINE_PRESET_HELP_ENTRIES
-    assert [name for name, _ in description.entries] == [
-        "Breathing",
-        "Dialogue",
-        "Arc",
-        "Pulse",
-    ]
-    keyboard = _keyboard_section(sections)
-    assert keyboard.title == CONTROLS_SECTION_TITLE
-    assert keyboard.entries == (("Enter", "open generate dialog"),)
-
+    assert _says(description.lines, "replacing the current clips", "intensity")
 
 def test_timeline_reset_help_lists_choices() -> None:
     from cleave.timeline_presets import TIMELINE_RESET_HELP_ENTRIES
@@ -791,7 +779,12 @@ def test_song_marker_help_lists_every_marker_type() -> None:
     for row_kind in (RowKind.SONG_MARKERS_HEADER, RowKind.SONG_MARKER_ITEM):
         description = _description_section(sections_for(row_kind))
         assert description is not None, row_kind
-        assert [label for label, _ in description.entries] == [
+        labels = [label for label, _ in description.entries]
+        # Intensity is explained once, on the page.
+        if row_kind is RowKind.SONG_MARKERS_HEADER:
+            assert labels[-5:] == ["very calm", "calm", "normal", "intense", "very intense"]
+            labels = labels[:-5]
+        assert labels == [
             "-",
             "intro",
             "verse",

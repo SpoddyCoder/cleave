@@ -155,6 +155,7 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.TIMELINE_SOFT_CUT_FADE_IN,
         RowKind.TIMELINE_SOFT_CUT_FADE_OUT,
         RowKind.TIMELINE_SOFT_CUT_CROSSFADE,
+        RowKind.TIMELINE_GLIDE,
         RowKind.POST_FX_LIMITER_THRESHOLD,
         RowKind.POST_FX_LIMITER_RATIO,
         RowKind.POST_FX_LIMITER_RELEASE,
@@ -1337,3 +1338,46 @@ def test_preset_row_reads_previewing_while_switching_is_held() -> None:
     assert format_row_label(controls.build_view_state(paused=False), desc) == "preset"
     layer.switching_paused = True
     assert format_row_label(controls.build_view_state(paused=False), desc) == "previewing"
+
+
+def test_song_marker_row_has_an_intensity_dropdown() -> None:
+    import pygame
+
+    from cleave.song_markers import SongMarker
+    from cleave.viz.row_hotkeys import handle_row_hotkey
+    from cleave.viz.row_spec import apply_field_second_choice
+    from tests.support.viz import keydown
+
+    controls = make_controls(("layer_1",))
+    controls.session.song_markers.markers = [SongMarker(4.0, "drop")]
+    desc = RowDescriptor(RowKind.SONG_MARKER_ITEM, marker_index=0)
+    choice = row_spec(RowKind.SONG_MARKER_ITEM).second_choice
+    assert choice.labels() == ("very calm", "calm", "normal", "intense", "very intense")
+    state = controls.build_view_state(paused=False)
+    assert choice.index(state, desc) == 2
+    assert apply_field_second_choice(controls, desc, 2) is True
+    assert controls.session.song_markers.markers == [SongMarker(4.0, "drop", "very intense")]
+    controls.session.timeline.locked = True
+    assert apply_field_second_choice(controls, desc, -1) is False
+    assert controls.session.song_markers.markers[0].intensity == "very intense"
+    layer = RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
+    assert handle_row_hotkey(controls, layer, keydown(pygame.K_i)) is False
+
+
+def test_i_opens_the_intensity_list_on_the_focused_marker() -> None:
+    import pygame
+
+    from cleave.song_markers import SongMarker
+    from cleave.viz.row_spec import second_choice_target
+    from tests.support.viz import keydown
+
+    controls = make_controls(("layer_1",))
+    controls.session.song_markers.markers = [SongMarker(4.0, "drop")]
+    controls.navigator.select("timeline.song_markers")
+    desc = RowDescriptor(RowKind.SONG_MARKER_ITEM, marker_index=0)
+    controls.shell_focus.inspector_cursor = desc
+    controls.inspector.handle_hotkey(keydown(pygame.K_i))
+    view = controls.inline_edit.choice_view
+    assert view is not None and view.target == second_choice_target(desc)
+    controls.inline_edit.pick_choice(0)
+    assert controls.session.song_markers.markers[0].intensity == "very calm"

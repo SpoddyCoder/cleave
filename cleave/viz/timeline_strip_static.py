@@ -17,6 +17,7 @@ import pygame
 from cleave.song_markers import (
     DEFAULT_SONG_MARKER_TYPE,
     SONG_MARKER_TYPES,
+    SongIntensity,
     SongSection,
 )
 from cleave.viz.preset_schedule import RowLabel, RowPresets, row_labels
@@ -74,8 +75,14 @@ SOFT_TICK_WIDTH: int = 1
 CLIP_LABEL_INSET: int = 5
 # A clip narrower than this many pixels shows no name.
 CLIP_LABEL_MIN_PX: int = 18
-# How far a row's off colour goes towards its section's colour.
-SECTION_TINT_MIX: float = 0.22
+# How far a row's off colour goes towards its section's colour, by intensity.
+SECTION_TINT_MIX: dict[SongIntensity, float] = {
+    "very calm": 0.08,
+    "calm": 0.14,
+    "normal": 0.22,
+    "intense": 0.32,
+    "very intense": 0.42,
+}
 # Section name in the ruler, clear of the marker line it starts on.
 SECTION_LABEL_INSET: int = 5
 # Outline around the selected clip; thicker while the selection flash runs.
@@ -119,8 +126,10 @@ def typed_sections(state: TimelineViewState) -> list[SongSection]:
     times = state.song_marker_times
     ends = (*times[1:], state.duration_sec)
     return [
-        SongSection(start, end, section_type)
-        for start, end, section_type in zip(times, ends, state.song_marker_types)
+        SongSection(start, end, section_type, intensity)
+        for start, end, section_type, intensity in zip(
+            times, ends, state.song_marker_types, state.song_marker_intensities
+        )
         if section_type != DEFAULT_SONG_MARKER_TYPE and end > start
     ]
 
@@ -362,7 +371,7 @@ def build_static_panel(
             _lerp_rgb(
                 palette().timeline_off_segment,
                 section_color(section.section_type),
-                SECTION_TINT_MIX,
+                SECTION_TINT_MIX[section.intensity],
             ),
         )
         for section in typed_sections(state)

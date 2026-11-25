@@ -26,6 +26,7 @@ weight-field mass is 0.
 
 from __future__ import annotations
 
+import math
 import random
 import statistics
 from collections.abc import Mapping, Sequence
@@ -51,12 +52,14 @@ from cleave.timeline_presets.conductor import (
 )
 from cleave.timeline_presets.emit import cues_from_states, levels_from_active
 from cleave.timeline_presets.grid import thin_bar_times_for_arrange
-from cleave.timeline_presets.sections import (
-    SectionPace,
-    any_typed,
-    layer_range,
-    max_layers,
-    section_profile,
+from cleave.timeline_presets.shapes import (
+    INTENSITY_STEP,
+    SHAPES,
+    Part,
+    ShapePace,
+    layer_bounds,
+    part_at,
+    section_parts,
 )
 
 SECTION_BARS_MIN = 1
@@ -72,7 +75,7 @@ SECTION_BARS_WEIGHTS: tuple[tuple[int, float], ...] = (
 )
 SECTION_LONG_WEIGHT = 0.08
 # Section lengths in typed sections, by pace.
-_PACE_BARS_WEIGHTS: dict[SectionPace, tuple[tuple[int, float], ...]] = {
+_PACE_BARS_WEIGHTS: dict[ShapePace, tuple[tuple[int, float], ...]] = {
     "slow": ((2, 0.2), (3, 0.3), (4, 0.5)),
     "normal": SECTION_BARS_WEIGHTS,
     "fast": ((1, 0.9), (2, 0.1)),
@@ -117,7 +120,8 @@ def compose_pattern_mask_timeline(
         )
 
     song_sections = resolve_sections(song_markers, duration_sec)
-    typed = any_typed(song_sections)
+    typed = any(section.typed for section in song_sections)
+    parts = section_parts(song_sections)
     marker_times = [section.start for section in song_sections[1:]]
     bars = thin_bar_times_for_arrange(bar_times, duration_sec)
     sections = partition_pattern_mask_sections(
@@ -133,9 +137,7 @@ def compose_pattern_mask_timeline(
             [_cast_for_slots(opening, rng)],
         )
 
-    conductor = StemConductor.build(
-        signals, slot_stems, sections, density_bias=density_bias
-    )
+    conductor = StemConductor.build(signals, slot_stems, sections)
     beat_period = _beat_period(bars, beat_times)
     n_slots = len(slot_list)
     order = list(slot_list)
@@ -186,7 +188,8 @@ def compose_pattern_mask_timeline(
         at_marker = any(abs(t - start) <= 1e-6 for t in marker_times)
         allow_five = high_energy or density_bias >= 2
         song_section = section_at(song_sections, midpoint)
-        shape = section_profile(song_section)
+        part = part_at(parts, midpoint)
+        shape = None if song_section is None else SHAPES.get(song_section.section_type)
         entering = song_section != prev_song_section
         prev_song_section = song_section
         if entering:
@@ -198,15 +201,9 @@ def compose_pattern_mask_timeline(
                 # A bridge with nothing else to show keeps its layers.
                 if len(avoid) > n_slots - 2:
                     avoid = frozenset()
-        if shape is not None and song_section is not None:
+        if shape is not None and part is not None:
             target = _pick_section_target(
-                rng,
-                song_section,
-                start,
-                midpoint,
-                n_slots,
-                density_bias=density_bias,
-                high_energy=high_energy,
+                rng, part, midpoint, n_slots, density_bias=density_bias
             )
         else:
             target = _pick_target_count(
@@ -217,6 +214,7 @@ def compose_pattern_mask_timeline(
                 budget_gain=budget_gain,
                 near_silent=bool(weights is not None and weights.near_silent),
             )
+            target = _with_intensity(target, song_section, n_slots)
 
         if index == 0:
             picked = _pick_slots(
@@ -269,6 +267,20 @@ def compose_pattern_mask_timeline(
             )
             if at_marker and not added and not removed:
                 added, removed = _swap_one(rng, current, order, weights, airtime)
+            if song_section is not None and song_section.intensity != "normal":
+                lo, hi = layer_bounds(song_section.intensity, n_slots)
+                count = len((current | added) - removed)
+                if not lo <= count <= hi:
+                    # Intensity is a bound, not a tendency.
+                    added, removed = _move_to_target(
+                        rng,
+                        current,
+                        max(lo, min(hi, count)),
+                        order,
+                        weights,
+                        airtime,
+                        avoid,
+                    )
         settled = (current | added) - removed
 
         for t, active, new_slots in _overlap_states(
@@ -356,28 +368,52 @@ def partition_pattern_mask_sections(
 def _pace_weights(
     section: SongSection | None,
 ) -> tuple[tuple[int, float], ...] | None:
-    profile = section_profile(section)
-    return None if profile is None else _PACE_BARS_WEIGHTS[profile.pace]
+    shape = None if section is None else SHAPES.get(section.section_type)
+    return None if shape is None else _PACE_BARS_WEIGHTS[shape.pace]
+
+
+def section_target_range(
+    part: Part, t: float, n_slots: int, density_bias: int
+) -> tuple[float, int, int]:
+    """A typed section's layer count at *t*, as layers mode shapes it.
+
+    Returns the count, which may fall between two, and the fewest and most
+    its intensity allows. A run of same-type markers shares one shape, so a
+    build rises across all of them.
+    """
+    section = part.section
+    shape = SHAPES[section.section_type]
+    first, last = shape.count
+    raw = first + (last - first) * part.progress(t)
+    raw += INTENSITY_STEP[section.intensity] + 0.5 * density_bias
+    lo, hi = layer_bounds(section.intensity, n_slots)
+    return max(lo, min(hi, raw)), lo, hi
 
 
 def _pick_section_target(
     rng: random.Random,
-    section: SongSection,
-    start: float,
+    part: Part,
     midpoint: float,
     n_slots: int,
     *,
     density_bias: int,
-    high_energy: bool,
 ) -> int:
     """Layers for one stretch of a typed section; a build's count only rises."""
-    lo, hi = layer_range(section, start, n_slots, density_bias)
-    if section.section_type == "build":
-        progress = (midpoint - section.start) / max(section.end - section.start, 1e-6)
-        return min(hi, lo + int(progress * (hi - lo + 1)))
-    if section.section_type == "drop" and high_energy and hi == max_layers(n_slots):
-        hi = min(n_slots, hi + 1)
-    return rng.randint(lo, hi)
+    raw, lo, hi = section_target_range(part, midpoint, n_slots, density_bias)
+    whole = math.floor(raw)
+    if SHAPES[part.section.section_type].rising:
+        count = int(math.floor(raw + 0.5))
+    else:
+        count = whole + (1 if rng.random() < raw - whole else 0)
+    return max(lo, min(hi, count))
+
+
+def _with_intensity(target: int, section: SongSection | None, n_slots: int) -> int:
+    """A plain section's own count, moved and bounded by its intensity."""
+    if section is None or section.intensity == "normal":
+        return target
+    lo, hi = layer_bounds(section.intensity, n_slots)
+    return max(lo, min(hi, target + INTENSITY_STEP[section.intensity]))
 
 
 def _move_to_target(

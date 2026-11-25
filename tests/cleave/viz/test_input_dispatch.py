@@ -147,7 +147,7 @@ def test_ctrl_enter_drops_song_marker_from_timeline_context() -> None:
         runtime,
     ) is True
     markers = runtime.seed.session.song_markers
-    assert markers.times == [12.5]
+    assert markers.times == [0.0, 12.5]
     assert markers.selected_index is None
     assert runtime.seed.session.timeline.panel_open is True
     assert runtime.controls.focus_cursor == prior_focus

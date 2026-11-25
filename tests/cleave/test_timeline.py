@@ -1458,3 +1458,45 @@ def test_clip_operations_keep_a_clip_preset_and_split_continues() -> None:
     recast_clips = lane_clips(recast, **kwargs)
     assert clip_starts_preset(recast_clips, recast_clips[1])
     assert recast_clips[1].preset == b
+
+
+def _glide(cues, glide=4.0, fades=TimelineFadeGroup()):
+    return lane_level_breakpoints(
+        TimelineLane(baseline=0.0, cues=cues),
+        inherit=0.0,
+        hard_cut_fades=fades,
+        soft_cut_fades=fades,
+        duration_sec=100.0,
+        glide=glide,
+    )
+
+
+def test_glide_rise_ends_on_the_cue_and_fall_starts_there() -> None:
+    cues = [SlotCue(0.0, 0.5), SlotCue(10.0, 1.0), SlotCue(20.0, 0.25)]
+    assert _glide(cues) == [(0.0, 0.0), (0.0, 0.5), (6.0, 0.5), (10.0, 1.0), (20.0, 1.0), (24.0, 0.25)]
+
+
+def test_glide_stays_inside_short_clips() -> None:
+    cues = [SlotCue(0.0, 0.5), SlotCue(2.0, 1.0), SlotCue(3.0, 0.5), SlotCue(5.0, 0.25)]
+    assert _glide(cues) == [
+        (0.0, 0.0),
+        (0.0, 0.5),
+        (2.0, 1.0),
+        (3.0, 1.0),
+        (5.0, 0.5),
+        (9.0, 0.25),
+    ]
+
+
+def test_glide_ignores_cut_fades_but_entries_keep_them() -> None:
+    fades = TimelineFadeGroup(enabled=True, fade_in=1.0, fade_out=1.0)
+    cues = [SlotCue(10.0, 1.0, cut="soft"), SlotCue(20.0, 0.5, cut="hard"), SlotCue(30.0, 0.0, cut="soft")]
+    points = _glide(cues, fades=fades)
+    assert points[:2] == [(9.0, 0.0), (10.0, 1.0)]
+    assert (20.0, 1.0) in points and (24.0, 0.5) in points
+    assert points[-1] == (30.5, 0.0)
+
+
+def test_glide_off_steps() -> None:
+    cues = [SlotCue(0.0, 0.5), SlotCue(10.0, 1.0)]
+    assert _glide(cues, glide=0.0)[-2:] == [(10.0, 0.5), (10.0, 1.0)]

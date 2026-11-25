@@ -26,7 +26,9 @@ def test_place_marker_insert_sorted() -> None:
 
 def test_place_marker_insert_empty() -> None:
     markers, replaced_index, replaced_time = place_marker((), 12.5)
-    assert markers == (SongMarker(12.5),)
+    # The first marker also starts the song's first section.
+    assert markers == (SongMarker(0.0), SongMarker(12.5))
+    assert place_marker((), 0.0, marker_type="intro")[0] == (SongMarker(0.0, "intro"),)
     assert replaced_index is None
     assert replaced_time is None
 
@@ -105,7 +107,7 @@ def test_place_marker_type_wins_over_a_replaced_marker() -> None:
     markers, *_ = place_marker((SongMarker(10.0, "verse"),), 10.5, marker_type="drop")
     assert markers == (SongMarker(10.5, "drop"),)
     markers, *_ = place_marker((), 4.0, marker_type="intro")
-    assert markers == (SongMarker(4.0, "intro"),)
+    assert markers == (SongMarker(0.0), SongMarker(4.0, "intro"))
     markers, *_ = place_marker(markers, 30.0, marker_type="outro")
     assert markers[-1] == SongMarker(30.0, "outro")
 
@@ -140,3 +142,30 @@ def test_snap_markers_merges_and_maps_indices() -> None:
     )
     assert markers == (SongMarker(4.0, "chorus"), SongMarker(8.0, "verse"))
     assert indices == (0, 0, 1)
+
+
+def test_intensity_survives_replace_and_retype() -> None:
+    markers, *_ = place_marker((SongMarker(10.0, "verse", "calm"),), 10.5)
+    assert markers == (SongMarker(10.5, "verse", "calm"),)
+    markers, *_ = place_marker(markers, 10.5, marker_type="drop")
+    assert markers == (SongMarker(10.5, "drop", "calm"),)
+
+
+def test_snap_merges_type_and_intensity_separately() -> None:
+    markers, _indices = snap_markers(
+        (
+            SongMarker(3.9, intensity="calm"),
+            SongMarker(4.2, "chorus", "intense"),
+            SongMarker(9.0, "verse", "intense"),
+        ),
+        lambda t: round(t / 4.0) * 4.0,
+    )
+    assert markers == (
+        SongMarker(4.0, "chorus", "calm"),
+        SongMarker(8.0, "verse", "intense"),
+    )
+
+
+def test_sections_carry_intensity() -> None:
+    sections = resolve_sections([SongMarker(10.0, "drop", "calm")], 30.0)
+    assert [section.intensity for section in sections] == ["normal", "calm"]

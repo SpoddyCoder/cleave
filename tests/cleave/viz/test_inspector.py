@@ -353,6 +353,7 @@ def test_cue_fades_page_follows_enabled_flags() -> None:
     assert _kinds(build_inspector_rows(state, "timeline.cue_fades")) == [
         RowKind.TIMELINE_HARD_CUTS,
         RowKind.TIMELINE_SOFT_CUTS,
+        RowKind.TIMELINE_GLIDE,
     ]
     state.timeline.hard_cut_fades.enabled = True
     state.timeline.soft_cut_fades.enabled = True
@@ -556,7 +557,8 @@ def test_cue_fades_divider_sits_between_hard_and_soft_cuts() -> None:
         if row.descriptor is not None and row.descriptor.kind == RowKind.TIMELINE_SOFT_CUTS
     )
     assert rows[soft - 1].divider
-    assert sum(row.divider for row in rows) == 2
+    # A third sets glide apart from both.
+    assert sum(row.divider for row in rows) == 3
 
 
 def test_paused_switching_button_moves_below_preset_fields() -> None:

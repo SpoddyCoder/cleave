@@ -1341,6 +1341,7 @@ def test_write_session_snapshot_persists_timeline_disabled_without_cues(
         "bar_phase": 0,
         "show_bar_grid": False,
         "show_preset_names": True,
+        "glide": 4.0,
             "cuts": {
                 "hard": {
                     "enabled": False,
@@ -1360,7 +1361,7 @@ def test_write_session_snapshot_persists_timeline_disabled_without_cues(
 
 def test_write_session_snapshot_leaves_generate_choices_out(tmp_path: Path) -> None:
     cfg, session, out_path = _snapshot_fixture(tmp_path)
-    session.timeline.timeline_preset_kind = "arc"
+    session.timeline.timeline_preset_density = "dense"
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))

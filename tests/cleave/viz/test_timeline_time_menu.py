@@ -61,7 +61,7 @@ def test_drop_song_marker_submenu_drops_at_the_playhead_or_here() -> None:
     playhead.run()
     assert playhead_drops == ["drop"]
     here.run()
-    assert controls.session.song_markers.times == [12.0]
+    assert controls.session.song_markers.times == [0.0, 12.0]
     assert transport.calls == []
 
 
@@ -82,7 +82,7 @@ def test_drop_section_here_drops_a_typed_marker() -> None:
         "outro",
     ]
     section.items[3].run()
-    assert controls.session.song_markers.markers == [SongMarker(12.0, "chorus")]
+    assert controls.session.song_markers.markers == [SongMarker(0.0), SongMarker(12.0, "chorus")]
 
 
 def _marker_entries(controls, *, commands: bool = False):
@@ -104,13 +104,14 @@ def test_marker_items_replace_the_time_items() -> None:
         "timeline.marker.play",
         None,
         "timeline.marker.type",
+        "timeline.marker.intensity",
         "timeline.marker.delete",
     ]
     entries[0].run()
     entries[1].run()
     assert transport.calls == [("seek", 12.2), ("seek", 12.2), ("transport",)]
-    assert entries[4].label == "Delete marker 00:12.20…"
-    assert entries[4].shortcut == "Delete"
+    assert entries[5].label == "Delete marker 00:12.20…"
+    assert entries[5].shortcut == "Delete"
 
 
 def test_unselected_marker_delete_item_shows_no_key() -> None:
@@ -119,9 +120,9 @@ def test_unselected_marker_delete_item_shows_no_key() -> None:
     entries = TimelineTimeMenu(controls, _Transport()).entries(
         12.0, 0.5, commands=False, marker_index=0, marker_selected=False
     )
-    assert entries[4].id == "timeline.marker.delete"
-    assert entries[4].shortcut is None
-    assert entries[4].enabled
+    assert entries[5].id == "timeline.marker.delete"
+    assert entries[5].shortcut is None
+    assert entries[5].enabled
 
 
 def test_marker_type_submenu_checks_and_sets_the_type() -> None:
@@ -147,6 +148,7 @@ def test_recording_disables_marker_edits_but_not_seeking() -> None:
     assert entries[0].enabled is True
     assert entries[3].enabled is False
     assert entries[4].enabled is False
+    assert entries[5].enabled is False
     assert entries[4].hint == "Stop recording to edit markers"
 
 
@@ -227,3 +229,19 @@ def test_locked_timeline_disables_commands_with_a_hint() -> None:
     assert items["timeline.generate"].enabled is False
     assert items["timeline.generate"].hint == "Unlock the timeline to edit"
     assert items["edit.undo"].hint == "Unlock the timeline to edit"
+
+
+def test_marker_intensity_submenu_checks_and_sets_it() -> None:
+    controls = make_controls()
+    controls.session.song_markers.markers = [SongMarker(12.2, "drop")]
+    submenu = _marker_entries(controls)[4]
+    assert submenu.label == "Intensity"
+    assert [(i.label, i.checked) for i in submenu.items] == [
+        ("very calm", False),
+        ("calm", False),
+        ("normal", True),
+        ("intense", False),
+        ("very intense", False),
+    ]
+    submenu.items[1].run()
+    assert controls.session.song_markers.markers == [SongMarker(12.2, "drop", "calm")]

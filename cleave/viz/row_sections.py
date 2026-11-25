@@ -770,6 +770,8 @@ TIMELINE_CUTS_SECTION = SectionDef(
         SectionNode(divider=True),
         SectionNode(leaf_kind=RowKind.TIMELINE_SOFT_CUTS),
         SectionNode(conditional=TIMELINE_SOFT_CUTS_ACTIVE),
+        SectionNode(divider=True),
+        SectionNode(leaf_kind=RowKind.TIMELINE_GLIDE),
         SectionNode(commands=("timeline.set_cut_type",)),
     ),
 )
@@ -859,6 +861,7 @@ TIMELINE_SECTION_KINDS = frozenset(
         RowKind.TIMELINE_SOFT_CUT_FADE_IN,
         RowKind.TIMELINE_SOFT_CUT_FADE_OUT,
         RowKind.TIMELINE_SOFT_CUT_CROSSFADE,
+        RowKind.TIMELINE_GLIDE,
         RowKind.TIMELINE_SET_CUT_TYPE,
         RowKind.TIMELINE_CLIP_HEADER,
         RowKind.TIMELINE_CLIP_START,

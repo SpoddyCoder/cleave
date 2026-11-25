@@ -30,12 +30,16 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Snap song markers on Timeline > Beat / Bar Grid (and in that row's right-click menu) moves the song markers you have already placed to the nearest beat or bar. The dialog says how many move and how many merge. Markers before or after the detected beats stay put, and undo does not cover it.
 - Help on Timeline > Song Markers, and on each marker, has a table of the marker types: what each one means and what Generate timeline does there.
 - The timeline strip shows the song's sections: each marker with a type puts its name on the time ruler and a faint tint on the rows up to the next marker. Themes can set the colours with `song_section_colors`.
+- Each song marker has an intensity: very calm, calm, normal, intense, or very intense. It sets how many layers Generate timeline plays in that section and how bright they are, from one soft layer to three or four near full. Set it with the second dropdown on a marker's row on Timeline > Song Markers, the I key on the row, or Intensity in the marker's right-click menu. The section's tint on the timeline strip is fainter the calmer it is.
+- Timeline > Clip Fades > glide: when two touching clips on one layer have different opacity, the layer glides between them over this many seconds (4 to start with) instead of jumping, whatever their cut. A rise ends on the clip edge, so a drop still lands on its marker. This also changes how existing timelines with touching clips look; set glide to 0 for the old jumps.
+- Generate timeline can set every layer to 100% opacity (layer opacity) and switch every layer to change presets on each clip (change presets), so the brightness and preset changes it plans show as planned. Locked layers are left as they are, and the line under the dialog's title names the layers that will still be below 100% or without preset changes. Ctrl+Z undoes both with the rest of Generate.
+- The first song marker you drop also adds a plain marker at 0:00, so the song opens with a section like the rest. Change or delete it like any other marker.
 - Drop section here, in the right-click menu of the time ruler and timeline rows, drops a song marker with a section type already set.
 
 ### Changed
 
 - Song marker types are now song sections: intro, verse, build, chorus, drop, breakdown, bridge, and outro, with - for a plain marker. They replace begin, sustain, crescendo, and diminuendo. Projects saved with one of those no longer open; the error names the marker to change in `project.yaml`.
-- Generate timeline arranges each section to suit its type, in both modes: how many layers play, how fast they change, and where the arrangement lifts. A build rises into the section after it instead of dropping to one layer, and Arc puts its climax in the last drop or chorus. Songs with only plain markers generate as before.
+- Generate timeline is rebuilt around song sections and intensity, and its character choice (Breathing, Dialogue, Arc, Pulse) is gone. In layers mode one layer leads at full opacity and the others sit back, so the picture stays clear without washing out; layers come in, leave, brighten, and dim one at a time, a bar or two apart, except at markers. Layers that stay on change preset at markers and every few bars, each on its own beat. Back-to-back markers of one type make one longer section: a run of build markers rises once across all of them, keeping each marker's intensity. Plain sections, the opening included, are as busy as the music is loud. Pattern mask mode follows the same sections, runs, and intensities.
 - The bar grid draws over the timeline strip's rows instead of behind them, shows beats when you zoom in and fewer bars when you zoom out, and adds a lane of bar numbers under the time ruler.
 - Layers is now the first section in the navigator, above Overlay, Post-FX, Pattern Mask, and Timeline.
 - Help lists mouse actions and keys apart, under Mouse and Keyboard headings, everywhere it shows controls, with related controls next to each other. Navigation / Global adds Space, Alt+Left/Right, Shift+F10, and F3, and every setting with a list says Enter opens it. The Keyboard Controls title is now Controls.
@@ -87,8 +91,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Set cut type on clips, and the cut type option in Generate timeline, no longer take away clips' presets or make a clip that should change preset carry on with the one before.
 - An error in Generate timeline no longer ends the session. A message says why it failed, and the timeline and preset lists stay as they were.
-- Generate timeline with the Arc character no longer fails when the climax falls where no bars were detected, such as after the last bar.
 - The transport bar's bar number, and dragging it or typing a bar, follow bar phase.
 - Edit > Undo and Redo (Ctrl+Z, Ctrl+Y) now cover bar phase, along with the clips it moves. A quick run of presses is one step.
 - Bar phase can be changed when the timeline has no clips, so you can set it before you start recording.

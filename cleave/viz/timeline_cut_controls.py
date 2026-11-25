@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from dataclasses import replace
 from typing import Literal
 
 from cleave.cut_types import CutType
@@ -82,15 +83,9 @@ def apply_cut_to_lanes(
             else:
                 apply = at_marker
             if apply and cue.cut != cut:
-                new_cues.append(
-                    SlotCue(
-                        t=cue.t,
-                        level=cue.level,
-                        blend=cue.blend,
-                        role=cue.role,
-                        cut=cut,
-                    )
-                )
+                # Only the cut changes: a clip keeps its preset and its link
+                # to the clip before it.
+                new_cues.append(replace(cue, cut=cut))
                 changed = True
                 updated += 1
             else:

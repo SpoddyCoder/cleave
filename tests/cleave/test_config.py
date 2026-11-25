@@ -1476,7 +1476,7 @@ def test_persist_timeline_leaves_generate_choices_out() -> None:
 
     session = TuningSession(
         layer_z_order=list(DEFAULT_LAYER_SLOTS),
-        timeline=TimelineRuntime(enabled=True, timeline_preset_kind="arc"),
+        timeline=TimelineRuntime(enabled=True, timeline_preset_density="dense"),
     )
     cfg = CleaveConfig(
         paths=PathsConfig(preset_root=Path("/tmp"), texture_paths=()),
