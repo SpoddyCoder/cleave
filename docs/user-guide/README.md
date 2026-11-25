@@ -574,7 +574,7 @@ Cleave detects the beat and bar grid when it first prepares a song. On **Timelin
 
 **Snap song markers** on this page moves the markers you have already placed to the nearest beat or bar, which helps when you dropped them with placement snap off. The dialog says how many will move, and how many will merge because they land on the same time. Markers before or after the detected beats stay put, and Ctrl+Z does not undo it.
 
-For bulk clean-up of clips, use **Snap clips** on this page, **Snap clips to markers** on the Song Markers page, and **Set cut type on clips** on the Clip Fades page.
+For bulk clean-up of clips, use **Snap clips** on this page, **Snap clips to markers** at the left of the icon line under the Song Markers page title, and **Set cut type on clips** on the Clip Fades page.
 
 ---
 

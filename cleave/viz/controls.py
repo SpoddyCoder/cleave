@@ -975,7 +975,7 @@ class TuningControls:
             return
         if marker_index is None:
             focus.inspector_cursor = None
-            focus.inspector_command_id = "timeline.snap_to_markers"
+            focus.inspector_command_id = None
         else:
             focus.inspector_cursor = RowDescriptor(
                 RowKind.SONG_MARKER_ITEM,

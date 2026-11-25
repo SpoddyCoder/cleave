@@ -98,6 +98,7 @@ from cleave.viz.row_spec import (
     row_spec,
 )
 from cleave.viz.commands import command_by_id, command_context
+from cleave.viz.inspector_controls import run_inspector_command
 from cleave.viz.theme import palette, set_ui_scale_percent
 from cleave.viz.material_icons import (
     FILE_GLYPH,
@@ -1548,12 +1549,11 @@ def _focus_timeline_snap_cues(controls: TuningControls) -> None:
     _focus_inspector_kind(controls, RowKind.TIMELINE_SNAP_CUES)
 
 
-def _focus_timeline_snap_song_markers(controls: TuningControls) -> None:
-    focus = controls.shell_focus
-    focus.region = ShellRegion.INSPECTOR
-    focus.selected_id = "timeline.song_markers"
-    focus.inspector_cursor = None
-    focus.inspector_command_id = "timeline.snap_to_markers"
+def _open_timeline_snap_song_markers(controls: TuningControls) -> None:
+    """Press the Song Markers page's title button."""
+    controls.shell_focus.region = ShellRegion.INSPECTOR
+    controls.shell_focus.selected_id = "timeline.song_markers"
+    run_inspector_command(controls, "timeline.snap_to_markers")
 
 
 def _focus_timeline_set_cut_type(controls: TuningControls) -> None:
@@ -1578,7 +1578,6 @@ def _confirm_snap_song_markers(
     proximity_label: str = "5.0s",
     scope_label: str = "All Layers",
 ) -> None:
-    _press_focused(controls, keydown(pygame.K_RETURN))
     _set_form_field(controls, "proximity", proximity_label)
     _set_form_field(controls, "layers", scope_label)
     choose_modal_option(controls, "Snap clips")
@@ -2435,8 +2434,7 @@ def test_snap_to_markers_opens_one_form_with_proximity_and_layers() -> None:
     controls.session.timeline.lanes = {
         "layer_1": _lane(None, (9.0, True)),
     }
-    _focus_timeline_snap_song_markers(controls)
-    assert _press_focused(controls, keydown(pygame.K_RETURN)) is True
+    _open_timeline_snap_song_markers(controls)
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
     assert modal_view.kind == ModalKind.FORM
@@ -2458,8 +2456,7 @@ def test_snap_form_hides_marker_fields_for_beats() -> None:
     controls = make_controls(("layer_1",), beat_times=(0.0, 1.0))
     controls.session.song_markers.times = [10.0]
     controls.session.timeline.lanes = {"layer_1": _lane(None, (9.0, True))}
-    _focus_timeline_snap_song_markers(controls)
-    _press_focused(controls, keydown(pygame.K_RETURN))
+    _open_timeline_snap_song_markers(controls)
     _set_form_field(controls, "snap to", "beats")
     modal_view = controls.modal_host.view_state()
     assert [row.label for row in modal_view.form_rows] == ["snap to"]
@@ -2472,7 +2469,7 @@ def test_timeline_snap_song_markers_layer_mutates_only_that_lane() -> None:
         "layer_1": _lane(None, (4.0, True)),
         "layer_2": _lane(None, (4.2, False)),
     }
-    _focus_timeline_snap_song_markers(controls)
+    _open_timeline_snap_song_markers(controls)
     _confirm_snap_song_markers(controls, scope_label="Layer 1")
     assert not controls.modal_host.active
     assert controls.session.timeline.lanes["layer_1"].cues == [
@@ -2492,7 +2489,7 @@ def test_timeline_snap_song_markers_each_layer_vs_closest_wins() -> None:
         "layer_1": _lane(None, (4.5, True)),
         "layer_2": _lane(None, (4.8, False)),
     }
-    _focus_timeline_snap_song_markers(controls)
+    _open_timeline_snap_song_markers(controls)
     _confirm_snap_song_markers(controls, scope_label="All Layers")
     assert controls.session.timeline.lanes["layer_1"].cues == [
         SlotCue(t=5.0, level=1.0),
@@ -2507,7 +2504,7 @@ def test_timeline_snap_song_markers_each_layer_vs_closest_wins() -> None:
         "layer_1": _lane(None, (4.5, True)),
         "layer_2": _lane(None, (4.8, False)),
     }
-    _focus_timeline_snap_song_markers(controls)
+    _open_timeline_snap_song_markers(controls)
     _confirm_snap_song_markers(controls, scope_label="Closest Wins")
     assert controls.session.timeline.lanes["layer_1"].cues == [
         SlotCue(t=4.5, level=1.0),
@@ -2525,8 +2522,7 @@ def test_timeline_snap_song_markers_recording_blocks() -> None:
     prior = {"layer_1": _lane(None, (4.0, True))}
     controls.session.timeline.lanes = dict(prior)
     controls.session.timeline.recording = True
-    _focus_timeline_snap_song_markers(controls)
-    assert _press_focused(controls, keydown(pygame.K_RETURN)) is True
+    _open_timeline_snap_song_markers(controls)
     assert not controls.modal_host.active
     assert controls.session.timeline.lanes == prior
     view = controls.build_view_state(paused=False)
@@ -2539,8 +2535,7 @@ def test_timeline_snap_song_markers_no_markers_notifies() -> None:
     controls.session.timeline.lanes = {
         "layer_1": _lane(None, (4.0, True)),
     }
-    _focus_timeline_snap_song_markers(controls)
-    assert _press_focused(controls, keydown(pygame.K_RETURN)) is True
+    _open_timeline_snap_song_markers(controls)
     assert not controls.modal_host.active
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "No song markers to snap to"
@@ -2550,8 +2545,7 @@ def test_timeline_snap_song_markers_no_cues_notifies() -> None:
     controls = make_controls(("layer_1",))
     controls.session.song_markers.times = [5.0]
     controls.session.timeline.lanes = {}
-    _focus_timeline_snap_song_markers(controls)
-    assert _press_focused(controls, keydown(pygame.K_RETURN)) is True
+    _open_timeline_snap_song_markers(controls)
     assert not controls.modal_host.active
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "No timeline clips to snap"
@@ -2563,7 +2557,7 @@ def test_timeline_snap_song_markers_uses_proximity() -> None:
     controls.session.timeline.lanes = {
         "layer_1": _lane(None, (3.0, True)),
     }
-    _focus_timeline_snap_song_markers(controls)
+    _open_timeline_snap_song_markers(controls)
     _confirm_snap_song_markers(controls, proximity_label="1.0s")
     assert controls.session.timeline.lanes["layer_1"].cues == [
         SlotCue(t=3.0, level=1.0),

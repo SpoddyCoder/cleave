@@ -712,10 +712,9 @@ TIMELINE_ROW_SECTION = SectionDef(
 SONG_MARKERS_SECTION = SectionDef(
     header_kind=RowKind.SONG_MARKERS_HEADER,
     context="global",
-    children=(
-        SectionNode(commands=("timeline.snap_to_markers",)),
-    ),
+    children=(),
     append_dynamic_children=_append_song_marker_rows,
+    title_command="timeline.snap_to_markers",
 )
 
 BEAT_BAR_GRID_SECTION = SectionDef(

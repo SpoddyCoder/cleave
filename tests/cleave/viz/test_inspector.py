@@ -366,18 +366,17 @@ def test_cue_fades_page_follows_enabled_flags() -> None:
     ]
 
 
-def test_song_markers_page_is_snap_and_marker_rows() -> None:
+def test_song_markers_page_is_marker_rows_with_snap_in_title() -> None:
     state = _view_state()
     state.timeline.song_marker_times = (1.0, 4.0, 9.0)
     rows = build_inspector_rows(state, "timeline.song_markers")
     kinds = _kinds(rows)
 
-    assert rows[-1].command_ids == ("timeline.snap_to_markers",)
-    assert rows[-2].divider
-    assert all(not row.command_ids for row in rows[:-1])
+    assert page_title_command(state, "timeline.song_markers") == "timeline.snap_to_markers"
+    assert all(not row.command_ids and not row.divider for row in rows)
     markers = [
         row.descriptor
-        for row in rows[:-2]
+        for row in rows
         if row.descriptor.kind is RowKind.SONG_MARKER_ITEM
     ]
     assert [desc.marker_index for desc in markers] == [0, 1, 2]
@@ -524,7 +523,6 @@ def test_layer_missing_from_view_state_has_no_rows(page: str | None) -> None:
         "timeline",
         "timeline.grid",
         "timeline.cue_fades",
-        "timeline.song_markers",
         "layers",
     ),
 )

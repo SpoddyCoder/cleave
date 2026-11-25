@@ -21,7 +21,7 @@ from cleave.viz.commands import (
 )
 from cleave.viz.focus_nav import MainFocus, TimelineFocus
 from cleave.viz.help_content import help_focus_descriptor
-from cleave.viz.inspector import build_inspector_rows
+from cleave.viz.inspector import build_inspector_rows, page_title_command
 from cleave.viz.modal import ModalKind
 from cleave.viz.navigator import layer_node_id
 from cleave.viz.row_kinds import RowDescriptor, RowKind
@@ -968,7 +968,7 @@ def test_inspector_only_timeline_actions_are_not_menu_commands() -> None:
 
     view = controls.build_view_state(paused=False)
     marker_rows = build_inspector_rows(view, "timeline.song_markers")
-    assert marker_rows[-1].command_ids == ("timeline.snap_to_markers",)
+    assert page_title_command(view, "timeline.song_markers") == "timeline.snap_to_markers"
     marker = next(
         row
         for row in marker_rows
