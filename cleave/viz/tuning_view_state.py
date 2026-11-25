@@ -76,6 +76,7 @@ from cleave.config_schema.timeline import (
     DEFAULT_TIMELINE_BAR_PHASE,
     DEFAULT_TIMELINE_PLACEMENT_SNAP,
     DEFAULT_TIMELINE_SHOW_BAR_GRID,
+    DEFAULT_TIMELINE_SHOW_PRESET_NAMES,
 )
 from cleave.preset_library import PresetLibrary
 from cleave.viz.preset_schedule import timer_first_times
@@ -399,6 +400,7 @@ class TimelineBlock:
     enabled: bool = DEFAULT_TIMELINE_ENABLED
     bar_phase_offset: int = DEFAULT_TIMELINE_BAR_PHASE
     show_bar_grid: bool = DEFAULT_TIMELINE_SHOW_BAR_GRID
+    show_preset_names: bool = DEFAULT_TIMELINE_SHOW_PRESET_NAMES
     placement_snap: str = DEFAULT_TIMELINE_PLACEMENT_SNAP
     hard_cut_fades: TimelineFadeGroupBlock = field(
         default_factory=default_hard_timeline_fade_group_block
@@ -424,6 +426,7 @@ class TimelineBlock:
             enabled=tl.enabled,
             bar_phase_offset=tl.bar_phase_offset,
             show_bar_grid=tl.show_bar_grid,
+            show_preset_names=tl.show_preset_names,
             placement_snap=tl.placement_snap,
             hard_cut_fades=TimelineFadeGroupBlock.from_runtime(tl.hard_cut_fades),
             soft_cut_fades=TimelineFadeGroupBlock.from_runtime(tl.soft_cut_fades),

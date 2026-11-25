@@ -458,7 +458,7 @@ def build_static_panel(
                 alpha=SOFT_TICK_ALPHA if soft else CUE_TICK_ALPHA,
                 width=SOFT_TICK_WIDTH if soft else CUE_TICK_WIDTH,
             )
-        for label in labels:
+        for label in labels if state.show_preset_names else ():
             _draw_clip_label(
                 panel,
                 font,

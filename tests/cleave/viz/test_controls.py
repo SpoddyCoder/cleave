@@ -2289,6 +2289,20 @@ def test_timeline_bar_grid_right_shows_left_hides() -> None:
     assert "hide" in _row_text(view, grid_row)
 
 
+def test_timeline_preset_names_left_hides_right_shows() -> None:
+    controls = make_controls(("layer_1",))
+    _focus_inspector_kind(controls, RowKind.TIMELINE_PRESET_NAMES)
+    row = RowDescriptor(RowKind.TIMELINE_PRESET_NAMES)
+    assert "show" in _row_text(controls.build_view_state(paused=False), row)
+
+    assert _press_focused(controls, keydown(pygame.K_LEFT)) is True
+    assert controls.session.timeline.show_preset_names is False
+    assert "hide" in _row_text(controls.build_view_state(paused=False), row)
+
+    assert _press_focused(controls, keydown(pygame.K_RIGHT)) is True
+    assert controls.session.timeline.show_preset_names is True
+
+
 def test_timeline_bar_phase_left_wraps_offset() -> None:
     controls = make_controls(
         ("layer_1",),

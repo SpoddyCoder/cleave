@@ -346,6 +346,7 @@ def build_timeline_view_state(
         submenu_focused=submenu_focused,
         arm_flash_start_ms=dict(tl.arm_flash_start_ms),
         show_bar_grid=tl.show_bar_grid,
+        show_preset_names=tl.show_preset_names,
         bar_grid_times=phased_bar_times(
             bar_times, beat_times, tl.bar_phase_offset
         ),

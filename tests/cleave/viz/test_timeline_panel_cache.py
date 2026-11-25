@@ -98,6 +98,13 @@ def test_static_signature_changes_on_show_bar_grid() -> None:
     assert _static_sig(hidden) != _static_sig(shown)
 
 
+def test_static_signature_changes_on_show_preset_names() -> None:
+    shown = strip_view_state()
+    hidden = strip_view_state()
+    hidden.show_preset_names = False
+    assert _static_sig(shown) != _static_sig(hidden)
+
+
 def test_static_signature_changes_on_bar_grid_times() -> None:
     phase0 = strip_view_state(show_bar_grid=True, bar_grid_times=(0.0, 4.0))
     phase1 = strip_view_state(show_bar_grid=True, bar_grid_times=(1.0, 5.0))

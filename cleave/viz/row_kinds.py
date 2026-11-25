@@ -115,6 +115,7 @@ class RowKind(Enum):
     TIMELINE_HEADER = auto()
     TIMELINE_ENABLED = auto()
     TIMELINE_LOCKED = auto()
+    TIMELINE_PRESET_NAMES = auto()
     TIMELINE_GENERATE = auto()
     TIMELINE_RESET = auto()
     TIMELINE_BEAT_BAR_GRID_HEADER = auto()

@@ -53,6 +53,7 @@ class TimelineViewState:
     arm_flash_start_ms: dict[str, int] = field(default_factory=dict)
     show_bar_grid: bool = False
     bar_grid_times: tuple[float, ...] = ()
+    show_preset_names: bool = True
     beat_grid_times: tuple[float, ...] = ()
     song_marker_times: tuple[float, ...] = ()
     selected_song_marker_index: int | None = None

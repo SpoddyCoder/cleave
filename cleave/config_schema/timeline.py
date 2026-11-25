@@ -50,6 +50,7 @@ DEFAULT_TIMELINE_PLACEMENT_SNAP: TimelinePlacementSnap = "beat"
 TIMELINE_BAR_PHASE_BEATS = 4
 DEFAULT_TIMELINE_BAR_PHASE = 0
 DEFAULT_TIMELINE_SHOW_BAR_GRID = False
+DEFAULT_TIMELINE_SHOW_PRESET_NAMES = True
 
 
 def step_timeline_placement_snap(
@@ -160,6 +161,9 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
     show_bar_grid = bool(
         timeline_map.get("show_bar_grid", DEFAULT_TIMELINE_SHOW_BAR_GRID)
     )
+    show_preset_names = bool(
+        timeline_map.get("show_preset_names", DEFAULT_TIMELINE_SHOW_PRESET_NAMES)
+    )
     cuts_raw = timeline_map.get("cuts")
     if cuts_raw is None:
         cuts = TimelineCutsConfig()
@@ -189,6 +193,7 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
             placement_snap=placement_snap,
             bar_phase=bar_phase,
             show_bar_grid=show_bar_grid,
+            show_preset_names=show_preset_names,
         )
     lanes_map = as_mapping(lanes_raw, "timeline.lanes")
     if ctx.layer_slots is None:
@@ -278,6 +283,7 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
         placement_snap=placement_snap,
         bar_phase=bar_phase,
         show_bar_grid=show_bar_grid,
+        show_preset_names=show_preset_names,
     )
 
 
@@ -298,6 +304,7 @@ def persist_timeline(ctx: PersistCtx) -> dict[str, Any]:
         "placement_snap": runtime.placement_snap,
         "bar_phase": runtime.bar_phase_offset,
         "show_bar_grid": runtime.show_bar_grid,
+        "show_preset_names": runtime.show_preset_names,
         "cuts": {
             "hard": _persist_timeline_fade_group(runtime.hard_cut_fades),
             "soft": _persist_timeline_fade_group(runtime.soft_cut_fades),

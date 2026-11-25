@@ -77,6 +77,7 @@ from cleave.config_schema.timeline import (
     DEFAULT_TIMELINE_BAR_PHASE,
     DEFAULT_TIMELINE_PLACEMENT_SNAP,
     DEFAULT_TIMELINE_SHOW_BAR_GRID,
+    DEFAULT_TIMELINE_SHOW_PRESET_NAMES,
     TimelinePlacementSnap,
 )
 from cleave.stems import DEFAULT_STEM_COUNT, StemSource, stem_sources
@@ -365,6 +366,7 @@ class TimelineRuntime:
     strip_view: StripView = field(default_factory=StripView)
     bar_phase_offset: int = DEFAULT_TIMELINE_BAR_PHASE
     show_bar_grid: bool = DEFAULT_TIMELINE_SHOW_BAR_GRID
+    show_preset_names: bool = DEFAULT_TIMELINE_SHOW_PRESET_NAMES
     placement_snap: TimelinePlacementSnap = DEFAULT_TIMELINE_PLACEMENT_SNAP
     timeline_preset_kind: str = DEFAULT_TIMELINE_PRESET_KIND
     timeline_preset_density: TimelinePresetDensity = DEFAULT_TIMELINE_PRESET_DENSITY
@@ -723,6 +725,11 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
     show_bar_grid = (
         DEFAULT_TIMELINE_SHOW_BAR_GRID if timeline is None else timeline.show_bar_grid
     )
+    show_preset_names = (
+        DEFAULT_TIMELINE_SHOW_PRESET_NAMES
+        if timeline is None
+        else timeline.show_preset_names
+    )
     lanes: dict[str, TimelineLane] = {}
     for slot in cfg.layer_z_order:
         if slot in source_lanes:
@@ -738,6 +745,7 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
             placement_snap=placement_snap,
             bar_phase_offset=bar_phase,
             show_bar_grid=show_bar_grid,
+            show_preset_names=show_preset_names,
         )
     return TimelineRuntime(
         enabled=enabled,
@@ -747,6 +755,7 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
         placement_snap=placement_snap,
         bar_phase_offset=bar_phase,
         show_bar_grid=show_bar_grid,
+        show_preset_names=show_preset_names,
         hard_cut_fades=_fade_group_runtime_from_cfg(cuts.hard),
         soft_cut_fades=_fade_group_runtime_from_cfg(cuts.soft),
     )

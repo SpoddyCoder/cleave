@@ -1394,6 +1394,7 @@ def test_persist_timeline_placement_snap_round_trip() -> None:
             placement_snap="bar",
             bar_phase_offset=3,
             show_bar_grid=True,
+            show_preset_names=False,
         ),
     )
     cfg = CleaveConfig(
@@ -1419,6 +1420,7 @@ def test_persist_timeline_placement_snap_round_trip() -> None:
     runtime = timeline_runtime_from_cfg(replace(cfg, timeline=round_trip))
     assert runtime.bar_phase_offset == 3
     assert runtime.show_bar_grid is True
+    assert runtime.show_preset_names is False
 
 
 def test_persist_post_fx_limiter_round_trip() -> None:

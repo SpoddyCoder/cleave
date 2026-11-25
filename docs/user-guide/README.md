@@ -477,6 +477,8 @@ While the timeline is on, every row shows what its layer's presets do, depending
 
 Names are shortened to fit, and a clip whose opacity is too low to hold a line of text shows none. Hover over a clip to see the full name. With the timeline off, only each clip layers show names on the strip.
 
+To take the names and hooked arrows (red ones too) off the strip, set **preset names on clips** to hide on the **Timeline** page. The lines between presets stay, and hovering over a clip still shows its preset.
+
 The timer follows the song, including while the layer is off, so a preset whose time falls wholly in a gap is not seen, and a short list starts again from the top. Right-click a timer layer's clip to **Replace preset** (the list entry that plays where you clicked) or **Convert to each clip** (below).
 
 #### Choosing a preset for each clip

@@ -1340,6 +1340,7 @@ def test_write_session_snapshot_persists_timeline_disabled_without_cues(
         "placement_snap": "beat",
         "bar_phase": 0,
         "show_bar_grid": False,
+        "show_preset_names": True,
             "cuts": {
                 "hard": {
                     "enabled": False,

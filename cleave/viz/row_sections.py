@@ -818,6 +818,7 @@ TIMELINE_PAGE_SECTION = SectionDef(
     children=(
         SectionNode(leaf_kind=RowKind.TIMELINE_ENABLED),
         SectionNode(leaf_kind=RowKind.TIMELINE_LOCKED),
+        SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_NAMES),
         SectionNode(commands=("timeline.generate", "timeline.reset")),
     ),
 )
@@ -838,6 +839,7 @@ TIMELINE_SECTION_KINDS = frozenset(
         RowKind.TIMELINE_HEADER,
         RowKind.TIMELINE_ENABLED,
         RowKind.TIMELINE_LOCKED,
+        RowKind.TIMELINE_PRESET_NAMES,
         RowKind.SONG_MARKERS_HEADER,
         RowKind.SONG_MARKER_ITEM,
         RowKind.TIMELINE_GENERATE,

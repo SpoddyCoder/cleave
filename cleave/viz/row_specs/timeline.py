@@ -72,9 +72,9 @@ def _apply_timeline_bar_phase(
 def _format_timeline_bar_grid(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return _bar_grid_display(state.timeline.show_bar_grid)
+    return _show_hide_display(state.timeline.show_bar_grid)
 
-def _bar_grid_display(show: bool) -> str:
+def _show_hide_display(show: bool) -> str:
     return "show" if show else "hide"
 
 def _apply_timeline_bar_grid(
@@ -84,6 +84,19 @@ def _apply_timeline_bar_grid(
     _large: bool,
 ) -> None:
     controls.session.timeline.show_bar_grid = forward
+
+def _format_timeline_preset_names(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return _show_hide_display(state.timeline.show_preset_names)
+
+def _apply_timeline_preset_names(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _large: bool,
+) -> None:
+    controls.session.timeline.show_preset_names = forward
 
 def _format_timeline_placement_snap(
     state: TuningViewState, _desc: RowDescriptor
@@ -689,6 +702,24 @@ SPECS: dict[RowKind, RowSpec] = {
         ),
         blocked_by_section_lock=False,
     ),
+    RowKind.TIMELINE_PRESET_NAMES: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="preset names on clips",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_timeline_preset_names,
+        apply_horizontal=_apply_timeline_preset_names,
+        choice=bool_choice(
+            lambda s, _d: s.timeline.show_preset_names, _show_hide_display
+        ),
+        help_title="Preset Names On Clips",
+        help_entries=(
+            ("Left/Right", "hide / show"),
+        ),
+        help_description=(
+            "Shows each clip's preset name, or the hooked arrow on a clip that continues the preset before it. When hidden, hover over a clip to see its preset.",
+        ),
+        blocked_by_section_lock=True,
+    ),
     RowKind.TIMELINE_GENERATE: RowSpec(
         affordance=RowAffordance.COMMAND,
         panel_label="Generate timeline…",
@@ -762,7 +793,7 @@ SPECS: dict[RowKind, RowSpec] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_timeline_bar_grid,
         apply_horizontal=_apply_timeline_bar_grid,
-        choice=bool_choice(lambda s, _d: s.timeline.show_bar_grid, _bar_grid_display),
+        choice=bool_choice(lambda s, _d: s.timeline.show_bar_grid, _show_hide_display),
         help_title="Bar Grid",
         help_entries=(
             ("Left/Right", "hide / show"),

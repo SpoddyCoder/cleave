@@ -72,6 +72,7 @@ class TimelineStaticSignature:
     panel_h: int
     visibility_bucket: int
     show_bar_grid: bool
+    show_preset_names: bool
     bar_grid_times: tuple[float, ...]
     beat_grid_times: tuple[float, ...]
     song_marker_times: tuple[float, ...]
@@ -190,6 +191,7 @@ def timeline_static_signature(
         panel_h=panel_h,
         visibility_bucket=visibility_bucket(visibility),
         show_bar_grid=state.show_bar_grid,
+        show_preset_names=state.show_preset_names,
         bar_grid_times=state.bar_grid_times,
         beat_grid_times=state.beat_grid_times,
         song_marker_times=state.song_marker_times,

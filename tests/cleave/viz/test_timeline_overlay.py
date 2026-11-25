@@ -2077,3 +2077,39 @@ def test_band_height_makes_room_for_the_bar_lane() -> None:
         timeline_band_height_px(2, bar_lane=True) - timeline_band_height_px(2)
         == layout.bar_lane_h
     )
+
+
+def test_hidden_preset_names_draw_no_names_or_continue_arrows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from dataclasses import replace
+
+    from cleave.viz.preset_schedule import RowPresets
+
+    pygame.init()
+    # The first clip names what the row does; the second shows the arrow.
+    state = strip_view_state(
+        lanes={
+            "layer_1": TimelineLane(
+                baseline=1.0,
+                cues=[SlotCue(t=40.0, level=0.0), SlotCue(t=60.0, level=1.0)],
+            )
+        },
+        layer_z_order=["layer_1"],
+        submenu_focused=False,
+    )
+    state = replace(state, presets={"layer_1": RowPresets("off", layer_preset="x.milk")})
+    calls: list[object] = []
+    monkeypatch.setattr(
+        "cleave.viz.timeline_strip_static._draw_clip_label",
+        lambda *a, **k: calls.append(a),
+    )
+
+    def draw(view) -> int:
+        calls.clear()
+        surface = pygame.Surface((1280, 400), pygame.SRCALPHA)
+        TimelineOverlay().draw(surface, view, timeline_rect=(0, 100, 1280, 300))
+        return len(calls)
+
+    assert draw(state) == 2
+    assert draw(replace(state, show_preset_names=False)) == 0

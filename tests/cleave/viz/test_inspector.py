@@ -96,10 +96,17 @@ def test_parents_and_unknown_ids_have_no_rows(node_id: str) -> None:
             ),
         ),
         ("post_fx", (RowKind.POST_FX_LOCKED,)),
-        ("timeline", (RowKind.TIMELINE_ENABLED, RowKind.TIMELINE_LOCKED)),
+        (
+            "timeline",
+            (
+                RowKind.TIMELINE_ENABLED,
+                RowKind.TIMELINE_LOCKED,
+                RowKind.TIMELINE_PRESET_NAMES,
+            ),
+        ),
     ),
 )
-def test_root_pages_list_only_their_switches(
+def test_root_pages_list_their_own_rows(
     node_id: str, kinds: tuple[RowKind, ...]
 ) -> None:
     rows = build_inspector_rows(_view_state(), node_id)
