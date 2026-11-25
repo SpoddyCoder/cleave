@@ -35,7 +35,7 @@ from cleave.blend_modes import BlendMode
 from cleave.cue_roles import CUE_ROLE_BLEND, CueRole
 from cleave.stems import StemSource
 from cleave.signals import Signals
-from cleave.song_markers import SongMarker, SongMarkerType
+from cleave.song_markers import SongMarker, SongSection, resolve_sections, section_at
 from cleave.timeline import (
     LEVEL_EPS,
     SlotCue,
@@ -51,6 +51,13 @@ from cleave.timeline_presets.conductor import (
 )
 from cleave.timeline_presets.emit import cues_from_states, levels_from_active
 from cleave.timeline_presets.grid import thin_bar_times_for_arrange
+from cleave.timeline_presets.sections import (
+    SectionPace,
+    any_typed,
+    layer_range,
+    max_layers,
+    section_profile,
+)
 
 SECTION_BARS_MIN = 1
 SECTION_BARS_MAX = 4
@@ -64,6 +71,12 @@ SECTION_BARS_WEIGHTS: tuple[tuple[int, float], ...] = (
     (4, 0.06),
 )
 SECTION_LONG_WEIGHT = 0.08
+# Section lengths in typed sections, by pace.
+_PACE_BARS_WEIGHTS: dict[SectionPace, tuple[tuple[int, float], ...]] = {
+    "slow": ((2, 0.2), (3, 0.3), (4, 0.5)),
+    "normal": SECTION_BARS_WEIGHTS,
+    "fast": ((1, 0.9), (2, 0.1)),
+}
 
 _MIN_STATE_GAP = 1e-3
 _HIGH_ENERGY_GAIN = 1.15
@@ -86,7 +99,6 @@ def compose_pattern_mask_timeline(
     duration_sec: float,
     rng: random.Random,
     bar_times: Sequence[float],
-    song_marker_times: Sequence[float] = (),
     song_markers: Sequence[SongMarker] = (),
     density_bias: int = 0,
     signals: Signals | None = None,
@@ -104,12 +116,15 @@ def compose_pattern_mask_timeline(
             [_cast_for_slots(slot_list, rng)],
         )
 
-    markers = _normalized_markers(song_markers, song_marker_times, duration_sec)
-    marker_times = [m.time for m in markers]
+    song_sections = resolve_sections(song_markers, duration_sec)
+    typed = any_typed(song_sections)
+    marker_times = [section.start for section in song_sections[1:]]
     bars = thin_bar_times_for_arrange(bar_times, duration_sec)
     sections = partition_pattern_mask_sections(
-        bars, duration_sec, rng, marker_times
+        bars, duration_sec, rng, marker_times, song_sections
     )
+    if not sections and typed:
+        sections = [(section.start, section.end) for section in song_sections]
     if not sections:
         opening = frozenset(slot_list[:1])
         return cues_from_states(
@@ -134,6 +149,8 @@ def compose_pattern_mask_timeline(
     casts: list[dict[str, tuple[CueRole, BlendMode]]] = []
     recasts: list[tuple[str, float, CueRole]] = []
     last_t = -1.0
+    avoid: frozenset[str] = frozenset()
+    prev_song_section: SongSection | None = None
 
     def _emit(
         t: float,
@@ -166,33 +183,40 @@ def compose_pattern_mask_timeline(
         weights = None if conductor is None else conductor.phrase_at(midpoint)
         budget_gain = 1.0 if weights is None else weights.budget_gain
         high_energy = budget_gain >= _HIGH_ENERGY_GAIN
-        marker_type = _marker_type_at(start, markers)
-        next_start = sections[index + 1][0] if index + 1 < len(sections) else None
-        next_marker = (
-            _marker_type_at(next_start, markers) if next_start is not None else None
-        )
-        at_begin = marker_type == "begin"
-        at_crescendo = marker_type == "crescendo"
-        next_crescendo = next_marker == "crescendo"
-        near_diminuendo = (
-            marker_type == "diminuendo" or next_marker == "diminuendo"
-        )
-        at_marker = marker_type is not None
-        allow_five = (
-            next_crescendo or at_crescendo or high_energy or density_bias >= 2
-        )
-        target = _pick_target_count(
-            rng,
-            n_slots,
-            density_bias=density_bias,
-            at_begin=at_begin,
-            at_crescendo=at_crescendo,
-            next_crescendo=next_crescendo,
-            near_diminuendo=near_diminuendo,
-            allow_five=allow_five,
-            budget_gain=budget_gain,
-            near_silent=bool(weights is not None and weights.near_silent),
-        )
+        at_marker = any(abs(t - start) <= 1e-6 for t in marker_times)
+        allow_five = high_energy or density_bias >= 2
+        song_section = section_at(song_sections, midpoint)
+        shape = section_profile(song_section)
+        entering = song_section != prev_song_section
+        prev_song_section = song_section
+        if entering:
+            avoid = frozenset()
+            if song_section is not None and song_section.section_type == "bridge":
+                avoid = frozenset(
+                    slot for slot, role in current_roles.items() if role == "lead"
+                )
+                # A bridge with nothing else to show keeps its layers.
+                if len(avoid) > n_slots - 2:
+                    avoid = frozenset()
+        if shape is not None and song_section is not None:
+            target = _pick_section_target(
+                rng,
+                song_section,
+                start,
+                midpoint,
+                n_slots,
+                density_bias=density_bias,
+                high_energy=high_energy,
+            )
+        else:
+            target = _pick_target_count(
+                rng,
+                n_slots,
+                density_bias=density_bias,
+                allow_five=allow_five,
+                budget_gain=budget_gain,
+                near_silent=bool(weights is not None and weights.near_silent),
+            )
 
         if index == 0:
             picked = _pick_slots(
@@ -220,28 +244,31 @@ def compose_pattern_mask_timeline(
             _accumulate_airtime(airtime, current, end - start)
             continue
 
-        action = _pick_action(
-            rng,
-            len(current),
-            target,
-            n_slots,
-            at_marker=at_marker,
-            next_crescendo=next_crescendo,
-        )
-        added, removed = _resolve_mutation(
-            rng,
-            current,
-            action,
-            target,
-            order,
-            weights,
-            airtime,
-            allow_five=allow_five,
-            at_marker=at_marker,
-            drop_to_one=at_begin or at_crescendo,
-        )
-        if at_marker and not added and not removed:
-            added, removed = _swap_one(rng, current, order, weights, airtime)
+        if shape is not None:
+            added, removed = _move_to_target(
+                rng, current, target, order, weights, airtime, avoid
+            )
+        else:
+            action = _pick_action(
+                rng,
+                len(current),
+                target,
+                n_slots,
+                at_marker=at_marker,
+            )
+            added, removed = _resolve_mutation(
+                rng,
+                current,
+                action,
+                target,
+                order,
+                weights,
+                airtime,
+                allow_five=allow_five,
+                at_marker=at_marker,
+            )
+            if at_marker and not added and not removed:
+                added, removed = _swap_one(rng, current, order, weights, airtime)
         settled = (current | added) - removed
 
         for t, active, new_slots in _overlap_states(
@@ -256,7 +283,7 @@ def compose_pattern_mask_timeline(
             beat_times,
             beat_period,
             transition_duration=transition_duration,
-            at_marker=at_marker,
+            in_one_step=at_marker or shape is not None,
         ):
             _emit(t, active, new_slots=new_slots, force_t=at_marker)
 
@@ -290,11 +317,12 @@ def partition_pattern_mask_sections(
     duration_sec: float,
     rng: random.Random,
     song_marker_times: Sequence[float] = (),
+    song_sections: Sequence[SongSection] = (),
 ) -> list[tuple[float, float]]:
     """Split the song into short sections; song markers always cut.
 
     Common lengths are 1-2 bars, with occasional 3-4. At most one section
-    per song may be 6-8 bars.
+    per song may be 6-8 bars. Typed *song_sections* follow their own pace.
     """
     markers = [
         float(t) for t in song_marker_times if 0.0 < float(t) < duration_sec
@@ -302,7 +330,11 @@ def partition_pattern_mask_sections(
     long_used = False
     if not markers:
         sections, _long_used = _partition_on_bars(
-            bars, duration_sec, rng, long_used
+            bars,
+            duration_sec,
+            rng,
+            long_used,
+            _pace_weights(section_at(song_sections, 0.0)),
         )
         return sections
 
@@ -310,41 +342,80 @@ def partition_pattern_mask_sections(
     for sec_start, sec_end in _section_bounds(markers, duration_sec):
         section_bars = [t for t in bars if sec_start <= t < sec_end]
         chunk, long_used = _partition_in_section(
-            section_bars, sec_start, sec_end, rng, long_used
+            section_bars,
+            sec_start,
+            sec_end,
+            rng,
+            long_used,
+            _pace_weights(section_at(song_sections, sec_start)),
         )
         sections.extend(chunk)
     return sections
 
 
-def _normalized_markers(
-    song_markers: Sequence[SongMarker],
-    song_marker_times: Sequence[float],
-    duration_sec: float,
-) -> list[SongMarker]:
-    by_time: dict[float, SongMarker] = {}
-    source: Sequence[SongMarker]
-    if song_markers:
-        source = song_markers
-    else:
-        source = tuple(
-            SongMarker(float(t), "standard") for t in song_marker_times
+def _pace_weights(
+    section: SongSection | None,
+) -> tuple[tuple[int, float], ...] | None:
+    profile = section_profile(section)
+    return None if profile is None else _PACE_BARS_WEIGHTS[profile.pace]
+
+
+def _pick_section_target(
+    rng: random.Random,
+    section: SongSection,
+    start: float,
+    midpoint: float,
+    n_slots: int,
+    *,
+    density_bias: int,
+    high_energy: bool,
+) -> int:
+    """Layers for one stretch of a typed section; a build's count only rises."""
+    lo, hi = layer_range(section, start, n_slots, density_bias)
+    if section.section_type == "build":
+        progress = (midpoint - section.start) / max(section.end - section.start, 1e-6)
+        return min(hi, lo + int(progress * (hi - lo + 1)))
+    if section.section_type == "drop" and high_energy and hi == max_layers(n_slots):
+        hi = min(n_slots, hi + 1)
+    return rng.randint(lo, hi)
+
+
+def _move_to_target(
+    rng: random.Random,
+    current: frozenset[str],
+    target: int,
+    order: Sequence[str],
+    weights: PhraseWeights | None,
+    airtime: Mapping[str, float],
+    avoid: frozenset[str],
+) -> tuple[frozenset[str], frozenset[str]]:
+    """Layers to add and remove so exactly *target* are on, swapping one if already so."""
+    active = [slot for slot in order if slot in current]
+    allowed = [slot for slot in order if slot not in avoid]
+    if len(allowed) < target:
+        allowed = list(order)
+    removed = {slot for slot in active if slot not in allowed}
+    kept = [slot for slot in active if slot in allowed]
+    inactive = [slot for slot in allowed if slot not in current]
+    if len(kept) > target:
+        removed.update(
+            _pick_slots(
+                rng, kept, len(kept) - target, weights, airtime, prefer_busy=False
+            )
         )
-    for marker in source:
-        t = float(marker.time)
-        if 0.0 < t < duration_sec and t not in by_time:
-            by_time[t] = SongMarker(t, marker.marker_type)
-    return [by_time[t] for t in sorted(by_time)]
-
-
-def _marker_type_at(
-    t: float | None, markers: Sequence[SongMarker]
-) -> SongMarkerType | None:
-    if t is None:
-        return None
-    for marker in markers:
-        if abs(marker.time - t) <= 1e-6:
-            return marker.marker_type
-    return None
+        return frozenset(), frozenset(removed)
+    missing = target - len(kept)
+    if missing == 0 and not removed and inactive:
+        removed.update(
+            _pick_slots(rng, kept, 1, weights, airtime, prefer_busy=False)
+        )
+        missing = 1
+    added = frozenset(
+        _pick_slots(rng, inactive, missing, weights, airtime, prefer_busy=True)
+        if missing
+        else ()
+    )
+    return added, frozenset(removed)
 
 
 def _section_bounds(
@@ -364,13 +435,14 @@ def _partition_in_section(
     sec_end: float,
     rng: random.Random,
     long_used: bool,
+    bars_weights: Sequence[tuple[int, float]] | None = None,
 ) -> tuple[list[tuple[float, float]], bool]:
     if sec_end - sec_start < 1e-6:
         return [], long_used
     if not section_bars:
         return [(sec_start, sec_end)], long_used
     raw, long_used = _partition_on_bars(
-        section_bars, sec_end, rng, long_used
+        section_bars, sec_end, rng, long_used, bars_weights
     )
     if not raw:
         return [(sec_start, sec_end)], long_used
@@ -390,7 +462,10 @@ def _pick_section_bars(
     remaining: int,
     *,
     long_used: bool,
+    bars_weights: Sequence[tuple[int, float]] | None = None,
 ) -> tuple[int, bool]:
+    if bars_weights is not None:
+        return min(_weighted_choice(rng, bars_weights), remaining), long_used
     if remaining <= SECTION_BARS_MAX:
         return remaining, long_used
     can_long = (
@@ -408,6 +483,7 @@ def _partition_on_bars(
     duration_sec: float,
     rng: random.Random,
     long_used: bool,
+    bars_weights: Sequence[tuple[int, float]] | None = None,
 ) -> tuple[list[tuple[float, float]], bool]:
     sections: list[tuple[float, float]] = []
     i = 0
@@ -415,7 +491,7 @@ def _partition_on_bars(
     while i < n:
         remaining = n - i
         target, long_used = _pick_section_bars(
-            rng, remaining, long_used=long_used
+            rng, remaining, long_used=long_used, bars_weights=bars_weights
         )
         start = bars[i]
         end_i = i + target
@@ -493,17 +569,11 @@ def _pick_target_count(
     n_slots: int,
     *,
     density_bias: int,
-    at_begin: bool,
-    at_crescendo: bool,
-    next_crescendo: bool,
-    near_diminuendo: bool,
     allow_five: bool,
     budget_gain: float,
     near_silent: bool,
 ) -> int:
     if n_slots <= 1:
-        return 1
-    if at_begin or at_crescendo:
         return 1
     w1, w2, w3, w4, w5 = 0.08, 0.45, 0.35, 0.15, 0.05
     if density_bias > 0:
@@ -519,15 +589,6 @@ def _pick_target_count(
     if not allow_five:
         w4 += w5
         w5 = 0.0
-    if next_crescendo:
-        w1 = 0.0
-        w2 *= 0.15
-        w3 *= 0.4
-        w4 *= 2.2
-        if n_slots >= 5:
-            w5 = max(w5, 0.2) * 2.5
-    if near_diminuendo:
-        w1, w2, w3, w4, w5 = 0.20, 0.60, 0.20, 0.0, 0.0
     if near_silent:
         w1, w2, w3, w4, w5 = 0.30, 0.60, 0.10, 0.0, 0.0
     folded: dict[int, float] = {}
@@ -539,14 +600,13 @@ def _pick_target_count(
     if not folded:
         return 1
     picked = _weighted_choice(rng, tuple(folded.items()))
-    if budget_gain >= 1.2 and not near_diminuendo:
+    if budget_gain >= 1.2:
         picked = min(n_slots, picked + 1)
         if picked >= 5 and not allow_five:
             picked = min(4, n_slots)
     elif budget_gain <= 0.8:
-        picked = max(2 if next_crescendo else 1, picked - 1)
-    floor = 2 if next_crescendo else 1
-    return max(floor, min(n_slots, picked))
+        picked = max(1, picked - 1)
+    return max(1, min(n_slots, picked))
 
 
 def _pick_action(
@@ -556,7 +616,6 @@ def _pick_action(
     n_slots: int,
     *,
     at_marker: bool = False,
-    next_crescendo: bool = False,
 ) -> _Action:
     add_one, remove_one, add_two, hold = 0.50, 0.30, 0.10, 0.10
     can_add_one = current_n < n_slots
@@ -582,9 +641,6 @@ def _pick_action(
         remove_one = 0.0
     if at_marker:
         hold = 0.0
-    if next_crescendo and current_n < 2:
-        hold = 0.0
-        remove_one = 0.0
     return _weighted_choice(
         rng,
         (
@@ -637,7 +693,6 @@ def _resolve_mutation(
     *,
     allow_five: bool,
     at_marker: bool = False,
-    drop_to_one: bool = False,
 ) -> tuple[frozenset[str], frozenset[str]]:
     current_n = len(current)
     n_slots = len(order)
@@ -656,14 +711,6 @@ def _resolve_mutation(
                 rng, active, min(k, cap), weights, airtime, prefer_busy=False
             )
         )
-
-    if drop_to_one:
-        if current_n <= 1:
-            return _swap_one(rng, current, order, weights, airtime)
-        keep = frozenset(
-            _pick_slots(rng, active, 1, weights, airtime, prefer_busy=True)
-        )
-        return frozenset(), current - keep
 
     if at_marker and current_n == target:
         return _swap_one(rng, current, order, weights, airtime)
@@ -917,14 +964,14 @@ def _overlap_states(
     beat_times: Sequence[float],
     beat_period: float,
     transition_duration: float = 0.0,
-    at_marker: bool = False,
+    in_one_step: bool = False,
 ) -> list[tuple[float, frozenset[str], frozenset[str]]]:
     """Return (t, active, newly_on) states for a section-boundary mutation."""
     if not added and not removed:
         return []
     t_lo = last_t + _MIN_STATE_GAP
     t_hi = end - _MIN_STATE_GAP
-    if at_marker:
+    if in_one_step:
         return [(start, settled, added)]
     if added and removed:
         min_span = max(0.0, float(transition_duration)) + beat_period

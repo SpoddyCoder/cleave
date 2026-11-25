@@ -27,6 +27,7 @@ from cleave.config_schema.project_resolution import (
 from cleave.song_markers import (
     DEFAULT_SONG_MARKER_TYPE,
     SongMarker,
+    format_marker_time,
     parse_song_marker_type,
 )
 
@@ -48,12 +49,17 @@ def _parse_song_markers(raw_markers: object) -> tuple[SongMarker, ...]:
             raise ValueError("invalid project manifest: song-markers entry")
         if "time" not in item:
             raise ValueError("invalid project manifest: song-markers entry time")
-        marker_type = (
-            DEFAULT_SONG_MARKER_TYPE
-            if "type" not in item
-            else parse_song_marker_type(item["type"])
-        )
-        markers.append(SongMarker(float(item["time"]), marker_type))
+        time = float(item["time"])
+        marker_type = DEFAULT_SONG_MARKER_TYPE
+        if "type" in item:
+            try:
+                marker_type = parse_song_marker_type(item["type"])
+            except ValueError as exc:
+                raise ValueError(
+                    f"{PROJECT_FILENAME}: song marker at "
+                    f"{format_marker_time(time)}: {exc}"
+                ) from exc
+        markers.append(SongMarker(time, marker_type))
     return tuple(markers)
 
 

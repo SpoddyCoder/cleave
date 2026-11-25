@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import random
+import traceback
 from collections.abc import Callable, Mapping, Sequence
 
 from cleave.signals import Signals
@@ -32,7 +33,7 @@ from cleave.timeline_presets.mode import (
     timeline_preset_mode_display,
 )
 from cleave.timeline_presets.accent import apply_accent
-from cleave.timeline_presets.crescendo import apply_crescendo
+from cleave.timeline_presets.build import apply_build
 from cleave.timeline_presets.cue_snap import (
     TIMELINE_PRESET_CUE_SNAP_OPTIONS,
     timeline_preset_cue_snap_display,
@@ -94,7 +95,7 @@ _KIND_BUILDERS = {
 
 _GENERATE_HELP = (
     "Builds a new timeline from these settings, replacing the current clips. Arrangement decides which layers play when, clip timing and cuts then tidy every generated clip, and each layer whose presets change on each clip gets a preset for every new clip. That replaces the layer's whole preset list, spares included.",
-    "In layers mode, each crescendo song marker gets a crescendo. The project remembers these settings for next time.",
+    "Sections marked with a type, such as verse, build, or drop, are arranged to suit it, whatever the character. The project remembers these settings for next time.",
 )
 _CHARACTER_HELP = ("The shape of the arrangement: which layers play together, and when.",)
 _DENSITY_HELP = (
@@ -127,7 +128,7 @@ _REPOPULATE_OPTION_HELP = {
     "directory sequential": "presets from the layer's preset directory, in order.",
 }
 _CONDUCTOR_HELP = (
-    "Uses the stems' audio to decide which layers lead each phrase and how bright each one is. In layers mode, plain song markers also get an accent. It needs the song's audio analysis and is skipped without it.",
+    "Uses the stems' audio to decide which layers lead each phrase and how bright each one is. In layers mode, plain, chorus, and drop song markers also get an accent. It needs the song's audio analysis and is skipped without it.",
 )
 _CONDUCTOR_OPTION_HELP = {
     False: "levels come from the character alone.",
@@ -382,8 +383,16 @@ class TimelinePresetController:
         tl.timeline_preset_repopulate = repopulate_options[values["repopulate"]]
         tl.timeline_preset_conductor = _CONDUCTOR_OPTIONS[values["conductor"]]
         tl.timeline_preset_mode = TIMELINE_PRESET_MODE_OPTIONS[values["mode"]]
-        with self._history.recording("Generate timeline"):
+        before = self._history.begin("Generate timeline")
+        try:
             self._apply(tl.timeline_preset_kind, duration_sec)
+            self._history.commit()
+        except Exception as exc:
+            # A failed generate must not end the session and lose unsaved work.
+            traceback.print_exc()
+            self._history.rollback(before)
+            reason = f"{type(exc).__name__}: {exc}" if str(exc) else type(exc).__name__
+            self._notify(f"Generate timeline failed, timeline unchanged: {reason}")
 
     def prompt_reset(self, duration_sec: float) -> None:
         if self.session.timeline.locked or self._refuse_locked_layers():
@@ -430,16 +439,14 @@ class TimelinePresetController:
         if not grid:
             self._notify("No bars available; re-run separate")
             return
-        self._clear_timeline_state()
         tl = self.session.timeline
-        tl.enabled = True
         slots = list(self.session.layer_z_order)
         markers = list(self.session.song_markers.markers)
         marker_times = [m.time for m in markers]
         rng = random.Random()
         builder_kwargs: dict = {
             "bar_times": grid,
-            "song_marker_times": marker_times,
+            "song_markers": markers,
             "density_bias": density_bias_for(tl.timeline_preset_density),
         }
         conductor_skipped = False
@@ -457,7 +464,6 @@ class TimelinePresetController:
                 slots,
                 duration_sec,
                 rng,
-                song_markers=markers,
                 beat_times=self._beat_times,
                 transition_duration=self.session.pattern_mask.transition,
                 **builder_kwargs,
@@ -470,7 +476,7 @@ class TimelinePresetController:
                 rng,
                 **builder_kwargs,
             )
-            after_crescendo = apply_crescendo(
+            after_build = apply_build(
                 built,
                 slots,
                 duration_sec=duration_sec,
@@ -478,9 +484,9 @@ class TimelinePresetController:
                 song_markers=markers,
                 rng=rng,
             )
-            if after_crescendo is not built:
-                built = after_crescendo
-                message = f"{message} (crescendo)"
+            if after_build is not built:
+                built = after_build
+                message = f"{message} (build)"
             if tl.timeline_preset_conductor and self._signals is not None:
                 after_accent = apply_accent(
                     built,
@@ -504,6 +510,8 @@ class TimelinePresetController:
         self._apply_cue_snap(built, grid)
         self._apply_song_marker_snap(built, marker_times, slots)
         self._apply_timeline_cuts(built, marker_times, tl.timeline_preset_timeline_cuts)
+        self._clear_timeline_state()
+        tl.enabled = True
         for slot in slots:
             tl.lanes[slot] = built[slot]
         if self._on_repopulate is not None:

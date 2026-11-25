@@ -42,7 +42,7 @@ Accent colors for modes and icons (not label/value roles):
   preset_icon, preset_file_icon,
   timeline_track_colors, timeline_off_segment, timeline_clip_text, bar_grid, song_bound,
   playhead, playhead_flash,
-  song_marker, song_marker_selected, calibration_flash
+  song_marker, song_marker_selected, song_section_colors, calibration_flash
 
 Buttons (fills, not text roles). Each tone has a rest fill, a lit hover fill
 and border, and a pressed fill; button_paint.button_look() turns them into a
@@ -434,6 +434,9 @@ class Palette:
     playhead_flash: RGB
     song_marker: RGB
     song_marker_selected: RGB
+    # Name and row tint of each section type, in SONG_MARKER_TYPES order without
+    # the plain type.
+    song_section_colors: tuple[RGB, ...]
     # Flash over the preview while Measure audio latency runs.
     calibration_flash: RGB
     # Timeline strip scrollbar: a faint rail and a neutral pill, so it does not
@@ -564,6 +567,16 @@ def _ultraviolet() -> Palette:
         playhead_flash=(220, 170, 255),
         song_marker=(220, 40, 40),
         song_marker_selected=(255, 170, 40),
+        song_section_colors=(
+            (120, 160, 210),  # intro
+            (110, 190, 150),  # verse
+            (235, 190, 80),  # build
+            (240, 130, 190),  # chorus
+            (255, 95, 85),  # drop
+            (150, 140, 230),  # breakdown
+            (80, 200, 210),  # bridge
+            (165, 165, 175),  # outro
+        ),
         calibration_flash=(255, 255, 255),
         timeline_scroll_rail=song_bound,
         timeline_scroll_thumb=muted,
@@ -682,6 +695,16 @@ def _chocolate() -> Palette:
         playhead_flash=(255, 210, 160),
         song_marker=(220, 42, 40),
         song_marker_selected=(255, 176, 42),
+        song_section_colors=(
+            (120, 160, 210),  # intro
+            (110, 190, 150),  # verse
+            (235, 190, 80),  # build
+            (240, 130, 190),  # chorus
+            (255, 95, 85),  # drop
+            (150, 140, 230),  # breakdown
+            (80, 200, 210),  # bridge
+            (165, 165, 175),  # outro
+        ),
         calibration_flash=(255, 255, 255),
         timeline_scroll_rail=(74, 52, 38),
         timeline_scroll_thumb=(171, 146, 124),
@@ -798,6 +821,16 @@ def _mint() -> Palette:
         playhead_flash=(180, 255, 226),
         song_marker=(220, 40, 40),
         song_marker_selected=(255, 170, 40),
+        song_section_colors=(
+            (120, 160, 210),  # intro
+            (110, 190, 150),  # verse
+            (235, 190, 80),  # build
+            (240, 130, 190),  # chorus
+            (255, 95, 85),  # drop
+            (150, 140, 230),  # breakdown
+            (80, 200, 210),  # bridge
+            (165, 165, 175),  # outro
+        ),
         calibration_flash=(255, 255, 255),
         timeline_scroll_rail=(36, 68, 60),
         timeline_scroll_thumb=(134, 168, 158),
@@ -925,6 +958,16 @@ def _daylight() -> Palette:
         playhead_flash=(200, 150, 255),
         song_marker=(200, 40, 40),
         song_marker_selected=(230, 140, 0),
+        song_section_colors=(
+            (50, 95, 160),  # intro
+            (20, 115, 70),  # verse
+            (145, 95, 0),  # build
+            (175, 40, 120),  # chorus
+            (190, 35, 30),  # drop
+            (90, 70, 190),  # breakdown
+            (0, 110, 120),  # bridge
+            (95, 95, 110),  # outro
+        ),
         calibration_flash=(255, 255, 255),
         timeline_scroll_rail=song_bound,
         timeline_scroll_thumb=muted,

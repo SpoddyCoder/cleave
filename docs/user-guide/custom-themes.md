@@ -23,6 +23,7 @@ button_bg: "#202040"
   - `icon_lit_hover_lift` and `icon_lit_hover_edge_lift` take -1 to 1: positive values lighten a lit icon under the pointer, negative values darken it.
 - `subheading` is the heading over a group of rows, in the inspector and in dialogs, and over the Mouse and Keyboard lists in help.
 - `timeline_track_colors` is a list of up to eight colours, one per timeline row.
+- `song_section_colors` is a list of eight colours, one per section type: intro, verse, build, chorus, drop, breakdown, bridge, outro. Each colours the section's name on the time ruler and, faintly, its rows.
 
 ## Text on panels and text on fills
 
@@ -56,7 +57,7 @@ Every key a theme can set, grouped by where it appears:
 | Menus, dialogs, and progress bars | `surface_bg`, `surface_edge`, `surface_text`, `accent_from`, `accent_to` |
 | Rows | `hover`, `hover_bg_alpha`, `row_select_tint`, `row_selected_alpha`, `row_selected_bar`, `row_focused_alpha`, `row_focused_bar`, `row_focus_edge` |
 | Icon hover | `icon_hover_fg`, `icon_hover_bg`, `icon_hover_bg_alpha`, `icon_hover_edge`, `icon_lit_hover_lift`, `icon_lit_hover_edge_lift` |
-| Timeline strip | `timeline_track_colors`, `timeline_off_segment`, `timeline_clip_text`, `bar_grid`, `song_bound`, `playhead`, `playhead_flash`, `song_marker`, `song_marker_selected`, `timeline_scroll_rail`, `timeline_scroll_thumb` |
+| Timeline strip | `timeline_track_colors`, `timeline_off_segment`, `timeline_clip_text`, `bar_grid`, `song_bound`, `playhead`, `playhead_flash`, `song_marker`, `song_marker_selected`, `song_section_colors`, `timeline_scroll_rail`, `timeline_scroll_thumb` |
 | Calibration | `calibration_flash` |
 | Scrollbars | `scrollbar_track`, `scrollbar_thumb`, `scrollbar_thumb_hover` |
 
@@ -186,6 +187,15 @@ playhead: "#5a3282"
 playhead_flash: "#dcaaff"
 song_marker: "#dc2828"
 song_marker_selected: "#ffaa28"
+song_section_colors:
+  - "#78a0d2"
+  - "#6ebe96"
+  - "#ebbe50"
+  - "#f082be"
+  - "#ff5f55"
+  - "#968ce6"
+  - "#50c8d2"
+  - "#a5a5af"
 timeline_scroll_rail: "#3a4254"
 timeline_scroll_thumb: "#8c97b0"
 

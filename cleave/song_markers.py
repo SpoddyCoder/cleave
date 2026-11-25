@@ -9,38 +9,55 @@ from typing import Callable, Literal, Sequence
 from cleave.choice import step_choice
 
 SongMarkerType = Literal[
-    "standard", "begin", "sustain", "crescendo", "diminuendo"
+    "standard",
+    "intro",
+    "verse",
+    "build",
+    "chorus",
+    "drop",
+    "breakdown",
+    "bridge",
+    "outro",
 ]
 
 DEFAULT_SONG_MARKER_TYPE: SongMarkerType = "standard"
 
 SONG_MARKER_TYPES: tuple[SongMarkerType, ...] = (
     "standard",
-    "begin",
-    "sustain",
-    "crescendo",
-    "diminuendo",
+    "intro",
+    "verse",
+    "build",
+    "chorus",
+    "drop",
+    "breakdown",
+    "bridge",
+    "outro",
 )
 
 SONG_MARKER_TYPE_HELP: dict[SongMarkerType, str] = {
     "standard": (
-        "a plain section change. Generated layers start a new phrase here, and with conductor on one layer gets an accent. The pattern mask swaps its layers."
+        "a plain section change. It ends the section before it, and the character sets how busy this one is. With conductor on, one layer gets an accent in layers mode."
     ),
-    "begin": (
-        "where a crescendo starts to build. Without one, the build starts two markers before the crescendo. The pattern mask drops to one layer."
+    "intro": "a calm opening on one layer.",
+    "verse": "one or two layers, changing slowly.",
+    "build": (
+        "rises from one layer to the full stack by the next marker. Follow it with a drop or a chorus."
     ),
-    "sustain": (
-        "where a crescendo reaches full and holds. Without one, it is full from the marker just before the crescendo. A plain section change for the pattern mask."
+    "chorus": (
+        "high energy, three or four layers. With conductor on, one layer gets an accent in layers mode."
     ),
-    "crescendo": (
-        "the end of a build. Layers fade in up to here, then drop to one until the next crescendo starts or the song ends. The pattern mask tends to fill up before it, then drops to one."
+    "drop": (
+        "the biggest moment: four layers at once, changing fast. With conductor on, one layer gets an accent in layers mode."
     ),
-    "diminuendo": (
-        "a quieter moment. Layers are not thinned out yet, so it is only a section change. The pattern mask uses fewer layers on either side of it."
-    ),
+    "breakdown": "the music strips back, down to one layer.",
+    "bridge": "one or two layers, led by a different layer than before.",
+    "outro": "winds down from two layers to one.",
 }
 
-_GESTURE_PEAK_TYPES = frozenset({"crescendo", "diminuendo"})
+
+def song_marker_type_display(marker_type: str) -> str:
+    """Name shown for *marker_type*: ``-`` for a plain marker."""
+    return "-" if marker_type == DEFAULT_SONG_MARKER_TYPE else marker_type
 
 
 @dataclass(frozen=True)
@@ -60,36 +77,57 @@ def step_song_marker_type(
 def parse_song_marker_type(raw: object) -> SongMarkerType:
     if raw in SONG_MARKER_TYPES:
         return raw  # type: ignore[return-value]
-    raise ValueError(f"invalid song marker type: {raw!r}")
+    raise ValueError(
+        f"invalid song marker type {raw!r}; "
+        f"expected one of: {', '.join(SONG_MARKER_TYPES)}"
+    )
 
 
-def song_marker_gesture_warning(
-    markers: Sequence[SongMarker],
-    changed_index: int,
-) -> str | None:
-    """Return a warn-only message when the edited marker is structurally invalid.
+@dataclass(frozen=True)
+class SongSection:
+    """A stretch of the song, from one marker to the next."""
 
-    Peak types are ``crescendo`` and ``diminuendo``. A ``begin`` / ``sustain``
-    binds forward to the first peak; a later ``begin`` starts a fresh gesture.
+    start: float
+    end: float
+    section_type: SongMarkerType = DEFAULT_SONG_MARKER_TYPE
+
+    @property
+    def typed(self) -> bool:
+        return self.section_type != DEFAULT_SONG_MARKER_TYPE
+
+    def contains(self, t: float) -> bool:
+        return self.start - 1e-9 <= t < self.end - 1e-9
+
+
+def resolve_sections(
+    markers: Sequence[SongMarker], duration_sec: float
+) -> tuple[SongSection, ...]:
+    """Sections covering the whole song, in order.
+
+    A stretch before the first marker is plain. Markers outside the song are
+    ignored, and the first of several at one time wins.
     """
-    if changed_index < 0 or changed_index >= len(markers):
-        return None
-    marker_type = markers[changed_index].marker_type
-    if marker_type in _GESTURE_PEAK_TYPES:
-        if changed_index == 0:
-            return f"{marker_type} has no marker before it to rise from"
-        if marker_type == "diminuendo":
-            return "diminuendo is not generated yet"
-        return None
-    if marker_type not in ("begin", "sustain"):
-        return None
-    for j in range(changed_index + 1, len(markers)):
-        other = markers[j].marker_type
-        if other == "begin":
-            break
-        if other in _GESTURE_PEAK_TYPES:
-            return None
-    return f"{marker_type} has no crescendo/diminuendo after it"
+    if duration_sec <= 0.0:
+        return ()
+    by_time: dict[float, SongMarkerType] = {}
+    for marker in markers:
+        t = float(marker.time)
+        if 0.0 <= t < duration_sec:
+            by_time.setdefault(t, marker.marker_type)
+    by_time.setdefault(0.0, DEFAULT_SONG_MARKER_TYPE)
+    times = sorted(by_time)
+    return tuple(
+        SongSection(start, end, by_time[start])
+        for start, end in zip(times, [*times[1:], float(duration_sec)])
+    )
+
+
+def section_at(
+    sections: Sequence[SongSection], t: float
+) -> SongSection | None:
+    """The section holding *t*, or None outside the song."""
+    return next((section for section in sections if section.contains(t)), None)
+
 
 def nearest_index(times: Sequence[float], t: float) -> int:
     """Return the index of the song marker nearest to ``t``.
@@ -124,12 +162,14 @@ def place_marker(
     markers: Sequence[SongMarker],
     t: float,
     window: float = 2.0,
+    marker_type: SongMarkerType | None = None,
 ) -> tuple[tuple[SongMarker, ...], int | None, float | None]:
     """Insert ``t`` into sorted song markers, or replace within ``window`` seconds.
 
     If any existing marker lies within ``window`` of ``t``, the nearest one is
-    replaced (earlier marker on a tie). The replaced marker keeps its type.
-    Otherwise ``t`` is inserted as a standard marker in sorted order.
+    replaced (earlier marker on a tie). Otherwise ``t`` is inserted in sorted
+    order. ``marker_type`` sets the type; without it a replaced marker keeps its
+    own and an inserted one is standard.
 
     Returns ``(new_markers, replaced_index, replaced_time)``. On replace,
     ``replaced_index`` is the index of the new marker in ``new_markers`` and
@@ -137,20 +177,24 @@ def place_marker(
     """
     t = float(t)
     if not markers:
-        return (SongMarker(t),), None, None
+        return (SongMarker(t, marker_type or DEFAULT_SONG_MARKER_TYPE),), None, None
 
     times = [m.time for m in markers]
     idx = nearest_index(times, t)
     if abs(times[idx] - t) <= window:
         old = float(markers[idx].time)
         updated = list(markers)
-        updated[idx] = SongMarker(t, markers[idx].marker_type)
+        updated[idx] = SongMarker(t, marker_type or markers[idx].marker_type)
         updated.sort(key=lambda m: m.time)
         new_idx = next(i for i, m in enumerate(updated) if m.time == t)
         return tuple(updated), new_idx, old
 
     updated = list(markers)
-    bisect.insort(updated, SongMarker(t), key=lambda m: m.time)
+    bisect.insort(
+        updated,
+        SongMarker(t, marker_type or DEFAULT_SONG_MARKER_TYPE),
+        key=lambda m: m.time,
+    )
     return tuple(updated), None, None
 
 

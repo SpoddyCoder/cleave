@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 
 from cleave.stems import StemSource
 from cleave.viz.preset_schedule import RowPresets
+from cleave.song_markers import SongMarkerType
 from cleave.timeline import (
     ClipGrip,
     SlotCue,
@@ -56,6 +57,8 @@ class TimelineViewState:
     show_preset_names: bool = True
     beat_grid_times: tuple[float, ...] = ()
     song_marker_times: tuple[float, ...] = ()
+    # Type of each marker, in step with the times.
+    song_marker_types: tuple[SongMarkerType, ...] = ()
     selected_song_marker_index: int | None = None
     song_marker_flash_start_ms: int | None = None
     hard_cut_fades: TimelineFadeGroup = field(default_factory=TimelineFadeGroup)

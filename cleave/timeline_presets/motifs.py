@@ -411,7 +411,8 @@ def _expand_flash_tutti(
     solo = vocab.active_for(_pick_single(vocab, rotation))
 
     bars = list(bar_times)
-    if not bars:
+    # A phrase before the first detected bar or after the last has none.
+    if not any(phrase_start <= t <= phrase_end for t in bars):
         states = [(phrase_start, tutti)]
         return _soft_latch_states(
             states,

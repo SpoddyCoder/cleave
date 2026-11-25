@@ -12,7 +12,8 @@ import numpy as np
 from cleave.stems import StemSource
 from cleave.preset_playlist import PresetPlaylist
 from cleave.signals import Signals
-from cleave.song_markers import SongMarker
+from cleave.song_markers import SongMarker, resolve_sections
+from cleave.timeline_presets.sections import layer_range
 from cleave.timeline import (
     LEVEL_EPS,
     TimelineFadeGroup,
@@ -77,7 +78,6 @@ def _compose(
         duration_sec,
         random.Random(seed),
         _bar_times(duration_sec),
-        song_marker_times=[m.time for m in (song_markers or ())],
         song_markers=song_markers or (),
         density_bias=density_bias,
         signals=signals,
@@ -274,7 +274,7 @@ def test_count_distribution_two_three_mode() -> None:
     assert mode in (2, 3)
 
 
-def test_five_plus_rare_without_crescendo() -> None:
+def test_five_plus_rare_without_markers() -> None:
     slots = _slots(6)
     histogram: Counter[int] = Counter()
     for seed in range(20):
@@ -308,8 +308,8 @@ def test_interior_markers_change_slot_set_at_marker_time() -> None:
     slots = _slots(4)
     markers = [
         SongMarker(12.0, "standard"),
-        SongMarker(36.0, "sustain"),
-        SongMarker(60.0, "diminuendo"),
+        SongMarker(36.0, "verse"),
+        SongMarker(60.0, "bridge"),
     ]
     for seed in range(15):
         lanes = _compose(slots, seed=seed, song_markers=markers)
@@ -326,25 +326,37 @@ def test_interior_markers_change_slot_set_at_marker_time() -> None:
             )
 
 
-def test_begin_section_starts_at_one_layer() -> None:
-    slots = _slots(4)
-    markers = [SongMarker(16.0, "begin"), SongMarker(48.0, "crescendo")]
-    for seed in range(15):
+def test_typed_sections_stay_in_their_layer_range() -> None:
+    slots = _slots(6)
+    markers = [
+        SongMarker(0.0, "intro"),
+        SongMarker(12.0, "verse"),
+        SongMarker(30.0, "chorus"),
+        SongMarker(48.0, "breakdown"),
+    ]
+    sections = resolve_sections(markers, _DUR)
+    for seed in range(10):
         lanes = _compose(slots, seed=seed, song_markers=markers)
-        assert len(_active_at(lanes, slots, 16.0 + 1e-6)) == 1, f"seed={seed}"
+        for section in sections:
+            t = section.start + 1e-6
+            while t < section.end:
+                lo, hi = layer_range(section, t, len(slots), 0)
+                assert lo <= len(_active_at(lanes, slots, t)) <= hi, (seed, t)
+                t += 0.5
 
 
-def test_crescendo_drops_from_multiple_to_one() -> None:
-    slots = _slots(4)
-    markers = [SongMarker(20.0, "begin"), SongMarker(40.0, "crescendo")]
-    for seed in range(15):
+def test_build_rises_into_a_full_drop() -> None:
+    slots = _slots(6)
+    markers = [SongMarker(16.0, "build"), SongMarker(40.0, "drop")]
+    for seed in range(10):
         lanes = _compose(slots, seed=seed, song_markers=markers)
-        before = _active_at(lanes, slots, 40.0 - 1e-6)
-        after = _active_at(lanes, slots, 40.0 + 1e-6)
-        assert len(before) >= 2, f"seed={seed} pre-crescendo count {len(before)}"
-        assert len(after) == 1, f"seed={seed} crescendo count {len(after)}"
-        changes = _slot_set_change_times(lanes, slots)
-        assert any(abs(t - 40.0) <= 1e-6 for t in changes), f"seed={seed}"
+        counts = [
+            len(_active_at(lanes, slots, t + 0.01)) for t in range(16, 40)
+        ]
+        assert counts[0] == 1
+        assert counts[-1] == 4
+        assert counts == sorted(counts), seed
+        assert len(_active_at(lanes, slots, 40.0 + 1e-6)) >= 4
 
 
 def test_role_bias_lead_then_pulse_then_accent_bed() -> None:
@@ -575,7 +587,7 @@ def test_apply_pattern_mask_calls_builder_and_enables_mask() -> None:
             "cleave.viz.timeline_preset_controls.compose_pattern_mask_timeline",
             return_value=fake,
         ) as mock_pm,
-        patch("cleave.viz.timeline_preset_controls.apply_crescendo") as mock_cresc,
+        patch("cleave.viz.timeline_preset_controls.apply_build") as mock_build,
         patch("cleave.viz.timeline_preset_controls.apply_accent") as mock_accent,
         patch(
             "cleave.viz.timeline_preset_controls.build_breathing_cues"
@@ -587,7 +599,7 @@ def test_apply_pattern_mask_calls_builder_and_enables_mask() -> None:
     assert "song_markers" in kwargs
     assert "beat_times" in kwargs
     assert kwargs["transition_duration"] == 1.0
-    mock_cresc.assert_not_called()
+    mock_build.assert_not_called()
     mock_accent.assert_not_called()
     mock_breath.assert_not_called()
     assert session.pattern_mask.enabled is True
@@ -640,13 +652,13 @@ def test_apply_layers_mode_uses_character_builder() -> None:
             "cleave.viz.timeline_preset_controls.compose_pattern_mask_timeline"
         ) as mock_pm,
         patch(
-            "cleave.viz.timeline_preset_controls.apply_crescendo",
+            "cleave.viz.timeline_preset_controls.apply_build",
             side_effect=lambda lanes, *args, **kwargs: lanes,
-        ) as mock_cresc,
+        ) as mock_build,
     ):
         controller._apply("breathing", _DUR)
     mock_pm.assert_not_called()
-    mock_cresc.assert_called_once()
+    mock_build.assert_called_once()
     assert "bar_times" in captured["kwargs"]
     assert session.pattern_mask.enabled is False
     assert session.pattern_mask.transition == 0.0

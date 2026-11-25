@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 
 import numpy as np
@@ -290,14 +290,24 @@ class StemConductor:
         self,
         states: Sequence[tuple[float, frozenset[str]]],
         duration_sec: float,
+        keep_stack_at: Callable[[float], bool] | None = None,
     ) -> list[tuple[float, dict[str, float]]]:
+        """Levels per state; *keep_stack_at* keeps a near-silent stack's layers on."""
         if not states:
             return []
         out: list[tuple[float, dict[str, float]]] = []
         for i, (t, active) in enumerate(states):
             t1 = states[i + 1][0] if i + 1 < len(states) else float(duration_sec)
             weights = self.phrase_at(t)
-            out.append((float(t), self._levels_for_state(t, t1, active, weights)))
+            keep_stack = keep_stack_at is not None and keep_stack_at(float(t))
+            out.append(
+                (
+                    float(t),
+                    self._levels_for_state(
+                        t, t1, active, weights, keep_stack=keep_stack
+                    ),
+                )
+            )
         return out
 
     def _levels_for_state(
@@ -306,6 +316,8 @@ class StemConductor:
         t1: float,
         active: frozenset[str],
         weights: PhraseWeights,
+        *,
+        keep_stack: bool = False,
     ) -> dict[str, float]:
         if not active:
             return {}
@@ -315,7 +327,9 @@ class StemConductor:
                 sorted(active), key=lambda s: weights.slot_activity.get(s, 0.0)
             )
             return {
-                slot: (CONDUCTOR_LEVEL_FLOOR if slot == lead else 0.0)
+                slot: (
+                    CONDUCTOR_LEVEL_FLOOR if keep_stack or slot == lead else 0.0
+                )
                 for slot in active
             }
 

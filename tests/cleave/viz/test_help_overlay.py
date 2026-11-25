@@ -465,7 +465,7 @@ def test_timeline_presets_help_lists_characters() -> None:
     description = _description_section(sections)
     assert description is not None
     assert description.title == "Generate Timeline"
-    assert _says(description.lines, 'replacing the current clips', 'crescendo')
+    assert _says(description.lines, 'replacing the current clips', 'verse')
     assert description.entries == TIMELINE_PRESET_HELP_ENTRIES
     assert [name for name, _ in description.entries] == [
         "Breathing",
@@ -792,7 +792,15 @@ def test_song_marker_help_lists_every_marker_type() -> None:
         description = _description_section(sections_for(row_kind))
         assert description is not None, row_kind
         assert [label for label, _ in description.entries] == [
-            "-", "begin", "sustain", "crescendo", "diminuendo"
+            "-",
+            "intro",
+            "verse",
+            "build",
+            "chorus",
+            "drop",
+            "breakdown",
+            "bridge",
+            "outro",
         ]
 
 

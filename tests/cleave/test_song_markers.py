@@ -11,7 +11,7 @@ from cleave.song_markers import (
     nearest_index,
     place_marker,
     snap_markers,
-    song_marker_gesture_warning,
+    resolve_sections,
 )
 
 
@@ -33,9 +33,9 @@ def test_place_marker_insert_empty() -> None:
 
 def test_place_marker_replace_within_2s() -> None:
     markers, replaced_index, replaced_time = place_marker(
-        (SongMarker(10.0, "crescendo"), SongMarker(30.0)), 11.5
+        (SongMarker(10.0, "chorus"), SongMarker(30.0)), 11.5
     )
-    assert markers == (SongMarker(11.5, "crescendo"), SongMarker(30.0))
+    assert markers == (SongMarker(11.5, "chorus"), SongMarker(30.0))
     assert replaced_index == 0
     assert replaced_time == 10.0
 
@@ -49,9 +49,9 @@ def test_place_marker_replace_nearest_of_two() -> None:
     assert replaced_time == 10.0
 
     markers, replaced_index, replaced_time = place_marker(
-        (SongMarker(10.0), SongMarker(12.0, "diminuendo")), 11.5
+        (SongMarker(10.0), SongMarker(12.0, "drop")), 11.5
     )
-    assert markers == (SongMarker(10.0), SongMarker(11.5, "diminuendo"))
+    assert markers == (SongMarker(10.0), SongMarker(11.5, "drop"))
     assert replaced_index == 1
     assert replaced_time == 12.0
 
@@ -94,85 +94,49 @@ def test_format_marker_time() -> None:
 
 
 def test_step_song_marker_type() -> None:
-    assert step_song_marker_type("standard", forward=True) == "begin"
-    assert step_song_marker_type("begin", forward=True) == "sustain"
-    assert step_song_marker_type("sustain", forward=True) == "crescendo"
-    assert step_song_marker_type("crescendo", forward=True) == "diminuendo"
-    assert step_song_marker_type("diminuendo", forward=True) == "diminuendo"
+    assert step_song_marker_type("standard", forward=True) == "intro"
+    assert step_song_marker_type("verse", forward=True) == "build"
+    assert step_song_marker_type("outro", forward=True) == "outro"
     assert step_song_marker_type("standard", forward=False) == "standard"
-    assert step_song_marker_type("begin", forward=False) == "standard"
-    assert step_song_marker_type("crescendo", forward=False) == "sustain"
+    assert step_song_marker_type("intro", forward=False) == "standard"
 
 
-def test_song_marker_gesture_warning_orphan_begin() -> None:
-    markers = [SongMarker(10.0, "begin"), SongMarker(20.0)]
-    assert (
-        song_marker_gesture_warning(markers, 0)
-        == "begin has no crescendo/diminuendo after it"
-    )
+def test_place_marker_type_wins_over_a_replaced_marker() -> None:
+    markers, *_ = place_marker((SongMarker(10.0, "verse"),), 10.5, marker_type="drop")
+    assert markers == (SongMarker(10.5, "drop"),)
+    markers, *_ = place_marker((), 4.0, marker_type="intro")
+    assert markers == (SongMarker(4.0, "intro"),)
+    markers, *_ = place_marker(markers, 30.0, marker_type="outro")
+    assert markers[-1] == SongMarker(30.0, "outro")
 
 
-def test_song_marker_gesture_warning_orphan_sustain() -> None:
-    markers = [
-        SongMarker(10.0, "crescendo"),
-        SongMarker(20.0, "sustain"),
-        SongMarker(30.0),
+def test_resolve_sections_cover_the_song() -> None:
+    def spans(markers):
+        return [
+            (s.start, s.end, s.section_type) for s in resolve_sections(markers, 60.0)
+        ]
+
+    assert spans([]) == [(0.0, 60.0, "standard")]
+    assert spans([SongMarker(0.0, "intro")]) == [(0.0, 60.0, "intro")]
+    assert spans(
+        [
+            SongMarker(30.0),
+            SongMarker(10.0, "chorus"),
+            SongMarker(10.0, "verse"),
+            SongMarker(60.0, "outro"),
+            SongMarker(-1.0, "drop"),
+        ]
+    ) == [
+        (0.0, 10.0, "standard"),
+        (10.0, 30.0, "chorus"),
+        (30.0, 60.0, "standard"),
     ]
-    assert (
-        song_marker_gesture_warning(markers, 1)
-        == "sustain has no crescendo/diminuendo after it"
-    )
-
-
-def test_song_marker_gesture_warning_sustain_before_begin() -> None:
-    markers = [
-        SongMarker(10.0, "sustain"),
-        SongMarker(20.0, "begin"),
-        SongMarker(30.0, "crescendo"),
-    ]
-    assert (
-        song_marker_gesture_warning(markers, 0)
-        == "sustain has no crescendo/diminuendo after it"
-    )
-    assert song_marker_gesture_warning(markers, 1) is None
-
-
-def test_song_marker_gesture_warning_peak_first() -> None:
-    markers = [SongMarker(10.0, "crescendo"), SongMarker(20.0)]
-    assert (
-        song_marker_gesture_warning(markers, 0)
-        == "crescendo has no marker before it to rise from"
-    )
-    markers[0] = SongMarker(10.0, "diminuendo")
-    assert (
-        song_marker_gesture_warning(markers, 0)
-        == "diminuendo has no marker before it to rise from"
-    )
-
-
-def test_song_marker_gesture_warning_valid_gesture() -> None:
-    markers = [
-        SongMarker(10.0, "begin"),
-        SongMarker(20.0, "sustain"),
-        SongMarker(30.0, "crescendo"),
-    ]
-    assert song_marker_gesture_warning(markers, 0) is None
-    assert song_marker_gesture_warning(markers, 1) is None
-    assert song_marker_gesture_warning(markers, 2) is None
-
-
-def test_song_marker_gesture_warning_diminuendo_info() -> None:
-    markers = [SongMarker(10.0), SongMarker(20.0, "diminuendo")]
-    assert (
-        song_marker_gesture_warning(markers, 1)
-        == "diminuendo is not generated yet"
-    )
 
 
 def test_snap_markers_merges_and_maps_indices() -> None:
     markers, indices = snap_markers(
-        (SongMarker(3.9), SongMarker(4.2, "crescendo"), SongMarker(9.0, "begin")),
+        (SongMarker(3.9), SongMarker(4.2, "chorus"), SongMarker(9.0, "verse")),
         lambda t: round(t / 4.0) * 4.0,
     )
-    assert markers == (SongMarker(4.0, "crescendo"), SongMarker(8.0, "begin"))
+    assert markers == (SongMarker(4.0, "chorus"), SongMarker(8.0, "verse"))
     assert indices == (0, 0, 1)

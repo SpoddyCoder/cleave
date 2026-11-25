@@ -822,6 +822,43 @@ def test_song_markers_rise_through_ruler_and_rows() -> None:
     assert static.get_at((x_plain, static_y))[:3] != palette().song_marker
 
 
+def test_sections_tint_the_rows_and_name_themselves_in_the_ruler() -> None:
+    from cleave.viz.timeline_strip_static import section_color
+
+    pygame.init()
+    overlay = TimelineOverlay()
+    state = strip_view_state(
+        duration_sec=100.0,
+        lanes={f"layer_{i}": TimelineLane(0.0, []) for i in range(1, 5)},
+        song_marker_times=(20.0, 60.0, 80.0, 81.0),
+        song_marker_types=("drop", "standard", "verse", "standard"),
+    )
+    upload, bar_left, bar_width, _tick_top = _marker_upload(overlay, state)
+    static = overlay._cache.panel
+    assert static is not None
+    row_y = overlay.row_layout[0][2] + overlay.row_layout[0][4] // 2
+
+    def row_at(t: float):
+        x = time_to_x(t, bar_left, bar_width, 0.0, 100.0)
+        return static.get_at((x, row_y))[:3]
+
+    assert row_at(40.5) != row_at(70.5)
+    ruler = overlay._ruler
+    assert ruler is not None
+
+    def named(section_type: str) -> bool:
+        color = section_color(section_type)
+        return any(
+            ruler.get_at((x, y))[:3] == color
+            for x in range(ruler.get_width())
+            for y in range(ruler.get_height())
+        )
+
+    assert named("drop")
+    # One second is too narrow for its name.
+    assert not named("verse")
+
+
 def test_selected_song_marker_flashes_and_dirties_its_column(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

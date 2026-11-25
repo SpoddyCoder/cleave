@@ -47,7 +47,7 @@ def test_drop_song_marker_submenu_drops_at_the_playhead_or_here() -> None:
     playhead_drops: list[str] = []
     controls.song_markers.drop = lambda: playhead_drops.append("drop")
     entries = TimelineTimeMenu(controls, transport).entries(12.0, 0.5, commands=False)
-    assert len(entries) == 1
+    assert len(entries) == 2
     drop = entries[0]
     assert isinstance(drop, ContextSubmenu)
     assert (drop.id, drop.label, drop.enabled) == (
@@ -65,6 +65,26 @@ def test_drop_song_marker_submenu_drops_at_the_playhead_or_here() -> None:
     assert transport.calls == []
 
 
+def test_drop_section_here_drops_a_typed_marker() -> None:
+    controls = make_controls()
+    entries = TimelineTimeMenu(controls, _Transport()).entries(12.0, 0.5, commands=False)
+    section = entries[1]
+    assert isinstance(section, ContextSubmenu)
+    assert section.label == "Drop section here"
+    assert [item.label for item in section.items] == [
+        "intro",
+        "verse",
+        "build",
+        "chorus",
+        "drop",
+        "breakdown",
+        "bridge",
+        "outro",
+    ]
+    section.items[3].run()
+    assert controls.session.song_markers.markers == [SongMarker(12.0, "chorus")]
+
+
 def _marker_entries(controls, *, commands: bool = False):
     return TimelineTimeMenu(controls, _Transport()).entries(
         12.0, 0.5, commands=commands, marker_index=0
@@ -73,7 +93,7 @@ def _marker_entries(controls, *, commands: bool = False):
 
 def test_marker_items_replace_the_time_items() -> None:
     controls = make_controls()
-    controls.session.song_markers.markers = [SongMarker(time=12.2, marker_type="begin")]
+    controls.session.song_markers.markers = [SongMarker(time=12.2, marker_type="verse")]
     transport = _Transport()
     entries = TimelineTimeMenu(controls, transport).entries(
         12.0, 0.5, commands=False, marker_index=0
@@ -95,7 +115,7 @@ def test_marker_items_replace_the_time_items() -> None:
 
 def test_unselected_marker_delete_item_shows_no_key() -> None:
     controls = make_controls()
-    controls.session.song_markers.markers = [SongMarker(time=12.2, marker_type="begin")]
+    controls.session.song_markers.markers = [SongMarker(time=12.2, marker_type="verse")]
     entries = TimelineTimeMenu(controls, _Transport()).entries(
         12.0, 0.5, commands=False, marker_index=0, marker_selected=False
     )
@@ -108,15 +128,15 @@ def test_marker_type_submenu_checks_and_sets_the_type() -> None:
     controls = make_controls()
     controls.session.song_markers.markers = [
         SongMarker(time=12.2),
-        SongMarker(time=30.0, marker_type="crescendo"),
+        SongMarker(time=30.0, marker_type="drop"),
     ]
     submenu = _marker_entries(controls)[3]
     assert isinstance(submenu, ContextSubmenu)
     checked = [item.id for item in submenu.items if getattr(item, "checked", False)]
     assert checked == ["timeline.marker.type.standard"]
-    begin = next(i for i in submenu.items if i.id == "timeline.marker.type.begin")
-    begin.run()
-    assert controls.session.song_markers.markers[0].marker_type == "begin"
+    verse = next(i for i in submenu.items if i.id == "timeline.marker.type.verse")
+    verse.run()
+    assert controls.session.song_markers.markers[0].marker_type == "verse"
 
 
 def test_recording_disables_marker_edits_but_not_seeking() -> None:

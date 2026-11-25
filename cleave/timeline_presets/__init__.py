@@ -7,6 +7,7 @@ from collections.abc import Mapping, Sequence
 
 from cleave.stems import StemSource
 from cleave.signals import Signals
+from cleave.song_markers import SongMarker
 from cleave.timeline import TimelineLane
 from cleave.timeline_presets.arrange import PHRASE_SEC_MIN, compose_timeline
 from cleave.timeline_presets.pattern_mask_arrange import (
@@ -75,7 +76,7 @@ def build_breathing_cues(
     duration_sec: float,
     rng: random.Random | None = None,
     bar_times: Sequence[float] = (),
-    song_marker_times: Sequence[float] = (),
+    song_markers: Sequence[SongMarker] = (),
     density_bias: int = 0,
     signals: Signals | None = None,
     slot_stems: Mapping[str, StemSource] | None = None,
@@ -86,7 +87,7 @@ def build_breathing_cues(
         BREATHING,
         _rng(rng),
         bar_times,
-        song_marker_times=song_marker_times,
+        song_markers=song_markers,
         density_bias=density_bias,
         signals=signals,
         slot_stems=slot_stems,
@@ -98,7 +99,7 @@ def build_dialogue_cues(
     duration_sec: float,
     rng: random.Random | None = None,
     bar_times: Sequence[float] = (),
-    song_marker_times: Sequence[float] = (),
+    song_markers: Sequence[SongMarker] = (),
     density_bias: int = 0,
     signals: Signals | None = None,
     slot_stems: Mapping[str, StemSource] | None = None,
@@ -109,7 +110,7 @@ def build_dialogue_cues(
         DIALOGUE,
         _rng(rng),
         bar_times,
-        song_marker_times=song_marker_times,
+        song_markers=song_markers,
         density_bias=density_bias,
         signals=signals,
         slot_stems=slot_stems,
@@ -121,7 +122,7 @@ def build_arc_cues(
     duration_sec: float,
     rng: random.Random | None = None,
     bar_times: Sequence[float] = (),
-    song_marker_times: Sequence[float] = (),
+    song_markers: Sequence[SongMarker] = (),
     density_bias: int = 0,
     signals: Signals | None = None,
     slot_stems: Mapping[str, StemSource] | None = None,
@@ -132,7 +133,7 @@ def build_arc_cues(
         ARC,
         _rng(rng),
         bar_times,
-        song_marker_times=song_marker_times,
+        song_markers=song_markers,
         density_bias=density_bias,
         signals=signals,
         slot_stems=slot_stems,
@@ -144,7 +145,7 @@ def build_pulse_cues(
     duration_sec: float,
     rng: random.Random | None = None,
     bar_times: Sequence[float] = (),
-    song_marker_times: Sequence[float] = (),
+    song_markers: Sequence[SongMarker] = (),
     density_bias: int = 0,
     signals: Signals | None = None,
     slot_stems: Mapping[str, StemSource] | None = None,
@@ -155,7 +156,7 @@ def build_pulse_cues(
         PULSE,
         _rng(rng),
         bar_times,
-        song_marker_times=song_marker_times,
+        song_markers=song_markers,
         density_bias=density_bias,
         signals=signals,
         slot_stems=slot_stems,

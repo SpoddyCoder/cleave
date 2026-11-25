@@ -134,23 +134,25 @@ def _apply(
     )
 
 
-def test_resolve_accent_times_standard_only() -> None:
+def test_resolve_accent_times_plain_chorus_and_drop() -> None:
     markers = [
         SongMarker(0.0, "standard"),
         SongMarker(8.0, "standard"),
-        SongMarker(12.0, "begin"),
-        SongMarker(16.0, "sustain"),
-        SongMarker(20.0, "crescendo"),
+        SongMarker(12.0, "verse"),
+        SongMarker(16.0, "build"),
+        SongMarker(20.0, "chorus"),
+        SongMarker(22.0, "outro"),
         SongMarker(24.0, "standard"),
+        SongMarker(30.0, "drop"),
         SongMarker(40.0, "standard"),
     ]
-    assert resolve_accent_times(markers, _DUR) == [8.0, 24.0]
+    assert resolve_accent_times(markers, _DUR) == [8.0, 20.0, 24.0, 30.0]
 
 
 def test_accent_window_spans_to_next_marker() -> None:
     markers = [
         SongMarker(8.0, "standard"),
-        SongMarker(12.0, "begin"),
+        SongMarker(12.0, "verse"),
         SongMarker(24.0, "standard"),
     ]
     window = accent_window(8.0, markers, _DUR)
@@ -170,7 +172,7 @@ def test_accent_window_spans_to_next_marker() -> None:
 def test_accent_window_caps_long_section() -> None:
     markers = [
         SongMarker(5.0, "standard"),
-        SongMarker(35.0, "crescendo"),
+        SongMarker(35.0, "outro"),
     ]
     window = accent_window(5.0, markers, _DUR)
     assert window is not None
@@ -183,9 +185,9 @@ def test_accent_window_caps_long_section() -> None:
 def test_apply_accent_inserts_at_standard_markers() -> None:
     markers = [
         SongMarker(8.0, "standard"),
-        SongMarker(12.0, "begin"),
-        SongMarker(16.0, "sustain"),
-        SongMarker(20.0, "crescendo"),
+        SongMarker(12.0, "verse"),
+        SongMarker(16.0, "build"),
+        SongMarker(20.0, "outro"),
         SongMarker(24.0, "standard"),
     ]
     lanes = _steady_lanes()
@@ -207,7 +209,7 @@ def test_apply_accent_inserts_at_standard_markers() -> None:
 def test_apply_accent_spans_section_until_next_marker() -> None:
     markers = [
         SongMarker(8.0, "standard"),
-        SongMarker(18.0, "begin"),
+        SongMarker(18.0, "verse"),
     ]
     after = _apply(_steady_lanes(level=0.5), markers)
     accent_slot = next(
@@ -225,7 +227,7 @@ def test_apply_accent_spans_section_until_next_marker() -> None:
 def test_apply_accent_caps_long_section_with_restore() -> None:
     markers = [
         SongMarker(5.0, "standard"),
-        SongMarker(35.0, "crescendo"),
+        SongMarker(35.0, "outro"),
     ]
     prior = 0.5
     after = _apply(_steady_lanes(level=prior), markers)
@@ -253,7 +255,7 @@ def test_apply_accent_caps_long_section_with_restore() -> None:
 
 
 def test_apply_accent_dims_supporting_layer() -> None:
-    markers = [SongMarker(10.0, "standard"), SongMarker(25.0, "begin")]
+    markers = [SongMarker(10.0, "standard"), SongMarker(25.0, "verse")]
     prior = 0.75
     after = _apply(_steady_lanes(level=prior, role="lead"), markers)
     accent_slot = next(
@@ -280,11 +282,11 @@ def test_apply_accent_dims_supporting_layer() -> None:
     assert lane_level_at(after[accent_slot], 10.0, inherit=0.0) == pytest.approx(1.0)
 
 
-def test_apply_accent_noop_without_standard_markers() -> None:
+def test_apply_accent_noop_without_accent_markers() -> None:
     markers = [
-        SongMarker(8.0, "begin"),
-        SongMarker(12.0, "sustain"),
-        SongMarker(20.0, "crescendo"),
+        SongMarker(8.0, "verse"),
+        SongMarker(12.0, "build"),
+        SongMarker(20.0, "outro"),
     ]
     lanes = _steady_lanes()
     after = _apply(lanes, markers)
@@ -335,7 +337,7 @@ def test_apply_accent_picks_loudest_slot() -> None:
 def test_apply_accent_returns_to_prior_level() -> None:
     marker_t = 10.0
     prior = 0.5
-    markers = [SongMarker(marker_t, "standard"), SongMarker(22.0, "begin")]
+    markers = [SongMarker(marker_t, "standard"), SongMarker(22.0, "verse")]
     lanes = _steady_lanes(level=prior, role="lead")
     after = _apply(lanes, markers)
     window = accent_window(marker_t, markers, _DUR)
@@ -357,3 +359,27 @@ def test_apply_accent_returns_to_prior_level() -> None:
         prior
     )
     assert lane_role_at(after[accent_slot], t_end) == "lead"
+
+
+def test_accent_keeps_a_typed_section_in_its_layer_range() -> None:
+    markers = [SongMarker(10.0, "drop"), SongMarker(25.0, "breakdown")]
+    lanes = {
+        slot: TimelineLane(
+            baseline=0.0,
+            cues=[
+                SlotCue(t=10.0, level=1.0, role="lead", blend="add"),
+                SlotCue(t=25.0, level=0.0),
+            ]
+            if slot != "layer_4"
+            else [SlotCue(t=25.0, level=1.0, role="lead", blend="add")],
+        )
+        for slot in _SLOTS
+    }
+    after = _apply(lanes, markers)
+
+    def count(t: float) -> int:
+        return sum(lane_level_at(after[slot], t, inherit=0.0) > 0 for slot in _SLOTS)
+
+    assert 3 <= count(10.0) <= 4
+    assert count(25.0) == 1
+    assert count(30.0) == 1

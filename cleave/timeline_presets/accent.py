@@ -1,14 +1,17 @@
 """Song-marker accent overlay for timeline presets.
 
-Fires accents at in-range song markers typed ``standard`` when the conductor
+Fires accents at in-range plain, chorus, and drop markers when the conductor
 supplies stem signals. Other marker types are ignored for triggering but still
 cut sections (any marker ends the prior section).
 
-Each accent spans from its ``standard`` marker to the next song marker (or song
-end), capped at ``ACCENT_MAX_SEC``. Long sections get one accent window from the
-marker then restore; there is no second accent in the leftover. While the accent
-slot is up, one other active supporting layer is dimmed by one ``LEVEL_QUANTUM``
-step (floored at ``LEVEL_QUANTUM``) and restored when the accent ends.
+Each accent spans from its marker to the next song marker (or song end), capped
+at ``ACCENT_MAX_SEC``. Long sections get one accent window from the marker then
+restore; there is no second accent in the leftover. While the accent slot is
+up, one other active supporting layer is dimmed by one ``LEVEL_QUANTUM`` step
+(floored at ``LEVEL_QUANTUM``) and restored when the accent ends.
+
+When any section has a type, an accent also ends at the arrangement's next
+change, and never takes a typed section over its layer range.
 """
 
 from __future__ import annotations
@@ -21,7 +24,12 @@ from cleave.blend_modes import BlendMode
 from cleave.cue_roles import CUE_ROLE_BLEND, CueRole
 from cleave.stems import StemSource
 from cleave.signals import Signals
-from cleave.song_markers import SongMarker
+from cleave.song_markers import (
+    SongMarker,
+    SongSection,
+    resolve_sections,
+    section_at,
+)
 from cleave.timeline import (
     LEVEL_EPS,
     LEVEL_QUANTUM,
@@ -37,6 +45,11 @@ from cleave.timeline import (
 )
 from cleave.timeline_presets.emit import cues_from_states
 from cleave.timeline_presets.motifs import MIN_SWITCH_GAP_SEC
+from cleave.timeline_presets.sections import (
+    ACCENT_SECTION_TYPES,
+    any_typed,
+    layer_range,
+)
 
 # Longest single accent hold from a standard marker; leftover of a longer
 # section stays at restored prior levels (no second accent in that section).
@@ -73,17 +86,19 @@ class AccentBurst:
     t_start: float
     t_end: float
     dim_slot: str | None = None
+    # End on the arrangement's own change, not the state before the accent.
+    follow_lane: bool = False
 
 
 def resolve_accent_times(
     song_markers: Sequence[SongMarker],
     duration_sec: float,
 ) -> list[float]:
-    """Sorted unique ``standard`` marker times strictly inside ``(0, duration_sec)``."""
+    """Sorted unique accent marker times strictly inside ``(0, duration_sec)``."""
     times: list[float] = []
     seen: set[float] = set()
     for marker in song_markers:
-        if marker.marker_type != "standard":
+        if marker.marker_type not in ACCENT_SECTION_TYPES:
             continue
         t = float(marker.time)
         if not (0.0 < t < duration_sec) or t in seen:
@@ -153,12 +168,11 @@ def apply_accent(
     rng: random.Random,
     bar_times: Sequence[float] = (),
 ) -> dict[str, TimelineLane]:
-    """Insert section accents at ``standard`` markers; return ``lanes`` if none.
+    """Insert section accents; return ``lanes`` if none.
 
-    ``density_bias`` is accepted for pipeline symmetry with the conductor; accents
-    do not scale by density. ``bar_times`` is unused (section bounds use markers).
+    ``density_bias`` sets how many layers a typed section allows; accents do not
+    scale by it. ``bar_times`` is unused (section bounds use markers).
     """
-    del density_bias  # reserved for future density-aware accent staging
     del bar_times  # section span uses song markers only
     slot_list = list(slots)
     if not slot_list or duration_sec <= 0.0:
@@ -169,6 +183,7 @@ def apply_accent(
     if not _signals_ready(signals, slot_stems, slot_list):
         return lanes
 
+    sections = resolve_sections(song_markers, duration_sec)
     bursts = _plan_bursts(
         times,
         slot_list,
@@ -177,6 +192,8 @@ def apply_accent(
         signals=signals,
         slot_stems=slot_stems,
         lanes=lanes,
+        sections=sections if any_typed(sections) else (),
+        density_bias=density_bias,
         rng=rng,
     )
     if not bursts:
@@ -189,6 +206,7 @@ def apply_accent(
             burst.slot,
             t_start=burst.t_start,
             t_end=burst.t_end,
+            follow_lane=burst.follow_lane,
         )
         if burst.dim_slot is not None:
             result[burst.dim_slot] = _inject_dim_cues(
@@ -223,8 +241,11 @@ def _plan_bursts(
     signals: Signals,
     slot_stems: Mapping[str, StemSource],
     lanes: Mapping[str, TimelineLane],
+    sections: Sequence[SongSection],
+    density_bias: int,
     rng: random.Random,
 ) -> list[AccentBurst]:
+    """Accents to insert. *sections* is empty when no section has a type."""
     airtime = _layer_airtime(lanes, slots, duration_sec)
     bursts: list[AccentBurst] = []
     last_start: float | None = None
@@ -236,10 +257,26 @@ def _plan_bursts(
         if window is None:
             continue
         t_start, t_end = window
+        allowed = list(slots)
+        if sections:
+            t_end = min(
+                [t_end]
+                + [
+                    float(cue.t)
+                    for lane in lanes.values()
+                    for cue in lane.cues
+                    if cue.t > t_start + 1e-9
+                ]
+            )
+            allowed = _slots_in_range(
+                lanes, slots, t_start, section_at(sections, t_start), density_bias
+            )
+            if not allowed:
+                continue
         slot = _pick_accent_slot(
             signals,
             slot_stems,
-            slots,
+            allowed,
             t_start,
             airtime=airtime,
             recent_slots=recent_slots,
@@ -252,12 +289,32 @@ def _plan_bursts(
                 t_start=t_start,
                 t_end=t_end,
                 dim_slot=dim_slot,
+                follow_lane=bool(sections),
             )
         )
         last_start = t_start
         recent_slots.append(slot)
         airtime[slot] = airtime.get(slot, 0.0) + (t_end - t_start)
     return bursts
+
+
+def _slots_in_range(
+    lanes: Mapping[str, TimelineLane],
+    slots: Sequence[str],
+    t: float,
+    section: SongSection | None,
+    density_bias: int,
+) -> list[str]:
+    """Slots that can take an accent at *t* within the section's layer range."""
+    if section is None or not section.typed:
+        return list(slots)
+    active = [
+        slot
+        for slot in slots
+        if lane_level_at(lanes.get(slot) or empty_lane(), t, inherit=0.0) > LEVEL_EPS
+    ]
+    _lo, hi = layer_range(section, t, len(slots), density_bias)
+    return list(slots) if len(active) < hi else active
 
 
 def _pick_accent_slot(
@@ -369,6 +426,7 @@ def _inject_accent_cues(
     *,
     t_start: float,
     t_end: float,
+    follow_lane: bool = False,
 ) -> TimelineLane:
     """Rewrite ``slot`` through the burst via ``cues_from_states``.
 
@@ -413,6 +471,7 @@ def _inject_accent_cues(
         prior_level=prior_level,
         prior_role=prior_role,
         prior_blend=prior_blend,
+        follow_lane=follow_lane,
     )
 
 
@@ -472,6 +531,7 @@ def _anchored_accent_lane(
     prior_level: float,
     prior_role: CueRole | None,
     prior_blend: BlendMode | None,
+    follow_lane: bool,
 ) -> TimelineLane:
     """Upsert anchored accent/restore cues when emit would drop a role-only change."""
     cues = [
@@ -489,6 +549,10 @@ def _anchored_accent_lane(
             anchor=True,
         )
     )
+    if follow_lane:
+        prior_level = lane_level_at(lane, t_end, inherit=0.0)
+        prior_role = lane_role_at(lane, t_end)
+        prior_blend = lane_blend_at(lane, t_end)
     cues.append(
         _restore_cue(
             t_end,

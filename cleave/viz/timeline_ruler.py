@@ -8,6 +8,7 @@ narrower window. Steps follow how many pixels a second spans.
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 import pygame
@@ -164,6 +165,11 @@ def ruler_tick_top(height: int) -> int:
     return max(0, bottom - max(2, height // 2))
 
 
+def ruler_label_y(height: int, label_h: int) -> int:
+    """Top of a label *label_h* tall on a ruler *height* pixels tall."""
+    return max(0, height - 1 - RULER_BOTTOM_GAP_PX - 1 - label_h)
+
+
 def ruler_font(strip_font_size: int) -> pygame.font.Font:
     return overlay_font(max(1, int(round(strip_font_size * RULER_FONT_RATIO))))
 
@@ -236,11 +242,13 @@ def render_time_ruler(
     view_end_sec: float,
     duration_sec: float,
     strip_font_size: int,
+    reserved: Sequence[tuple[int, int]] = (),
 ) -> pygame.Surface | None:
     """Transparent ruler surface *width* x *height*; ticks rise from the baseline.
 
     Song start and end marks run on past the baseline to the bottom edge, where
-    the strip's rows continue them.
+    the strip's rows continue them. Times and their ticks keep off the
+    *reserved* ``(left, right)`` spans.
     """
     if width <= 0 or height <= 0:
         return None
@@ -275,18 +283,25 @@ def render_time_ruler(
     for t in ticks.major:
         label = font.render(format_ruler_time(t, ticks.major_step), True, palette().muted)
         label_x = min(x_of(t), bar_right - 1) + LABEL_TICK_GAP_PX
-        if label_x + label.get_width() <= bar_right:
+        label_right = label_x + label.get_width()
+        if any(left <= label_right and label_x <= right for left, right in reserved):
+            continue
+        if label_right <= bar_right:
             labels.append((label_x, label))
 
     pygame.draw.line(surface, palette().bar_grid, (bar_left, bottom), (bar_right - 1, bottom), 1)
     for t in ticks.minor:
         x = x_of(t)
         # Minor ticks under a label would read as part of its text.
-        if any(lx - 1 <= x <= lx + lab.get_width() for lx, lab in labels):
+        if any(lx - 1 <= x <= lx + lab.get_width() for lx, lab in labels) or any(
+            left - 1 <= x <= right for left, right in reserved
+        ):
             continue
         pygame.draw.line(surface, palette().bar_grid, (x, bottom - minor_h), (x, bottom), 1)
     for t in ticks.major:
         x = min(x_of(t), bar_right - 1)
+        if any(left - 1 <= x <= right for left, right in reserved):
+            continue
         pygame.draw.line(surface, palette().muted, (x, bottom - major_h), (x, bottom), 1)
     for x in song_bound_xs(
         duration_sec=duration_sec,
@@ -299,6 +314,5 @@ def render_time_ruler(
         if bottom + 1 < height:
             pygame.draw.line(surface, palette().song_bound, (x, bottom + 1), (x, height - 1), 1)
     for label_x, label in labels:
-        label_y = max(0, bottom - 1 - label.get_height())
-        surface.blit(label, (label_x, label_y))
+        surface.blit(label, (label_x, ruler_label_y(height, label.get_height())))
     return surface

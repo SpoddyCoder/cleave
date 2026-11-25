@@ -29,11 +29,6 @@ from cleave.timeline_presets.chords import (
 )
 from cleave.timeline_presets.density import density_bias_for
 from cleave.song_markers import SongMarker
-from cleave.timeline_presets.crescendo import (
-    apply_crescendo,
-    resolve_crescendo_window,
-    resolve_crescendo_windows,
-)
 from cleave.timeline_presets.grid import thin_bar_times_for_arrange
 from cleave.timeline_presets.motifs import hamming_distance
 
@@ -526,7 +521,7 @@ def test_compose_with_markers_allows_off_bar_cues() -> None:
         duration_sec,
         random.Random(3),
         bar_times=bars,
-        song_marker_times=markers,
+        song_markers=[SongMarker(t) for t in markers],
     )
     _assert_lanes_cover_slots(lanes, slots)
     _assert_never_zero(lanes, slots, duration_sec)
@@ -549,7 +544,9 @@ def test_compose_ignores_out_of_range_markers() -> None:
         duration_sec,
         random.Random(5),
         bar_times=bars,
-        song_marker_times=[-1.0, 0.0, duration_sec, duration_sec + 5.0],
+        song_markers=[
+            SongMarker(t) for t in (-1.0, 0.0, duration_sec, duration_sec + 5.0)
+        ],
     )
     _assert_cues_on_bars(lanes, thinned)
     _assert_min_gaps(lanes, bars, duration_sec)
@@ -716,188 +713,19 @@ def test_density_bias_monotonic_active_counts(builder) -> None:
     )
 
 
-def _crescendo_markers(
-    times: list[float], *, peak: float | None = None
-) -> list[SongMarker]:
-    """Standard markers; when ``peak`` is set that time is typed crescendo."""
-    return [
-        SongMarker(t, "crescendo" if peak is not None and t == peak else "standard")
-        for t in times
-    ]
-
-
-def test_resolve_crescendo_window_uses_marker_minus_two() -> None:
-    markers = _crescendo_markers([10.0, 40.0, 70.0, 100.0], peak=100.0)
-    window = resolve_crescendo_window(markers, 120.0)
-    assert window is not None
-    assert window.t_start == 40.0
-    assert window.t_full == 70.0
-    assert window.t_peak_end == 100.0
-
-
-def test_resolve_crescendo_window_falls_back_without_minus_two() -> None:
-    markers = _crescendo_markers([20.0, 60.0, 100.0], peak=60.0)
-    window = resolve_crescendo_window(markers, 120.0, peak_time=60.0)
-    assert window is not None
-    assert window.t_peak_end == 60.0
-    # Fraction start (60 - 20% of 120 = 36) lands after t_full (20); collapse hold.
-    assert window.t_start == pytest.approx(36.0)
-    assert window.t_full == 60.0
-    assert window.t_start < window.t_full <= window.t_peak_end
-
-
-def test_resolve_crescendo_window_requires_prior_marker() -> None:
-    assert resolve_crescendo_window(
-        [SongMarker(50.0, "crescendo")], 100.0
-    ) is None
-    assert resolve_crescendo_window(
-        _crescendo_markers([10.0, 50.0]), 100.0
-    ) is None
-
-
-def test_resolve_crescendo_windows_all_typed_peaks() -> None:
-    markers = [
-        SongMarker(10.0),
-        SongMarker(40.0, "crescendo"),
-        SongMarker(70.0),
-        SongMarker(100.0, "crescendo"),
-    ]
-    windows = resolve_crescendo_windows(markers, 120.0)
-    assert len(windows) == 2
-    # First peak has only one prior marker: fraction start lands after t_full,
-    # so the hold collapses to a pure rise into the peak.
-    assert windows[0].t_peak_end == 40.0
-    assert windows[0].t_start == pytest.approx(16.0)
-    assert windows[0].t_full == 40.0
-    assert windows[1].t_peak_end == 100.0
-    assert windows[1].t_full == 70.0
-    assert windows[1].t_start == 40.0
-
-
-def test_resolve_crescendo_window_begin_anchor() -> None:
-    markers = [
-        SongMarker(10.0),
-        SongMarker(20.0, "begin"),
-        SongMarker(40.0),
-        SongMarker(70.0, "crescendo"),
-    ]
-    window = resolve_crescendo_window(markers, 120.0)
-    assert window is not None
-    assert window.t_start == 20.0
-    assert window.t_full == 40.0
-    assert window.t_peak_end == 70.0
-
-
-def test_resolve_crescendo_window_sustain_anchor() -> None:
-    markers = [
-        SongMarker(10.0),
-        SongMarker(25.0),
-        SongMarker(40.0, "sustain"),
-        SongMarker(70.0, "crescendo"),
-    ]
-    window = resolve_crescendo_window(markers, 120.0)
-    assert window is not None
-    assert window.t_start == 25.0
-    assert window.t_full == 40.0
-    assert window.t_peak_end == 70.0
-
-
-def test_resolve_crescendo_window_begin_and_sustain() -> None:
-    markers = [
-        SongMarker(5.0),
-        SongMarker(15.0, "begin"),
-        SongMarker(30.0),
-        SongMarker(45.0, "sustain"),
-        SongMarker(60.0),
-        SongMarker(80.0, "crescendo"),
-    ]
-    window = resolve_crescendo_window(markers, 120.0)
-    assert window is not None
-    assert window.t_start == 15.0
-    assert window.t_full == 45.0
-    assert window.t_peak_end == 80.0
-
-
-def test_resolve_crescendo_window_multi_section_span() -> None:
-    markers = [
-        SongMarker(10.0, "begin"),
-        SongMarker(20.0),
-        SongMarker(30.0),
-        SongMarker(40.0, "sustain"),
-        SongMarker(50.0),
-        SongMarker(60.0, "crescendo"),
-    ]
-    window = resolve_crescendo_window(markers, 120.0)
-    assert window is not None
-    assert window.t_start == 10.0
-    assert window.t_full == 40.0
-    assert window.t_peak_end == 60.0
-
-
-def test_resolve_crescendo_window_scopes_after_prior_peak() -> None:
-    markers = [
-        SongMarker(10.0, "begin"),
-        SongMarker(15.0, "sustain"),
-        SongMarker(20.0, "crescendo"),
-        SongMarker(30.0, "begin"),
-        SongMarker(40.0, "sustain"),
-        SongMarker(50.0, "crescendo"),
-    ]
-    windows = resolve_crescendo_windows(markers, 120.0)
-    assert len(windows) == 2
-    assert windows[0].t_start == 10.0
-    assert windows[0].t_full == 15.0
-    assert windows[0].t_peak_end == 20.0
-    assert windows[1].t_start == 30.0
-    assert windows[1].t_full == 40.0
-    assert windows[1].t_peak_end == 50.0
-
-
-def test_resolve_crescendo_window_collapses_hold_when_start_not_before_full() -> None:
-    markers = [
-        SongMarker(30.0, "sustain"),
-        SongMarker(50.0, "begin"),
-        SongMarker(70.0, "crescendo"),
-    ]
-    window = resolve_crescendo_window(markers, 120.0)
-    assert window is not None
-    # begin at 50 is not < t_full (30), so begin is skipped; N-2 fallback is
-    # sustain at 30 and t_full is also 30 -> collapse hold to peak.
-    assert window.t_start == 30.0
-    assert window.t_full == 70.0
-    assert window.t_peak_end == 70.0
-
-
-def test_resolve_crescendo_window_scopes_past_diminuendo() -> None:
-    markers = [
-        SongMarker(10.0, "begin"),
-        SongMarker(20.0, "sustain"),
-        SongMarker(40.0, "diminuendo"),
-        SongMarker(45.0, "begin"),
-        SongMarker(55.0, "sustain"),
-        SongMarker(70.0, "crescendo"),
-    ]
-    windows = resolve_crescendo_windows(markers, 120.0)
-    assert len(windows) == 1
-    assert windows[0].t_start == 45.0
-    assert windows[0].t_full == 55.0
-    assert windows[0].t_peak_end == 70.0
-
-
-def test_crescendo_states_ramp_through_quantised_levels() -> None:
-    from cleave.timeline_presets.crescendo import (
-        CRESCENDO_ENTRY_LEVEL,
-        CrescendoWindow,
-        _crescendo_states,
+def test_build_states_ramp_through_quantised_levels() -> None:
+    from cleave.timeline_presets.build import (
+        BUILD_ENTRY_LEVEL,
+        BuildWindow,
+        _build_states,
     )
 
     slots = _slots(4)
     bars = _bar_times_for(120.0)
-    window = CrescendoWindow(t_start=50.0, t_full=80.0, t_peak_end=100.0)
-    states = _crescendo_states(
+    window = BuildWindow(t_start=50.0, t_full=80.0, t_end=100.0)
+    states = _build_states(
         slots,
         window,
-        duration_sec=120.0,
         bar_times=bars,
         rng=random.Random(0),
     )
@@ -907,7 +735,7 @@ def test_crescendo_states_ramp_through_quantised_levels() -> None:
     assert len(ramp) > 2
     weights = [sum(levels.values()) for levels in ramp]
     assert weights == sorted(weights)
-    assert weights[0] == pytest.approx(CRESCENDO_ENTRY_LEVEL)
+    assert weights[0] == pytest.approx(BUILD_ENTRY_LEVEL)
     distinct_levels = {level for levels in ramp for level in levels.values()}
     assert len(distinct_levels) > 2
     # Entrant count grows monotonically toward the full stack.
@@ -918,8 +746,8 @@ def test_crescendo_states_ramp_through_quantised_levels() -> None:
     assert len(full) == min(4, MAX_CONCURRENT_LAYERS)
 
 
-def test_crescendo_spread_times_are_evenly_spaced() -> None:
-    from cleave.timeline_presets.crescendo import _spread_times
+def test_build_spread_times_are_evenly_spaced() -> None:
+    from cleave.timeline_presets.build import _spread_times
 
     bars = _bar_times_for(120.0)
     times = _spread_times(50.0, 80.0, 4, bars)
@@ -930,31 +758,6 @@ def test_crescendo_spread_times_are_evenly_spaced() -> None:
     assert all(gap > 0.0 for gap in gaps)
     # Interior steps land mid-window, not bunched against either end.
     assert max(gaps) <= 2.0 * min(gaps)
-
-
-def test_apply_crescendo_ramps_holds_then_solos() -> None:
-    slots = _slots(4)
-    duration_sec = 120.0
-    markers = _crescendo_markers([20.0, 50.0, 80.0, 100.0], peak=100.0)
-    bars = _bar_times_for(duration_sec)
-    base = build_breathing_cues(slots, duration_sec, random.Random(1), bar_times=bars)
-    lanes = apply_crescendo(
-        base,
-        slots,
-        duration_sec=duration_sec,
-        bar_times=bars,
-        song_markers=markers,
-        rng=random.Random(2),
-    )
-    # Ramp start: one layer; full stack at marker-1; hold through selected; solo after.
-    assert _active_count_at(lanes, slots, 50.0) == 1
-    assert _active_count_at(lanes, slots, 80.0) == min(4, MAX_CONCURRENT_LAYERS)
-    assert _active_count_at(lanes, slots, 90.0) == min(4, MAX_CONCURRENT_LAYERS)
-    assert _active_count_at(lanes, slots, 100.0) == 1
-    assert _active_count_at(lanes, slots, 110.0) == 1
-    assert max(_sample_active_counts(lanes, slots, duration_sec, step=1.0)) <= (
-        MAX_CONCURRENT_LAYERS
-    )
 
 
 def test_pick_motif_density_bonus_favors_duos() -> None:

@@ -13,7 +13,6 @@ from cleave.song_markers import (
     marker_index_near,
     place_marker,
     snap_markers,
-    song_marker_gesture_warning,
 )
 from cleave.timeline import snap_placement_time
 from cleave.viz.modal import FormField, FormSpec, FormValues, ModalHost
@@ -79,7 +78,7 @@ class SongMarkerController:
         markers.selected_flash_start_ms = pygame.time.get_ticks()
 
     def set_type(self, index: int, marker_type: SongMarkerType) -> None:
-        """Give marker *index* *marker_type*, warning when the gesture is malformed."""
+        """Give marker *index* *marker_type*."""
         markers = self.session.song_markers
         if index < 0 or index >= len(markers.markers):
             return
@@ -87,16 +86,19 @@ class SongMarkerController:
         if marker_type == current.marker_type:
             return
         markers.markers[index] = SongMarker(current.time, marker_type)
-        warning = song_marker_gesture_warning(markers.markers, index)
-        if warning is not None and self._on_notification is not None:
-            self._on_notification(warning)
 
     def drop(self) -> None:
         """Drop or replace a song marker where the user tapped (session until Save)."""
         self.drop_at(tap_sec(self._playback, self._duration_sec))
 
-    def drop_at(self, t_sec: float) -> None:
-        """Drop or replace a song marker at *t_sec*, snapped as placement snaps."""
+    def drop_at(
+        self, t_sec: float, marker_type: SongMarkerType | None = None
+    ) -> None:
+        """Drop or replace a song marker at *t_sec*, snapped as placement snaps.
+
+        Without *marker_type* a replaced marker keeps its type and a new one is
+        plain.
+        """
         if self.session.timeline.recording:
             return
         t = snap_placement_time(
@@ -114,7 +116,7 @@ class SongMarkerController:
         ):
             prior_selected_time = markers.markers[markers.selected_index].time
         new_markers, replaced_index, replaced_time = place_marker(
-            markers.markers, t
+            markers.markers, t, marker_type=marker_type
         )
         markers.markers = list(new_markers)
         # Never activate the newly placed marker; keep prior selection by time.

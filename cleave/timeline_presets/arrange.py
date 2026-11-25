@@ -7,6 +7,7 @@ from collections.abc import Mapping, Sequence
 
 from cleave.stems import StemSource
 from cleave.signals import Signals
+from cleave.song_markers import SongMarker, SongSection, resolve_sections, section_at
 from cleave.timeline import TimelineLane
 from cleave.timeline_presets.characters import CharacterProfile, in_climax_window
 from cleave.timeline_presets.chords import (
@@ -29,6 +30,13 @@ from cleave.timeline_presets.motifs import (
     motifs_for_profile,
     switch_gap_ok,
 )
+from cleave.timeline_presets.sections import (
+    any_typed,
+    climax_section,
+    fit_layers,
+    layer_range,
+    section_profile,
+)
 
 # Phrase length bounds for the arranger (bar counts and wall-clock seconds).
 PHRASE_BARS_MIN = 4
@@ -39,6 +47,8 @@ PHRASE_SEC_MIN = 8.0
 _DENSITY_PICK_WEIGHT = 1.0
 # Soft bias toward chords whose stems are active in the current phrase.
 _CONDUCTOR_PICK_WEIGHT = 2.0
+# Shortest time between switches in a fast section.
+FAST_SWITCH_GAP_SEC = 3.0
 
 
 def compose_timeline(
@@ -47,7 +57,7 @@ def compose_timeline(
     profile: CharacterProfile,
     rng: random.Random,
     bar_times: Sequence[float],
-    song_marker_times: Sequence[float] = (),
+    song_markers: Sequence[SongMarker] = (),
     density_bias: int = 0,
     signals: Signals | None = None,
     slot_stems: Mapping[str, StemSource] | None = None,
@@ -55,7 +65,9 @@ def compose_timeline(
     slot_list = list(slots)
     if not slot_list or duration_sec <= 0.0:
         return {}
-    markers = _normalize_song_markers(song_marker_times, duration_sec)
+    sections = resolve_sections(song_markers, duration_sec)
+    typed = any_typed(sections)
+    markers = [section.start for section in sections[1:]]
     if len(slot_list) == 1:
         return cues_from_states(
             slot_list,
@@ -68,7 +80,7 @@ def compose_timeline(
     motifs = motifs_for_profile(profile.motif_ids)
 
     bars = thin_bar_times_for_arrange(bar_times, duration_sec)
-    if len(bars) < PHRASE_BARS_MIN and not markers:
+    if len(bars) < PHRASE_BARS_MIN and not markers and not typed:
         opening = frozenset({order[0]})
         return cues_from_states(
             slot_list,
@@ -76,6 +88,8 @@ def compose_timeline(
         )
 
     phrases = _partition_phrases(bars, duration_sec, rng, markers)
+    if not phrases and typed:
+        phrases = [(section.start, section.end) for section in sections]
     if not phrases:
         opening = frozenset({order[0]})
         return cues_from_states(
@@ -95,8 +109,24 @@ def compose_timeline(
     solo_rotation = 0
     layer_airtime = {slot: 0.0 for slot in order}
     claimed_markers: set[float] = set()
+    section_starts: set[float] = set()
+    prev_section: SongSection | None = None
+    avoid: frozenset[str] = frozenset()
 
     climax_phrase_index = _climax_phrase_index(phrases, duration_sec)
+    climax_section_start: float | None = None
+    if typed:
+        climax = climax_section(sections)
+        if climax is not None:
+            climax_section_start = climax.start
+            climax_phrase_index = next(
+                (
+                    i
+                    for i, (start, end) in enumerate(phrases)
+                    if climax.contains((start + end) * 0.5)
+                ),
+                None,
+            )
     budget_scale = budget_scale_for(density_bias)
 
     for phrase_i, (phrase_start, phrase_end) in enumerate(phrases):
@@ -104,12 +134,19 @@ def compose_timeline(
         progress = midpoint / duration_sec
         weights = None if conductor is None else conductor.phrase_at(midpoint)
         budget_gain = 1.0 if weights is None else weights.budget_gain
-        budget = max(1.0, profile.envelope(progress) * budget_scale * budget_gain)
-        climax_window = in_climax_window(progress)
+        section = section_at(sections, midpoint)
+        shape = section_profile(section)
+        energy = profile.envelope(progress) if shape is None else shape.budget
+        budget = max(1.0, energy * budget_scale * budget_gain)
+        if climax_section_start is not None:
+            climax_window = phrase_i == climax_phrase_index
+        else:
+            climax_window = shape is None and in_climax_window(progress)
         force_climax = (
             profile.climax_motif_id is not None
             and phrase_i == climax_phrase_index
             and not climax_used
+            and (shape is None or climax_section_start is not None)
         )
 
         rotation = solo_rotation
@@ -164,19 +201,72 @@ def compose_timeline(
         )
         solo_rotation += len(phrase_states)
 
+        gap_sec = MIN_SWITCH_GAP_SEC
+        if typed and section is not None:
+            entering = section != prev_section
+            boundary = entering and (
+                section.typed or (prev_section is not None and prev_section.typed)
+            )
+            if entering:
+                avoid = frozenset()
+                if section.section_type == "bridge" and states:
+                    avoid = _lead_of(states[-1], order, conductor, layer_airtime)
+            activity = {} if weights is None else weights.slot_activity
+            if shape is not None and shape.pace == "fast":
+                gap_sec = FAST_SWITCH_GAP_SEC
+            phrase_states = _section_phrase_states(
+                phrase_states,
+                section,
+                phrase_start=phrase_start,
+                phrase_end=phrase_end,
+                bars=bars,
+                order=order,
+                density_bias=density_bias,
+                activity=activity,
+                airtime=layer_airtime,
+                avoid=avoid,
+                peak=force_climax,
+            )
+            if boundary and phrase_states:
+                start = section.start
+                first = phrase_states[0][1]
+                while (
+                    len(states) > 1
+                    and states[-1][0] > start - MIN_SWITCH_GAP_SEC
+                    and states[-1][0] not in section_starts
+                ):
+                    states.pop()
+                prev_active = states[-1][1] if states else None
+                section_starts.add(start)
+                if first != prev_active:
+                    states.append((start, first))
+                    prev_active = first
+                phrase_states = phrase_states[1:]
+                for slot in first:
+                    layer_airtime[slot] += max(phrase_end - start, 1e-6) / len(first)
+            prev_section = section
+
         for t, active in phrase_states:
             if prev_active is not None and active == prev_active:
                 continue
-            if states:
+            winding_down = (
+                shape is not None
+                and shape.winds_down
+                and section is not None
+                and t >= (section.start + section.end) * 0.5 - 1e-9
+            )
+            if states and not winding_down:
                 t = _enforce_min_bar_gap(
                     bars,
                     states[-1][0],
                     t,
                     MIN_SWITCH_GAP_BARS,
-                    MIN_SWITCH_GAP_SEC,
+                    gap_sec,
                 )
                 if t is None:
                     continue
+            if typed and section is not None and not section.contains(t):
+                continue
             if t >= duration_sec:
                 break
             states.append((t, active))
@@ -191,13 +281,20 @@ def compose_timeline(
     elif states[0][0] != 0.0:
         states.insert(0, (0.0, states[0][1]))
 
-    _apply_resolve(profile, vocab, states, duration_sec, bars, rng)
+    if not sections[-1].typed:
+        _apply_resolve(profile, vocab, states, duration_sec, bars, rng)
     states.sort(key=lambda item: item[0])
 
     level_states = (
         [(t, levels_from_active(active)) for t, active in states]
         if conductor is None
-        else conductor.level_states(states, duration_sec)
+        else conductor.level_states(
+            states,
+            duration_sec,
+            keep_stack_at=lambda t: (
+                section_profile(section_at(sections, t)) is not None
+            ),
+        )
     )
     casts = None
     if conductor is not None:
@@ -212,19 +309,114 @@ def compose_timeline(
     )
 
 
-def _normalize_song_markers(
-    song_marker_times: Sequence[float],
-    duration_sec: float,
-) -> list[float]:
-    """Sorted unique markers strictly inside ``(0, duration_sec)``."""
-    cleaned = sorted(
-        {
-            float(t)
-            for t in song_marker_times
-            if 0.0 < float(t) < duration_sec
-        }
-    )
-    return cleaned
+def _lead_of(
+    state: tuple[float, frozenset[str]],
+    order: Sequence[str],
+    conductor: StemConductor | None,
+    airtime: Mapping[str, float],
+) -> frozenset[str]:
+    """The layer leading *state*: its cast lead, else the one seen most."""
+    t, active = state
+    if conductor is not None:
+        cast = conductor.cast_for_state(active, conductor.phrase_at(t))
+        leads = frozenset(slot for slot, (role, _blend) in cast.items() if role == "lead")
+        if leads:
+            return leads
+    present = [slot for slot in order if slot in active]
+    if not present:
+        return frozenset()
+    return frozenset({max(present, key=lambda slot: airtime.get(slot, 0.0))})
+
+
+def _section_phrase_states(
+    states: Sequence[tuple[float, frozenset[str]]],
+    section: SongSection,
+    *,
+    phrase_start: float,
+    phrase_end: float,
+    bars: Sequence[float],
+    order: Sequence[str],
+    density_bias: int,
+    activity: Mapping[str, float],
+    airtime: Mapping[str, float],
+    avoid: frozenset[str],
+    peak: bool,
+) -> list[tuple[float, frozenset[str]]]:
+    """A phrase's states fitted to its section's pace and layer range.
+
+    Plain sections only lose states that fall outside them. *peak* asks for the
+    most layers the section allows.
+    """
+    inside = [
+        (max(t, section.start), active) for t, active in states if t < section.end - 1e-9
+    ]
+    shape = section_profile(section)
+    if shape is None:
+        return inside
+    if not inside:
+        inside = [(phrase_start, states[0][1] if states else frozenset())]
+    if shape.pace == "slow":
+        inside = inside[:1]
+    start = section.start if phrase_start <= section.start + 1e-9 else inside[0][0]
+    inside[0] = (start, inside[0][1])
+    if shape.winds_down:
+        half = (section.start + section.end) * 0.5
+        turn = next((t for t in bars if half - 1e-9 <= t < section.end - 1e-9), half)
+        if phrase_start < turn < phrase_end:
+            inside.append((turn, inside[-1][1]))
+    if shape.pace == "fast":
+        # Keep the stack and trade one layer at a time.
+        previous = start
+        for t in bars:
+            if previous + FAST_SWITCH_GAP_SEC - 1e-9 <= t < phrase_end - 1e-9:
+                inside.append((t, frozenset()))
+                previous = t
+        inside = [inside[0]] + [entry for entry in inside[1:] if not entry[1]]
+
+    fitted: list[tuple[float, frozenset[str]]] = []
+    for index, (t, active) in enumerate(inside):
+        lo, hi = layer_range(section, t, len(order), density_bias)
+        if shape.pace == "fast" and fitted:
+            active = _trade_one(fitted[-1][1], order, fitted)
+        fitted.append(
+            (
+                t,
+                fit_layers(
+                    active,
+                    hi if peak and index == 0 else lo,
+                    hi,
+                    order,
+                    activity,
+                    airtime,
+                    avoid=avoid,
+                ),
+            )
+        )
+    return fitted
+
+
+def _trade_one(
+    active: frozenset[str],
+    order: Sequence[str],
+    fitted: Sequence[tuple[float, frozenset[str]]],
+) -> frozenset[str]:
+    """*active* with its longest-standing layer swapped for the longest-absent one."""
+
+    def run(slot: str, on: bool) -> int:
+        count = 0
+        for _t, layers in reversed(fitted):
+            if (slot in layers) != on:
+                break
+            count += 1
+        return count
+
+    absent = [slot for slot in order if slot not in active]
+    present = [slot for slot in order if slot in active]
+    if not absent or not present:
+        return active
+    leaving = max(present, key=lambda slot: run(slot, True))
+    joining = max(absent, key=lambda slot: run(slot, False))
+    return (active - {leaving}) | {joining}
 
 
 def _section_bounds(

@@ -71,7 +71,6 @@ From [plans-completed/improved-timeline-presets.md](plans-completed/improved-tim
 - Close the structure gap without asking the user to drop every marker by hand.
 - Give section-scale drama (breakdown solo, chorus lift) that bar-only partitioning cannot invent.
 - Make the visuals have motifs at song scale, not only at phrase scale.
-- Bias the stem conductor curve by section role (intro, verse, chorus, bridge, and similar) rather than replacing it.
 
 ### Design sketch
 
@@ -79,17 +78,7 @@ From [plans-completed/improved-timeline-presets.md](plans-completed/improved-tim
 2. Boundaries become **suggested song markers**, shown as today's red ticks and saved to `project.yaml` under the same deferred-write model as [plans-completed/song-markers.md](plans-completed/song-markers.md). The user corrects a few if needed.
 3. `compose_timeline` generates one arrangement **per cluster**, not per section, and replays it at each recurrence with a deterministic variation seeded by occurrence index: add a layer, raise the lead, tighten switch rate.
 4. Non-repeating material (bridge, breakdown) is identifiable precisely because it is unlike everything else in the matrix, so it gets the contrast treatment: solo one stem, or cut to black and re-enter on the next bar.
-5. Section roles bias the conductor curve rather than replacing it:
-
-| Section | Visual role |
-| --- | --- |
-| Intro / outro | single calm foundation layer |
-| Verse | two layers, slow switches |
-| Pre-chorus | rising weight toward the next wall |
-| Chorus | peak weight, still under the busyness cap |
-| Bridge / breakdown | solo one stem, others ducked |
-| Drop | hard cut to black, re-entry on the next bar |
-
+5. Suggested markers carry section types where the matrix supports one. The types and what each does to the arrangement live in [cleave/timeline_presets/sections.py](../../cleave/timeline_presets/sections.py).
 6. Hard walls, soft latch, and exclusive marker claiming stay as today; auto markers simply feed the same walls.
 
 ### Libraries
@@ -150,7 +139,7 @@ Let some layers join the pattern mask while others stay as normal overlays on to
 Timeline preset generation:
 
 - Retire `timeline.preset.mode` (`layers` / `pattern_mask`). Generate reads membership: members go to the pattern-mask arranger (short sections, swaps, recasts), non-members to the layers arranger (longer arcs, fades).
-- The two arrangers share one conductor and one overall visible-layer budget, so crescendos do not stack a full mask plus every overlay, and quiet passages do not go empty.
+- The two arrangers share one conductor and one overall visible-layer budget, so builds do not stack a full mask plus every overlay, and quiet passages do not go empty.
 - Cue semantics differ by membership: members are effectively on/off with `MaskTransition` wipes (cue blend is forced to `black-key`), overlays keep level, blend, and hard/soft fades. The cue inspector rows follow membership, so membership joins the structure signature.
 - Changing membership after Generate leaves cues shaped for the other arranger; a toast could suggest regenerating.
 

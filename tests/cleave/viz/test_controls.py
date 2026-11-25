@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import io
 import sys
 import tempfile
@@ -1853,7 +1854,60 @@ def test_timeline_presets_arc_clears_and_applies() -> None:
     assert all(lane.baseline is not None for lane in lanes.values())
 
 
-def test_timeline_presets_crescendo_when_typed_marker() -> None:
+@pytest.mark.parametrize("stage", ["build", "repopulate"])
+def test_failed_generate_keeps_the_session_and_the_timeline(
+    stage: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    beats = tuple(float(i) for i in range(241))
+    controls = make_controls(
+        ("layer_1", "layer_2"),
+        beat_times=beats,
+        bar_times=beats[::4],
+        duration_sec=240.0,
+    )
+    tl = controls.session.timeline
+    tl.lanes = {
+        "layer_1": _lane(True, (1.0, False)),
+        "layer_2": _lane(False, (2.0, True)),
+    }
+    prior = copy.deepcopy(tl.lanes)
+    tl.armed_slots.add("layer_1")
+    enabled = tl.enabled
+
+    def fail(*_args, **_kwargs):
+        raise ValueError("no bars here")
+
+    if stage == "build":
+        monkeypatch.setattr(
+            "cleave.viz.timeline_preset_controls.apply_build", fail
+        )
+    else:
+        monkeypatch.setattr(controls._timeline_presets, "_on_repopulate", fail)
+    _focus_timeline_presets(controls)
+    _confirm_timeline_preset(controls)
+
+    assert not controls.modal_host.active
+    assert tl.lanes == prior
+    assert tl.enabled == enabled
+    assert not controls.edit_history.can_undo
+    assert not controls.edit_history.pending
+    if stage == "build":
+        assert tl.armed_slots == {"layer_1"}
+    view = controls.build_view_state(paused=False)
+    assert view.notification_message == (
+        "Generate timeline failed, timeline unchanged: ValueError: no bars here"
+    )
+    assert "Traceback" in capsys.readouterr().err
+
+    monkeypatch.undo()
+    if stage == "build":
+        _focus_timeline_presets(controls)
+        _confirm_timeline_preset(controls)
+        assert tl.lanes != prior
+        assert controls.edit_history.can_undo
+
+
+def test_timeline_presets_build_when_typed_marker() -> None:
     from cleave.song_markers import SongMarker
 
     beats = tuple(float(i) for i in range(241))
@@ -1868,17 +1922,17 @@ def test_timeline_presets_crescendo_when_typed_marker() -> None:
         SongMarker(30.0),
         SongMarker(90.0),
         SongMarker(150.0),
-        SongMarker(200.0, "crescendo"),
+        SongMarker(200.0, "build"),
     ]
     controls.session.timeline.timeline_preset_kind = "breathing"
     _focus_timeline_presets(controls)
     _confirm_timeline_preset(controls)
     assert not controls.modal_host.active
     view = controls.build_view_state(paused=False)
-    assert view.notification_message == "Applied Breathing timeline preset (crescendo)"
+    assert view.notification_message == "Applied Breathing timeline preset (build)"
 
 
-def test_timeline_presets_skips_crescendo_without_typed_marker() -> None:
+def test_timeline_presets_skips_build_without_typed_marker() -> None:
     beats = tuple(float(i) for i in range(241))
     bars = tuple(float(i) for i in range(0, 241, 4))
     controls = make_controls(
@@ -4870,22 +4924,16 @@ def test_song_marker_left_right_steps_type() -> None:
     assert _row_text(view, row) == "00:26.02: -"
 
     assert _press_focused(controls, keydown(pygame.K_RIGHT)) is True
-    assert markers.markers[0].marker_type == "begin"
+    assert markers.markers[0].marker_type == "intro"
     assert controls.config_dirty
     view = controls.build_view_state(paused=False)
     row = RowDescriptor(RowKind.SONG_MARKER_ITEM, marker_index=0)
-    assert _row_text(view, row) == "00:26.02: begin"
+    assert _row_text(view, row) == "00:26.02: intro"
 
     assert _press_focused(controls, keydown(pygame.K_RIGHT)) is True
-    assert markers.markers[0].marker_type == "sustain"
-    assert _press_focused(controls, keydown(pygame.K_RIGHT)) is True
-    assert markers.markers[0].marker_type == "crescendo"
-    assert _press_focused(controls, keydown(pygame.K_RIGHT)) is True
-    assert markers.markers[0].marker_type == "diminuendo"
-    assert _press_focused(controls, keydown(pygame.K_RIGHT)) is True
-    assert markers.markers[0].marker_type == "diminuendo"
+    assert markers.markers[0].marker_type == "verse"
     assert _press_focused(controls, keydown(pygame.K_LEFT)) is True
-    assert markers.markers[0].marker_type == "crescendo"
+    assert markers.markers[0].marker_type == "intro"
 
 
 def test_song_marker_combo_pick_sets_type_in_one_change() -> None:
@@ -4896,39 +4944,21 @@ def test_song_marker_combo_pick_sets_type_in_one_change() -> None:
     view = controls.build_view_state(paused=False)
     choice = row_spec(RowKind.SONG_MARKER_ITEM).choice
     assert choice is not None
-    assert choice.labels() == ("-", "begin", "sustain", "crescendo", "diminuendo")
+    assert choice.labels() == (
+        "-",
+        "intro",
+        "verse",
+        "build",
+        "chorus",
+        "drop",
+        "breakdown",
+        "bridge",
+        "outro",
+    )
     assert choice.index(view, desc) == 0
 
     assert apply_field_choice(controls, desc, 3) is True
-    assert markers.markers[0].marker_type == "crescendo"
-
-
-def test_song_marker_type_cycle_toasts_orphan_begin() -> None:
-    controls = make_controls(("layer_1",))
-    controls.session.timeline.panel_open = True
-    markers = controls.session.song_markers
-    markers.markers = [SongMarker(10.0, "standard"), SongMarker(20.0)]
-    _focus_inspector_kind(controls, RowKind.SONG_MARKER_ITEM, marker_index=0)
-    noted: list[str] = []
-    controls.show_notification = noted.append  # type: ignore[method-assign]
-
-    assert _press_focused(controls, keydown(pygame.K_RIGHT)) is True
-    assert markers.markers[0].marker_type == "begin"
-    assert noted == ["begin has no crescendo/diminuendo after it"]
-
-
-def test_song_marker_type_cycle_toasts_orphan_sustain() -> None:
-    controls = make_controls(("layer_1",))
-    controls.session.timeline.panel_open = True
-    markers = controls.session.song_markers
-    markers.markers = [SongMarker(10.0, "begin"), SongMarker(20.0)]
-    _focus_inspector_kind(controls, RowKind.SONG_MARKER_ITEM, marker_index=0)
-    noted: list[str] = []
-    controls.show_notification = noted.append  # type: ignore[method-assign]
-
-    assert _press_focused(controls, keydown(pygame.K_RIGHT)) is True
-    assert markers.markers[0].marker_type == "sustain"
-    assert noted == ["sustain has no crescendo/diminuendo after it"]
+    assert markers.markers[0].marker_type == "build"
 
 
 def test_drop_song_marker_insert_preserves_prior_selection_by_time() -> None:

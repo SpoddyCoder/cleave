@@ -414,15 +414,15 @@ In the screenshot at the top of this guide, the strip (number 7) has a clip on l
 The fastest way to get started is to let Cleave build an arrangement. Choose **Generate timeline** on the Timeline page, and the dialog offers:
 
 - **mode:** either switch whole layers in and out, or swap them through the [Pattern Mask](#pattern-mask).
-- **character:** the shape of the arrangement. Breathing is mostly one layer, sometimes two; Dialogue has the layers answer each other; Arc builds to a single climax and then settles; Pulse runs one layer at a time with short pairs.
+- **character:** the shape of the arrangement. Breathing is mostly one layer, sometimes two; Dialogue has the layers answer each other; Arc builds to a single climax (in the last drop, else the last chorus, if you marked one) and then settles; Pulse runs one layer at a time with short pairs.
 - **density:** how busy the arrangement is.
 - **conductor:** optionally lets the stems' audio decide which layers lead each phrase and how bright each one is.
 - **snap** and **cut type:** how clip edges align to the beat grid and how layers transition.
 - **clip presets:** how each new clip gets its preset, on layers whose presets change on each clip: by clip roles (offered once at least one preset in your library has a role), or shuffled or in order from each layer's preset folder.
 
-Press H in the dialog for a full description of each option. You will get much better results if you [mark the song's structure](#song-markers) and [assign roles to your presets](#curating-your-presets) first.
+Press H in the dialog for a full description of each option. You will get much better results if you [mark the song's sections](#song-markers) and [assign roles to your presets](#curating-your-presets) first.
 
-Generate replaces the current timeline and, on layers whose presets change on each clip, the whole preset list, including presets you picked by hand and spares. The dialog says which layers' lists it replaces, and Ctrl+Z undoes it all. If one of those layers is locked, unlock it first; the same goes for Reset timeline.
+Generate replaces the current timeline and, on layers whose presets change on each clip, the whole preset list, including presets you picked by hand and spares. The dialog says which layers' lists it replaces, and Ctrl+Z undoes it all. If one of those layers is locked, unlock it first; the same goes for Reset timeline. If Generate fails, a message says why and the timeline stays as it was.
 
 ### Reading the strip
 
@@ -509,7 +509,7 @@ When you choose each clip on a layer set to **on a timer** (or choose **Convert 
 
 When choosing each clip would cut clips, replace presets your clips already hold, or turn the timeline on, Cleave first tells you exactly what will change. Cancel leaves everything as it was, and Ctrl+Z puts it back afterwards.
 
-A right-click on the time ruler offers Drop song marker, Undo, Redo, and a **Timeline** submenu holding Generate timeline, Snap clips, Snap clips to markers, Set cut type on clips, and Reset timeline.
+A right-click on the time ruler offers Drop song marker, Drop section here, Undo, Redo, and a **Timeline** submenu holding Generate timeline, Snap clips, Snap clips to markers, Set cut type on clips, and Reset timeline.
 
 With **placement snap** on (Timeline > Beat / Bar Grid), clips snap to beats or bars.
 
@@ -546,22 +546,34 @@ Sometimes you want to see a layer the timeline has switched off. Click the row's
 
 Markers pay off in three ways: clips snap to them, you can jump between them, and Generate timeline builds its arrangement around them.
 
-Each marker has a **type**, set on **Timeline > Song Markers**:
+Each marker starts a section that runs to the next marker, or to the end of the song. Its **type** says what kind of section it is. Set it on **Timeline > Song Markers** or from the marker's right-click menu, or right-click where a section starts and choose **Drop section here**:
 
-| Type | What it means |
+| Type | What Generate timeline does |
 | --- | --- |
-| `-` | A plain section change. With conductor on, one layer gets an accent here. |
-| crescendo | The visuals build up to this point, then drop to one layer until the next crescendo starts or the song ends. |
-| diminuendo | A quieter moment. Only pattern mask mode thins out around it for now; in layers mode it is a plain section change. |
-| begin | Where a crescendo starts to build. |
-| sustain | Where a crescendo reaches full and holds. |
+| `-` | A plain section change. It ends the section before it, and the character sets how busy this one is. With conductor on, one layer gets an accent in layers mode. |
+| intro | One calm layer. |
+| verse | One or two layers, changing slowly. |
+| build | Rises from one layer to the full stack by the next marker. |
+| chorus | Three or four layers, with an accent in layers mode when conductor is on. |
+| drop | Four layers at once, changing fast, with an accent in layers mode when conductor is on. |
+| breakdown | One layer. |
+| bridge | One or two layers, led by a different layer than before. |
+| outro | Two layers, then one from halfway. |
+
+A build works best straight before a drop or a chorus:
 
 ```
-CRESCENDO:   thin >>>  FULL ---- FULL ---- > solo
-             begin   sustain         crescendo
+thin >>>>>>> FULL | FULL ----------
+build              drop
 ```
 
-Press H on the Song Markers page for what each type does in both Generate timeline modes.
+Layer counts are for normal **density** and depend on how many layers you have. Denser or sparser settings move verse, chorus, drop, bridge, and the start of an outro up or down. You do not have to give every marker a type: plain ones still cut the arrangement.
+
+On the timeline strip, each section with a type shows its name on the time ruler when there is room, and a faint tint on its rows.
+
+Projects saved with the marker types of earlier versions (begin, sustain, crescendo, diminuendo) do not open. The message names the marker; change its `type` in the project's `project.yaml` to one of the types above, or to `standard` for a plain marker.
+
+Press H on the Song Markers page for this list in the editor.
 
 ![Song Markers page](images/song-markers.png)
 
@@ -752,7 +764,7 @@ These work anywhere in the editor. Press H to see the keys for whatever you are 
 
 1. Open a song and let Cleave prepare it.
 2. Press H, then browse presets on each layer's **Milkdrop Preset** page until the mix works.
-3. Drop song markers (Ctrl+Enter) at the main structural moments as the song plays.
+3. Drop song markers (Ctrl+Enter) where each section starts as the song plays, then set their types (verse, chorus, drop) on **Timeline > Song Markers**.
 4. Turn the timeline on and choose **Generate timeline**.
 5. Refine clips on the strip, add credits cards, and set a fade in and out.
 6. Save, then **Project > Render**.

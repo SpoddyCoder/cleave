@@ -352,6 +352,9 @@ def build_timeline_view_state(
         ),
         beat_grid_times=tuple(beat_times),
         song_marker_times=tuple(session.song_markers.times),
+        song_marker_types=tuple(
+            marker.marker_type for marker in session.song_markers.markers
+        ),
         selected_song_marker_index=selected_marker,
         song_marker_flash_start_ms=(
             markers.selected_flash_start_ms if selected_marker is not None else None

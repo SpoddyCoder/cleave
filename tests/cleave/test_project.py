@@ -233,8 +233,8 @@ def test_manifest_round_trip_with_song_markers(tmp_path: Path) -> None:
         restored_from="original-slug",
         song_markers=(
             SongMarker(8.25, "standard"),
-            SongMarker(64.5, "crescendo"),
-            SongMarker(120.0, "diminuendo"),
+            SongMarker(64.5, "chorus"),
+            SongMarker(120.0, "breakdown"),
         ),
     )
     with (project / PROJECT_FILENAME).open("w", encoding="utf-8") as handle:
@@ -248,8 +248,8 @@ def test_manifest_round_trip_with_song_markers(tmp_path: Path) -> None:
     assert data["version"] == 1
     assert data["song-markers"] == [
         {"time": 8.25, "type": "standard"},
-        {"time": 64.5, "type": "crescendo"},
-        {"time": 120.0, "type": "diminuendo"},
+        {"time": 64.5, "type": "chorus"},
+        {"time": 120.0, "type": "breakdown"},
     ]
     assert data["restored-from"] == "original-slug"
     assert data["ingest"]["demucs_model"] == "htdemucs"
@@ -339,13 +339,13 @@ def test_save_song_markers_preserves_ingest(tmp_path: Path) -> None:
 
     save_song_markers(
         project,
-        (SongMarker(10.0, "crescendo"), SongMarker(42.5, "diminuendo")),
+        (SongMarker(10.0, "chorus"), SongMarker(42.5, "breakdown")),
     )
 
     manifest = load_manifest(project)
     assert manifest.song_markers == (
-        SongMarker(10.0, "crescendo"),
-        SongMarker(42.5, "diminuendo"),
+        SongMarker(10.0, "chorus"),
+        SongMarker(42.5, "breakdown"),
     )
     assert manifest.slug == "song"
     assert manifest.mix_filename == "song.flac"
@@ -364,8 +364,8 @@ def test_save_song_markers_preserves_ingest(tmp_path: Path) -> None:
     }
     assert data["restored-from"] == "archived-slug"
     assert data["song-markers"] == [
-        {"time": 10.0, "type": "crescendo"},
-        {"time": 42.5, "type": "diminuendo"},
+        {"time": 10.0, "type": "chorus"},
+        {"time": 42.5, "type": "breakdown"},
     ]
 
 
@@ -777,3 +777,28 @@ def test_write_manifest_update_preserves_unknown_keys(tmp_path: Path) -> None:
     assert manifest.mix_filename == "song.wav"
     assert manifest.demucs_model == "htdemucs_ft"
     assert manifest.restored_from == "archived-slug"
+
+
+def test_unknown_song_marker_type_names_the_marker_and_the_types(
+    tmp_path: Path,
+) -> None:
+    manifest = ProjectManifest(
+        version=1,
+        slug="song",
+        mix_filename="song.flac",
+        original_path=str(tmp_path / "source.flac"),
+        separated_at="2026-06-08T20:15:00+00:00",
+        demucs_model="htdemucs",
+    )
+    data = {
+        **manifest.to_dict(),
+        "song-markers": [{"time": 64.5, "type": "crescendo"}],
+    }
+    with (tmp_path / PROJECT_FILENAME).open("w", encoding="utf-8") as handle:
+        yaml.safe_dump(data, handle, sort_keys=False)
+    with pytest.raises(ValueError) as error:
+        load_manifest(tmp_path)
+    message = str(error.value)
+    assert "01:04.50" in message
+    assert "'crescendo'" in message
+    assert "chorus, drop" in message

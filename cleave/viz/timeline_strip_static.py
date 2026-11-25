@@ -14,6 +14,11 @@ from dataclasses import dataclass, replace
 
 import pygame
 
+from cleave.song_markers import (
+    DEFAULT_SONG_MARKER_TYPE,
+    SONG_MARKER_TYPES,
+    SongSection,
+)
 from cleave.viz.preset_schedule import RowLabel, RowPresets, row_labels
 from cleave.viz.material_icons import RECORD_GLYPH, REPLAY_GLYPH, SOLO_GLYPH
 from cleave.viz.overlay_primitives import overlay_panel_surface
@@ -28,6 +33,8 @@ from cleave.viz.timeline_ruler import (
     bar_label_spacing_px,
     draw_bar_lane,
     render_time_ruler,
+    ruler_font,
+    ruler_label_y,
     song_bound_xs,
 )
 from cleave.viz.timeline_strip_grid import GridLines, grid_lines
@@ -67,6 +74,10 @@ SOFT_TICK_WIDTH: int = 1
 CLIP_LABEL_INSET: int = 5
 # A clip narrower than this many pixels shows no name.
 CLIP_LABEL_MIN_PX: int = 18
+# How far a row's off colour goes towards its section's colour.
+SECTION_TINT_MIX: float = 0.22
+# Section name in the ruler, clear of the marker line it starts on.
+SECTION_LABEL_INSET: int = 5
 # Outline around the selected clip; thicker while the selection flash runs.
 SELECTED_CLIP_OUTLINE_WIDTH: int = 2
 # Trim handles at the edges of the hovered or selected clip.
@@ -97,6 +108,37 @@ def track_color(row_index: int) -> tuple[int, int, int]:
     return palette().timeline_track_colors[row_index % len(palette().timeline_track_colors)]
 
 
+def section_color(section_type: str) -> tuple[int, int, int]:
+    """Colour of a section type's name and row tint."""
+    colors = palette().song_section_colors
+    return colors[(SONG_MARKER_TYPES.index(section_type) - 1) % len(colors)]
+
+
+def typed_sections(state: TimelineViewState) -> list[SongSection]:
+    """Sections with a type: each runs from its marker to the next."""
+    times = state.song_marker_times
+    ends = (*times[1:], state.duration_sec)
+    return [
+        SongSection(start, end, section_type)
+        for start, end, section_type in zip(times, ends, state.song_marker_types)
+        if section_type != DEFAULT_SONG_MARKER_TYPE and end > start
+    ]
+
+
+def _section_span(
+    section: SongSection, state: TimelineViewState, layout: StripLayout
+) -> tuple[int, int] | None:
+    """Pixel ``(left, right)`` of the section's visible part, or None out of view."""
+    view_start, view_end = view_window(state)
+    if section.end <= view_start or section.start >= view_end:
+        return None
+    left, right = (
+        time_to_x(t, layout.bar_left, layout.bar_width, view_start, view_end)
+        for t in (section.start, section.end)
+    )
+    return (left, right) if right > left else None
+
+
 def bar_level_y(bar_rect: pygame.Rect, level: float) -> int:
     """Y of the top of a bottom-filled level within ``bar_rect``."""
     filled = max(0.0, min(1.0, float(level))) * bar_rect.h
@@ -113,8 +155,13 @@ def _draw_level_bar(
     view_end_sec: float,
     bar_rect: pygame.Rect,
     on_color: tuple[int, int, int],
+    tints: list[tuple[int, int, tuple[int, int, int]]],
 ) -> None:
     pygame.draw.rect(panel, palette().timeline_off_segment, bar_rect)
+    for left, right, color in tints:
+        pygame.draw.rect(
+            panel, color, pygame.Rect(left, bar_rect.y, right - left, bar_rect.h)
+        )
     if view_end_sec <= view_start_sec or len(breakpoints) < 2:
         return
     dim_color = _lerp_rgb(palette().timeline_off_segment, on_color, _BAR_LEVEL_DIM_MIX)
@@ -309,6 +356,19 @@ def build_static_panel(
     panel = overlay_panel_surface((panel_w, panel_h))
     row_layout: list[RowLayoutEntry] = []
 
+    tints = [
+        (
+            *span,
+            _lerp_rgb(
+                palette().timeline_off_segment,
+                section_color(section.section_type),
+                SECTION_TINT_MIX,
+            ),
+        )
+        for section in typed_sections(state)
+        if (span := _section_span(section, state, layout)) is not None
+    ]
+
     # In the gaps between rows; each row redraws the lines over its own bar.
     lines = _grid_lines(state, layout, font_size)
     for t in lines.bars:
@@ -424,6 +484,7 @@ def build_static_panel(
             view_end_sec=view_end,
             bar_rect=bar_rect,
             on_color=track_color(row_index),
+            tints=tints,
         )
         _draw_row_grid(
             panel,
@@ -552,8 +613,12 @@ def build_ruler(
     *,
     font_size: int,
 ) -> pygame.Surface | None:
-    """Time scale over the badge row and the strip's top padding, then the bar lane."""
+    """Time scale over the badge row and the strip's top padding, then the bar lane.
+
+    Section names share the time scale's line and hide the times they cover.
+    """
     view_start, view_end = view_window(state)
+    names = _section_names(state, layout, font_size)
     ruler = render_time_ruler(
         width=layout.panel_w,
         height=layout.ruler_h,
@@ -563,7 +628,13 @@ def build_ruler(
         view_end_sec=view_end,
         duration_sec=state.duration_sec,
         strip_font_size=font_size,
+        reserved=[
+            (x - SECTION_LABEL_INSET, x + name.get_width()) for x, name in names
+        ],
     )
+    if ruler is not None:
+        for x, name in names:
+            ruler.blit(name, (x, ruler_label_y(layout.ruler_h, name.get_height())))
     if ruler is None or not layout.bar_lane_h:
         return ruler
     band = pygame.Surface((layout.panel_w, layout.band_h), pygame.SRCALPHA)
@@ -581,6 +652,25 @@ def build_ruler(
         strip_font_size=font_size,
     )
     return band
+
+
+def _section_names(
+    state: TimelineViewState, layout: StripLayout, font_size: int
+) -> list[tuple[int, pygame.Surface]]:
+    """``(x, name)`` of each section in view whose whole name fits."""
+    font = ruler_font(font_size)
+    names: list[tuple[int, pygame.Surface]] = []
+    for section in typed_sections(state):
+        span = _section_span(section, state, layout)
+        if span is None:
+            continue
+        x = span[0] + SECTION_LABEL_INSET
+        name = font.render(
+            section.section_type, True, section_color(section.section_type)
+        )
+        if x + name.get_width() <= span[1]:
+            names.append((x, name))
+    return names
 
 
 def _draw_scrollbar(

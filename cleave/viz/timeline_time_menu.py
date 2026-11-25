@@ -15,7 +15,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Protocol
 
-from cleave.song_markers import SONG_MARKER_TYPES, format_marker_time
+from cleave.song_markers import (
+    DEFAULT_SONG_MARKER_TYPE,
+    SONG_MARKER_TYPES,
+    format_marker_time,
+    song_marker_type_display,
+)
 from cleave.viz.commands import (
     CommandContext,
     command_by_id,
@@ -125,6 +130,25 @@ class TimelineTimeMenu:
                 enabled=not recording,
                 hint=hint,
             ),
+            ContextSubmenu(
+                id="timeline.time.drop_section",
+                label="Drop section here",
+                items=tuple(
+                    ContextMenuItem(
+                        id=f"timeline.time.drop_section.{marker_type}",
+                        label=marker_type,
+                        run=lambda marker_type=marker_type: markers.drop_at(
+                            t_sec, marker_type
+                        ),
+                        enabled=not recording,
+                        hint=hint,
+                    )
+                    for marker_type in SONG_MARKER_TYPES
+                    if marker_type != DEFAULT_SONG_MARKER_TYPE
+                ),
+                enabled=not recording,
+                hint=hint,
+            ),
         )
 
     def _marker_items(
@@ -142,7 +166,7 @@ class TimelineTimeMenu:
         type_items = tuple(
             ContextMenuItem(
                 id=f"timeline.marker.type.{marker_type}",
-                label=marker_type,
+                label=song_marker_type_display(marker_type),
                 run=lambda marker_type=marker_type: markers.set_type(
                     index, marker_type
                 ),

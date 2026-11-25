@@ -162,15 +162,13 @@ def test_select_starts_the_flash_only_on_a_change(monkeypatch) -> None:
     assert session.song_markers.selected_index == 1
 
 
-def test_set_type_changes_the_type_and_warns() -> None:
+def test_set_type_changes_the_type() -> None:
     notes: list[str] = []
     controller, session, _modal = _make_controller(on_notification=notes.append)
     session.song_markers.markers = [SongMarker(10.0)]
-    controller.set_type(0, "begin")
-    assert session.song_markers.markers[0] == SongMarker(10.0, "begin")
-    assert notes == ["begin has no crescendo/diminuendo after it"]
-    controller.set_type(0, "begin")
-    assert len(notes) == 1
+    controller.set_type(0, "verse")
+    assert session.song_markers.markers[0] == SongMarker(10.0, "verse")
+    assert notes == []
 
 
 def test_drop_while_playing_subtracts_tap_latency() -> None:
@@ -219,7 +217,7 @@ def _snap_controller():
 def test_snap_moves_markers_to_bars_and_keeps_types_and_selection() -> None:
     controller, session, modal, notes = _snap_controller()
     session.song_markers.markers = [
-        SongMarker(4.3, "begin"),
+        SongMarker(4.3, "verse"),
         SongMarker(8.0),
         SongMarker(60.0),
     ]
@@ -230,7 +228,7 @@ def test_snap_moves_markers_to_bars_and_keeps_types_and_selection() -> None:
     assert view.form_info == "(moves 1 of 3 song markers)"
     modal.activate_option(0)
     assert session.song_markers.markers == [
-        SongMarker(4.0, "begin"),
+        SongMarker(4.0, "verse"),
         SongMarker(8.0),
         SongMarker(60.0),
     ]

@@ -252,6 +252,11 @@ class EditHistory:
         """Drop the pending edit without recording it. The caller restores state."""
         self._pending = None
 
+    def rollback(self, before: EditSnapshot) -> None:
+        """Put a failed edit back to *before*, its ``begin`` state, unrecorded."""
+        self._pending = None
+        self._restore(before)
+
     @property
     def can_undo(self) -> bool:
         """False while an edit is pending, such as a drag or a take."""

@@ -18,6 +18,7 @@ from cleave.song_markers import (
     SONG_MARKER_TYPE_HELP,
     SONG_MARKER_TYPES,
     SongMarkerType,
+    song_marker_type_display,
     step_song_marker_type,
     format_marker_time,
     parse_song_marker_type,
@@ -241,13 +242,8 @@ def _toggle_timeline_enabled(
 def _format_song_markers_count(state: TuningViewState, _desc: RowDescriptor) -> str:
     return f"({len(state.timeline.song_marker_times)})"
 
-def _song_marker_type_display(marker_type: str) -> str:
-    if marker_type == DEFAULT_SONG_MARKER_TYPE:
-        return "-"
-    return marker_type
-
 SONG_MARKER_TYPE_HELP_ENTRIES: tuple[tuple[str, str], ...] = tuple(
-    (_song_marker_type_display(marker_type), SONG_MARKER_TYPE_HELP[marker_type])
+    (song_marker_type_display(marker_type), SONG_MARKER_TYPE_HELP[marker_type])
     for marker_type in SONG_MARKER_TYPES
 )
 
@@ -262,7 +258,7 @@ def _format_song_marker_time(state: TuningViewState, desc: RowDescriptor) -> str
     return format_marker_time(state.timeline.song_marker_times[desc.marker_index])
 
 def _format_song_marker_type(state: TuningViewState, desc: RowDescriptor) -> str:
-    return _song_marker_type_display(_song_marker_type(state, desc))
+    return song_marker_type_display(_song_marker_type(state, desc))
 
 def _set_song_marker_type(
     controls: TuningControls,
@@ -729,7 +725,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Generate Timeline",
         help_entries=(("Enter", "open generate dialog"),),
         help_description=(
-            "Builds a complete timeline from the arrangement style you pick in a dialog, replacing the current clips. Crescendo song markers each get a crescendo, and the project remembers your choices for next time.",
+            "Builds a complete timeline from the arrangement style you pick in a dialog, replacing the current clips. Song markers with a type, such as verse, build, or drop, shape their sections, and the project remembers your choices for next time.",
         ),
         help_mode_entries=TIMELINE_PRESET_HELP_ENTRIES,
         blocked_by_section_lock=True,
@@ -986,7 +982,7 @@ SPECS: dict[RowKind, RowSpec] = {
         help_title="Song Markers",
         help_description=(
             "Markers for the song's structure, such as drops, breakdowns, and builds. Ctrl+Enter drops one at the playhead.",
-            "Each marker's type says what Generate timeline does there:",
+            "A marker starts a section that runs to the next marker. Its type says how Generate timeline arranges that section:",
         ),
         help_mode_entries=SONG_MARKER_TYPE_HELP_ENTRIES,
     ),
@@ -1004,7 +1000,7 @@ SPECS: dict[RowKind, RowSpec] = {
         choice=options_choice(
             SONG_MARKER_TYPES,
             _song_marker_type,
-            _song_marker_type_display,
+            song_marker_type_display,
             jump=_jump_song_marker_type,
         ),
         fit_strategy=FitStrategy.NONE,

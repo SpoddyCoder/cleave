@@ -32,10 +32,7 @@ from cleave.timeline_presets.conductor import (
     timeline_preset_conductor_display,
 )
 from cleave.song_markers import SongMarker
-from cleave.timeline_presets.crescendo import (
-    apply_crescendo,
-    resolve_crescendo_window,
-)
+from cleave.timeline_presets.build import apply_build, resolve_build_windows
 from cleave.timeline_presets.emit import cues_from_states
 
 _SR = 100.0
@@ -826,7 +823,7 @@ def test_conductor_does_not_let_one_slot_dominate() -> None:
     assert min(totals.values()) > 0.05, totals
 
 
-def test_arranger_conductor_crescendo_preserves_prefix_levels() -> None:
+def test_arranger_conductor_build_preserves_prefix_levels() -> None:
     slots = ["layer_1", "layer_2", "layer_3", "layer_4"]
     duration_sec = 120.0
     bars = _bar_times(duration_sec)
@@ -849,11 +846,10 @@ def test_arranger_conductor_crescendo_preserves_prefix_levels() -> None:
     markers = [
         SongMarker(20.0),
         SongMarker(50.0),
-        SongMarker(80.0),
-        SongMarker(100.0, "crescendo"),
+        SongMarker(80.0, "build"),
+        SongMarker(100.0),
     ]
-    window = resolve_crescendo_window(markers, duration_sec)
-    assert window is not None
+    (window,) = resolve_build_windows(markers, duration_sec, bars)
     base = build_breathing_cues(
         slots,
         duration_sec,
@@ -862,7 +858,7 @@ def test_arranger_conductor_crescendo_preserves_prefix_levels() -> None:
         signals=signals,
         slot_stems=_slot_stems(),
     )
-    after = apply_crescendo(
+    after = apply_build(
         base,
         slots,
         duration_sec=duration_sec,
@@ -879,8 +875,8 @@ def test_arranger_conductor_crescendo_preserves_prefix_levels() -> None:
         t += 1.0
 
 
-def test_arranger_conductor_crescendo_preserves_prefix_roles() -> None:
-    """Regression: apply_crescendo must not strip conductor casts on rebuild."""
+def test_arranger_conductor_build_preserves_prefix_roles() -> None:
+    """Regression: apply_build must not strip conductor casts on rebuild."""
     slots = ["layer_1", "layer_2", "layer_3", "layer_4"]
     duration_sec = 120.0
     bars = _bar_times(duration_sec)
@@ -903,11 +899,10 @@ def test_arranger_conductor_crescendo_preserves_prefix_roles() -> None:
     markers = [
         SongMarker(20.0),
         SongMarker(50.0),
-        SongMarker(80.0),
-        SongMarker(100.0, "crescendo"),
+        SongMarker(80.0, "build"),
+        SongMarker(100.0),
     ]
-    window = resolve_crescendo_window(markers, duration_sec)
-    assert window is not None
+    (window,) = resolve_build_windows(markers, duration_sec, bars)
     base = build_breathing_cues(
         slots,
         duration_sec,
@@ -925,7 +920,7 @@ def test_arranger_conductor_crescendo_preserves_prefix_roles() -> None:
     assert base_prefix_on
     assert any(cue.role is not None for cue in base_prefix_on)
 
-    after = apply_crescendo(
+    after = apply_build(
         base,
         slots,
         duration_sec=duration_sec,
@@ -944,33 +939,33 @@ def test_arranger_conductor_crescendo_preserves_prefix_roles() -> None:
     for cue in after_prefix_on:
         assert cue.blend == CUE_ROLE_BLEND[cue.role]
 
-    # Crescendo ramp itself also gets lead/bed casts (not left null).
+    # Build ramp itself also gets lead/bed casts (not left null).
     ramp_on = [
         cue
         for lane in after.values()
         for cue in lane.cues
-        if cue.t >= window.t_start - 1e-9 and cue.level > 0.0
+        if window.t_start - 1e-9 <= cue.t < window.t_end and cue.level > 0.0
     ]
     assert ramp_on
     assert all(cue.role in ("lead", "bed") for cue in ramp_on)
     assert all(cue.blend == CUE_ROLE_BLEND[cue.role] for cue in ramp_on)
 
 
-def test_apply_crescendo_without_roles_stays_role_free() -> None:
+def test_apply_build_without_roles_stays_role_free() -> None:
     slots = ["layer_1", "layer_2", "layer_3", "layer_4"]
     duration_sec = 120.0
     bars = _bar_times(duration_sec)
     markers = [
         SongMarker(20.0),
         SongMarker(50.0),
-        SongMarker(80.0),
-        SongMarker(100.0, "crescendo"),
+        SongMarker(80.0, "build"),
+        SongMarker(100.0),
     ]
     base = build_breathing_cues(
         slots, duration_sec, random.Random(1), bar_times=bars
     )
     assert all(cue.role is None for lane in base.values() for cue in lane.cues)
-    after = apply_crescendo(
+    after = apply_build(
         base,
         slots,
         duration_sec=duration_sec,

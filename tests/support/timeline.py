@@ -129,6 +129,7 @@ def strip_view_state(
     bar_grid_times: tuple[float, ...] = (),
     beat_grid_times: tuple[float, ...] = (),
     song_marker_times: tuple[float, ...] = (),
+    song_marker_types: tuple[str, ...] = (),
     selected_song_marker_index: int | None = None,
     song_marker_flash_start_ms: int | None = None,
     hard_cut_fades_enabled: bool = False,
@@ -192,6 +193,7 @@ def strip_view_state(
         bar_grid_times=bar_grid_times,
         beat_grid_times=beat_grid_times,
         song_marker_times=song_marker_times,
+        song_marker_types=song_marker_types,
         selected_song_marker_index=selected_song_marker_index,
         song_marker_flash_start_ms=song_marker_flash_start_ms,
         hard_cut_fades=TimelineFadeGroup(
