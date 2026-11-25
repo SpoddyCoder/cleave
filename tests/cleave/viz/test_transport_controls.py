@@ -47,7 +47,7 @@ def _transport(
     transport = TransportControls(
         PlaybackState(player=player),  # type: ignore[arg-type]
         100.0,
-        _DOWNBEATS,
+        lambda: _DOWNBEATS,
         inline,
         seeks.append,
     )
@@ -201,7 +201,7 @@ def test_bar_needs_a_grid() -> None:
     transport = TransportControls(
         PlaybackState(player=_Player()),  # type: ignore[arg-type]
         100.0,
-        (),
+        tuple,
         inline,
         seeks.append,
     )

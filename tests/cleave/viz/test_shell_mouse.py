@@ -368,6 +368,7 @@ def _host() -> Iterator[ShellHost]:
             set_timeline_height=MagicMock(),
         ),
         session=SimpleNamespace(layer_z_order=["layer_1", "layer_2"]),
+        bar_lane_shown=False,
         set_shell_region=MagicMock(),
         disarm_value_nudge=MagicMock(),
         context_menu=ContextMenuState(),

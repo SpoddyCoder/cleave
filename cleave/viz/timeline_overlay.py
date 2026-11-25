@@ -186,6 +186,7 @@ class TimelineOverlay:
             viewport_height=viewport_height,
             timeline_rect=timeline_rect,
             any_override=bool(state.override_slots),
+            bar_lane=state.bar_lane,
         )
         if layout is None:
             return None
@@ -214,7 +215,10 @@ class TimelineOverlay:
             incremental = True
         else:
             static_panel, self._row_layout = build_static_panel(
-                state, layout, overlay_font(self._font_size)
+                state,
+                layout,
+                overlay_font(self._font_size),
+                font_size=self._font_size,
             )
             self._ruler = build_ruler(state, layout, font_size=self._font_size)
             cache.panel = static_panel

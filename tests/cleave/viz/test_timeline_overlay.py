@@ -2013,3 +2013,67 @@ def test_unchanged_frame_skips_fill_and_live_patch(monkeypatch) -> None:
     state.position_sec = 51.0
     _compose_bytes(overlay, state)
     assert calls == ["patch"]
+
+
+def _draw_grid_strip(*, show: bool, level: float = 1.0):
+    pygame.init()
+    overlay = TimelineOverlay()
+    state = strip_view_state(
+        lanes={"layer_1": TimelineLane(baseline=0.0, cues=[SlotCue(t=0.0, level=level)])},
+        layer_z_order=["layer_1", "layer_2"],
+        show_bar_grid=show,
+        bar_grid_times=(0.0, 25.0, 50.0, 75.0),
+        beat_grid_times=(),
+    )
+    surface = pygame.Surface((1280, 400), pygame.SRCALPHA)
+    overlay.draw(surface, state, timeline_rect=(0, 100, 1280, 300))
+    layout = overlay.layout
+    assert layout is not None
+    return overlay, layout, surface
+
+
+def _bar_pixel(layout, surface, x: int, row: int, where: float):
+    rect = layout.bar_rect(layout.row_y(row))
+    return tuple(surface.get_at((x, layout.panel_y + rect.y + int(rect.h * where))))
+
+
+@pytest.mark.parametrize("where", (0.25, 0.9))
+def test_bar_grid_shows_over_clips_and_off_rows(where: float) -> None:
+    for row in (0, 1):
+        _overlay, layout, surface = _draw_grid_strip(show=True, level=0.5)
+        x = layout.bar_left + layout.bar_width // 4
+        on_line = _bar_pixel(layout, surface, x, row, where)
+        assert on_line != _bar_pixel(layout, surface, x + 4, row, where)
+        assert on_line[3] == 255
+        _overlay, layout, surface = _draw_grid_strip(show=False, level=0.5)
+        assert _bar_pixel(layout, surface, x, row, where) == _bar_pixel(
+            layout, surface, x + 4, row, where
+        )
+
+
+def test_bar_lane_adds_height_and_seeks_like_the_ruler() -> None:
+    _o, plain, _s = _draw_grid_strip(show=False)
+    overlay, layout, surface = _draw_grid_strip(show=True)
+    assert plain.bar_lane_h == 0
+    assert layout.bar_lane_h > 0
+    assert layout.band_h == plain.band_h + layout.bar_lane_h
+    assert layout.ruler_h == plain.ruler_h
+    assert layout.transport_rects() == plain.transport_rects()
+    lane_y = layout.panel_y - layout.badge_reserve + layout.ruler_h
+    x = layout.bar_left + layout.bar_width // 2
+    hit = overlay.hit_at(x, lane_y + layout.bar_lane_h // 2)
+    assert hit is not None
+    assert hit.row is None
+    assert hit.t_sec == pytest.approx(50.0, abs=0.2)
+    bottom = lane_y + layout.bar_lane_h - 1
+    assert tuple(surface.get_at((x, bottom)))[:3] == palette().muted
+
+
+def test_band_height_makes_room_for_the_bar_lane() -> None:
+    from cleave.viz.timeline_strip_layout import timeline_band_height_px
+
+    _o, layout, _s = _draw_grid_strip(show=True)
+    assert (
+        timeline_band_height_px(2, bar_lane=True) - timeline_band_height_px(2)
+        == layout.bar_lane_h
+    )

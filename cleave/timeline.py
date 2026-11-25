@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
+from functools import lru_cache
 from typing import Literal
 
 import numpy as np
@@ -1320,6 +1321,26 @@ def shift_bars_by_beats(
         shifted = max(0, min(last, nearest + offset))
         result.append(float(beats[shifted]))
     return tuple(result)
+
+
+def phased_bar_times(
+    bar_times: Sequence[float],
+    beat_times: Sequence[float],
+    bar_phase: int,
+) -> tuple[float, ...]:
+    """The bar grid at *bar_phase*, without bars clamped onto the same beat."""
+    return _phased_bar_times(tuple(bar_times), tuple(beat_times), bar_phase)
+
+
+@lru_cache(maxsize=8)
+def _phased_bar_times(
+    bar_times: tuple[float, ...],
+    beat_times: tuple[float, ...],
+    bar_phase: int,
+) -> tuple[float, ...]:
+    if not bar_phase:
+        return bar_times
+    return tuple(dict.fromkeys(shift_bars_by_beats(bar_times, beat_times, bar_phase)))
 
 
 def shift_lane_cues_by_beats(

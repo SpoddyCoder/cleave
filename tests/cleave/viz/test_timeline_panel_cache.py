@@ -104,6 +104,12 @@ def test_static_signature_changes_on_bar_grid_times() -> None:
     assert _static_sig(phase0) != _static_sig(phase1)
 
 
+def test_static_signature_changes_on_beat_grid_times() -> None:
+    phase0 = strip_view_state(show_bar_grid=True, beat_grid_times=(0.0, 4.0))
+    phase1 = strip_view_state(show_bar_grid=True, beat_grid_times=(1.0, 5.0))
+    assert _static_sig(phase0) != _static_sig(phase1)
+
+
 def test_static_signature_changes_on_song_marker_times() -> None:
     empty = strip_view_state(song_marker_times=())
     with_markers = strip_view_state(song_marker_times=(10.0, 40.0))

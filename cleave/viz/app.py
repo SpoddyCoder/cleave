@@ -543,7 +543,10 @@ def live_shell_layout(runtime: LiveVisualizerRuntime) -> ShellLayout:
             requested_tl = shell.timeline_height
         timeline_h = clamp_timeline_band_height(
             requested_tl,
-            timeline_band_height_px(len(runtime.seed.session.layer_z_order)),
+            timeline_band_height_px(
+                len(runtime.seed.session.layer_z_order),
+                bar_lane=runtime.controls.bar_lane_shown,
+            ),
             display_h=display_h,
             top_h=menu_h + transport_h,
         )

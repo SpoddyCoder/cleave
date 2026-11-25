@@ -11,17 +11,17 @@ from cleave.timeline import TimelineClip, stem_abbreviation
 from cleave.viz.icon_button import icon_gap, icon_row
 from cleave.viz.material_icons import visibility_icon_slot_width
 from cleave.viz.theme import palette, timeline_panel_height_px, timeline_ui_metrics
-from cleave.viz.timeline_panel_cache import timeline_badge_reserve_px
+from cleave.viz.timeline_panel_cache import timeline_badge_reserve_px, timeline_bar_lane_px
 from cleave.viz.timeline_ruler import ruler_tick_top
 
 
-def timeline_band_height_px(row_count: int) -> int:
-    """Shell band under the columns: the strip and the badge row above it."""
+def timeline_band_height_px(row_count: int, *, bar_lane: bool = False) -> int:
+    """Shell band under the columns: the strip, and the badge row and bar lane above."""
     if row_count <= 0:
         return 0
     metrics = timeline_ui_metrics()
     return timeline_panel_height_px(row_count) + timeline_badge_reserve_px(
-        font_size=metrics.font_size
+        font_size=metrics.font_size, bar_lane=bar_lane
     )
 
 
@@ -243,7 +243,7 @@ def row_prefix_width(
 class StripLayout:
     """Where everything sits in one compose of the strip, in panel coordinates.
 
-    The panel's top is y=0; the badge row and ruler sit above it, so upload
+    The panel's top is y=0; the badge row, ruler and bar lane sit above it, so upload
     coordinates are panel coordinates plus ``badge_reserve``.
     """
 
@@ -267,10 +267,21 @@ class StripLayout:
     layer_num_width: int
     stem_abbrev_width: int
     badge_reserve: int
+    # Bar numbers between the time ruler and the rows; part of badge_reserve.
+    bar_lane_h: int
     bar_top: int
     bar_bottom: int
     # Scrollbar track under the rows, in panel coordinates.
     scrollbar_rect: tuple[int, int, int, int]
+
+    @property
+    def band_h(self) -> int:
+        """Height above the rows: the time ruler and the bar lane."""
+        return self.badge_reserve + self.bar_top
+
+    @property
+    def ruler_h(self) -> int:
+        return self.band_h - self.bar_lane_h
 
     @property
     def label_width(self) -> int:
@@ -320,7 +331,7 @@ class StripLayout:
             padding=self.padding,
             label_width=self.label_width,
             bar_left=self.bar_left,
-            corner_h=self.badge_reserve + self.bar_top,
+            corner_h=self.ruler_h,
             gap=timeline_ui_metrics().rec_badge_gap,
         )
 
@@ -331,7 +342,7 @@ class StripLayout:
     def playhead_top_y(self, *, y_offset: int) -> int:
         """The playhead rises through the ruler to the top of its major ticks."""
         ruler_top = y_offset - self.badge_reserve
-        return ruler_top + ruler_tick_top(self.badge_reserve + self.bar_top)
+        return ruler_top + ruler_tick_top(self.ruler_h)
 
     def playhead_strip_rect(
         self, playhead_px: int, *, y_offset: int
@@ -357,6 +368,7 @@ def compute_strip_layout(
     viewport_height: int,
     timeline_rect: tuple[int, int, int, int] | None = None,
     any_override: bool = False,
+    bar_lane: bool = False,
 ) -> StripLayout | None:
     """Lay the strip out for *row_count* rows, or None when there is no room.
 
@@ -376,7 +388,9 @@ def compute_strip_layout(
     band_x, band_y, band_w, band_h = timeline_rect
     if band_w <= 0 or band_h <= 0:
         return None
-    badge_reserve = timeline_badge_reserve_px(font_size=font_size, padding=padding)
+    badge_reserve = timeline_badge_reserve_px(
+        font_size=font_size, padding=padding, bar_lane=bar_lane
+    )
     # Rows share any band height past the nominal fit.
     fit_h = timeline_panel_height_px(row_count)
     spare = band_h - badge_reserve - fit_h if fills_band else 0
@@ -411,6 +425,7 @@ def compute_strip_layout(
         layer_num_width=layer_num_width,
         stem_abbrev_width=stem_abbrev_width,
         badge_reserve=badge_reserve,
+        bar_lane_h=timeline_bar_lane_px(font_size) if bar_lane else 0,
         bar_top=padding,
         bar_bottom=bar_bottom,
         scrollbar_rect=(

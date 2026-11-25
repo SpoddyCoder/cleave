@@ -163,8 +163,7 @@ class StripHitMap:
                     )
             # The time scale starts at its major ticks; the labels above them
             # and the band's top edge stay clear for the resize splitter.
-            ruler_h = layout.badge_reserve + layout.bar_top
-            if upload_y < ruler_tick_top(ruler_h):
+            if upload_y < ruler_tick_top(layout.ruler_h):
                 return None
             return StripHit(
                 row=None,

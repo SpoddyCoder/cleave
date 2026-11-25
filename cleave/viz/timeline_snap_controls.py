@@ -7,7 +7,7 @@ from collections.abc import Callable, Sequence
 from cleave.timeline import (
     SongMarkerSnapMode,
     empty_lane,
-    shift_bars_by_beats,
+    phased_bar_times,
     snap_lane_to_beats,
     snap_lanes_to_song_markers,
 )
@@ -297,11 +297,11 @@ class TimelineSnapController:
 
     def _bar_grid(self) -> tuple[float, ...]:
         """Bars shifted by the bar phase, without those clamped onto the same beat."""
-        bar_phase = self.session.timeline.bar_phase_offset
-        if not bar_phase:
-            return self._bar_times
-        shifted = shift_bars_by_beats(self._bar_times, self._beat_times, bar_phase)
-        return tuple(dict.fromkeys(shifted))
+        return phased_bar_times(
+            self._bar_times,
+            self._beat_times,
+            self.session.timeline.bar_phase_offset,
+        )
 
     def _snap_to(
         self,

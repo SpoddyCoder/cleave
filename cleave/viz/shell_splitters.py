@@ -143,7 +143,9 @@ class SplitterDrag:
         if layout is None:
             return requested
         rows = len(self._ctx.controls.session.layer_z_order)
-        fit_h = timeline_band_height_px(rows)
+        fit_h = timeline_band_height_px(
+            rows, bar_lane=self._ctx.controls.bar_lane_shown
+        )
         top_h = layout.menu[3] + layout.transport[3]
         display_h = layout.timeline[1] + layout.timeline[3]
         height = clamp_timeline_band_height(

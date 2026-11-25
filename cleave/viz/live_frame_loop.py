@@ -254,14 +254,11 @@ class LiveFrameLoop:
             shell.top_layer, None if layout is None else layout.visualiser
         )
         position = current_sec(rt.playback, rt.seed.duration_sec)
-        signals = rt.seed.signals
         readout = TransportReadout(
             paused=rt.playback.paused,
             position_sec=position,
             duration_sec=rt.seed.duration_sec,
-            bar_text=playback_bar_text(
-                position, () if signals is None else signals.downbeat_times
-            ),
+            bar_text=playback_bar_text(position, rt.controls.transport.bar_times),
             fps=self.display_fps,
         )
         draw_shell_frame(

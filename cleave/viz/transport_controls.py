@@ -134,13 +134,13 @@ class TransportControls:
         self,
         playback: PlaybackState,
         duration_sec: float,
-        downbeat_times: Sequence[float],
+        bar_times: Callable[[], Sequence[float]],
         inline_edit: InlineEditController,
         seek_to: Callable[[float], None],
     ) -> None:
         self._playback = playback
         self._duration_sec = duration_sec
-        self._downbeats = tuple(downbeat_times)
+        self._bar_times = bar_times
         self._inline_edit = inline_edit
         self._seek_to = seek_to
         self._drag_field: TransportField | None = None
@@ -150,7 +150,12 @@ class TransportControls:
 
     @property
     def has_bars(self) -> bool:
-        return bool(self._downbeats)
+        return bool(self._bar_times())
+
+    @property
+    def bar_times(self) -> Sequence[float]:
+        """The bar grid at the current bar phase."""
+        return self._bar_times()
 
     def toggle_pause(self) -> None:
         toggle_pause(self._playback, self._duration_sec)
@@ -208,7 +213,7 @@ class TransportControls:
         self._drag_field = field
         self._drag_steps = 0
         self._drag_origin = (
-            float(bar_at(position, self._downbeats))
+            float(bar_at(position, self._bar_times()))
             if field is TransportField.BAR
             else position
         )
@@ -229,10 +234,11 @@ class TransportControls:
 
     def seek_bar(self, bar: int) -> None:
         """Seek to the downbeat that starts *bar*, clamped to the grid."""
-        if not self._downbeats:
+        bars = self._bar_times()
+        if not bars:
             return
-        index = max(0, min(bar - 1, len(self._downbeats) - 1))
-        self._seek_to(self._downbeats[index])
+        index = max(0, min(bar - 1, len(bars) - 1))
+        self._seek_to(bars[index])
 
     def begin_entry(self, field: TransportField) -> None:
         """Open a text field on the clock or the bar, filled with its value."""
@@ -245,10 +251,10 @@ class TransportControls:
                 validate=_validate_time,
             )
         elif field is TransportField.BAR and self.has_bars:
-            count = len(self._downbeats)
+            count = len(self._bar_times())
             self._inline_edit.begin_text(
                 field,
-                str(bar_at(position, self._downbeats)),
+                str(bar_at(position, self._bar_times())),
                 self._commit_bar,
                 validate=lambda text: (
                     None
@@ -263,7 +269,7 @@ class TransportControls:
             self._seek_to(seconds)
 
     def _commit_bar(self, text: str) -> None:
-        bar = parse_bar_text(text, len(self._downbeats))
+        bar = parse_bar_text(text, len(self._bar_times()))
         if bar is not None:
             self.seek_bar(bar)
 

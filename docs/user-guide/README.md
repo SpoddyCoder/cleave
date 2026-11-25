@@ -568,7 +568,7 @@ DIMINUENDO:  FULL >>>  thin ---- thin ---- > restore
 
 Cleave detects the beat and bar grid when it first prepares a song. On **Timeline > Beat / Bar Grid**:
 
-- **bar grid** draws the bars on the strip.
+- **bar grid** draws the bars over the strip's rows, and adds a lane of bar numbers under the time ruler, which you can click to seek as you do the ruler. Zoom in to see the beats between bars; zoomed out, only every second, fourth, or eighth bar (and so on) is drawn.
 - **placement snap** quantises new clips and markers to the nearest beat or bar. It is off in a new project; leave it off if detection got the song wrong.
 - **bar phase** shifts the grid, and any clips with it, by one beat, for when the downbeat has been detected in the wrong place. Set it before you record, if you can, so new clips land on the right bars. Ctrl+Z undoes it, clips included.
 

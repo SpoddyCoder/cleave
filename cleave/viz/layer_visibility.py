@@ -19,7 +19,7 @@ from cleave.timeline import (
     lane_level_envelope,
     levels_equal,
     punch_lane,
-    shift_bars_by_beats,
+    phased_bar_times,
     strip_lane_range,
 )
 from cleave.viz.preset_schedule import row_presets
@@ -346,9 +346,10 @@ def build_timeline_view_state(
         submenu_focused=submenu_focused,
         arm_flash_start_ms=dict(tl.arm_flash_start_ms),
         show_bar_grid=tl.show_bar_grid,
-        bar_grid_times=shift_bars_by_beats(
+        bar_grid_times=phased_bar_times(
             bar_times, beat_times, tl.bar_phase_offset
         ),
+        beat_grid_times=tuple(beat_times),
         song_marker_times=tuple(session.song_markers.times),
         selected_song_marker_index=selected_marker,
         song_marker_flash_start_ms=(

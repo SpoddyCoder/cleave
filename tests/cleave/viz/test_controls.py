@@ -2364,6 +2364,23 @@ def test_timeline_bar_phase_undo_steps_back_before_deleted_clips() -> None:
     assert tl.lanes["layer_1"].cues[0].t == 1.0
 
 
+def test_transport_bars_follow_bar_phase() -> None:
+    controls = make_controls(
+        ("layer_1",),
+        beat_times=(0.0, 1.0, 2.0, 3.0, 4.0, 5.0),
+        bar_times=(0.0, 4.0),
+    )
+    assert tuple(controls.transport.bar_times) == (0.0, 4.0)
+    controls.session.timeline.bar_phase_offset = 1
+    assert tuple(controls.transport.bar_times) == (1.0, 5.0)
+    # Bars clamped onto the last beat count once.
+    controls.session.timeline.bar_phase_offset = 3
+    assert tuple(controls.transport.bar_times) == (3.0, 5.0)
+    assert controls.bar_lane_shown is False
+    controls.session.timeline.show_bar_grid = True
+    assert controls.bar_lane_shown is True
+
+
 def test_timeline_bar_phase_recording_blocks() -> None:
     controls = make_controls(
         ("layer_1",),

@@ -14,6 +14,7 @@ import pygame
 
 from cleave.viz.overlay_primitives import overlay_font
 from cleave.viz.theme import palette
+from cleave.viz.timeline_strip_grid import GridLines
 
 # (major, minor) step pairs in seconds, fine to coarse. From 10s up, labelled
 # marks land on whole tens of seconds.
@@ -165,6 +166,64 @@ def ruler_tick_top(height: int) -> int:
 
 def ruler_font(strip_font_size: int) -> pygame.font.Font:
     return overlay_font(max(1, int(round(strip_font_size * RULER_FONT_RATIO))))
+
+
+def bar_label_spacing_px(bar_count: int, strip_font_size: int) -> int:
+    """How far apart bar numbers up to *bar_count* stay in the bar lane."""
+    label_w = ruler_font(strip_font_size).size(str(max(1, bar_count)))[0]
+    return int((label_w + LABEL_TICK_GAP_PX * 4) * LABEL_SPACING_RATIO)
+
+
+def draw_bar_lane(
+    surface: pygame.Surface,
+    lines: GridLines,
+    *,
+    top: int,
+    height: int,
+    bar_left: int,
+    bar_width: int,
+    view_start_sec: float,
+    view_end_sec: float,
+    duration_sec: float,
+    strip_font_size: int,
+) -> None:
+    """Bar ticks and numbers on *surface*, rising from the lane's bottom edge."""
+    font = ruler_font(strip_font_size)
+    bar_right = bar_left + bar_width
+    bottom = top + height - 1
+    window = {
+        "bar_left": bar_left,
+        "bar_width": bar_width,
+        "view_start_sec": view_start_sec,
+        "view_end_sec": view_end_sec,
+    }
+
+    def tick(x: int, tick_h: int, color: tuple[int, int, int]) -> None:
+        pygame.draw.line(surface, color, (x, bottom - tick_h + 1), (x, bottom), 1)
+
+    def x_of(t: float) -> int:
+        return min(view_time_to_x(t, **window), bar_right - 1)
+
+    for x in song_bound_xs(duration_sec=duration_sec, **window):
+        tick(x, height, palette().song_bound)
+    spans: list[tuple[int, int]] = []
+    for t, bar in lines.labels:
+        x = x_of(t)
+        tick(x, height, palette().muted)
+        label = font.render(str(bar), True, palette().muted)
+        label_x = x + LABEL_TICK_GAP_PX
+        if label_x + label.get_width() > bar_right:
+            continue
+        surface.blit(label, (label_x, top + (height - label.get_height()) // 2))
+        spans.append((label_x - 1, label_x + label.get_width()))
+    labelled = {t for t, _bar in lines.labels}
+    for times, tick_h in ((lines.bars, height // 2), (lines.beats, height // 4)):
+        for t in times:
+            x = x_of(t)
+            # Ticks under a number would read as part of it.
+            if t in labelled or any(left <= x <= right for left, right in spans):
+                continue
+            tick(x, max(1, tick_h), palette().muted)
 
 
 def render_time_ruler(

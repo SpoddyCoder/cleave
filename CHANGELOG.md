@@ -30,6 +30,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- The bar grid draws over the timeline strip's rows instead of behind them, shows beats when you zoom in and fewer bars when you zoom out, and adds a lane of bar numbers under the time ruler.
 - Layers is now the first section in the navigator, above Overlay, Post-FX, Pattern Mask, and Timeline.
 - Help lists mouse actions and keys apart, under Mouse and Keyboard headings, everywhere it shows controls, with related controls next to each other. Navigation / Global adds Space, Alt+Left/Right, Shift+F10, and F3, and every setting with a list says Enter opens it. The Keyboard Controls title is now Controls.
 - Headings over groups of rows, in the inspector and in dialogs such as Generate timeline and Download packages, have their own colour in each theme instead of a grey that looked disabled. Theme files set it as `subheading`.
@@ -79,6 +80,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- The transport bar's bar number, and dragging it or typing a bar, follow bar phase.
 - Edit > Undo and Redo (Ctrl+Z, Ctrl+Y) now cover bar phase, along with the clips it moves. A quick run of presses is one step.
 - Bar phase can be changed when the timeline has no clips, so you can set it before you start recording.
 - Snap clips > bars follows bar phase, so clip edges move onto the bars the timeline draws, and the dialog counts the edges it will move the same way. Before, with a bar phase other than +0, they moved onto the wrong beats.

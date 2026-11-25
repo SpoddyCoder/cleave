@@ -12,6 +12,7 @@ from cleave.config import CleaveConfig
 from cleave.signals import Signals
 from cleave.preset_library import PresetLibrary
 from cleave.preset_list_entry import PresetListEntry
+from cleave.timeline import phased_bar_times
 from cleave.viz.clip_presets import (
     TIMELINE_LOCK_REASON,
     ClipPresetPicker,
@@ -211,7 +212,9 @@ class TuningControls:
         self.transport = TransportControls(
             playback,
             duration_sec,
-            bar_times,
+            lambda: phased_bar_times(
+                bar_times, beat_times, session.timeline.bar_phase_offset
+            ),
             self.inline_edit,
             self.seek_to,
         )
@@ -1108,6 +1111,11 @@ class TuningControls:
             self._layer_bindings.on_seek(delta_sec)
         else:
             seek(self.playback, delta_sec, self.duration_sec)
+
+    @property
+    def bar_lane_shown(self) -> bool:
+        """True when the timeline strip shows its numbered bar lane."""
+        return self.session.timeline.show_bar_grid and self.transport.has_bars
 
     def seek_to(self, position_sec: float) -> None:
         """Absolute seek; routes through ``on_seek`` (PCM flush + preset re-apply)."""

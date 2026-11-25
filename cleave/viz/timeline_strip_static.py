@@ -9,6 +9,7 @@ Drawn once per change of the static signature and cached; the live layer
 
 from __future__ import annotations
 
+from bisect import bisect_right
 from dataclasses import dataclass, replace
 
 import pygame
@@ -23,7 +24,13 @@ from cleave.viz.row_present_renderers import (
 from cleave.viz.theme import palette, timeline_ui_metrics
 from cleave.viz.text_fit import fit_text_to_width
 from cleave.timeline import LEVEL_EPS
-from cleave.viz.timeline_ruler import render_time_ruler, song_bound_xs
+from cleave.viz.timeline_ruler import (
+    bar_label_spacing_px,
+    draw_bar_lane,
+    render_time_ruler,
+    song_bound_xs,
+)
+from cleave.viz.timeline_strip_grid import GridLines, grid_lines
 from cleave.viz.timeline_strip_layout import (
     StripLayout,
     clip_bar_span,
@@ -46,6 +53,9 @@ from cleave.viz.ui_tint import blit_hover, blit_row_band, draw_row_edge
 # Dim end of the level-bar colour ramp sits this far from off toward the
 # track colour (quarter beds stay readable).
 _BAR_LEVEL_DIM_MIX: float = 0.4
+# Grid lines over the rows stay weaker than the ticks that mark cuts.
+GRID_BAR_ALPHA: int = 80
+GRID_BEAT_ALPHA: int = 35
 CUE_TICK_ALPHA: int = 120
 CUE_TICK_WIDTH: int = 2
 # A join where the next clip continues the preset, and a timer row's preset
@@ -167,6 +177,75 @@ def _draw_tick(
     )
 
 
+def _level_at(breakpoints: list[tuple[float, float]], t: float) -> float:
+    """Level at *t*; on a step, the level that starts there."""
+    index = bisect_right(breakpoints, t, key=lambda point: point[0])
+    if index == 0 or not breakpoints:
+        return 0.0
+    if index == len(breakpoints):
+        return breakpoints[-1][1]
+    t0, level0 = breakpoints[index - 1]
+    t1, level1 = breakpoints[index]
+    return level0 + (level1 - level0) * (t - t0) / (t1 - t0)
+
+
+def _draw_row_grid(
+    panel: pygame.Surface,
+    lines: GridLines,
+    *,
+    breakpoints: list[tuple[float, float]],
+    bar_rect: pygame.Rect,
+    view_start_sec: float,
+    view_end_sec: float,
+) -> None:
+    """Grid lines over a row's level bar: dark on the clips, light where it is off.
+
+    Columns are blitted: drawing with an alpha colour would replace the panel's
+    alpha instead of blending.
+    """
+    blits: list[tuple[pygame.Surface, tuple[int, int], tuple[int, int, int, int]]] = []
+    for times, alpha in (
+        (lines.beats, GRID_BEAT_ALPHA),
+        (lines.bars, GRID_BAR_ALPHA),
+    ):
+        on = pygame.Surface((1, bar_rect.h), pygame.SRCALPHA)
+        on.fill((*palette().timeline_clip_text, alpha))
+        off = pygame.Surface((1, bar_rect.h), pygame.SRCALPHA)
+        off.fill((*palette().label, alpha))
+        for t in times:
+            x = min(
+                time_to_x(t, bar_rect.x, bar_rect.w, view_start_sec, view_end_sec),
+                bar_rect.right - 1,
+            )
+            level = _level_at(breakpoints, t)
+            off_h = bar_rect.h
+            if level > LEVEL_EPS:
+                off_h = max(0, min(bar_rect.h, bar_level_y(bar_rect, level) - bar_rect.y))
+            if off_h:
+                blits.append((off, (x, bar_rect.y), (0, 0, 1, off_h)))
+            if off_h < bar_rect.h:
+                blits.append(
+                    (on, (x, bar_rect.y + off_h), (0, 0, 1, bar_rect.h - off_h))
+                )
+    panel.blits(blits, doreturn=False)
+
+
+def _grid_lines(
+    state: TimelineViewState, layout: StripLayout, font_size: int
+) -> GridLines:
+    if not state.show_bar_grid:
+        return GridLines()
+    view_start, view_end = view_window(state)
+    return grid_lines(
+        state.bar_grid_times,
+        state.beat_grid_times,
+        view_start_sec=view_start,
+        view_end_sec=view_end,
+        bar_width=layout.bar_width,
+        min_label_px=bar_label_spacing_px(len(state.bar_grid_times), font_size),
+    )
+
+
 def _draw_clip_label(
     panel: pygame.Surface,
     font: pygame.font.Font,
@@ -214,6 +293,8 @@ def build_static_panel(
     state: TimelineViewState,
     layout: StripLayout,
     font: pygame.font.Font,
+    *,
+    font_size: int,
 ) -> tuple[pygame.Surface, list[RowLayoutEntry]]:
     """The cached panel under the live layer, and where each row sits on it."""
     panel_w = layout.panel_w
@@ -228,18 +309,20 @@ def build_static_panel(
     panel = overlay_panel_surface((panel_w, panel_h))
     row_layout: list[RowLayoutEntry] = []
 
-    if state.show_bar_grid and state.bar_grid_times:
-        for t in state.bar_grid_times:
-            if not time_in_view(t, view_start, view_end):
-                continue
-            grid_x = time_to_x(t, bar_left, bar_width, view_start, view_end)
-            pygame.draw.line(
-                panel,
-                palette().bar_grid,
-                (grid_x, layout.bar_top),
-                (grid_x, layout.bar_bottom - 1),
-                1,
-            )
+    # In the gaps between rows; each row redraws the lines over its own bar.
+    lines = _grid_lines(state, layout, font_size)
+    for t in lines.bars:
+        grid_x = min(
+            time_to_x(t, bar_left, bar_width, view_start, view_end),
+            bar_left + bar_width - 1,
+        )
+        pygame.draw.line(
+            panel,
+            palette().bar_grid,
+            (grid_x, layout.bar_top),
+            (grid_x, layout.bar_bottom - 1),
+            1,
+        )
 
     for display_i in range(row_count):
         row_index = display_i
@@ -331,15 +414,24 @@ def build_static_panel(
                 (layout.header_button_x("release"), icon_y),
             )
 
+        breakpoints = bar_level_breakpoints_for_row(state, slot)
         _draw_level_bar(
             panel,
-            breakpoints=bar_level_breakpoints_for_row(state, slot),
+            breakpoints=breakpoints,
             bar_left=bar_left,
             bar_width=bar_width,
             view_start_sec=view_start,
             view_end_sec=view_end,
             bar_rect=bar_rect,
             on_color=track_color(row_index),
+        )
+        _draw_row_grid(
+            panel,
+            lines,
+            breakpoints=breakpoints,
+            bar_rect=bar_rect,
+            view_start_sec=view_start,
+            view_end_sec=view_end,
         )
 
         row_clips = row_clips_for_view(state, slot)
@@ -460,11 +552,11 @@ def build_ruler(
     *,
     font_size: int,
 ) -> pygame.Surface | None:
-    """Time scale over the badge row and the strip's top padding."""
+    """Time scale over the badge row and the strip's top padding, then the bar lane."""
     view_start, view_end = view_window(state)
-    return render_time_ruler(
+    ruler = render_time_ruler(
         width=layout.panel_w,
-        height=layout.badge_reserve + layout.bar_top,
+        height=layout.ruler_h,
         bar_left=layout.bar_left,
         bar_width=layout.bar_width,
         view_start_sec=view_start,
@@ -472,6 +564,23 @@ def build_ruler(
         duration_sec=state.duration_sec,
         strip_font_size=font_size,
     )
+    if ruler is None or not layout.bar_lane_h:
+        return ruler
+    band = pygame.Surface((layout.panel_w, layout.band_h), pygame.SRCALPHA)
+    band.blit(ruler, (0, 0))
+    draw_bar_lane(
+        band,
+        _grid_lines(state, layout, font_size),
+        top=layout.ruler_h,
+        height=layout.bar_lane_h,
+        bar_left=layout.bar_left,
+        bar_width=layout.bar_width,
+        view_start_sec=view_start,
+        view_end_sec=view_end,
+        duration_sec=state.duration_sec,
+        strip_font_size=font_size,
+    )
+    return band
 
 
 def _draw_scrollbar(

@@ -53,6 +53,7 @@ class TimelineViewState:
     arm_flash_start_ms: dict[str, int] = field(default_factory=dict)
     show_bar_grid: bool = False
     bar_grid_times: tuple[float, ...] = ()
+    beat_grid_times: tuple[float, ...] = ()
     song_marker_times: tuple[float, ...] = ()
     selected_song_marker_index: int | None = None
     song_marker_flash_start_ms: int | None = None
@@ -67,6 +68,11 @@ class TimelineViewState:
     view_end_sec: float | None = None
     # How each row's presets change, for the names on its clips.
     presets: dict[str, RowPresets] = field(default_factory=dict)
+
+    @property
+    def bar_lane(self) -> bool:
+        """True when the numbered bar lane shows under the time ruler."""
+        return self.show_bar_grid and bool(self.bar_grid_times)
 
 
 def view_window(state: TimelineViewState) -> tuple[float, float]:

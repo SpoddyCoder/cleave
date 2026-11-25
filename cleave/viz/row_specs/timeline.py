@@ -762,7 +762,7 @@ SPECS: dict[RowKind, RowSpec] = {
             ("Left/Right", "hide / show"),
         ),
         help_description=(
-            "Draws the detected bars on the timeline strip. Gaps are stretches where no beat was found, such as a beatless intro.",
+            "Draws the detected bars over the timeline strip, with bar numbers under the time ruler. Zoom in to see beats. Gaps are stretches where no beat was found, such as a beatless intro.",
         ),
         blocked_by_section_lock=True,
     ),

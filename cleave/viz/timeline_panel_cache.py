@@ -18,6 +18,7 @@ from cleave.viz.theme import (
     timeline_ui_metrics,
     ui_scale_generation,
 )
+from cleave.viz.timeline_ruler import ruler_font
 
 if TYPE_CHECKING:
     from cleave.viz.timeline_strip_state import TimelineViewState
@@ -72,6 +73,7 @@ class TimelineStaticSignature:
     visibility_bucket: int
     show_bar_grid: bool
     bar_grid_times: tuple[float, ...]
+    beat_grid_times: tuple[float, ...]
     song_marker_times: tuple[float, ...]
     selected_song_marker_index: int | None
     hard_cut_fades_enabled: bool
@@ -189,6 +191,7 @@ def timeline_static_signature(
         visibility_bucket=visibility_bucket(visibility),
         show_bar_grid=state.show_bar_grid,
         bar_grid_times=state.bar_grid_times,
+        beat_grid_times=state.beat_grid_times,
         song_marker_times=state.song_marker_times,
         selected_song_marker_index=state.selected_song_marker_index,
         hard_cut_fades_enabled=state.hard_cut_fades.enabled,
@@ -222,10 +225,19 @@ def timeline_upload_signature(
     )
 
 
+def timeline_bar_lane_px(font_size: int) -> int:
+    """Height of the bar lane: one line of the ruler's font."""
+    return ruler_font(font_size).get_height()
+
+
 def timeline_badge_reserve_px(
-    *, font_size: int | None = None, padding: int | None = None
+    *,
+    font_size: int | None = None,
+    padding: int | None = None,
+    bar_lane: bool = False,
 ) -> int:
-    """Height added above the strip for the badge row (time scale, REC).
+    """Height added above the strip for the badge row (time scale, REC) and,
+    with *bar_lane*, the bar numbers under it.
 
     The badge row sits at the top of the band and takes the place of the
     strip's top padding, so only the part taller than that padding is added.
@@ -236,12 +248,13 @@ def timeline_badge_reserve_px(
     if padding is None:
         padding = metrics.padding
     badge_h = overlay_font(font_size).get_height() + metrics.rec_badge_pad_y * 2
-    return max(0, badge_h + metrics.rec_badge_gap - padding)
+    lane_h = timeline_bar_lane_px(font_size) if bar_lane else 0
+    return max(0, badge_h + metrics.rec_badge_gap - padding) + lane_h
 
 
 def timeline_panel_max_dimensions(viewport_w: int, viewport_h: int) -> tuple[int, int]:
     """Upload capacity: the full eight-row fit, or the viewport for a taller band."""
     panel_w = max(1, viewport_w)
     panel_h = timeline_panel_height_px(MAX_LAYER_COUNT)
-    badge_reserve = timeline_badge_reserve_px()
+    badge_reserve = timeline_badge_reserve_px(bar_lane=True)
     return panel_w, max(panel_h + badge_reserve, viewport_h)
