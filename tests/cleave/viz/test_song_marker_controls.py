@@ -225,7 +225,7 @@ def test_snap_moves_markers_to_bars_and_keeps_types_and_selection() -> None:
     controller.prompt_snap()
     view = modal.view_state()
     assert view.form_rows[0].options == ("beats", "bars")
-    assert view.form_info == "(moves 1 of 3 song markers)"
+    assert view.form_info == "Moves 1 of 3 song markers"
     modal.activate_option(0)
     assert session.song_markers.markers == [
         SongMarker(4.0, "verse"),
@@ -262,7 +262,7 @@ def test_snap_merge_follows_selection() -> None:
     session.song_markers.times = [3.9, 4.2, 8.1]
     session.song_markers.selected_index = 2
     controller.prompt_snap()
-    assert modal.view_state().form_info == "(moves 3 of 3 song markers, merges 1)"
+    assert modal.view_state().form_info == "Moves 3 of 3 song markers, merges 1"
     modal.activate_option(0)
     assert session.song_markers.times == [4.0, 8.0]
     assert session.song_markers.selected_index == 1

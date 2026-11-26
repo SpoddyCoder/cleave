@@ -221,7 +221,7 @@ class TapSyncControls:
                 confirm_label="Apply",
                 on_confirm=apply,
                 on_cancel=self._dismiss_without_apply,
-                info=lambda _values: f"(now {format_tap_latency_ms(current_ms)})",
+                info=lambda _values: f"Now {format_tap_latency_ms(current_ms)}",
             )
         )
 

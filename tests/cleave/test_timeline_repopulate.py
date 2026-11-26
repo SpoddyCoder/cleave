@@ -6,3 +6,6 @@ from cleave.timeline_presets.repopulate import (
 )
 
 
+def test_default_keeps_the_current_list() -> None:
+    assert DEFAULT_TIMELINE_PRESET_REPOPULATE == "keep"
+    assert timeline_preset_repopulate_display("keep") == "use current list"

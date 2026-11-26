@@ -173,6 +173,24 @@ def populate_from_cue_marker_roles(
     return list(layer.preset_list)
 
 
+def kept_list_for_clips(
+    entries: Sequence[PresetListEntry], clip_count: int
+) -> list[PresetListEntry]:
+    """The layer's own presets, each once, looped to cover *clip_count* clips.
+
+    The list's first appearance order is kept, so a list dealt by an earlier
+    Generate comes back as the set it was made from. When the clips are fewer
+    than the presets, the rest stay on as spares.
+    """
+    unique: list[PresetListEntry] = []
+    for entry in entries:
+        if entry not in unique:
+            unique.append(entry)
+    if not unique:
+        return []
+    return [unique[i % len(unique)] for i in range(max(clip_count, len(unique)))]
+
+
 def repopulate_preset_lists(
     session: TuningSession,
     *,
@@ -181,9 +199,11 @@ def repopulate_preset_lists(
     catalog: PresetCatalog,
     rng: random.Random | None = None,
 ) -> None:
-    """Give every clip a preset on each-clip layers after Generate timeline.
+    """Fill the preset lists of each-clip layers for Generate timeline's clips.
 
-    ``mode`` is a staged ``TimelinePresetRepopulate`` value.
+    ``mode`` is a ``TimelinePresetRepopulate`` value. ``"keep"`` loops the
+    layer's own list over its clips; a layer with an empty list gets a
+    shuffled one from its folder instead.
     """
     rng = rng or random.Random()
     for slot in session.layer_z_order:
@@ -192,7 +212,17 @@ def repopulate_preset_lists(
             continue
         if runtime.preset_switching_trigger != "timeline":
             continue
-        if mode == "cue roles":
+        if mode == "keep":
+            kept = kept_list_for_clips(
+                runtime.preset_list, on_segment_populate_count(session, slot)
+            )
+            if kept:
+                runtime.preset_list = kept
+                continue
+            mode_for_slot = "directory random"
+        else:
+            mode_for_slot = mode
+        if mode_for_slot == "cue roles":
             populate_from_cue_marker_roles(
                 session,
                 slot,
@@ -200,19 +230,11 @@ def repopulate_preset_lists(
                 catalog=catalog,
                 rng=rng,
             )
-        elif mode == "directory sequential":
-            populate_from_directory(
-                session,
-                slot,
-                project_dir=project_dir,
-                order="sequential",
-                rng=rng,
-            )
         else:
             populate_from_directory(
                 session,
                 slot,
                 project_dir=project_dir,
-                order="random",
+                order="sequential" if mode_for_slot == "directory sequential" else "random",
                 rng=rng,
             )

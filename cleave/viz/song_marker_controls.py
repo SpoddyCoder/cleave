@@ -241,7 +241,7 @@ class SongMarkerController:
         snapped, _new_indices, moved = self._snapped(target)
         merged = total - len(snapped)
         merges = f", merges {merged}" if merged else ""
-        return f"(moves {moved} of {total} song markers{merges})"
+        return f"Moves {moved} of {total} song markers{merges}"
 
     def _snap(self, target: str) -> None:
         markers = self.session.song_markers

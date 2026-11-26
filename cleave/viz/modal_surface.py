@@ -45,6 +45,7 @@ from cleave.viz.modal_layout import (
     focus_highlight_rect,
     form_control_width,
     form_field_height,
+    form_info_lines,
     form_heading_height,
     form_row_height,
     form_row_pad_y,
@@ -777,8 +778,12 @@ class ModalSurface:
         if view.form_info is not None:
             if has_message:
                 y += line_gap
-            _text(draw, x, y, view.form_info, palette().highlight)
-            y += line_h
+            info_lines = form_info_lines(view.form_info)
+            for index, line in enumerate(info_lines):
+                if index:
+                    y += line_gap
+                _text(draw, x, y, line, palette().highlight)
+                y += line_h
         if has_labeled:
             if has_message:
                 y += line_h + line_gap

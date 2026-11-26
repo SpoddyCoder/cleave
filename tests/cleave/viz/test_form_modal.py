@@ -253,7 +253,7 @@ def test_info_adds_one_line_under_the_title() -> None:
     plain = ModalHost()
     _info_form(plain, info=None)
     with_info = ModalHost()
-    _info_form(with_info, info="(moves 1 of 1 clip edges)")
+    _info_form(with_info, info="Moves 1 of 1 clip edges")
     plain_h = measure_panel(_Measure(), plain.view_state(), line_gap=2, screen_w=1920)[1]
     info_h = measure_panel(
         _Measure(), with_info.view_state(), line_gap=2, screen_w=1920

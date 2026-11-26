@@ -32,6 +32,11 @@ CARET_WIDTH = 2
 BANNER_HEIGHT_LINES = 6
 
 
+def form_info_lines(info: str) -> list[str]:
+    """A form's info text, one entry per line it draws on."""
+    return info.split("\n")
+
+
 # Spacing reads the live UI scale, so a scale change applies on the next frame.
 def panel_pad_x() -> int:
     return tuning_ui_metrics().modal_panel_pad_x
@@ -326,8 +331,9 @@ def measure_panel(
     if state.form_info is not None:
         if has_message:
             content_h += line_gap
-        content_w = max(content_w, measure.size(state.form_info)[0])
-        content_h += line_h
+        info_lines = form_info_lines(state.form_info)
+        content_w = max(content_w, *(measure.size(line)[0] for line in info_lines))
+        content_h += len(info_lines) * line_h + (len(info_lines) - 1) * line_gap
 
     if has_labeled:
         if has_message:

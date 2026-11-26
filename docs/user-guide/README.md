@@ -416,12 +416,17 @@ The fastest way to get started is to let Cleave build an arrangement. Choose **G
 - **mode:** either bring whole layers in and out, or swap them through the [Pattern Mask](#pattern-mask).
 - **density:** how busy the arrangement is.
 - **conductor:** optionally lets the stems' audio decide which layer leads each phrase and give the layers roles, which set their blend modes. Without it, layers take turns leading and keep their own blend modes.
-- **layer opacity:** set every layer to 100%, or leave it. A layer's own opacity multiplies its clips', so the brightness Generate plans shows as planned only at 100%.
 - **snap** and **cut type:** how clip edges align to the beat grid and how layers transition.
-- **change presets:** switch every layer to change presets on each clip, or leave them. Generate plans new presets at song markers and every few bars, and they play only on layers set to each clip.
-- **clip presets:** how each new clip gets its preset, on layers whose presets change on each clip: by clip roles (offered once at least one preset in your library has a role), or shuffled or in order from each layer's preset folder.
 
-The line under the dialog's title says what Generate replaces, and which layers will still be below 100% or without preset changes. Locked layers keep their opacity and presets. Press H in the dialog for a full description of each option. You will get much better results if you [mark the song's sections](#song-markers) and [assign roles to your presets](#curating-your-presets) first.
+Under **Layer settings**, Generate can also change three settings on every unlocked layer, so its plan shows as planned. Each starts where it leaves the layer's own setting in place (keep, or use current list):
+
+| Setting | Changes the layer's | Choices |
+|---|---|---|
+| **opacity** | Compositing > opacity | keep, or set to 100%. A layer's opacity multiplies its clips', so the planned brightness shows only at 100%. |
+| **change presets** | Preset Switching > change presets | keep, or each clip. Generate plans new presets at song markers and every few bars, and they play only on layers set to each clip. |
+| **preset list** | Preset List | use current list (the default) deals the layer's own presets onto the clips in order, starting again from the top when there are more clips than presets; an empty list gets a new shuffled one. The other choices build a new list: shuffled or in order from the layer's folder, or by clip roles (offered once at least one preset in your library has a role). Shown only when some layer changes presets on each clip. |
+
+The lines under the dialog's title say how many clips Generate replaces and which layers will still be below 100%. Locked layers keep their opacity and presets. Press H in the dialog for a full description of each option. You will get much better results if you [mark the song's sections](#song-markers) and [assign roles to your presets](#curating-your-presets) first.
 
 In layers mode one layer leads at full opacity and the others sit back, so the picture stays clear rather than washing out. Layers come in, leave, brighten, and dim one at a time, a bar or two apart, except at song markers, where several may change together. Layers that stay on change preset at markers and every few bars, each on its own beat. The section types and intensities below set how many layers play and how bright they are.
 

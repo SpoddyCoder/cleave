@@ -1,7 +1,7 @@
-"""How Generate timeline picks presets for the clips it builds.
+"""What Generate timeline does with the preset lists of the clips it builds.
 
 Applies to layers whose presets change on each clip: every generated clip
-needs a preset of its own.
+needs a preset of its own, dealt from the layer's preset list.
 """
 
 from __future__ import annotations
@@ -9,24 +9,27 @@ from __future__ import annotations
 from typing import Literal
 
 TimelinePresetRepopulate = Literal[
-    "cue roles",
+    "keep",
     "directory random",
     "directory sequential",
+    "cue roles",
 ]
 
-DEFAULT_TIMELINE_PRESET_REPOPULATE: TimelinePresetRepopulate = "directory random"
+DEFAULT_TIMELINE_PRESET_REPOPULATE: TimelinePresetRepopulate = "keep"
 
 TIMELINE_PRESET_REPOPULATE_OPTIONS: tuple[TimelinePresetRepopulate, ...] = (
-    "cue roles",
+    "keep",
     "directory random",
     "directory sequential",
+    "cue roles",
 )
 
 
 _DISPLAY: dict[TimelinePresetRepopulate, str] = {
-    "cue roles": "clip roles",
-    "directory random": "shuffled (each layer's directory)",
-    "directory sequential": "in order (each layer's directory)",
+    "keep": "use current list",
+    "directory random": "new, shuffled from folder",
+    "directory sequential": "new, in order from folder",
+    "cue roles": "new, by clip roles",
 }
 
 

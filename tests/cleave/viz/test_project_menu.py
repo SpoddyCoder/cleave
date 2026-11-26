@@ -261,10 +261,10 @@ def test_render_dialog_shows_current_settings() -> None:
 def test_render_dialog_info_names_the_draft_output(tmp_path: Path) -> None:
     controls = make_controls(("layer_1",), project_dir=tmp_path, duration_sec=60.0)
     _prompt_project_render(controls)
-    assert controls.modal_host.view_state().form_info == "(renders/render.mp4)"
+    assert controls.modal_host.view_state().form_info == "Saves to renders/render.mp4"
     _focus_form_row(controls, "start")
     controls.handle_modal_keydown(keydown(pygame.K_PAGEUP))
-    assert controls.modal_host.view_state().form_info == "(renders/render_10-60s.mp4)"
+    assert controls.modal_host.view_state().form_info == "Saves to renders/render_10-60s.mp4"
 
 
 def test_render_dialog_steps_fps_and_range() -> None:

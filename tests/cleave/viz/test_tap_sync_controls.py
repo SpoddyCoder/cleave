@@ -472,7 +472,7 @@ def test_apply_dialog_steps_from_the_measured_value_before_applying() -> None:
     _tap_on_accents(controls, playback, accent_times, latency_sec=0.2, count=MIN_KEPT_TAPS)
     view = modal.view_state()
     assert view.form_rows[0].stepper is True
-    assert view.form_info == "(now +0 ms)"
+    assert view.form_info == "Now +0 ms"
     modal.handle_keydown(keydown(pygame.K_RIGHT))
     modal.handle_keydown(keydown(pygame.K_PAGEDOWN))
     modal.handle_keydown(keydown(pygame.K_RETURN))

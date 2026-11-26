@@ -20,7 +20,7 @@ from cleave.timeline_presets.lanes import compose_layers_timeline
 from cleave.timeline_presets.layer_setup import (
     FULL_OPACITY_PCT,
     change_presets_display,
-    layer_opacity_display,
+    opacity_display,
 )
 from cleave.timeline_presets.pattern_mask_arrange import compose_pattern_mask_timeline
 from cleave.timeline_presets.conductor import timeline_preset_conductor_display
@@ -74,14 +74,15 @@ _CONDUCTOR_OPTIONS = (False, True)
 _RESET_LAYER_OPTIONS = ("off", "on")
 _PATTERN_MASK_TRANSITION_SEC = 1.0
 # Generate dialog sections: what the arrangement is, then how its cues are
-# tidied, then what happens to the layers' preset lists.
+# tidied, then which layer settings it overrides.
 _ARRANGEMENT_SECTION = "Arrangement"
 _CUES_SECTION = "Clip timing and cuts"
-_PRESETS_SECTION = "Presets"
+_LAYER_SETTINGS_SECTION = "Layer settings"
 
 _GENERATE_HELP = (
-    "Builds a new timeline from these settings, replacing the current clips. Arrangement decides which layers play when, clip timing and cuts then tidy every generated clip, and each layer whose presets change on each clip gets a preset for every new clip. That replaces the layer's whole preset list, spares included.",
+    "Builds a new timeline from these settings, replacing the current clips. Arrangement decides which layers play when, clip timing and cuts then tidy every generated clip, and each layer whose presets change on each clip gets a preset for every new clip, dealt from its preset list.",
     "Each section is arranged to suit its song marker's type and intensity: how many layers play, which one leads, how bright each is, and how often presets change. Back-to-back markers of one type make one longer section, such as a build that rises across all of them. Settings are kept for the rest of the session.",
+    "Layer settings change the same settings on each layer's own pages, so the plan shows as planned. keep leaves them as they are. Locked layers are always left as they are, and Ctrl+Z undoes the changes with the rest of Generate.",
 )
 _DENSITY_HELP = (
     "How many layers tend to play at once: sparse favours solos, dense keeps more of the stack in.",
@@ -104,13 +105,14 @@ _TIMELINE_CUTS_OPTION_HELP = {
     "all hard": "every clip edge is a hard cut.",
     "none": "keep the cut each clip edge was made with.",
 }
-_REPOPULATE_HELP = (
-    "How each new clip gets its preset, on every layer whose presets change on each clip.",
+_PRESET_LIST_HELP = (
+    "The layer's Preset List, dealt onto the new clips in order on each layer whose presets change on each clip. Shown only when there is such a layer.",
 )
-_REPOPULATE_OPTION_HELP = {
-    "cue roles": "a preset picked for each clip's role.",
-    "directory random": "presets from the layer's preset directory, shuffled.",
-    "directory sequential": "presets from the layer's preset directory, in order.",
+_PRESET_LIST_OPTION_HELP = {
+    "keep": "the layer's own presets, starting again from the top when there are more clips than presets; an empty list gets a new shuffled one.",
+    "directory random": "a new list from the layer's preset folder, shuffled.",
+    "directory sequential": "a new list from the layer's preset folder, in order.",
+    "cue roles": "a new list with a preset picked for each clip's role.",
 }
 _CONDUCTOR_HELP = (
     "Uses the stems' audio to decide which layer leads each phrase and to give layers roles, which set their blend modes. In layers mode a chorus or drop opens with an accent on one layer. It needs the song's audio analysis and is skipped without it.",
@@ -128,19 +130,19 @@ _MODE_OPTION_HELP = {
     ),
 }
 _ON_OFF = (False, True)
-_LAYER_OPACITY_HELP = (
-    "Each layer's own opacity multiplies the opacity of its clips, so the brightness Generate plans shows as planned only on layers at 100%.",
+_OPACITY_HELP = (
+    "The layer's Compositing > opacity, which multiplies the opacity of its clips.",
 )
-_LAYER_OPACITY_OPTION_HELP = {
-    False: "keep each layer's opacity; layers below 100% look dimmer than planned.",
-    True: "set every unlocked layer to 100%.",
+_OPACITY_OPTION_HELP = {
+    False: "layers below 100% look dimmer than planned.",
+    True: "the brightness Generate plans shows as planned.",
 }
 _CHANGE_PRESETS_HELP = (
-    "Generate plans a new preset at song markers and every few bars, on layers that stay on. Those changes play only on layers whose presets change on each clip.",
+    "The layer's Preset Switching > change presets. Generate plans a new preset at song markers and every few bars, and those changes play only on layers set to each clip.",
 )
 _CHANGE_PRESETS_OPTION_HELP = {
-    False: "keep how each layer changes presets.",
-    True: "every unlocked layer changes presets on each clip, and every clip gets a preset as clip presets says.",
+    False: "layers on a timer, projectM decides, or never keep it, and their preset lists.",
+    True: "every layer plays the planned preset changes.",
 }
 _RESET_HELP = ("Removes every clip on the timeline.",)
 _RESET_LAYERS_HELP = ("What every layer does for the whole song after the reset.",)
@@ -264,16 +266,6 @@ class TimelinePresetController:
                         section=_ARRANGEMENT_SECTION,
                     ),
                     _choice_field(
-                        "layer_opacity",
-                        "layer opacity",
-                        _ON_OFF,
-                        tl.timeline_preset_full_opacity,
-                        layer_opacity_display,
-                        help=_LAYER_OPACITY_HELP,
-                        option_help=_LAYER_OPACITY_OPTION_HELP,
-                        section=_ARRANGEMENT_SECTION,
-                    ),
-                    _choice_field(
                         "cue_snap",
                         "snap to grid",
                         TIMELINE_PRESET_CUE_SNAP_OPTIONS,
@@ -303,6 +295,16 @@ class TimelinePresetController:
                         section=_CUES_SECTION,
                     ),
                     _choice_field(
+                        "opacity",
+                        "opacity",
+                        _ON_OFF,
+                        tl.timeline_preset_full_opacity,
+                        opacity_display,
+                        help=_OPACITY_HELP,
+                        option_help=_OPACITY_OPTION_HELP,
+                        section=_LAYER_SETTINGS_SECTION,
+                    ),
+                    _choice_field(
                         "change_presets",
                         "change presets",
                         _ON_OFF,
@@ -310,17 +312,18 @@ class TimelinePresetController:
                         change_presets_display,
                         help=_CHANGE_PRESETS_HELP,
                         option_help=_CHANGE_PRESETS_OPTION_HELP,
-                        section=_PRESETS_SECTION,
+                        section=_LAYER_SETTINGS_SECTION,
                     ),
                     _choice_field(
-                        "repopulate",
-                        "clip presets",
+                        "preset_list",
+                        "preset list",
                         repopulate_options,
                         repopulate_current,
                         timeline_preset_repopulate_display,
-                        help=_REPOPULATE_HELP,
-                        option_help=_REPOPULATE_OPTION_HELP,
-                        section=_PRESETS_SECTION,
+                        help=_PRESET_LIST_HELP,
+                        option_help=_PRESET_LIST_OPTION_HELP,
+                        section=_LAYER_SETTINGS_SECTION,
+                        visible=self._preset_list_used,
                         vertical=True,
                     ),
                 ),
@@ -330,8 +333,7 @@ class TimelinePresetController:
                 ),
                 info=lambda values: self._generate_info(
                     duration_sec,
-                    each_clip=_ON_OFF[values["change_presets"]],
-                    full_opacity=_ON_OFF[values["layer_opacity"]],
+                    full_opacity=_ON_OFF[values["opacity"]],
                 ),
                 help=_GENERATE_HELP,
             )
@@ -349,33 +351,14 @@ class TimelinePresetController:
         self,
         duration_sec: float,
         *,
-        each_clip: bool = False,
         full_opacity: bool = False,
     ) -> str | None:
+        """What Generate would change, one sentence per line."""
         session = self.session
-        parts: list[str] = []
+        notes: list[str] = []
         count = self._clip_count(duration_sec)
         if count:
-            parts.append(f"{_clips_label(count)} on the timeline")
-        converting = self._layers_to_convert() if each_clip else []
-        slots = [
-            slot
-            for slot in session.layer_z_order
-            if (is_each_clip(session, slot) and session.layers[slot].preset_list)
-            or slot in converting
-        ]
-        if slots:
-            noun = "preset list" if len(slots) == 1 else "preset lists"
-            parts.append(f"the {noun} of {layers_label(session, slots)}")
-        notes = [f"replaces {' and '.join(parts)}"] if parts else []
-        # What stays as it is after the layer options: locked layers always do.
-        others = [
-            slot
-            for slot in session.layer_z_order
-            if not is_each_clip(session, slot) and slot not in converting
-        ]
-        if others:
-            notes.append(f"no preset changes on {layers_label(session, others)}")
+            notes.append(f"Replaces {_clips_label(count)} on the timeline")
         dim = [
             slot
             for slot in session.layer_z_order
@@ -383,8 +366,15 @@ class TimelinePresetController:
             and not (full_opacity and not session.layers[slot].locked)
         ]
         if dim:
-            notes.append(f"{layers_label(session, dim)} below 100%")
-        return f"({'; '.join(notes)})" if notes else None
+            label = layers_label(session, dim)
+            notes.append(f"{label[0].upper()}{label[1:]} below 100%")
+        return "\n".join(notes) if notes else None
+
+    def _preset_list_used(self, values: FormValues) -> bool:
+        """Whether any layer would change presets on each clip after Generate."""
+        if _ON_OFF[values["change_presets"]] and self._layers_to_convert():
+            return True
+        return any(is_each_clip(self.session, slot) for slot in self.session.layer_z_order)
 
     def _layers_to_convert(self) -> list[str]:
         """Unlocked layers whose presets do not yet change on each clip."""
@@ -440,10 +430,10 @@ class TimelinePresetController:
         tl.timeline_preset_timeline_cuts = TIMELINE_PRESET_TIMELINE_CUTS_OPTIONS[
             values["timeline_cuts"]
         ]
-        tl.timeline_preset_repopulate = repopulate_options[values["repopulate"]]
+        tl.timeline_preset_repopulate = repopulate_options[values["preset_list"]]
         tl.timeline_preset_conductor = _CONDUCTOR_OPTIONS[values["conductor"]]
         tl.timeline_preset_mode = TIMELINE_PRESET_MODE_OPTIONS[values["mode"]]
-        tl.timeline_preset_full_opacity = _ON_OFF[values["layer_opacity"]]
+        tl.timeline_preset_full_opacity = _ON_OFF[values["opacity"]]
         tl.timeline_preset_each_clip = _ON_OFF[values["change_presets"]]
         before = self._history.begin("Generate timeline")
         try:
@@ -463,7 +453,7 @@ class TimelinePresetController:
         self._modal.prompt_form(
             FormSpec(
                 title=_RESET_TITLE,
-                info=lambda _values: f"(removes {_clips_label(count)})",
+                info=lambda _values: f"Removes {_clips_label(count)}",
                 fields=(
                     FormField(
                         "layers",

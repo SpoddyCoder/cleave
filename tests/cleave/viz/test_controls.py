@@ -1636,22 +1636,20 @@ def test_generate_opens_a_form_seeded_from_the_session() -> None:
         ("mode", "layers"),
         ("density", "normal"),
         ("conductor", "on"),
-        ("layer opacity", "leave as it is"),
         ("snap to grid", "none"),
         ("snap to song markers", "none"),
         ("cut type", "by marker"),
-        ("change presets", "leave as they are"),
-        ("clip presets", "shuffled (each layer's directory)"),
+        ("opacity", "keep"),
+        ("change presets", "keep"),
     ]
     assert [row.heading for row in modal_view.form_rows] == [
         "Arrangement",
         None,
         None,
-        None,
         "Clip timing and cuts",
         None,
         None,
-        "Presets",
+        "Layer settings",
         None,
     ]
     assert all(row.indented for row in modal_view.form_rows)
@@ -1662,13 +1660,34 @@ def test_generate_refill_omits_clip_roles_without_role_presets() -> None:
     controls.session.timeline.timeline_preset_repopulate = "cue roles"
     _focus_timeline_presets(controls)
     assert _press_focused(controls, keydown(pygame.K_RETURN)) is True
+    _set_form_field(controls, "change presets", "each clip")
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
     refill = next(
-        row for row in modal_view.form_rows if row.label == "clip presets"
+        row for row in modal_view.form_rows if row.label == "preset list"
     )
-    assert "clip roles" not in refill.options
-    assert refill.options[refill.value] == "shuffled (each layer's directory)"
+    assert "new, by clip roles" not in refill.options
+    assert refill.options[refill.value] == "use current list"
+
+
+def test_generate_shows_preset_list_only_when_a_layer_uses_it() -> None:
+    controls = make_controls(("layer_1",))
+    _focus_timeline_presets(controls)
+    _press_focused(controls, keydown(pygame.K_RETURN))
+
+    def labels() -> list[str]:
+        return [row.label for row in controls.modal_host.view_state().form_rows]
+
+    assert "preset list" not in labels()
+    _set_form_field(controls, "change presets", "each clip")
+    assert labels()[-1] == "preset list"
+    choose_modal_option(controls, "Cancel")
+
+    layer = controls.session.layers["layer_1"]
+    layer.preset_switching = "on"
+    layer.preset_switching_trigger = "timeline"
+    _press_focused(controls, keydown(pygame.K_RETURN))
+    assert labels()[-1] == "preset list"
 
 
 def test_generate_names_the_cues_it_replaces_under_the_title() -> None:
@@ -1681,12 +1700,11 @@ def test_generate_names_the_cues_it_replaces_under_the_title() -> None:
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
     assert modal_view.form_info == (
-        "(replaces 1 clip on the timeline; no preset changes on layer 1; "
-        "layer 1 below 100%)"
+        "Replaces 1 clip on the timeline\nLayer 1 below 100%"
     )
 
 
-def test_generate_names_the_preset_lists_it_replaces() -> None:
+def test_generate_names_the_layers_below_full_opacity() -> None:
     controls = make_controls(("layer_1", "layer_2", "layer_3"))
     controls.session.timeline.lanes["layer_1"] = TimelineLane(
         baseline=0.0, cues=[SlotCue(t=1.0, level=1.0)]
@@ -1701,8 +1719,7 @@ def test_generate_names_the_preset_lists_it_replaces() -> None:
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
     assert modal_view.form_info == (
-        "(replaces 1 clip on the timeline and the preset lists of layers 1 and 3; "
-        "no preset changes on layer 2; layers 1, 2 and 3 below 100%)"
+        "Replaces 1 clip on the timeline\nLayers 1, 2 and 3 below 100%"
     )
 
 
@@ -1719,11 +1736,10 @@ def test_generate_can_set_up_every_layer_for_its_plan() -> None:
     before = {slot: (l.opacity_pct, l.preset_switching_trigger) for slot, l in session.layers.items()}
     _focus_timeline_presets(controls)
     _press_focused(controls, keydown(pygame.K_RETURN))
-    _set_form_field(controls, "layer opacity", "set to 100%")
-    _set_form_field(controls, "change presets", "each clip, on every layer")
+    _set_form_field(controls, "opacity", "set to 100%")
+    _set_form_field(controls, "change presets", "each clip")
     assert controls.modal_host.view_state().form_info == (
-        "(replaces the preset lists of layers 1 and 2; no preset changes on layer 3; "
-        "layer 3 below 100%)"
+        "Layer 3 below 100%"
     )
     choose_modal_option(controls, "Generate")
     for slot in ("layer_1", "layer_2"):
@@ -1738,6 +1754,31 @@ def test_generate_can_set_up_every_layer_for_its_plan() -> None:
     assert {
         slot: (l.opacity_pct, l.preset_switching_trigger) for slot, l in session.layers.items()
     } == before
+
+
+def test_generate_keeps_and_loops_an_each_clip_layers_list(tmp_path: Path) -> None:
+    from cleave.viz.clip_presets import clip_preset_list
+
+    beats = tuple(float(i) for i in range(241))
+    controls = make_controls(
+        ("layer_1",),
+        beat_times=beats,
+        bar_times=beats[::4],
+        duration_sec=240.0,
+        project_dir=tmp_path,
+    )
+    layer = controls.session.layers["layer_1"]
+    layer.preset_switching = "on"
+    layer.preset_switching_trigger = "timeline"
+    layer.preset_list = entries("a.milk", "b.milk")
+    curated = list(layer.preset_list)
+    _focus_timeline_presets(controls)
+    _press_focused(controls, keydown(pygame.K_RETURN))
+    choose_modal_option(controls, "Generate")
+    held = clip_preset_list(controls.session, "layer_1", 240.0)
+    assert len(held) > 2
+    assert held == [curated[i % 2] for i in range(len(held))]
+    assert layer.preset_list == held
 
 
 def test_generate_hides_character_in_pattern_mask_mode() -> None:
@@ -2000,7 +2041,7 @@ def test_timeline_reset_enter_opens_choice_modal() -> None:
     assert modal_view.focus_index == 1
     assert "reset" in modal_view.message.lower()
     assert modal_view.body is None
-    assert modal_view.form_info == "(removes 0 clips)"
+    assert modal_view.form_info == "Removes 0 clips"
 
 
 def test_timeline_reset_all_off() -> None:
@@ -2201,7 +2242,7 @@ def test_timeline_snap_cues_opens_a_form() -> None:
     assert modal_view.message == "Snap clips"
     assert [row.label for row in modal_view.form_rows] == ["snap to"]
     assert modal_view.form_rows[0].options == ("beats", "bars")
-    assert modal_view.form_info == "(moves 1 of 1 clip edges)"
+    assert modal_view.form_info == "Moves 1 of 1 clip edges"
 
 
 def test_timeline_snap_beats_mutates_cues() -> None:
@@ -2268,7 +2309,7 @@ def test_timeline_snap_bars_follows_bar_phase() -> None:
     _set_form_field(controls, "snap to", "bars")
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
-    assert modal_view.form_info == "(moves 2 of 3 clip edges)"
+    assert modal_view.form_info == "Moves 2 of 3 clip edges"
     _snap_to(controls, "bars")
     assert controls.session.timeline.lanes["layer_1"].cues == [
         SlotCue(t=1.0, level=1.0),
@@ -2548,7 +2589,7 @@ def test_snap_to_markers_opens_one_form_with_proximity_and_layers() -> None:
     assert layers.options[layers.value] == "All Layers"
     assert "Closest Wins" in layers.options
     assert "Layer 1" in layers.options
-    assert modal_view.form_info == "(moves 1 of 1 clip edges)"
+    assert modal_view.form_info == "Moves 1 of 1 clip edges"
 
 
 def test_snap_form_hides_marker_fields_for_beats() -> None:
@@ -2680,9 +2721,9 @@ def test_set_cut_type_opens_one_form_with_a_live_count() -> None:
     assert modal_view.message == "Set cut type on clips"
     assert [row.label for row in modal_view.form_rows] == ["cut type", "applies to"]
     assert modal_view.form_rows[0].options == ("hard", "soft", "none")
-    assert modal_view.form_info == "(changes 2 of 2 clip edges)"
+    assert modal_view.form_info == "Changes 2 of 2 clip edges"
     _set_form_field(controls, "applies to", "song markers only")
-    assert controls.modal_host.view_state().form_info == "(changes 1 of 2 clip edges)"
+    assert controls.modal_host.view_state().form_info == "Changes 1 of 2 clip edges"
     assert controls.session.timeline.lanes == before
 
 

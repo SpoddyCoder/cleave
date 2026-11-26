@@ -292,7 +292,7 @@ class WelcomeFlow:
 
         def info(values: FormValues) -> str:
             total = sum(item.size_mb for item in selected(values))
-            return f"~{total} MB to download" if total else "nothing to download"
+            return f"~{total} MB to download" if total else "Nothing to download"
 
         def run(chosen: tuple[FirstRunItem, ...]) -> None:
             if chosen:

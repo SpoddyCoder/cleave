@@ -10,9 +10,9 @@ DEFAULT_TIMELINE_PRESET_EACH_CLIP = False
 FULL_OPACITY_PCT = 100
 
 
-def layer_opacity_display(full: bool) -> str:
-    return "set to 100%" if full else "leave as it is"
+def opacity_display(full: bool) -> str:
+    return "set to 100%" if full else "keep"
 
 
 def change_presets_display(each_clip: bool) -> str:
-    return "each clip, on every layer" if each_clip else "leave as they are"
+    return "each clip" if each_clip else "keep"

@@ -121,7 +121,7 @@ class AvSyncControls:
                 on_confirm=apply,
                 on_cancel=cancel,
                 on_change=on_change,
-                info=lambda _values: f"(now {saved_ms} ms)",
+                info=lambda _values: f"Now {saved_ms} ms",
             )
         )
 

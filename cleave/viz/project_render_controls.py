@@ -252,7 +252,7 @@ class ProjectRenderController:
     def _output_info(self, values: FormValues) -> str:
         draft = render_draft_from_values(values)
         if self._project_dir is None:
-            return f"({DEFAULT_PROJECT_RENDER_OUTPUT_LABEL})"
+            return f"Saves to {DEFAULT_PROJECT_RENDER_OUTPUT_LABEL}"
         path = default_project_render_path(
             self._project_dir,
             self.cfg.project_slug,
@@ -260,7 +260,7 @@ class ProjectRenderController:
             end_sec=draft.end_sec,
             duration_sec=self.duration_sec,
         )
-        return f"({project_render_output_label(path)})"
+        return f"Saves to {project_render_output_label(path)}"
 
     def _confirm_values(self, values: FormValues) -> None:
         draft = render_draft_from_values(values)

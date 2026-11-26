@@ -10,7 +10,9 @@ from cleave.preset_library import UNFILTERED_CATALOG, PresetLibrary
 from cleave.preset_playlist import PresetPlaylist
 from cleave.timeline import SlotCue, TimelineLane
 from cleave.preset_list_fill import needed_preset_count
+from cleave.preset_list_entry import PresetListEntry
 from cleave.viz.preset_list_populate import (
+    kept_list_for_clips,
     populate_from_cue_marker_roles,
     populate_from_directory,
     repopulate_preset_lists,
@@ -298,3 +300,47 @@ def test_populate_records_where_each_copy_came_from(tmp_path: Path) -> None:
     )
     assert [entry.source for entry in out] == [str((browse / "a.milk").resolve())]
     assert Path(out[0].path).parent == (tmp_path / "project" / "presets").resolve()
+
+
+def test_kept_list_loops_its_presets_over_more_clips() -> None:
+    a, b = PresetListEntry("a.milk"), PresetListEntry("b.milk")
+    assert kept_list_for_clips([a, b], 5) == [a, b, a, b, a]
+    # Fewer clips leave the rest as spares; repeats from a loop fold back.
+    assert kept_list_for_clips([a, b, a, b, a], 1) == [a, b]
+    assert kept_list_for_clips([], 3) == []
+
+
+def test_repopulate_keep_loops_the_layers_own_list(tmp_path: Path) -> None:
+    cues = tuple(SlotCue(t=float(t), level=1.0, cut="hard") for t in range(0, 50, 10))
+    session = _session(tmp_path, trigger="timeline", timeline_enabled=True, cues=cues)
+    a, b = PresetListEntry("a.milk"), PresetListEntry("b.milk")
+    session.layers["layer_1"].preset_list = [a, b]
+    repopulate_preset_lists(
+        session,
+        mode="keep",
+        project_dir=tmp_path,
+        catalog=UNFILTERED_CATALOG,
+        rng=random.Random(0),
+    )
+    listed = session.layers["layer_1"].preset_list
+    assert listed[:2] == [a, b]
+    assert set(listed) == {a, b}
+    assert len(listed) >= 2
+
+
+def test_repopulate_keep_fills_an_empty_list_from_the_folder(tmp_path: Path) -> None:
+    session = _session(tmp_path, trigger="timeline", timeline_enabled=True)
+    browse = session.layers["layer_1"].playlist.current_dir
+    (browse / "a.milk").write_text("MILK")
+    with patch(
+        "cleave.viz.preset_list_populate.copy_with_dedup",
+        side_effect=lambda dest, src: dest / src.name,
+    ):
+        repopulate_preset_lists(
+            session,
+            mode="keep",
+            project_dir=tmp_path,
+            catalog=UNFILTERED_CATALOG,
+            rng=random.Random(0),
+        )
+    assert [Path(e).name for e in session.layers["layer_1"].preset_list] == ["a.milk"]
