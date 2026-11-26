@@ -22,7 +22,7 @@ from cleave.song_markers import (
 )
 from cleave.viz.preset_schedule import RowLabel, RowPresets, row_labels
 from cleave.viz.material_icons import RECORD_GLYPH, REPLAY_GLYPH, SOLO_GLYPH
-from cleave.viz.overlay_primitives import overlay_panel_surface
+from cleave.viz.overlay_primitives import overlay_font, overlay_panel_surface
 from cleave.viz.row_present_renderers import (
     render_header_toggle,
     render_visibility_icon,
@@ -75,6 +75,15 @@ SOFT_TICK_WIDTH: int = 1
 CLIP_LABEL_INSET: int = 5
 # A clip narrower than this many pixels shows no name.
 CLIP_LABEL_MIN_PX: int = 18
+# The name's size against the strip font, at full and at its smallest.
+CLIP_LABEL_FONT_RATIO: float = 0.825
+CLIP_LABEL_MIN_FONT_RATIO: float = 0.675
+# Below this opacity the name shrinks with the clip, down to its smallest.
+CLIP_LABEL_SHRINK_LEVEL: float = 0.5
+# Rows taller than nominal grow the name at this share of their own growth,
+# up to this many times its size.
+CLIP_LABEL_GROWTH_RATE: float = 0.25
+CLIP_LABEL_MAX_GROWTH: float = 1.3
 # How far a row's off colour goes towards its section's colour, by intensity.
 SECTION_TINT_MIX: dict[SongIntensity, float] = {
     "very calm": 0.08,
@@ -302,11 +311,27 @@ def _grid_lines(
     )
 
 
+def clip_label_font_size(
+    level: float, strip_font_size: int, *, row_growth: float = 1.0
+) -> int:
+    """The preset name's font size on a clip at *level*.
+
+    *row_growth* is the row's height over the nominal row height.
+    """
+    growth = 1.0 + max(0.0, row_growth - 1.0) * CLIP_LABEL_GROWTH_RATE
+    growth = min(CLIP_LABEL_MAX_GROWTH, growth)
+    full = strip_font_size * CLIP_LABEL_FONT_RATIO * growth
+    smallest = strip_font_size * CLIP_LABEL_MIN_FONT_RATIO * growth
+    scaled = full * min(1.0, level / CLIP_LABEL_SHRINK_LEVEL)
+    return max(1, int(round(max(smallest, scaled))))
+
+
 def _draw_clip_label(
     panel: pygame.Surface,
-    font: pygame.font.Font,
     label: RowLabel,
     *,
+    font_size: int,
+    row_growth: float,
     bar_rect: pygame.Rect,
     bar_left: int,
     bar_width: int,
@@ -314,6 +339,8 @@ def _draw_clip_label(
     view_end_sec: float,
 ) -> None:
     clip = label.clip
+    level = max(0.0, min(1.0, float(clip.level)))
+    size = clip_label_font_size(level, font_size, row_growth=row_growth)
     span = clip_bar_span(
         replace(clip, start=label.start, end=label.end),
         bar_left=bar_left,
@@ -328,12 +355,7 @@ def _draw_clip_label(
     text = label.text
     if not text or right - left < CLIP_LABEL_MIN_PX or room <= 0:
         return
-    # The name sits on the clip's own colour, so it only shows where the
-    # level bar is tall enough to hold a line of text.
-    filled_h = int(round(max(0.0, min(1.0, float(clip.level))) * bar_rect.h))
-    line_h = font.get_height()
-    if filled_h < line_h:
-        return
+    font = overlay_font(size)
     fitted = fit_text_to_width(font, text, room)
     if not fitted:
         return
@@ -341,8 +363,13 @@ def _draw_clip_label(
         palette().button_danger_bg if label.empty else palette().timeline_clip_text
     )
     surf = font.render(fitted, True, color)
-    top = bar_rect.bottom - filled_h
-    panel.blit(surf, (left + CLIP_LABEL_INSET, top + (filled_h - line_h) // 2))
+    # Centred on the clip's level bar; on a short bar the name rests on the
+    # row's bottom edge and rises past the fill.
+    filled_h = int(round(level * bar_rect.h))
+    line_h = font.get_height()
+    y = bar_rect.bottom - filled_h + (filled_h - line_h) // 2
+    y = max(bar_rect.top, min(y, bar_rect.bottom - line_h))
+    panel.blit(surf, (left + CLIP_LABEL_INSET, y))
 
 
 def build_static_panel(
@@ -531,8 +558,9 @@ def build_static_panel(
         for label in labels if state.show_preset_names else ():
             _draw_clip_label(
                 panel,
-                font,
                 label,
+                font_size=font_size,
+                row_growth=layout.row_h / max(1, layout.icon_h),
                 bar_rect=bar_rect,
                 bar_left=bar_left,
                 bar_width=bar_width,

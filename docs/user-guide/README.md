@@ -478,7 +478,7 @@ While the timeline is on, every row shows what its layer's presets do, depending
 | projectM decides | "projectM decides" on the first clip, and the hooked arrow on the others. projectM's own timing can't be worked out ahead of time. |
 | each clip | The preset each clip holds. |
 
-Names are shortened to fit, and a clip whose opacity is too low to hold a line of text shows none. Hover over a clip to see the full name. With the timeline off, only each clip layers show names on the strip.
+Names are shortened to fit. On a clip below 50% opacity the name gets smaller, down to a minimum size. Drag the timeline taller and the names grow a little with the rows. Hover over a clip to see the full name. With the timeline off, only each clip layers show names on the strip.
 
 To take the names and hooked arrows (red ones too) off the strip, set **preset names on clips** to hide on the **Timeline** page. The lines between presets stay, and hovering over a clip still shows its preset.
 

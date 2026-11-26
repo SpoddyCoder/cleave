@@ -2150,3 +2150,17 @@ def test_hidden_preset_names_draw_no_names_or_continue_arrows(
 
     assert draw(state) == 2
     assert draw(replace(state, show_preset_names=False)) == 0
+
+
+def test_clip_label_font_size_follows_opacity_and_row_height() -> None:
+    from cleave.viz.timeline_strip_static import clip_label_font_size
+
+    assert clip_label_font_size(1.0, 40) == 33
+    assert clip_label_font_size(0.5, 40) == 33
+    assert clip_label_font_size(0.45, 40) == 30
+    # Floors at the smallest size and never hides.
+    assert clip_label_font_size(0.0, 40) == 27
+    # Taller rows grow the name a little, up to 30% more.
+    assert clip_label_font_size(1.0, 40, row_growth=1.2) == 35
+    assert clip_label_font_size(1.0, 40, row_growth=3.0) == 43
+    assert clip_label_font_size(1.0, 40, row_growth=0.5) == 33
