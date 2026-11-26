@@ -1,6 +1,6 @@
 # Section intensity and recall (phase 2)
 
-Status: **2a is done**, with a full rethink of Generate timeline (commit `6e70c37a` on `0.5.0`). **2b, recall, is not started** and is replanned below on the new generator.
+Status: **2a is done**, with a full rethink of Generate timeline (commit `6e70c37a` on `0.5.0`, then the Layer settings section of the Generate dialog). Tuning in the editor and **2b, recall**, moved to [todos.md](../todos.md) under Timeline follow-ups.
 
 ## Done
 
@@ -41,41 +41,3 @@ What is in the commit:
   - The report script was in the session scratchpad and is gone; `tests/cleave/test_timeline_plan.py` holds the same rules.
 - All 720 dialog combinations ran through the controller with the snap passes, and no recasts were lost.
 - The full suite passes.
-
-### Still open from 2a
-
-- Retake `docs/user-guide/images/song-markers.png` (the marker row now has two dropdowns).
-- In the editor, the user has not yet checked:
-  - whether the opacity tables look right, with the visual limiter on and off;
-  - the two-dropdown row at narrow inspector widths.
-- The tables in `shapes.py` are first guesses, meant to be tuned.
-
-## 2b. Recall (to do)
-
-Not started. The earlier design assumed `arrange.py` and replay of fitted states, so it is rewritten here for the planner.
-
-### Decisions kept
-
-- Recall is a Generate option, off by default. Field `repeated sections`, after density: **new each time** (default), **same look**, **same look, building**. Both modes. Session only. Hidden when no type comes back.
-- It brings back which layers play, their timing, roles and blends, and presets on each-clip layers.
-- A run is one or more consecutive markers of one type (now the same thing as a `Part` run in `shapes.py`). The first run of a type is the source. Later runs recall it part by part, by position in the run. A part with no source part is planned fresh and becomes a source. Plain markers never recall.
-- Intensity is not part of the match: a recalled part uses its own marker's intensity and level table.
-- **Building** adds one layer per recall, within the intensity bounds, unless that marker's intensity is not normal.
-- Timing maps by bar offset from the part start. A shorter target truncates; a longer one loops the source. With no bars, map by seconds.
-
-### Where it fits now
-
-- **Planner level, not replay.** In `plan_timeline`, a recalled part copies its source part's `Target`s: the same phrase offsets mapped by bars, the same active layers and lead, and the same rank order. Levels come from the target's own intensity row in `LEVELS`, not copied, so an intensity change between the two still shows. Roles come from the source when the conductor is on. Then `weave` runs as usual, so spacing and crossfade rules still hold.
-- **Recasts.** `weave._place_preset_changes` should mirror the source: the same marker recasts, and between-marker recasts at mapped bar offsets. The k-th preset start in a recalled part then pairs with the k-th in its source.
-- **Shared helper.** A small `recall.py` holds run matching (`(source Part, target Part)` pairs from `section_parts`) and the bar-offset time map, used by both modes. Pattern mask copies its section-level counts and swaps the same way.
-- **Presets.** After `repopulate` (`PresetListController.repopulate`, then `deal_list_onto_clips`), give the k-th switching clip of each recalled part the k-th preset of its source, by order rather than time, since snap moves edges. Then rebuild `preset_list` as clip order plus spares, so `sync_each_clip_layers` leaves it alone. This stays inside the Generate edit, so undo and rollback cover it. `on_repopulate` needs the pairs. With `preset list` on keep, this reorders the kept list but never changes which presets are in it.
-- **Dialog note:** when no layer changes presets on each clip and `change presets` is on keep, say that only layers come back.
-
-### Verification
-
-- Equal, shorter and longer parts; runs of different lengths; off-grid markers; no bars; a source past the last bar.
-- Building stops at the bounds; an explicit intensity beats building.
-- Recalled clips get the source's presets; undo restores; locked layers refuse; layers that are not each-clip are untouched.
-- Rerun the brightness and pacing rules in `test_timeline_plan.py` with recall on, since copying a source must not break them.
-- Every dialog combination on buttercup through the controller with the snap passes.
-- Update the changelog, guide (Generate and Song markers), and help.
