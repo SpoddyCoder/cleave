@@ -1555,3 +1555,37 @@ def test_cmd_play_stems_on_a_project_reseparates_it(
 
         cmd_play(build_parser().parse_args(["play", str(project), "--stems", "4"]))
         assert sessions.call_args.args[1].kind is OpenTargetKind.PROJECT
+
+
+def test_cli_preset_curation_backup_and_restore_round_trip(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from cleave.paths import backups_dir, default_preset_root, library_db_path
+    from cleave.preset_library import PresetLibrary
+
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path / "old"))
+    preset = default_preset_root() / "pack" / "a.milk"
+    preset.parent.mkdir(parents=True)
+    preset.write_text("a", encoding="utf-8")
+    library = PresetLibrary.open(library_db_path())
+    library.index(default_preset_root())
+    library.set_role(preset, "accent")
+    library.close()
+
+    cmd_backup(build_parser().parse_args(["backup", "--presets"]))
+    (backup,) = backups_dir().glob("*.json")
+    assert "1 preset: 0 favourites, 1 role, 0 blacklisted" in capsys.readouterr().out
+
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path / "new"))
+    cmd_restore(build_parser().parse_args(["restore", str(backup)]))
+    assert "Merged 1 preset" in capsys.readouterr().out
+    library = PresetLibrary.open(library_db_path())
+    try:
+        assert [entry.role for entry in library.curation_entries()] == ["accent"]
+    finally:
+        library.close()
+
+
+def test_cli_backup_without_presets_needs_project_and_destination() -> None:
+    with pytest.raises(SystemExit):
+        cmd_backup(build_parser().parse_args(["backup", "my-track"]))

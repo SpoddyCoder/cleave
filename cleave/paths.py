@@ -139,6 +139,11 @@ def library_db_path() -> Path:
     return (data_dir() / "cleave.db").resolve()
 
 
+def backups_dir() -> Path:
+    """Return the folder that holds preset curation backups under :func:`data_dir`."""
+    return (data_dir() / "backups").resolve()
+
+
 def model_cache_dir() -> Path:
     """Return the torch-hub weight cache under :func:`data_dir`.
 

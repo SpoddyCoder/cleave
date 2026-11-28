@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import sqlite3
 import sys
 import time
 from pathlib import Path
@@ -390,10 +391,83 @@ def cmd_render(args: argparse.Namespace) -> None:
     )
 
 
+def _open_library():
+    from cleave.paths import library_db_path
+    from cleave.preset_library import PresetLibrary, PresetLibraryError
+
+    try:
+        return PresetLibrary.open(library_db_path())
+    except (PresetLibraryError, OSError, sqlite3.Error) as e:
+        _exit_error(f"error: {e}")
+
+
+def _backup_presets(args: argparse.Namespace) -> None:
+    from cleave.paths import backups_dir
+    from cleave.preset_curation import CurationBackupError, back_up_library
+
+    if args.destination is not None:
+        _exit_error("error: backup --presets takes one destination at most")
+    dest = Path(args.project_dir) if args.project_dir is not None else backups_dir()
+    library = _open_library()
+    try:
+        if not library.curation_entries():
+            _exit_error("error: no preset is curated yet; nothing to back up")
+        path, counts = back_up_library(library, dest)
+    except CurationBackupError as e:
+        _exit_error(f"error: {e}")
+    finally:
+        library.close()
+    print(f"Backed up {counts.summary()} to {path}")
+
+
+def _restore_presets(args: argparse.Namespace) -> None:
+    from cleave.paths import backups_dir, default_preset_root
+    from cleave.preset_curation import (
+        CurationBackupError,
+        preview_restore,
+        read_backup,
+        restore_into,
+    )
+
+    if args.as_slug is not None:
+        _exit_error("error: --as applies to project archives, not preset backups")
+    try:
+        entries = read_backup(Path(args.archive))
+    except CurationBackupError as e:
+        _exit_error(f"error: {e}")
+    if not entries:
+        _exit_error("error: this backup has no curated presets in it")
+    library = _open_library()
+    try:
+        indexed = library.load_index(default_preset_root())
+        preview = preview_restore(library, entries)
+        safety = restore_into(
+            library, entries, replace=args.replace, safety_dir=backups_dir()
+        )
+    except (CurationBackupError, OSError, sqlite3.Error) as e:
+        _exit_error(f"error: {e}")
+    finally:
+        library.close()
+    verb = "Replaced" if args.replace else "Merged"
+    print(f"{verb} {preview.counts.summary()}")
+    if indexed:
+        print(
+            f"{preview.installed:,} of {preview.counts.presets:,} match presets "
+            "in your presets folder"
+        )
+    if safety is not None:
+        print(f"Previous curation saved to {safety}")
+
+
 def cmd_backup(args: argparse.Namespace) -> None:
     from cleave.archive import backup_project
     from cleave.paths import resolve_project
 
+    if args.presets:
+        _backup_presets(args)
+        return
+    if args.project_dir is None or args.destination is None:
+        _exit_error("error: backup needs a project and a destination (or --presets)")
     try:
         project_dir = resolve_project(Path(args.project_dir))
     except (FileNotFoundError, ValueError) as e:
@@ -411,7 +485,13 @@ def cmd_backup(args: argparse.Namespace) -> None:
 
 def cmd_restore(args: argparse.Namespace) -> None:
     from cleave.archive import restore_project
+    from cleave.preset_curation import BACKUP_SUFFIX
 
+    if Path(args.archive).suffix.lower() == BACKUP_SUFFIX:
+        _restore_presets(args)
+        return
+    if args.replace:
+        _exit_error("error: --replace applies to preset backups, not project archives")
     try:
         project_path = restore_project(
             Path(args.archive), as_slug=args.as_slug, force=args.force
@@ -595,15 +675,28 @@ def build_parser() -> argparse.ArgumentParser:
     backup = subparsers.add_parser(
         "backup",
         prog="cleave backup",
-        help="Backup a project to a .cleave-tar.gz archive",
+        help=(
+            "Backup a project to a .cleave-tar.gz archive, or preset curation "
+            "(--presets) to a .json file"
+        ),
     )
     backup.add_argument(
         "project_dir",
-        help=_PROJECT_DIR_HELP,
+        nargs="?",
+        help=(
+            f"{_PROJECT_DIR_HELP}. With --presets: the .json file or folder to "
+            "write (default: the backups folder in the Cleave data folder)"
+        ),
     )
     backup.add_argument(
         "destination",
+        nargs="?",
         help="Archive file path, directory, or parent path to create",
+    )
+    backup.add_argument(
+        "--presets",
+        action="store_true",
+        help="Back up preset curation (favourites, blacklist, roles) instead of a project",
     )
     backup.add_argument(
         "-f",
@@ -616,11 +709,22 @@ def build_parser() -> argparse.ArgumentParser:
     restore = subparsers.add_parser(
         "restore",
         prog="cleave restore",
-        help="Restore a project from a .cleave-tar.gz archive",
+        help=(
+            "Restore a project from a .cleave-tar.gz archive, or preset curation "
+            "from a .json backup"
+        ),
     )
     restore.add_argument(
         "archive",
-        help="Path to a .cleave-tar.gz archive",
+        help=(
+            "Path to a .cleave-tar.gz archive, or a .json preset curation backup "
+            "(merged into your curation; the current curation is backed up first)"
+        ),
+    )
+    restore.add_argument(
+        "--replace",
+        action="store_true",
+        help="Preset backups: clear the current curation before restoring",
     )
     restore.add_argument(
         "--as",

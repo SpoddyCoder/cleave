@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING
 import pygame
 
 from cleave.config import CleaveConfig
+from cleave.file_manager import open_folder
+from cleave.paths import backups_dir
 from cleave.signals import Signals
 from cleave.preset_library import PresetLibrary
 from cleave.preset_list_entry import PresetListEntry
@@ -41,6 +43,7 @@ from cleave.viz.post_fx import sync_live_compositor_format
 from cleave.viz.preset_curation_controls import PresetCurationController
 from cleave.viz.preset_list_controls import PresetListController
 from cleave.viz.preset_switching import layer_notification, panel_layer_number
+from cleave.viz.curation_backup_controls import CurationBackupController
 from cleave.viz.preset_rescan_controls import PresetRescanController
 from cleave.viz.key_repeat import KeyRepeatController
 from cleave.viz.value_nudge import ValueNudgeHold
@@ -388,6 +391,16 @@ class TuningControls:
             preset_root,
             self._modal_host,
             hold_playback=lambda: hold_paused(self.playback, self.transport.toggle_pause),
+            on_notification=self.show_notification,
+        )
+        self.curation_backup = CurationBackupController(
+            self.library,
+            self._modal_host,
+            backups_dir=backups_dir,
+            prompt_pick_backup=lambda on_accept: (
+                self.project_switch.prompt_restore_curation(on_accept)
+            ),
+            open_folder=open_folder,
             on_notification=self.show_notification,
         )
         self.layer_mutations = LayerMutations(

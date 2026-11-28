@@ -15,6 +15,7 @@ You don't need to read this guide cover to cover before starting. Open a song, p
 - [Layers](#layers)
 - [Choosing presets](#choosing-presets)
 - [Curating your presets](#curating-your-presets)
+  - [Backing up your curation](#backing-up-your-curation)
 - [The timeline](#the-timeline)
 - [Pattern Mask](#pattern-mask)
 - [Credits cards (Overlay)](#credits-cards-overlay)
@@ -398,6 +399,32 @@ The same actions are in the preset's context menu.
 | accent | Short, bright hits. |
 
 Curation never moves, copies, or deletes preset files, and your marks survive renaming or moving a preset. Choose **View > Preset curation mode** again to return to your project.
+
+### Backing up your curation
+
+Your favourites, blacklist, and roles can take a long time to build up. Keep a copy, or carry them to a new computer or a fresh install of Cleave:
+
+1. Choose **Settings > Back up preset curation**. A dialog says how many favourites, roles, and blacklist marks it will save, and the folder it saves to; nothing changes until you choose **Back up**. Cleave then saves a small file named like `cleave-curation-2026-11-28-140512.json` in the `backups` folder (see [Where your files live](#where-your-files-live)) and tells you what it holds. **Show in folder** opens the folder so you can copy the file.
+2. On the other computer, choose **Settings > Restore preset curation** and pick the file. The picker starts in the `backups` folder; use Home, Drives, or Windows files to find a copy saved elsewhere.
+3. Cleave shows what the backup holds, how many of its presets are in your presets folder, and how many would change role. Choose:
+   - **Merge** to add the backup's favourites, blacklist marks, and roles to yours. Where a preset already has a different role, the backup's role wins.
+   - **Replace** to clear your current curation first, so you end up with exactly what the backup holds.
+
+Before either one changes anything, Cleave saves your current curation as another backup in the same folder, so you can always go back by restoring that file.
+
+Marks follow each preset's contents, not its file name or folder, so they still apply after a preset is renamed, moved, or copied to another computer, on Windows or Linux. A backup can be restored before you install the presets it names: their marks apply as soon as you add those packs.
+
+Backups hold only your marks, not the presets themselves, so install your preset packs on the new computer as well (**Settings > Download packages**, or copy your `presets` folder across).
+
+**From the command line.** On Linux, or from a script, the same backup and restore are available without opening the editor. Close the editor first, since it reads your curation when it starts:
+
+| Command | What it does |
+| --- | --- |
+| `cleave backup --presets` | Saves a backup to the `backups` folder. Add a file or folder name to save it somewhere else. |
+| `cleave restore <file>.json` | Merges a backup into your curation, saving your current curation first. |
+| `cleave restore <file>.json --replace` | Clears your current curation, then restores the backup. |
+
+From a source checkout, run these as `./cleave.py backup --presets` and so on.
 
 ---
 
@@ -783,6 +810,7 @@ The **Settings** menu holds preferences that apply to every project:
 - **Measure audio latency:** see [The visuals are out of time with the music](#the-visuals-are-out-of-time-with-the-music).
 - **Calibrate tap timing:** see [Markers and recorded clips land late](#markers-and-recorded-clips-land-late).
 - **Rescan presets:** re-reads the presets folder after you add presets to an existing pack, or while Cleave is open.
+- **Back up preset curation** and **Restore preset curation:** save your favourites, blacklist, and roles, and bring them back on this or another computer. See [Backing up your curation](#backing-up-your-curation).
 - **Download packages:** fetches anything you skipped on first launch. Presets downloaded here are indexed immediately, ready to curate.
 - **Dev Tools:** a crash log for bug reports.
 
@@ -858,7 +886,7 @@ Separation is far faster on an NVIDIA GPU. On Windows, tick the CUDA Toolkit in 
 
 | | Windows | Linux |
 | --- | --- | --- |
-| Projects, presets, textures, themes | `Documents\Cleave\` | `~/.local/share/cleave/` |
+| Projects, presets, textures, themes, curation backups (`backups`) | `Documents\Cleave\` | `~/.local/share/cleave/` |
 | Settings | `%APPDATA%\Cleave\config.yaml` | `~/.config/cleave/config.yaml` |
 
 Each song has its own folder under `projects`, containing:

@@ -1,12 +1,15 @@
-"""In-session File > New and File > Open.
+"""In-session file picker: File > New, File > Open, and Settings > Restore
+preset curation.
 
-Holds the picker and the accepted target. Leaving the session is a pending
+Holds the picker and the accepted target. A curation backup goes to the
+callback given with the prompt instead of switching projects. Leaving the session is a pending
 switch on :class:`ConfigSaveController`; this controller does not tear the
 live session down.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import pygame
@@ -41,6 +44,7 @@ class ProjectSwitchController:
         self._modal = modal_host
         self._picker: FilePicker | None = None
         self._accepted: OpenTarget | None = None
+        self._on_backup: Callable[[Path], None] | None = None
         self._repeat = KeyRepeatController()
 
     @property
@@ -65,6 +69,12 @@ class ProjectSwitchController:
         """Browse for audio to create a project. Replaces a picker already up."""
         self._prompt(PickerMode.NEW_PROJECT)
 
+    def prompt_restore_curation(self, on_accept: Callable[[Path], None]) -> None:
+        """Browse for a preset curation backup; *on_accept* gets the file."""
+        self._prompt(PickerMode.RESTORE_CURATION)
+        if self._picker is not None:
+            self._on_backup = on_accept
+
     def request_reseparate(self, project_dir: Path, choice: SplitChoice) -> None:
         """Leave the session to split *project_dir* as *choice* says, then reopen it."""
         if self._modal.active:
@@ -86,6 +96,7 @@ class ProjectSwitchController:
             return
         self._picker.cancelled = True
         self._picker = None
+        self._on_backup = None
         self._repeat.disarm()
 
     def handle_keydown(self, event: pygame.event.Event) -> bool:
@@ -141,13 +152,20 @@ class ProjectSwitchController:
             return
         self._config_save.clear_pending_switch()
         self._accepted = None
+        self._on_backup = None
         self._repeat.disarm()
         self._picker = FilePicker(mode=mode, cancel_label=CANCEL_LABEL)
 
     def _finish_accept(self, target: OpenTarget) -> None:
-        self._accepted = target
         self._picker = None
         self._repeat.disarm()
+        on_backup = self._on_backup
+        self._on_backup = None
+        if target.kind is OpenTargetKind.CURATION_BACKUP:
+            if on_backup is not None:
+                on_backup(target.path)
+            return
+        self._accepted = target
         if not self._config_save.commit_switch(on_cancel=self._drop_accepted):
             self._drop_accepted()
 

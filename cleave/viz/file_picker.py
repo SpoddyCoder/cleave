@@ -1,4 +1,4 @@
-"""File browser state for opening an audio file or a Cleave project.
+"""File browser state for opening an audio file, a Cleave project, or a backup.
 
 Pure state and view state: no pygame import, not even key constants. The host
 maps keys onto :class:`PickerAction` and pointer hits onto the row and
@@ -21,7 +21,9 @@ from cleave.open_target import (
     is_project_target,
     open_target_rejection,
 )
+from cleave.preset_curation import is_backup_candidate
 from cleave.paths import (
+    backups_dir,
     drive_roots,
     is_frozen,
     projects_dir,
@@ -55,6 +57,7 @@ class PickerMode(Enum):
     COLD_START = "cold-start"
     OPEN_PROJECT = "open-project"
     NEW_PROJECT = "new-project"
+    RESTORE_CURATION = "restore-curation"
 
 
 class PickerStart(Enum):
@@ -62,6 +65,7 @@ class PickerStart(Enum):
 
     PROJECTS = "projects"
     HOME = "home"
+    BACKUPS = "backups"
 
 
 @dataclass(frozen=True)
@@ -89,6 +93,11 @@ PICKER_MODE_SPECS: dict[PickerMode, PickerModeSpec] = {
         start=PickerStart.HOME,
         kinds=frozenset({OpenTargetKind.AUDIO}),
     ),
+    PickerMode.RESTORE_CURATION: PickerModeSpec(
+        title="Select a preset curation backup to restore",
+        start=PickerStart.BACKUPS,
+        kinds=frozenset({OpenTargetKind.CURATION_BACKUP}),
+    ),
 }
 
 
@@ -99,6 +108,8 @@ def picker_mode_rejection(mode: PickerMode, path: Path) -> str:
         return f"select a Cleave project, not {path.name}"
     if kinds == frozenset({OpenTargetKind.AUDIO}):
         return f"select an audio file, not {path.name}"
+    if kinds == frozenset({OpenTargetKind.CURATION_BACKUP}):
+        return f"select a preset curation backup (.json), not {path.name}"
     return f"cannot open {path.name}"
 
 
@@ -123,6 +134,7 @@ class PickerRowKind(Enum):
     DIRECTORY = "directory"
     PROJECT = "project"
     AUDIO = "audio"
+    BACKUP = "backup"
     DRIVE = "drive"
     NOTE = "note"
 
@@ -216,7 +228,7 @@ def _list_directory(
         return (), False
 
     directories: list[Path] = []
-    audio: list[Path] = []
+    files: list[tuple[Path, PickerRowKind]] = []
     for entry in entries:
         if entry.name.startswith("."):
             continue
@@ -228,7 +240,11 @@ def _list_directory(
                 and entry.suffix.lower() in AUDIO_SUFFIXES
                 and entry.is_file()
             ):
-                audio.append(entry)
+                files.append((entry, PickerRowKind.AUDIO))
+            elif OpenTargetKind.CURATION_BACKUP in accepted and is_backup_candidate(
+                entry
+            ):
+                files.append((entry, PickerRowKind.BACKUP))
         except OSError:
             continue
 
@@ -240,10 +256,8 @@ def _list_directory(
             else PickerRowKind.DIRECTORY
         )
         rows.append(PickerRow(label=entry.name, kind=kind, target=entry))
-    for entry in sorted(audio, key=_sort_key):
-        rows.append(
-            PickerRow(label=entry.name, kind=PickerRowKind.AUDIO, target=entry)
-        )
+    for entry, kind in sorted(files, key=lambda item: _sort_key(item[0])):
+        rows.append(PickerRow(label=entry.name, kind=kind, target=entry))
 
     truncated = len(rows) > MAX_ROWS
     return tuple(rows[:MAX_ROWS]), truncated
@@ -269,7 +283,7 @@ def _first_entry_index(rows: tuple[PickerRow, ...]) -> int:
 
 @dataclass
 class FilePicker:
-    """Browse the filesystem and return an audio file or project path.
+    """Browse the filesystem and return an audio file, project, or backup path.
 
     ``current`` is the directory being listed, or None while showing the
     drives listing. ``selected_index`` is the row Open acts on: arrow keys
@@ -489,7 +503,7 @@ class FilePicker:
     def open_row(self) -> OpenTarget | None:
         """Accept the highlighted listing row.
 
-        Audio and projects return a target. Directories, the parent row, and
+        Audio, projects, and backups return a target. Directories, the parent row, and
         drives navigate. A note does nothing.
         """
         self.focus = PickerFocus.LIST
@@ -506,7 +520,10 @@ class FilePicker:
         if row.kind is PickerRowKind.PARENT:
             self.go_parent()
             return
-        if row.target is not None and row.kind is not PickerRowKind.AUDIO:
+        if row.target is not None and row.kind not in (
+            PickerRowKind.AUDIO,
+            PickerRowKind.BACKUP,
+        ):
             self.navigate_to(row.target)
 
     def _accept(self) -> OpenTarget | None:
@@ -521,6 +538,8 @@ class FilePicker:
             return None
         if row.target is None:
             return None
+        if row.kind is PickerRowKind.BACKUP:
+            return OpenTarget(path=row.target, kind=OpenTargetKind.CURATION_BACKUP)
         target = classify_open_target(row.target)
         if target is None:
             if row.kind is PickerRowKind.DIRECTORY:
@@ -543,9 +562,10 @@ class FilePicker:
 
 def _start_directory(mode: PickerMode) -> Path:
     """Return the directory a new picker lists for *mode*."""
-    if PICKER_MODE_SPECS[mode].start is PickerStart.HOME:
+    spec_start = PICKER_MODE_SPECS[mode].start
+    if spec_start is PickerStart.HOME:
         return Path.home()
-    start = projects_dir()
+    start = backups_dir() if spec_start is PickerStart.BACKUPS else projects_dir()
     try:
         start.mkdir(parents=True, exist_ok=True)
     except OSError:

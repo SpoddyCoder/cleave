@@ -342,3 +342,52 @@ def test_dispatch_sends_picker_keys_and_lets_the_modal_win(
     assert switch.active
     assert controls.consume_pending_exit() is False
     assert controls.consume_pending_switch() is False
+
+
+def test_restore_curation_picker_hands_backup_to_callback(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from cleave.paths import backups_dir
+
+    _use_data(monkeypatch, tmp_path)
+    controls = make_controls()
+    switch = controls.project_switch
+    backups = backups_dir()
+    backups.mkdir(parents=True)
+    (backups / "cleave-curation-2026-11-28-140512.json").write_text("{}")
+    _wav(backups, "song.wav")
+    picked: list[Path] = []
+
+    switch.prompt_restore_curation(picked.append)
+    view = switch.view_state()
+    assert view is not None
+    assert view.title == PICKER_MODE_SPECS[PickerMode.RESTORE_CURATION].title
+    assert view.location == str(backups)
+    assert [row.label for row in view.rows] == [
+        "..",
+        "cleave-curation-2026-11-28-140512.json",
+    ]
+
+    _accept_label(switch, "cleave-curation-2026-11-28-140512.json")
+
+    assert picked == [backups / "cleave-curation-2026-11-28-140512.json"]
+    assert not switch.active
+    assert switch.take_accepted() is None
+    assert controls.consume_pending_switch() is False
+
+
+def test_open_after_restore_curation_does_not_call_back(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _use_data(monkeypatch, tmp_path)
+    controls = make_controls()
+    switch = controls.project_switch
+    picked: list[Path] = []
+    switch.prompt_restore_curation(picked.append)
+    switch.prompt_open()
+    _project(projects_dir(), "song")
+    switch.prompt_open()
+    _accept_label(switch, "song")
+    assert picked == []
+    assert switch.take_accepted() is not None
+    assert OpenTargetKind.CURATION_BACKUP not in PICKER_MODE_SPECS[PickerMode.OPEN_PROJECT].kinds

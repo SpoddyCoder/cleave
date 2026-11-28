@@ -80,6 +80,8 @@ _STATIC_IDS = (
     "settings.measure_latency",
     "settings.calibrate_tap_timing",
     "settings.rescan_presets",
+    "settings.back_up_curation",
+    "settings.restore_curation",
     "settings.download_packages",
     "help.overlay",
     "help.about",
@@ -165,6 +167,7 @@ def _fake_controls(
         request_quit=MagicMock(),
         prompt_welcome=MagicMock(),
         preset_rescan=SimpleNamespace(start=MagicMock()),
+        curation_backup=SimpleNamespace(prompt_back_up=MagicMock(), prompt_restore=MagicMock()),
         prompt_about=MagicMock(),
         editor_mode=SimpleNamespace(prompt_change_editor_mode=MagicMock()),
         tap_sync=SimpleNamespace(prompt_start=MagicMock()),
@@ -249,6 +252,8 @@ def test_menus_list_taxonomy_ids_once() -> None:
         "settings.calibrate_tap_timing",
         None,
         "settings.rescan_presets",
+        "settings.back_up_curation",
+        "settings.restore_curation",
         "settings.download_packages",
         None,
         "page.settings.dev_tools",
@@ -456,6 +461,8 @@ def test_wired_run_calls_controllers() -> None:
     command_by_id("settings.measure_latency", menus).run(controls)
     command_by_id("settings.calibrate_tap_timing", menus).run(controls)
     command_by_id("settings.rescan_presets", menus).run(controls)
+    command_by_id("settings.back_up_curation", menus).run(controls)
+    command_by_id("settings.restore_curation", menus).run(controls)
     command_by_id("settings.download_packages", menus).run(controls)
     command_by_id("help.about", menus).run(controls)
     controls.prompt_save_config.assert_called_once_with()
@@ -464,6 +471,8 @@ def test_wired_run_calls_controllers() -> None:
     controls.editor_mode.prompt_change_editor_mode.assert_called_once_with()
     controls.prompt_welcome.assert_called_once_with()
     controls.preset_rescan.start.assert_called_once_with()
+    controls.curation_backup.prompt_back_up.assert_called_once_with()
+    controls.curation_backup.prompt_restore.assert_called_once_with()
     controls.prompt_about.assert_called_once_with()
     controls.tap_sync.prompt_start.assert_called_once_with()
     controls.av_sync.prompt_start.assert_called_once_with()

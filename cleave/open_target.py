@@ -41,6 +41,8 @@ class OpenTargetKind(Enum):
     PROJECT = "project"
     # Re-split an existing project's stems, then open it.
     RESEPARATE = "reseparate"
+    # A preset curation backup (Settings > Restore preset curation).
+    CURATION_BACKUP = "curation-backup"
 
 
 @dataclass(frozen=True)

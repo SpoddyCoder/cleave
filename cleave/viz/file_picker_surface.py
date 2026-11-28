@@ -201,7 +201,8 @@ def apply_picker_pointer(
 ) -> OpenTarget | None:
     """Map one recorded intent onto ``FilePicker``. ``None`` does nothing.
 
-    Returns an open target when the intent opens an audio file or a project.
+    Returns an open target when the intent opens an audio file, a project, or
+    a backup.
     """
     if intent is None:
         return None

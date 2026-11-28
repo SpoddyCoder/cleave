@@ -339,6 +339,14 @@ def _run_rescan_presets(controls: TuningControls) -> None:
     controls.preset_rescan.start()
 
 
+def _run_back_up_curation(controls: TuningControls) -> None:
+    controls.curation_backup.prompt_back_up()
+
+
+def _run_restore_curation(controls: TuningControls) -> None:
+    controls.curation_backup.prompt_restore()
+
+
 def _run_download_packages(controls: TuningControls) -> None:
     controls.prompt_welcome()
 
@@ -867,6 +875,22 @@ _RESCAN_PRESETS = Command(
     run=_run_rescan_presets,
 )
 
+_BACK_UP_CURATION = Command(
+    id="settings.back_up_curation",
+    label="Back up preset curation…",
+    kind="command",
+    enabled=_enabled,
+    run=_run_back_up_curation,
+)
+
+_RESTORE_CURATION = Command(
+    id="settings.restore_curation",
+    label="Restore preset curation…",
+    kind="command",
+    enabled=_enabled,
+    run=_run_restore_curation,
+)
+
 _DOWNLOAD_PACKAGES = Command(
     id="settings.download_packages",
     label="Download packages…",
@@ -1134,6 +1158,8 @@ def build_menus(
                     _CALIBRATE_TAP_TIMING,
                     SEPARATOR,
                     _RESCAN_PRESETS,
+                    _BACK_UP_CURATION,
+                    _RESTORE_CURATION,
                     _DOWNLOAD_PACKAGES,
                     SEPARATOR,
                     _DEV_TOOLS_PAGE,

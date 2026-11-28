@@ -100,6 +100,21 @@ class PresetLibraryError(RuntimeError):
     """The preset library database cannot be opened."""
 
 
+@dataclass(frozen=True)
+class CurationEntry:
+    """Curation of one preset, keyed by :func:`preset_hash`.
+
+    ``name`` is the file name the preset had when it was curated; matching
+    uses ``hash`` only.
+    """
+
+    hash: str
+    name: str
+    favourite: bool = False
+    blacklisted: bool = False
+    role: CueRole | None = None
+
+
 class PresetCatalog(Protocol):
     """What preset browsing needs: blacklist filtering and virtual collections."""
 
@@ -498,6 +513,70 @@ class PresetLibrary:
                     (digest, role, path.name),
                 )
                 self._roles[digest] = role
+        self.revision += 1
+
+    def curation_entries(self) -> tuple[CurationEntry, ...]:
+        """Every curated preset, sorted by name then hash."""
+        names: dict[str, str] = {}
+        with self._db_lock:
+            for table in ("roles", "blacklist", "favourites"):
+                for digest, name in self._conn.execute(
+                    f"SELECT hash, name FROM {table}"
+                ):
+                    names[digest] = name
+        entries = [
+            CurationEntry(
+                hash=digest,
+                name=name,
+                favourite=digest in self._favourites,
+                blacklisted=digest in self._blacklist,
+                role=self._roles.get(digest),
+            )
+            for digest, name in names.items()
+        ]
+        entries.sort(key=lambda entry: (entry.name.casefold(), entry.hash))
+        return tuple(entries)
+
+    def indexed_hashes(self) -> frozenset[str]:
+        """Hashes of the presets in the current index."""
+        return frozenset(self._path_hash.values())
+
+    def apply_curation(
+        self, entries: Iterable[CurationEntry], *, replace: bool
+    ) -> None:
+        """Write *entries* in one transaction.
+
+        *replace* clears every favourite, blacklist mark, and role first.
+        Otherwise flags are added (never cleared) and an entry's role replaces
+        the preset's current one.
+        """
+        favourites: list[tuple[str, str]] = []
+        blacklist: list[tuple[str, str]] = []
+        roles: list[tuple[str, str, str]] = []
+        for entry in entries:
+            if entry.favourite:
+                favourites.append((entry.hash, entry.name))
+            if entry.blacklisted:
+                blacklist.append((entry.hash, entry.name))
+            if entry.role is not None:
+                roles.append((entry.hash, entry.role, entry.name))
+        with self._db_lock, self._conn:
+            if replace:
+                for table in ("favourites", "blacklist", "roles"):
+                    self._conn.execute(f"DELETE FROM {table}")
+            self._conn.executemany(
+                "INSERT OR REPLACE INTO favourites (hash, name) VALUES (?, ?)",
+                favourites,
+            )
+            self._conn.executemany(
+                "INSERT OR REPLACE INTO blacklist (hash, name) VALUES (?, ?)",
+                blacklist,
+            )
+            self._conn.executemany(
+                "INSERT OR REPLACE INTO roles (hash, role, name) VALUES (?, ?, ?)",
+                roles,
+            )
+        self._load_curation()
         self.revision += 1
 
     def _in_collection(self, digest: str, collection: PresetCollection) -> bool:
