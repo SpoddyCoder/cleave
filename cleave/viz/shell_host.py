@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 import pygame
 from imgui_bundle import imgui
 
+from cleave.preset_library import FavouriteTag
 from cleave.viz.commands import command_context, CommandContext
 from cleave.viz.context_menu import ContextMenuProvider
 from cleave.viz.help_column import draw_help_column
@@ -41,6 +42,7 @@ from cleave.viz.preset_browser_surface import PresetBrowserSurface
 from cleave.viz.preset_context_menu import (
     PRESET_MENU_KINDS,
     browser_preset_menu,
+    browser_tag_menu,
     preset_list_page_menu,
     preset_row_menu,
 )
@@ -715,7 +717,8 @@ class ShellHost:
         return True
 
     def _browser_menu_at(self, x: float, y: float) -> ContextMenuProvider | None:
-        """Curation menu for the browser's preset row under (*x*, *y*)."""
+        """Menu for the browser row under (*x*, *y*): curation for a preset, or,
+        inside Favourites, the tag items."""
         surface = self._browser_surface
         controls = self.context.controls
         browser = controls.preset_browser.browser
@@ -723,12 +726,16 @@ class ShellHost:
         if surface is None or browser is None or slot is None:
             return None
         index = surface.row_at(x, y)
-        if index is None or not 0 <= index < len(browser.rows):
-            return None
-        path = browser.rows[index].path
-        if browser.rows[index].kind is not BrowserRowKind.PRESET or path is None:
-            return None
-        return browser_preset_menu(controls, slot, path)
+        row = browser.rows[index] if index is not None and 0 <= index < len(browser.rows) else None
+        if row is not None and row.kind is BrowserRowKind.PRESET and row.path is not None:
+            return browser_preset_menu(controls, slot, row.path)
+        if row is not None and isinstance(row.collection, FavouriteTag):
+            return browser_tag_menu(controls, row.collection.name)
+        if browser.collection == "favourites" or (
+            row is not None and row.collection == "favourites"
+        ):
+            return browser_tag_menu(controls, None)
+        return None
 
     def _draw_help(
         self,

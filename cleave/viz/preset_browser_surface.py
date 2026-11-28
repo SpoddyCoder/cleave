@@ -100,7 +100,7 @@ def _row_role(row: BrowserRow):
 
     if row.kind is BrowserRowKind.NOTE:
         return palette().disabled
-    if row.kind is BrowserRowKind.PARENT:
+    if row.kind in (BrowserRowKind.PARENT, BrowserRowKind.NEW_TAG):
         return palette().label
     if row.kind in (BrowserRowKind.FOLDER, BrowserRowKind.COLLECTION):
         return palette().preset_icon

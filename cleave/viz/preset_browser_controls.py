@@ -5,6 +5,8 @@ onto a preset plays it on the layer after :data:`PREVIEW_DELAY_SEC`, through
 the same path as stepping the preset row. Enter keeps the preset; Esc puts the
 snapshot back. Opened to replace a preset list entry, it starts in that
 entry's folder, and Enter also puts the chosen preset in the entry's place.
+Inside Favourites, the New tag… row, F2 (rename) and Delete on a tag folder
+hand off to :class:`TagActions`.
 
 Listings build on a worker thread so the panel can show its spinner while a
 large folder or a library-wide search is read. One listing runs at a time;
@@ -16,11 +18,12 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 import pygame
 
-from cleave.preset_library import PresetLibrary
+from cleave.preset_library import PresetCollection, PresetLibrary
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.key_repeat import KeyRepeatController, mod_alt, mod_ctrl
 from cleave.viz.layer_mutations import LayerMutations
@@ -54,6 +57,8 @@ _KEY_ACTIONS: dict[int, BrowserAction] = {
     pygame.K_LEFT: BrowserAction.PARENT,
     pygame.K_BACKSPACE: BrowserAction.BACKSPACE,
     pygame.K_ESCAPE: BrowserAction.CANCEL,
+    pygame.K_F2: BrowserAction.RENAME,
+    pygame.K_DELETE: BrowserAction.DELETE,
 }
 _REPEAT_ACTIONS = frozenset(
     {
@@ -79,7 +84,7 @@ def _passes_through(event: pygame.event.Event, *, editing: bool) -> bool:
     """Keys the browser leaves to the editor: shortcuts, F-keys, Space, H."""
     if mod_ctrl(event.mod) or mod_alt(event.mod):
         return True
-    if event.key in _FUNCTION_KEYS:
+    if event.key in _FUNCTION_KEYS and event.key not in _KEY_ACTIONS:
         return True
     return not editing and event.key in _GLOBAL_KEYS
 
@@ -107,6 +112,15 @@ class _ListingJob:
             self.done.set()
 
 
+@dataclass(frozen=True)
+class TagActions:
+    """What the browser's tag rows and keys run: each opens a dialog."""
+
+    new_tag: Callable[[], None]
+    rename_tag: Callable[[str], None]
+    delete_tag: Callable[[str], None]
+
+
 class PresetBrowserControls:
     """Owns the open browser, its snapshot, listings, and the pending preview."""
 
@@ -121,6 +135,7 @@ class PresetBrowserControls:
         start_text_input: Callable[[], None],
         stop_text_input: Callable[[], None],
         text_input_shared: Callable[[], bool],
+        tag_actions: TagActions | None = None,
         synchronous: bool = False,
     ) -> None:
         self._session = session
@@ -131,6 +146,7 @@ class PresetBrowserControls:
         self._start_text_input = start_text_input
         self._stop_text_input = stop_text_input
         self._text_input_shared = text_input_shared
+        self._tag_actions = tag_actions
         self._synchronous = synchronous
         self._repeat = KeyRepeatController()
         self._browser: PresetBrowser | None = None
@@ -197,12 +213,13 @@ class PresetBrowserControls:
         *,
         replace_index: int | None = None,
         on_choose: Callable[[Path], None] | None = None,
+        collection: PresetCollection | None = None,
     ) -> None:
         """Browse *slot*'s presets from the folder or collection it is on.
 
         With *replace_index*, start at that preset list entry's folder, and
         Enter replaces the entry with the chosen preset. *on_choose* runs with
-        the preset Enter keeps.
+        the preset Enter keeps. *collection* starts in that collection instead.
         """
         if slot not in self._session.layers:
             return
@@ -213,8 +230,11 @@ class PresetBrowserControls:
         number = panel_layer_number(self._session.layer_z_order, slot)
         title = f"Browse presets: Layer {number}"
         folder = playlist.current_dir
-        collection = playlist.collection
         select = playlist.current
+        if collection is None:
+            collection = playlist.collection
+        elif collection != playlist.collection:
+            select = None
         if replace_index is not None:
             if not 0 <= replace_index < len(layer.preset_list):
                 return
@@ -360,9 +380,23 @@ class PresetBrowserControls:
         if outcome is BrowserOutcome.CANCEL:
             self.cancel()
             return
+        self._run_tag_action(outcome)
         self._sync_text_input()
         self._pump()
         self._after_change()
+
+    def _run_tag_action(self, outcome: BrowserOutcome) -> None:
+        actions = self._tag_actions
+        browser = self._browser
+        if actions is None or browser is None:
+            return
+        tag = browser.selected_tag
+        if outcome is BrowserOutcome.NEW_TAG:
+            actions.new_tag()
+        elif outcome is BrowserOutcome.RENAME_TAG and tag is not None:
+            actions.rename_tag(tag)
+        elif outcome is BrowserOutcome.DELETE_TAG and tag is not None:
+            actions.delete_tag(tag)
 
     # -- input -------------------------------------------------------------
 

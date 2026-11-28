@@ -617,13 +617,51 @@ class PresetLibrary:
     def tag_count(self, tag: str) -> int:
         return len(self._tag_members.get(tag, ()))
 
-    def new_tag_name(self, text: str) -> str:
-        """*text* as a new tag's name; :class:`ValueError` when invalid or taken."""
+    def new_tag_name(self, text: str, *, renaming: str | None = None) -> str:
+        """*text* as a tag's name; :class:`ValueError` when invalid or taken.
+
+        *renaming* is the tag being renamed, which may keep its name with
+        different capital letters.
+        """
         name = clean_tag_name(text)
         folded = name.casefold()
-        if any(existing.casefold() == folded for existing in self._tags):
+        if any(
+            existing.casefold() == folded and existing != renaming
+            for existing in self._tags
+        ):
             raise ValueError(f"There is already a tag named {name}")
         return name
+
+    def rename_tag(self, tag: str, text: str) -> str:
+        """Rename *tag* (see :meth:`new_tag_name`); its presets keep it."""
+        if tag not in self._tag_members:
+            raise ValueError(f"There is no tag named {tag}")
+        name = self.new_tag_name(text, renaming=tag)
+        if name == tag:
+            return name
+        with self._db_lock, self._conn:
+            self._conn.execute("UPDATE tags SET name = ? WHERE name = ?", (name, tag))
+            self._conn.execute(
+                "UPDATE favourite_tags SET tag = ? WHERE tag = ?", (name, tag)
+            )
+        self._tag_members[name] = self._tag_members.pop(tag)
+        self._tags = tuple(
+            sorted((name if t == tag else t for t in self._tags), key=str.casefold)
+        )
+        self.revision += 1
+        return name
+
+    def delete_tag(self, tag: str) -> int:
+        """Delete *tag*; returns how many presets lost it. They stay favourites."""
+        members = self._tag_members.pop(tag, None)
+        if members is None:
+            return 0
+        with self._db_lock, self._conn:
+            self._conn.execute("DELETE FROM tags WHERE name = ?", (tag,))
+            self._conn.execute("DELETE FROM favourite_tags WHERE tag = ?", (tag,))
+        self._tags = tuple(t for t in self._tags if t != tag)
+        self.revision += 1
+        return len(members)
 
     def add_tag(self, text: str) -> str:
         """Create a tag (see :meth:`new_tag_name`) and return its name."""

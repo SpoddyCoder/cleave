@@ -339,6 +339,10 @@ def _run_rescan_presets(controls: TuningControls) -> None:
     controls.preset_rescan.start()
 
 
+def _run_manage_tags(controls: TuningControls) -> None:
+    controls.tag_manager.prompt()
+
+
 def _run_back_up_curation(controls: TuningControls) -> None:
     controls.curation_backup.prompt_back_up()
 
@@ -875,6 +879,14 @@ _RESCAN_PRESETS = Command(
     run=_run_rescan_presets,
 )
 
+_MANAGE_TAGS = Command(
+    id="settings.manage_tags",
+    label="Manage tags…",
+    kind="command",
+    enabled=_enabled,
+    run=_run_manage_tags,
+)
+
 _BACK_UP_CURATION = Command(
     id="settings.back_up_curation",
     label="Back up preset curation…",
@@ -1158,6 +1170,7 @@ def build_menus(
                     _CALIBRATE_TAP_TIMING,
                     SEPARATOR,
                     _RESCAN_PRESETS,
+                    _MANAGE_TAGS,
                     _BACK_UP_CURATION,
                     _RESTORE_CURATION,
                     _DOWNLOAD_PACKAGES,

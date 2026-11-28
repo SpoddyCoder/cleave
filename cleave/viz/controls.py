@@ -12,7 +12,7 @@ from cleave.config import CleaveConfig
 from cleave.file_manager import open_folder
 from cleave.paths import backups_dir
 from cleave.signals import Signals
-from cleave.preset_library import PresetLibrary
+from cleave.preset_library import FavouriteTag, PresetLibrary
 from cleave.preset_list_entry import PresetListEntry
 from cleave.timeline import phased_bar_times
 from cleave.viz.clip_presets import (
@@ -33,7 +33,8 @@ from cleave.viz.layer_lifecycle_controls import LayerLifecycleController
 from cleave.viz.layer_mutations import LayerMutations
 from cleave.viz.layer_problems import layer_issues
 from cleave.viz.preset_clipboard import PresetClipboard, PresetEditTarget
-from cleave.viz.preset_browser_controls import PresetBrowserControls
+from cleave.viz.preset_browser_controls import PresetBrowserControls, TagActions
+from cleave.viz.tag_manager_controls import TagManagerController
 from cleave.viz.editor_mode_controls import (
     EditorModeController,
     curation_focus_slot,
@@ -96,6 +97,7 @@ from cleave.viz.navigator import (
     issue_target,
     initial_expanded_ids,
     layer_node_id,
+    layer_slot_of,
     timeline_row_node_id,
     timeline_row_slot_of,
 )
@@ -424,6 +426,17 @@ class TuningControls:
             text_input_shared=lambda: (
                 self._modal_host.active or self.inline_edit.text_target is not None
             ),
+            tag_actions=TagActions(
+                new_tag=lambda: self._preset_curation.prompt_new_tag(),
+                rename_tag=lambda tag: self._preset_curation.prompt_rename_tag(tag),
+                delete_tag=lambda tag: self._preset_curation.prompt_delete_tag(tag),
+            ),
+        )
+        self.tag_manager = TagManagerController(
+            self.library,
+            self._modal_host,
+            self._preset_curation,
+            show_tag=self._show_tag_in_browser,
         )
         self.preset_clipboard = PresetClipboard(
             self.preset_list,
@@ -763,6 +776,16 @@ class TuningControls:
         self.welcome.tick()
         self.preset_rescan.tick()
         self.latency_setup.tick()
+
+    def _show_tag_in_browser(self, tag: FavouriteTag) -> None:
+        """Open the preset browser in *tag* on the layer in view."""
+        slot = (
+            curation_focus_slot(self.session)
+            or layer_slot_of(self.shell_focus.selected_id)
+            or next(iter(self.session.layer_z_order), None)
+        )
+        if slot is not None:
+            self.preset_browser.open(slot, collection=tag)
 
     def build_view_state(
         self,

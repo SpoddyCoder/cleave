@@ -410,7 +410,10 @@ Tags sort your favourites into groups of your own, such as `a-tier`, `b-tier`, o
 - **Browse a tag:** in the preset browser, open **Favourites** to see **All favourites** and one folder per tag. Open a tag to see just its presets. A layer can play All favourites or a tag the same way it plays a folder, and **Populate list** fills the list from it. **Jump to directory** on the preset directory row lists them too.
 - **Names:** a tag name can be up to 40 characters, cannot contain `/` or `\`, and must differ from your other tags by more than capital letters.
 
-Tags cannot be renamed or deleted yet.
+**Managing tags.** Inside **Favourites** in the preset browser, right-click a tag folder to **Rename** or **Delete** it, or highlight it and press F2 (rename) or Delete. The **New tag** row at the end of the Favourites list, or a right-click anywhere in Favourites, adds a tag. To see every tag in one place, choose **Settings > Manage tags**: it lists your tags with how many presets each holds. Pick one and choose **Show presets** (opens the preset browser in that tag), **Rename**, or **Delete**, then **OK**; pick **New tag** to add one.
+
+- **Rename** keeps the tag on its presets, and a layer playing the tag stays on it. A new name can differ from the old one only in capital letters.
+- **Delete** asks first. The tag comes off its presets, which stay favourites, and a layer playing the tag moves to All favourites. Restoring a curation backup brings a deleted tag back.
 
 ### Backing up your curation
 
@@ -822,6 +825,7 @@ The **Settings** menu holds preferences that apply to every project:
 - **Measure audio latency:** see [The visuals are out of time with the music](#the-visuals-are-out-of-time-with-the-music).
 - **Calibrate tap timing:** see [Markers and recorded clips land late](#markers-and-recorded-clips-land-late).
 - **Rescan presets:** re-reads the presets folder after you add presets to an existing pack, or while Cleave is open.
+- **Manage tags:** see your favourite tags with how many presets each holds, and show, rename, delete, or add them. See [Tagging favourites](#tagging-favourites).
 - **Back up preset curation** and **Restore preset curation:** save your favourites and their tags, blacklist, and roles, and bring them back on this or another computer. See [Backing up your curation](#backing-up-your-curation).
 - **Download packages:** fetches anything you skipped on first launch. Presets downloaded here are indexed immediately, ready to curate.
 - **Dev Tools:** a crash log for bug reports.

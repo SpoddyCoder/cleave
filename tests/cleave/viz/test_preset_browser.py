@@ -285,7 +285,7 @@ def test_collection_lists_members_and_parent_returns_to_top(tree: Path) -> None:
     browser.select_row(favourites)
     browser.open_selected()
     assert browser.collection == "favourites"
-    assert [row.label for row in browser.rows] == ["..", "All favourites"]
+    assert [row.label for row in browser.rows] == ["..", "All favourites", "New tag…"]
     assert [crumb.label for crumb in browser.crumbs()] == ["presets", "Favourites"]
     browser.select_row(1)
     browser.open_selected()
@@ -425,6 +425,7 @@ def test_favourites_holds_all_favourites_then_one_folder_per_tag(tree: Path) -> 
         (BrowserRowKind.COLLECTION, "All favourites", "2 presets"),
         (BrowserRowKind.COLLECTION, "bright", "0 presets"),
         (BrowserRowKind.COLLECTION, "dark", "1 preset"),
+        (BrowserRowKind.NEW_TAG, "New tag…", ""),
     ]
 
     browser.set_filter("loose")
@@ -460,3 +461,17 @@ def test_favourites_holds_all_favourites_then_one_folder_per_tag(tree: Path) -> 
     browser.goto_crumb(0)
     assert browser.at_top
     assert browser.selected_row.collection == "favourites"
+
+
+def test_tag_rows_ask_for_new_rename_and_delete(tree: Path) -> None:
+    library = _indexed(tree)
+    library.add_tag("dark")
+    browser = PresetBrowser(preset_root=tree, catalog=library, collection="favourites")
+    assert browser.handle(BrowserAction.RENAME) is BrowserOutcome.NONE  # on All favourites
+    browser.select_row(2)
+    assert browser.selected_tag == "dark"
+    assert browser.handle(BrowserAction.RENAME) is BrowserOutcome.RENAME_TAG
+    assert browser.handle(BrowserAction.DELETE) is BrowserOutcome.DELETE_TAG
+    browser.select_row(3)
+    assert browser.handle(BrowserAction.ENTER_FOLDER) is BrowserOutcome.NONE
+    assert browser.open_selected() is BrowserOutcome.NEW_TAG

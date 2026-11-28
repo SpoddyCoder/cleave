@@ -8,6 +8,7 @@ from pathlib import Path
 from cleave.preset_library import UNFILTERED_CATALOG, FavouriteTag
 from cleave.viz.context_menu import ContextMenuItem, ContextSubmenu
 from cleave.viz.preset_context_menu import (
+    browser_tag_menu,
     preset_list_page_menu,
     preset_row_menu,
     preset_row_menu_entries,
@@ -496,3 +497,18 @@ def test_directory_jump_is_disabled_when_locked() -> None:
         jump = _entries(controls, _dir_desc())["preset.jump"]
         assert not jump.enabled
         assert jump.hint == "Locked: unlock to change"
+
+
+def test_browser_tag_menu_offers_rename_delete_and_new() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        controls, _paths = _controls_with_library(tmp)
+        controls.library.add_tag("dark")
+        items = [entry for entry in browser_tag_menu(controls, "dark")() if hasattr(entry, "id")]
+        assert [(item.id, item.label, item.shortcut) for item in items] == [
+            ("tag.rename", "Rename…", "F2"),
+            ("tag.delete", "Delete…", "Delete"),
+            ("tag.new", "New tag…", None),
+        ]
+        assert [entry.id for entry in browser_tag_menu(controls, None)()] == ["tag.new"]
+        items[1].run()
+        assert controls.modal_host.active

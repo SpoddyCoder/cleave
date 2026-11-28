@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pygame
 
-from cleave.preset_library import PresetLibrary
+from cleave.preset_library import FavouriteTag, PresetLibrary
 from cleave.preset_playlist import playlist_at_collection, playlist_at_dir
 from cleave.viz.modal import (
     ButtonRole,
@@ -301,3 +301,62 @@ def test_new_tag_rejects_a_taken_name_then_tags_the_preset(tmp_path: Path) -> No
     assert library.tags() == ("Dark", "dark wash")
     assert library.tags_of(src) == ("dark wash",)
     assert notes[-1] == "Favourited and tagged dark wash"
+
+
+def test_rename_and_delete_tag_move_layers_playing_it(tmp_path: Path) -> None:
+    src = tmp_path / "pack" / "demo.milk"
+    _write(src, "milk")
+    notes: list[str] = []
+    controller, session, modal, library = _make_controller(
+        tmp_path, notifications=notes
+    )
+    library.add_tag("dark")
+    library.set_tagged(src, "dark", True)
+    layer = session.layers["layer_1"]
+    layer.playlist = playlist_at_collection(
+        FavouriteTag("dark"), current_dir=tmp_path / "pack", catalog=library
+    )
+    done: list[str] = []
+
+    controller.prompt_rename_tag("dark", on_done=lambda: done.append("rename"))
+    view = modal.view_state()
+    assert view is not None and view.kind == ModalKind.TEXT
+    for _ in "dark":
+        modal.handle_keydown(keydown(pygame.K_BACKSPACE))
+    modal.handle_text_input("deep")
+    modal.handle_keydown(keydown(pygame.K_RETURN))
+    modal.handle_keydown(keydown(pygame.K_RETURN))
+    assert library.tags() == ("deep",)
+    assert layer.playlist.collection == FavouriteTag("deep")
+    assert layer.playlist.current == src.resolve()
+    assert notes[-1] == "Renamed tag dark to deep"
+    assert done == ["rename"]
+
+    controller.prompt_delete_tag("deep", on_done=lambda: done.append("delete"))
+    view = modal.view_state()
+    assert view is not None
+    assert view.options == ("Delete", "Cancel")
+    assert view.focus_index == 1
+    modal.handle_keydown(keydown(pygame.K_LEFT))
+    modal.handle_keydown(keydown(pygame.K_RETURN))
+    assert library.tags() == ()
+    assert library.is_favourite(src)
+    assert layer.playlist.collection == "all_favourites"
+    assert layer.playlist.current == src.resolve()
+    assert notes[-1] == "Deleted tag deep from 1 preset"
+    assert done == ["rename", "delete"]
+
+
+def test_new_tag_without_a_preset_only_adds_it(tmp_path: Path) -> None:
+    _write(tmp_path / "pack" / "demo.milk", "milk")
+    notes: list[str] = []
+    controller, _session, modal, library = _make_controller(
+        tmp_path, notifications=notes
+    )
+    controller.prompt_new_tag()
+    modal.handle_text_input("bright")
+    modal.handle_keydown(keydown(pygame.K_RETURN))
+    modal.handle_keydown(keydown(pygame.K_RETURN))
+    assert library.tags() == ("bright",)
+    assert library.tag_count("bright") == 0
+    assert notes[-1] == "Added tag bright"

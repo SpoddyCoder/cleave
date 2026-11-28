@@ -49,6 +49,9 @@ MAX_ROWS = 512
 PAGE_SIZE = 12
 
 
+NEW_TAG_ROW_LABEL = "New tag…"
+
+
 def browser_legend(*, editing: bool) -> tuple[tuple[str, str], ...]:
     """Key hints under the list."""
     if editing:
@@ -74,6 +77,8 @@ class BrowserAction(Enum):
     PARENT = "parent"
     BACKSPACE = "backspace"
     CANCEL = "cancel"
+    RENAME = "rename"
+    DELETE = "delete"
 
 
 class BrowserRowKind(Enum):
@@ -84,6 +89,7 @@ class BrowserRowKind(Enum):
     FOLDER = "folder"
     PRESET = "preset"
     NOTE = "note"
+    NEW_TAG = "new-tag"
 
 
 class BrowserOutcome(Enum):
@@ -92,6 +98,9 @@ class BrowserOutcome(Enum):
     NONE = "none"
     COMMIT = "commit"
     CANCEL = "cancel"
+    NEW_TAG = "new-tag"
+    RENAME_TAG = "rename-tag"
+    DELETE_TAG = "delete-tag"
 
 
 class BrowserFocus(Enum):
@@ -293,6 +302,8 @@ class PresetLister:
                     else "No presets in this collection"
                 )
                 rows.append(BrowserRow(BrowserRowKind.NOTE, note))
+            if collection == "favourites":
+                rows.append(BrowserRow(BrowserRowKind.NEW_TAG, NEW_TAG_ROW_LABEL))
             return (*rows, *presets)
         if at_top:
             for entry in self.catalog.collections():
@@ -492,6 +503,14 @@ class PresetBrowser:
             return None
         return self._rows[self.selected_index]
 
+    @property
+    def selected_tag(self) -> str | None:
+        """The tag folder the list has selected, or None."""
+        row = self.selected_row
+        if self.loading or self.focus is not BrowserFocus.LIST or row is None:
+            return None
+        return row.collection.name if isinstance(row.collection, FavouriteTag) else None
+
     def selected_preset(self) -> Path | None:
         """The preset row the list has selected; None while loading or on the filter."""
         if self.loading or self.focus is not BrowserFocus.LIST:
@@ -598,8 +617,14 @@ class PresetBrowser:
             self._move(len(self._rows))
         elif action is BrowserAction.ENTER_FOLDER:
             row = self.selected_row
-            if row is not None and row.kind is not BrowserRowKind.PRESET:
+            if row is not None and row.kind in (
+                BrowserRowKind.PARENT, BrowserRowKind.COLLECTION, BrowserRowKind.FOLDER
+            ):
                 self.open_selected()
+        elif action is BrowserAction.RENAME and self.selected_tag is not None:
+            return BrowserOutcome.RENAME_TAG
+        elif action is BrowserAction.DELETE and self.selected_tag is not None:
+            return BrowserOutcome.DELETE_TAG
         return BrowserOutcome.NONE
 
     def _move(self, delta: int) -> None:
@@ -626,6 +651,8 @@ class PresetBrowser:
             return BrowserOutcome.NONE
         if row.kind is BrowserRowKind.PRESET:
             return BrowserOutcome.COMMIT
+        if row.kind is BrowserRowKind.NEW_TAG:
+            return BrowserOutcome.NEW_TAG
         if row.kind is BrowserRowKind.PARENT:
             self.go_parent()
         elif row.kind is BrowserRowKind.COLLECTION and row.collection is not None:

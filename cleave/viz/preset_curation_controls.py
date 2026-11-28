@@ -8,7 +8,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 from cleave.cue_roles import CUE_ROLES, CueRole
-from cleave.preset_library import PresetLibrary
+from cleave.preset_library import FavouriteTag, PresetCollection, PresetLibrary
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.modal import ButtonRole, ModalHost, ModalLabeledLine, ModalOption
 from cleave.viz.session import TuningSession
@@ -33,6 +33,21 @@ def unfavourited_text(tags_removed: int) -> str:
 
 def tag_untag_label(tag: str) -> str:
     return f"Remove {tag}"
+
+
+def preset_count_phrase(count: int) -> str:
+    return "1 preset" if count == 1 else f"{count:,} presets"
+
+
+def delete_tag_body(count: int) -> str:
+    if count == 0:
+        return "No presets have this tag."
+    noun = "It stays a favourite" if count == 1 else "They stay favourites"
+    return (
+        f"{preset_count_phrase(count)} lose this tag. {noun}. A layer playing "
+        "the tag moves to All favourites. Restoring a curation backup brings "
+        "the tag back."
+    )
 
 class PresetCurationController:
     """Route favourite / tag / blacklist / role actions from the tuning panel.
@@ -98,8 +113,17 @@ class PresetCurationController:
         else:
             self._notify(f"Favourited and tagged {tag}")
 
-    def prompt_new_tag(self, slot: str, src: Path) -> None:
-        """Name a new tag, then put it on *src*."""
+    def prompt_new_tag(
+        self,
+        slot: str | None = None,
+        src: Path | None = None,
+        *,
+        on_done: Callable[[], None] | None = None,
+    ) -> None:
+        """Name a new tag, then put it on *src* when given.
+
+        *on_done* runs after the dialog closes, confirmed or not.
+        """
         self._lock_preset(slot)
 
         def validate(text: str) -> str | None:
@@ -112,18 +136,91 @@ class PresetCurationController:
         def confirm(text: str) -> None:
             try:
                 tag = self._library.add_tag(text)
-                self.toggle_tag(src, tag)
+                if src is not None:
+                    self.toggle_tag(src, tag)
+                else:
+                    self._refresh_collections()
+                    self._notify(f"Added tag {tag}")
             finally:
-                self._unlock_preset(slot)
+                self._finish(slot, on_done)
 
         self._modal.prompt_text(
             "New tag",
             "",
             confirm,
-            lambda: self._unlock_preset(slot),
+            lambda: self._finish(slot, on_done),
             single_line=True,
             validate=validate,
         )
+
+    def prompt_rename_tag(
+        self, tag: str, *, on_done: Callable[[], None] | None = None
+    ) -> None:
+        """Rename *tag*; its presets, and layers playing it, keep it."""
+
+        def validate(text: str) -> str | None:
+            try:
+                self._library.new_tag_name(text, renaming=tag)
+            except ValueError as exc:
+                return str(exc)
+            return None
+
+        def confirm(text: str) -> None:
+            try:
+                name = self._library.rename_tag(tag, text)
+                if name != tag:
+                    self._move_layers_off(FavouriteTag(tag), FavouriteTag(name))
+                    self._notify(f"Renamed tag {tag} to {name}")
+            finally:
+                self._finish(None, on_done)
+
+        self._modal.prompt_text(
+            f"Rename tag {tag}",
+            tag,
+            confirm,
+            lambda: self._finish(None, on_done),
+            single_line=True,
+            validate=validate,
+        )
+
+    def prompt_delete_tag(
+        self, tag: str, *, on_done: Callable[[], None] | None = None
+    ) -> None:
+        """Confirm, then delete *tag*; its presets stay favourites."""
+
+        def confirm() -> None:
+            try:
+                count = self._library.delete_tag(tag)
+                self._move_layers_off(FavouriteTag(tag), "all_favourites")
+                self._notify(
+                    f"Deleted tag {tag}"
+                    + (f" from {preset_count_phrase(count)}" if count else "")
+                )
+            finally:
+                self._finish(None, on_done)
+
+        self._modal.prompt_buttons(
+            f"Delete tag {tag}?",
+            [
+                ModalOption("Delete", confirm, ButtonRole.DANGER),
+                ModalOption(_CANCEL_LABEL, lambda: self._finish(None, on_done)),
+            ],
+            on_dismiss=lambda: self._finish(None, on_done),
+            initial_focus_index=1,
+            body=delete_tag_body(self._library.tag_count(tag)),
+        )
+
+    def _move_layers_off(self, old: FavouriteTag, new: PresetCollection) -> None:
+        """Point layers playing *old* at *new*, keeping their preset, then refresh."""
+        for layer in self.session.layers.values():
+            if layer.playlist.collection == old:
+                layer.playlist.collection = new
+        self._refresh_collections()
+
+    def _finish(self, slot: str | None, on_done: Callable[[], None] | None) -> None:
+        self._unlock_preset(slot)
+        if on_done is not None:
+            on_done()
 
     def prompt_tag(self, slot: str, src: Path) -> None:
         """Put a tag on *src* or take one off, or make a new one (hotkey **t**).
@@ -261,10 +358,10 @@ class PresetCurationController:
             if layer.preset_switching == "on":
                 self._layer_bindings.on_preset_switching_change(layer_slot)
 
-    def _lock_preset(self, slot: str) -> None:
-        if self._layer_bindings is not None:
+    def _lock_preset(self, slot: str | None) -> None:
+        if slot is not None and self._layer_bindings is not None:
             self._layer_bindings.lock_preset_for_modal(slot)
 
-    def _unlock_preset(self, slot: str) -> None:
-        if self._layer_bindings is not None:
+    def _unlock_preset(self, slot: str | None) -> None:
+        if slot is not None and self._layer_bindings is not None:
             self._layer_bindings.unlock_preset_after_modal(slot)

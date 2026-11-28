@@ -8,7 +8,9 @@ entry, insert after it, add to the end of the list); Populate and Clear list
 (after a confirmation); Move up and down, and Remove; then Favourite, a Tags
 submenu, Blacklist, and a Role submenu. The layer's current preset row offers Browse
 presets, Copy and Paste, Add to preset list, and the same curation items. A
-preset in the browser offers Copy and the curation items. A right-click on the
+preset in the browser offers Copy and the curation items. Inside the
+browser's Favourites folder, a tag folder offers Rename and Delete, and
+anywhere there offers New tag. A right-click on the
 Preset List page away from any entry (the only way in while the list is
 empty) offers Paste at the end of the list, Add current preset, Populate, and
 Clear list. Each item calls the same path as its key, and a disabled item
@@ -144,6 +146,39 @@ def browser_preset_menu(
             shortcut=COPY.shortcut,
         )
         return join_groups([(copy,), _curate_path_items(controls, desc, slot, path)])
+
+    return entries
+
+
+def browser_tag_menu(controls: TuningControls, tag: str | None) -> ContextMenuProvider:
+    """Provider inside the browser's Favourites: Rename and Delete for *tag*, New tag."""
+
+    def entries() -> tuple[ContextMenuEntry, ...]:
+        curation = controls.preset_curation
+        new = ContextMenuItem(
+            id="tag.new", label=NEW_TAG_LABEL, run=lambda: curation.prompt_new_tag()
+        )
+        if tag is None or tag not in curation.tags():
+            return (new,)
+        return join_groups(
+            [
+                (
+                    ContextMenuItem(
+                        id="tag.rename",
+                        label="Rename…",
+                        run=lambda: curation.prompt_rename_tag(tag),
+                        shortcut="F2",
+                    ),
+                    ContextMenuItem(
+                        id="tag.delete",
+                        label="Delete…",
+                        run=lambda: curation.prompt_delete_tag(tag),
+                        shortcut="Delete",
+                    ),
+                ),
+                (new,),
+            ]
+        )
 
     return entries
 

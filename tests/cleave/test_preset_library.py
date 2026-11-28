@@ -489,3 +489,31 @@ def test_tag_playlist_steps_through_tags_and_goes_up_to_favourites(tmp_path: Pat
 def test_marker_tooltip_lists_tags_on_the_favourite_marker() -> None:
     assert marker_tooltip("[F]", tags=("a-tier", "dark")) == "Favourite. Tags: a-tier, dark"
     assert marker_tooltip("[B]", tags=("a-tier",)) == "Blacklisted"
+
+
+def test_rename_and_delete_tag_keep_the_favourites(tmp_path: Path) -> None:
+    root = tmp_path / "presets"
+    a = _write(root / "pack" / "a.milk", "a")
+    db = tmp_path / "cleave.db"
+    library = PresetLibrary.open(db)
+    library.index(root)
+    library.add_tag("dark")
+    library.add_tag("bright")
+    library.set_tagged(a, "dark", True)
+
+    with pytest.raises(ValueError, match="already a tag named Bright"):
+        library.rename_tag("dark", "Bright")
+    assert library.rename_tag("dark", "Dark") == "Dark"
+    assert library.rename_tag("Dark", "deep") == "deep"
+    assert library.tags() == ("bright", "deep")
+    assert library.tags_of(a) == ("deep",)
+    library.close()
+
+    library = PresetLibrary.open(db)
+    library.index(root)
+    assert library.tags_of(a) == ("deep",)
+    assert library.delete_tag("deep") == 1
+    assert library.delete_tag("deep") == 0
+    assert library.tags() == ("bright",)
+    assert library.tags_of(a) == () and library.is_favourite(a)
+    library.close()
