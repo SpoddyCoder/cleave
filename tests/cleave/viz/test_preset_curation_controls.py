@@ -193,7 +193,7 @@ def test_curating_in_a_collection_keeps_the_current_preset(tmp_path: Path) -> No
     library.set_favourite(b, True)
     layer = session.layers["layer_1"]
     layer.playlist = playlist_at_collection(
-        "favourites", current_dir=tmp_path / "pack", catalog=library
+        "all_favourites", current_dir=tmp_path / "pack", catalog=library
     )
     assert layer.playlist.current == a.resolve()
 
@@ -207,7 +207,7 @@ def test_curating_in_a_collection_keeps_the_current_preset(tmp_path: Path) -> No
 
     layer.playlist.step_sibling(1, preset_root=tmp_path)
     layer.playlist.step_sibling(-1, preset_root=tmp_path)
-    assert layer.playlist.collection == "favourites"
+    assert layer.playlist.collection == "all_favourites"
     assert layer.playlist.paths == ()
 
 
@@ -216,7 +216,7 @@ def test_clearing_one_flag_keeps_the_other(tmp_path: Path) -> None:
     b = tmp_path / "pack" / "b.milk"
     _write(a, "a")
     _write(b, "b")
-    for collection, clear in (("favourites", "favourite"), ("blacklisted", "blacklist")):
+    for collection, clear in (("all_favourites", "favourite"), ("blacklisted", "blacklist")):
         controller, session, _modal, library = _make_controller(tmp_path)
         for path in (a, b):
             library.set_favourite(path, True)

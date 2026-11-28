@@ -114,7 +114,7 @@ def test_replace_clears_current_curation(tmp_path: Path) -> None:
     assert not library.is_favourite(a)
     assert not library.is_blacklisted(a)
     assert library.is_favourite(b)
-    assert library.collection_paths("favourites") == (b.resolve(),)
+    assert library.collection_paths("all_favourites") == (b.resolve(),)
 
 
 def test_backup_never_overwrites(tmp_path: Path) -> None:

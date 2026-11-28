@@ -83,7 +83,7 @@ def test_flags_persist_and_follow_a_moved_preset(tmp_path: Path) -> None:
     library.index(root)
     assert library.is_favourite(moved)
     assert library.role_of(moved) == "pulse"
-    assert library.collection_paths("favourites") == (moved.resolve(),)
+    assert library.collection_paths("all_favourites") == (moved.resolve(),)
     assert library.marker(moved) == " [F] [R:P]"
 
 
@@ -96,7 +96,7 @@ def test_collection_dedupes_by_hash_and_stays_under_root(tmp_path: Path) -> None
     library.index(root)
     library.set_favourite(outside, True)
 
-    assert library.collection_paths("favourites") == (first.resolve(),)
+    assert library.collection_paths("all_favourites") == (first.resolve(),)
     assert library.marker(outside, in_preset_list=True) == " [F] [L]"
 
 
@@ -150,14 +150,21 @@ def test_top_level_browse_steps_through_collections(tmp_path: Path) -> None:
 
     for _ in range(5):
         playlist.step_sibling(-1, preset_root=root)
+    # Favourites is a folder: it holds All favourites and the tags, no presets.
     assert playlist.collection == "favourites"
-    assert playlist.current == fav.resolve()
+    assert playlist.paths == ()
     display = playlist.directory_display(root)
     assert (display.path, display.position) == ("Favourites", "1/8")
-    assert (display.can_go_up, display.can_go_down) == (False, False)
+    assert (display.can_go_up, display.can_go_down) == (False, True)
     assert not playlist.go_parent(root)
-    assert not playlist.enter_child(root)
+    assert playlist.enter_child(root)
+    assert playlist.collection == "all_favourites"
+    assert playlist.current == fav.resolve()
+    display = playlist.directory_display(root)
+    assert (display.path, display.position) == ("Favourites / All favourites", "1/1")
     assert playlist.config_preset_path(root) == "alpha/fav.milk"
+    assert playlist.go_parent(root)
+    assert playlist.collection == "favourites"
 
     assert playlist.step_sibling(-1, preset_root=root)
     assert playlist.collection is None
@@ -179,11 +186,11 @@ def test_enter_collection_jumps_from_a_nested_folder(tmp_path: Path) -> None:
     library.set_favourite(fav, True)
     playlist = playlist_at_dir(root / "alpha" / "deep", catalog=library)
 
-    assert playlist.enter_collection("favourites")
-    assert playlist.collection == "favourites"
+    assert playlist.enter_collection("all_favourites")
+    assert playlist.collection == "all_favourites"
     assert playlist.current == fav.resolve()
     assert playlist.current_dir == (root / "alpha" / "deep").resolve()
-    assert not playlist.enter_collection("favourites")
+    assert not playlist.enter_collection("all_favourites")
 
     assert playlist.enter_collection("bed")
     assert playlist.collection == "bed"
@@ -249,7 +256,7 @@ def test_load_index_reuses_stored_index_without_hashing(
 
     assert library.load_index(root)
     assert library.root == root.resolve()
-    assert library.collection_paths("favourites") == (fav.resolve(),)
+    assert library.collection_paths("all_favourites") == (fav.resolve(),)
     library.close()
 
 
@@ -397,7 +404,8 @@ def test_tags_favourite_the_preset_and_go_when_it_is_unfavourited(tmp_path: Path
         a.resolve(),
         b.resolve(),
     )
-    assert library.tag_collections() == (
+    assert library.favourite_collections() == (
+        "all_favourites",
         FavouriteTag("A-tier"),
         FavouriteTag("lots of black"),
     )
@@ -457,20 +465,25 @@ def test_tag_playlist_steps_through_tags_and_goes_up_to_favourites(tmp_path: Pat
     display = playlist.directory_display(root)
     assert (display.can_go_up, display.can_go_down) == (False, True)
     assert playlist.enter_child(root)
+    assert playlist.collection == "all_favourites"
+    assert playlist.paths == (a.resolve(), b.resolve())
+    assert playlist.step_sibling(1, preset_root=root)
     assert playlist.collection == FavouriteTag("a-tier")
     assert playlist.paths == (a.resolve(),)
     display = playlist.directory_display(root)
-    assert (display.path, display.position) == ("Favourites / a-tier", "1/2")
+    assert (display.path, display.position) == ("Favourites / a-tier", "2/3")
     assert (display.can_go_up, display.can_go_down) == (True, False)
 
     assert playlist.step_sibling(1, preset_root=root)
     assert playlist.collection == FavouriteTag("b-tier")
     assert playlist.step_sibling(1, preset_root=root)
-    assert playlist.collection == FavouriteTag("a-tier")
+    assert playlist.collection == "all_favourites"
 
     assert playlist.go_parent(root)
     assert playlist.collection == "favourites"
-    assert playlist.config_preset_path(root) == "pack/a.milk"
+    # Like a folder holding only subfolders, Favourites has no preset to play.
+    assert playlist.paths == ()
+    assert playlist.config_preset_path(root) == "pack/"
 
 
 def test_marker_tooltip_lists_tags_on_the_favourite_marker() -> None:

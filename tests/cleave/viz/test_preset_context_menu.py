@@ -195,14 +195,20 @@ def test_tags_submenu_ticks_tags_and_offers_new_tag() -> None:
         assert controls.modal_host.active
 
 
-def test_jump_menu_lists_tags_after_favourites() -> None:
+def test_jump_menu_lists_all_favourites_and_tags_after_favourites() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         controls, _paths = _controls_with_library(tmp)
         controls.library.add_tag("b-tier")
         jump = _entries(controls, _dir_desc())["preset.jump"]
         labels = [item.label for item in jump.items]
-        assert labels[:2] == ["Favourites", "Favourites / b-tier"]
+        assert labels[:3] == [
+            "Favourites", "Favourites / All favourites", "Favourites / b-tier",
+        ]
         jump.items[1].run()
+        playlist = controls.session.layers["layer_1"].playlist
+        assert playlist.collection == "all_favourites"
+        jump = _entries(controls, _dir_desc())["preset.jump"]
+        jump.items[2].run()
         playlist = controls.session.layers["layer_1"].playlist
         assert playlist.collection == FavouriteTag("b-tier")
         # The view state (and its JSON structure signature) builds on a tag.
@@ -462,6 +468,7 @@ def test_directory_row_jumps_to_a_collection() -> None:
         assert jump.label == "Jump to directory"
         assert [item.label for item in jump.items] == [
             "Favourites",
+            "Favourites / All favourites",
             "Role: bed",
             "Role: pulse",
             "Role: lead",
@@ -475,7 +482,7 @@ def test_directory_row_jumps_to_a_collection() -> None:
         assert playlist.collection == "favourites"
         jump = _entries(controls, _dir_desc())["preset.jump"]
         assert [item.checked for item in jump.items] == [
-            True, False, False, False, False, False,
+            True, False, False, False, False, False, False,
         ]
 
         jump.items[-1].run()

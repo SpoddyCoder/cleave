@@ -32,6 +32,7 @@ from cleave.preset_library import (
     PresetCollection,
     collection_key,
     collection_label,
+    in_favourites,
 )
 from cleave.preset_playlist import list_navigable_dirs, milk_files_in_dir
 from cleave.viz.text_edit import (
@@ -271,14 +272,14 @@ class PresetLister:
             rows.append(BrowserRow(BrowserRowKind.PARENT, PARENT_LABEL))
         if collection is not None:
             if collection == "favourites":
-                for tag in self.catalog.tag_collections():
-                    count = len(self.catalog.collection_paths(tag))
+                for inside in self.catalog.favourite_collections():
+                    count = len(self.catalog.collection_paths(inside))
                     rows.append(
                         BrowserRow(
                             BrowserRowKind.COLLECTION,
-                            collection_label(tag),
+                            collection_label(inside),
                             detail=preset_count_text(count),
-                            collection=tag,
+                            collection=inside,
                         )
                     )
             presets = tuple(
@@ -326,7 +327,10 @@ class PresetLister:
         terms = filter_terms(filter_text)
         if collection is not None:
             base = self.preset_root
-            candidates = self.catalog.collection_paths(collection)
+            # The filter in the Favourites folder searches every favourite.
+            candidates = self.catalog.collection_paths(
+                "all_favourites" if collection == "favourites" else collection
+            )
         else:
             base = folder
             candidates = self._presets_below(folder)
@@ -513,7 +517,7 @@ class PresetBrowser:
         assert self.folder is not None
         out = [BrowserCrumb(ROOT_LABEL, self.preset_root)]
         if self.collection is not None:
-            if isinstance(self.collection, FavouriteTag):
+            if in_favourites(self.collection):
                 out.append(
                     BrowserCrumb(collection_label("favourites"), collection="favourites")
                 )
@@ -633,7 +637,7 @@ class PresetBrowser:
     def go_parent(self) -> None:
         """Leave a tag for Favourites, a collection for the top level, or go up."""
         assert self.folder is not None
-        if isinstance(self.collection, FavouriteTag):
+        if in_favourites(self.collection):
             self._show(collection="favourites", keep_collection=self.collection)
             return
         if self.collection is not None:

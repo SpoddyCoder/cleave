@@ -241,7 +241,7 @@ On a layer's **Milkdrop Preset** page:
 
 Many preset packs keep their presets in subfolders. When the folder you are in has none of its own, the **preset** row says how many subfolders are below and how many presets they hold: press Enter (or the down arrow) on **preset directory** to open the first one. Hover over either row, or the arrows, for a reminder of what they do.
 
-At the top level of the preset folders, Left/Right also reaches your collections: **Favourites**, one per **Role**, and **Blacklisted**. Your favourite tags sit inside Favourites: the down arrow goes from Favourites into its first tag, Left/Right then moves between tags, and the up arrow goes back to Favourites. To go straight to a collection or a tag, right-click the preset directory row and choose **Jump to directory**. See [Curating your presets](#curating-your-presets).
+At the top level of the preset folders, Left/Right also reaches your collections: **Favourites**, one per **Role**, and **Blacklisted**. Favourites is a folder holding **All favourites** (every favourite) and one folder per favourite tag. Like a pack folder that only holds folders, it plays nothing itself: the down arrow goes from Favourites into All favourites, Left/Right then moves through All favourites and the tags, and the up arrow goes back to Favourites. To go straight to a collection or a tag, right-click the preset directory row and choose **Jump to directory**. See [Curating your presets](#curating-your-presets).
 
 ### Browsing presets
 
@@ -249,7 +249,7 @@ The preset browser shows every folder and preset at once, so you can see what a 
 
 ![The preset browser showing a folder's subfolders](images/preset-browser.png)
 
-The list starts in the layer's folder, with the current preset selected. It shows `..` (the folder above), then the subfolders with how many presets each holds, then the presets with their curation markers. At the top level your collections (Favourites, Roles, Blacklisted) come first. Favourites lists one folder per tag, with how many presets each holds, then every favourite. The path along the top shows where you are; click a part of it to jump back up. A large folder or a search across the whole library can take a moment to read; a spinner shows over the list until it is ready. When the column is too narrow for the whole path, the folders nearest the top fold into `...`, which takes you up to the nearest of them.
+The list starts in the layer's folder, with the current preset selected. It shows `..` (the folder above), then the subfolders with how many presets each holds, then the presets with their curation markers. At the top level your collections (Favourites, Roles, Blacklisted) come first. Favourites holds All favourites, then one folder per tag, each with how many presets it holds; its filter searches every favourite. The path along the top shows where you are; click a part of it to jump back up. A large folder or a search across the whole library can take a moment to read; a spinner shows over the list until it is ready. When the column is too narrow for the whole path, the folders nearest the top fold into `...`, which takes you up to the nearest of them.
 
 Click a row to select it, or double-click a folder to open it. Moving to a preset plays it on the layer straight away, so you can step through a folder and watch each one. This works while the song is paused too: the preview shows each preset as it would look at the paused position. When you find one you like, press Enter (or double-click it) to keep it; the layer then browses that preset's folder. Esc puts back the preset and folder you started with. The back arrow at the right of the browser's title bar closes it and keeps the preset that is playing.
 
@@ -407,7 +407,7 @@ Tags sort your favourites into groups of your own, such as `a-tier`, `b-tier`, o
 
 - **Tag a preset:** right-click it and open **Tags**, then tick a tag, or choose **New tag…** to name a new one. Or press T: a dialog shows the preset's tags and has a button for each tag. A tag the preset already has reads **Remove** and its name. **New tag…** asks for a name.
 - **Tags are for favourites:** tagging a preset also makes it a favourite. Unfavouriting a preset (F) also takes off its tags, and the message says how many.
-- **Browse a tag:** in the preset browser, open **Favourites** to see one folder per tag, then every favourite. Open a tag to see just its presets. A layer can play a tag the same way it plays a folder, and **Populate list** fills the list from it.
+- **Browse a tag:** in the preset browser, open **Favourites** to see **All favourites** and one folder per tag. Open a tag to see just its presets. A layer can play All favourites or a tag the same way it plays a folder, and **Populate list** fills the list from it. **Jump to directory** on the preset directory row lists them too.
 - **Names:** a tag name can be up to 40 characters, cannot contain `/` or `\`, and must differ from your other tags by more than capital letters.
 
 Tags cannot be renamed or deleted yet.

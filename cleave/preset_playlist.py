@@ -11,10 +11,10 @@ from cleave.config import CleaveConfig
 from cleave.paths import config_anchor_path, config_relative_path
 from cleave.preset_library import (
     UNFILTERED_CATALOG,
-    FavouriteTag,
     PresetCatalog,
     PresetCollection,
     collection_label,
+    in_favourites,
 )
 
 if TYPE_CHECKING:
@@ -275,9 +275,10 @@ class PresetPlaylist:
     def _collection_siblings(
         self, preset_root: Path
     ) -> tuple[BrowseEntry, ...]:
-        """Left/Right peers of the collection: tags inside Favourites, else the top level."""
-        if isinstance(self.collection, FavouriteTag):
-            return self.catalog.tag_collections()
+        """Left/Right peers: what Favourites holds for a collection inside it,
+        else the top level."""
+        if in_favourites(self.collection):
+            return self.catalog.favourite_collections()
         return top_level_entries(preset_root, self.catalog)
 
     def _at_top_level(self, preset_root: Path) -> bool:
@@ -305,9 +306,9 @@ class PresetPlaylist:
             return DirectoryDisplay(
                 collection_label(self.collection, full=True),
                 f"{position}/{max(len(entries), 1)}",
-                isinstance(self.collection, FavouriteTag),
+                in_favourites(self.collection),
                 self.collection == "favourites"
-                and bool(self.catalog.tag_collections()),
+                and bool(self.catalog.favourite_collections()),
             )
         rel = config_relative_path(self.current_dir, preset_root).rstrip("/") + "/"
         can_go_up, can_go_down = directory_tree_moves(
@@ -468,10 +469,10 @@ class PresetPlaylist:
         return True
 
     def enter_child(self, preset_root: Path) -> bool:
-        """Open the first subfolder, or the first tag from Favourites."""
+        """Open the first subfolder, or All favourites from Favourites."""
         if self.collection == "favourites":
-            tags = self.catalog.tag_collections()
-            return bool(tags) and self.enter_collection(tags[0])
+            inside = self.catalog.favourite_collections()
+            return bool(inside) and self.enter_collection(inside[0])
         if self.collection is not None:
             return False
         children = list_navigable_dirs(self.current_dir)
@@ -486,7 +487,7 @@ class PresetPlaylist:
         *,
         browse_floor: Path | None = None,
     ) -> bool:
-        if isinstance(self.collection, FavouriteTag):
+        if in_favourites(self.collection):
             return self.enter_collection("favourites")
         if self.collection is not None:
             return False

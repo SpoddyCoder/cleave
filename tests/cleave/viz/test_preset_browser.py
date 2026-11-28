@@ -285,9 +285,17 @@ def test_collection_lists_members_and_parent_returns_to_top(tree: Path) -> None:
     browser.select_row(favourites)
     browser.open_selected()
     assert browser.collection == "favourites"
-    assert [row.label for row in browser.rows] == ["..", "Pack B/beta.milk"]
+    assert [row.label for row in browser.rows] == ["..", "All favourites"]
     assert [crumb.label for crumb in browser.crumbs()] == ["presets", "Favourites"]
+    browser.select_row(1)
+    browser.open_selected()
+    assert browser.collection == "all_favourites"
+    assert [row.label for row in browser.rows] == ["..", "Pack B/beta.milk"]
+    assert [crumb.label for crumb in browser.crumbs()] == [
+        "presets", "Favourites", "All favourites",
+    ]
 
+    browser.go_parent()
     browser.go_parent()
     assert browser.at_top
     assert browser.selected_row.collection == "favourites"
@@ -398,7 +406,7 @@ def test_missing_crumbs_start_at_the_first_folder_not_found(tmp_path: Path) -> N
     assert not mark_missing_crumbs((BrowserCrumb("Favourites"),))[0].missing
 
 
-def test_favourites_lists_tags_then_every_favourite(tree: Path) -> None:
+def test_favourites_holds_all_favourites_then_one_folder_per_tag(tree: Path) -> None:
     library = _indexed(tree)
     beta = tree / "Pack B" / "beta.milk"
     loose = tree / "Pack A" / "loose.milk"
@@ -414,13 +422,24 @@ def test_favourites_lists_tags_then_every_favourite(tree: Path) -> None:
 
     assert _kinds(browser) == [
         (BrowserRowKind.PARENT, "..", ""),
+        (BrowserRowKind.COLLECTION, "All favourites", "2 presets"),
         (BrowserRowKind.COLLECTION, "bright", "0 presets"),
         (BrowserRowKind.COLLECTION, "dark", "1 preset"),
-        (BrowserRowKind.PRESET, "Pack A/loose.milk", ""),
-        (BrowserRowKind.PRESET, "Pack B/beta.milk", ""),
     ]
 
-    browser.select_row(2)
+    browser.set_filter("loose")
+    assert [row.label for row in browser.rows] == ["Pack A/loose.milk"]
+    browser.set_filter("")
+
+    browser.select_row(1)
+    browser.open_selected()
+    assert [row.label for row in browser.rows] == [
+        "..", "Pack A/loose.milk", "Pack B/beta.milk",
+    ]
+    browser.go_parent()
+    assert browser.selected_row.collection == "all_favourites"
+
+    browser.select_row(3)
     browser.open_selected()
     assert browser.collection == FavouriteTag("dark")
     assert [row.label for row in browser.rows] == ["..", "Pack B/beta.milk"]
@@ -430,13 +449,13 @@ def test_favourites_lists_tags_then_every_favourite(tree: Path) -> None:
     assert browser.collection == "favourites"
     assert browser.selected_row.collection == FavouriteTag("dark")
 
-    browser.select_row(1)
+    browser.select_row(2)
     browser.open_selected()
     assert [row.label for row in browser.rows] == ["..", "No presets with this tag"]
     browser.goto_crumb(1)
     assert browser.collection == "favourites"
     assert browser.selected_row.collection == FavouriteTag("bright")
-    browser.select_row(2)
+    browser.select_row(3)
     browser.open_selected()
     browser.goto_crumb(0)
     assert browser.at_top

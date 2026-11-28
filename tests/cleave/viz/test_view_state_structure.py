@@ -794,7 +794,7 @@ def test_preset_position_counts_within_browsed_collection(tmp_path: Path) -> Non
     library.set_blacklisted((pack / "c.milk").resolve(), True)
     layer = controls.session.layers["layer_1"]
 
-    for collection in ("favourites", "pulse", "blacklisted"):
+    for collection in ("all_favourites", "pulse", "blacklisted"):
         layer.playlist = playlist_at_collection(
             collection, current_dir=pack, catalog=library
         )

@@ -26,7 +26,11 @@ from cleave.cue_roles import (
 
 SCHEMA_VERSION = 3
 
-BuiltinCollection = Literal["favourites", "bed", "pulse", "lead", "accent", "blacklisted"]
+BuiltinCollection = Literal[
+    "favourites", "all_favourites", "bed", "pulse", "lead", "accent", "blacklisted"
+]
+"""``favourites`` is the Favourites folder: it holds ``all_favourites`` and one
+collection per tag, and no presets of its own."""
 
 
 @dataclass(frozen=True)
@@ -38,7 +42,7 @@ class FavouriteTag:
 
 PresetCollection = BuiltinCollection | FavouriteTag
 
-PRESET_COLLECTIONS: tuple[BuiltinCollection, ...] = (
+PRESET_COLLECTIONS: tuple[BuiltinCollection, ...] = (  # the top level
     "favourites",
     "bed",
     "pulse",
@@ -49,6 +53,7 @@ PRESET_COLLECTIONS: tuple[BuiltinCollection, ...] = (
 
 _BUILTIN_LABEL: dict[BuiltinCollection, str] = {
     "favourites": "Favourites",
+    "all_favourites": "All favourites",
     "bed": "Role: bed",
     "pulse": "Role: pulse",
     "lead": "Role: lead",
@@ -59,17 +64,25 @@ _BUILTIN_LABEL: dict[BuiltinCollection, str] = {
 TAG_NAME_MAX = 40
 
 
-def collection_label(collection: PresetCollection, *, full: bool = False) -> str:
-    """Display name: ``Favourites``, ``Role: bed``, or a tag's name.
+def in_favourites(collection: PresetCollection | None) -> bool:
+    """True for a collection inside the Favourites folder: All favourites or a tag."""
+    return collection == "all_favourites" or isinstance(collection, FavouriteTag)
 
-    *full* names a tag with its parent, ``Favourites / a-tier``, for places
-    that show it away from the Favourites folder.
+
+def collection_label(collection: PresetCollection, *, full: bool = False) -> str:
+    """Display name: ``Favourites``, ``All favourites``, ``Role: bed``, or a tag's name.
+
+    *full* names a collection inside Favourites with its parent, such as
+    ``Favourites / a-tier``, for places that show it away from that folder.
     """
-    if isinstance(collection, FavouriteTag):
-        if full:
-            return f"{_BUILTIN_LABEL['favourites']} / {collection.name}"
-        return collection.name
-    return _BUILTIN_LABEL[collection]
+    name = (
+        collection.name
+        if isinstance(collection, FavouriteTag)
+        else _BUILTIN_LABEL[collection]
+    )
+    if full and in_favourites(collection):
+        return f"{_BUILTIN_LABEL['favourites']} / {name}"
+    return name
 
 
 def collection_key(collection: PresetCollection | None) -> str | None:
@@ -179,7 +192,7 @@ class PresetCatalog(Protocol):
 
     def collections(self) -> tuple[PresetCollection, ...]: ...
 
-    def tag_collections(self) -> tuple[FavouriteTag, ...]: ...
+    def favourite_collections(self) -> tuple[PresetCollection, ...]: ...
 
     def visible(self, paths: Iterable[Path]) -> tuple[Path, ...]: ...
 
@@ -196,7 +209,7 @@ class UnfilteredCatalog:
     def collections(self) -> tuple[PresetCollection, ...]:
         return ()
 
-    def tag_collections(self) -> tuple[FavouriteTag, ...]:
+    def favourite_collections(self) -> tuple[PresetCollection, ...]:
         return ()
 
     def visible(self, paths: Iterable[Path]) -> tuple[Path, ...]:
@@ -754,8 +767,10 @@ class PresetLibrary:
     def _in_collection(self, digest: str, collection: PresetCollection) -> bool:
         if isinstance(collection, FavouriteTag):
             return digest in self._tag_members.get(collection.name, ())
-        if collection == "favourites":
+        if collection == "all_favourites":
             return digest in self._favourites
+        if collection == "favourites":
+            return False
         if collection == "blacklisted":
             return digest in self._blacklist
         return self._roles.get(digest) == collection
@@ -765,8 +780,12 @@ class PresetLibrary:
         return PRESET_COLLECTIONS
 
     def tag_collections(self) -> tuple[FavouriteTag, ...]:
-        """One collection per tag, inside Favourites, sorted by name."""
+        """One collection per tag, sorted by name."""
         return tuple(FavouriteTag(name) for name in self._tags)
+
+    def favourite_collections(self) -> tuple[PresetCollection, ...]:
+        """What the Favourites folder holds: All favourites, then each tag."""
+        return ("all_favourites", *self.tag_collections())
 
     def collection_paths(self, collection: PresetCollection) -> tuple[Path, ...]:
         """Indexed files in ``collection``, one path per hash, sorted by path."""

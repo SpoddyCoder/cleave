@@ -175,7 +175,7 @@ def _jump_items(
     for collection in collections:
         targets.append(collection)
         if collection == "favourites":
-            targets.extend(playlist.catalog.tag_collections())
+            targets.extend(playlist.catalog.favourite_collections())
     return (
         ContextSubmenu(
             id="preset.jump",

@@ -92,7 +92,7 @@ def test_rescan_works_on_an_in_memory_library(tmp_path: Path) -> None:
     harness.run_until_idle()
 
     assert harness.notes == [done_message(1)]
-    assert library.collection_paths("favourites") == ()
+    assert library.collection_paths("all_favourites") == ()
 
 
 def test_cancel_keeps_previous_index(tmp_path: Path, monkeypatch) -> None:
