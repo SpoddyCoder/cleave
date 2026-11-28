@@ -83,6 +83,9 @@ class SectionDef:
     # False: the page's buttons join its last group of rows instead of
     # sitting under a divider of their own.
     commands_divider: bool = True
+    # True: buttons stay where the page lists them, under the row they act
+    # on, instead of moving to the bottom of the page.
+    commands_in_place: bool = False
 
 
 def _append_track_effect_rows(
@@ -146,11 +149,12 @@ SETTINGS_LATENCY_SECTION = SectionDef(
     context="global",
     children=(
         SectionNode(leaf_kind=RowKind.SETTINGS_AUDIO_LATENCY_MS),
+        SectionNode(commands=("settings.measure_latency",)),
+        SectionNode(divider=True),
         SectionNode(leaf_kind=RowKind.SETTINGS_TAP_LATENCY_MS),
-        SectionNode(
-            commands=("settings.measure_latency", "settings.calibrate_tap_timing")
-        ),
+        SectionNode(commands=("settings.calibrate_tap_timing",)),
     ),
+    commands_in_place=True,
 )
 
 SETTINGS_UI_SECTION = SectionDef(

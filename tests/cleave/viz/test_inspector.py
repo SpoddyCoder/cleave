@@ -192,12 +192,12 @@ def test_settings_pages() -> None:
         RowKind.SETTINGS_AUDIO_LATENCY_MS,
         RowKind.SETTINGS_TAP_LATENCY_MS,
     ]
-    assert latency[-1].command_ids == (
-        "settings.measure_latency",
-        "settings.calibrate_tap_timing",
-    )
-    assert latency[-1].depth == 0
-    assert latency[-2].divider
+    assert latency[0].descriptor.kind is RowKind.SETTINGS_AUDIO_LATENCY_MS
+    assert latency[1].command_ids == ("settings.measure_latency",)
+    assert latency[2].divider
+    assert latency[3].descriptor.kind is RowKind.SETTINGS_TAP_LATENCY_MS
+    assert latency[4].command_ids == ("settings.calibrate_tap_timing",)
+    assert len(latency) == 5
     ui = build_inspector_rows(state, "settings.ui")
     assert _kinds(ui) == [
         RowKind.SETTINGS_UI_SCALE,
@@ -528,7 +528,6 @@ def test_layer_missing_from_view_state_has_no_rows(page: str | None) -> None:
 @pytest.mark.parametrize(
     "node_id",
     (
-        "settings.latency",
         "timeline",
         "timeline.grid",
         "timeline.cue_fades",

@@ -1166,9 +1166,6 @@ def build_menus(
                 (
                     *_SETTINGS_PAGES,
                     SEPARATOR,
-                    _MEASURE_LATENCY,
-                    _CALIBRATE_TAP_TIMING,
-                    SEPARATOR,
                     _MANAGE_TAGS,
                     _RESCAN_PRESETS,
                     _BACK_UP_CURATION,
@@ -1188,6 +1185,8 @@ MENUS: tuple[Menu, ...] = build_menus()
 
 # Reachable from an inspector button only.
 _INSPECTOR_COMMANDS: tuple[Command, ...] = (
+    _MEASURE_LATENCY,
+    _CALIBRATE_TAP_TIMING,
     _ADD,
     _DELETE,
     _GENERATE,

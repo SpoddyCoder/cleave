@@ -77,8 +77,6 @@ _STATIC_IDS = (
     "project.backup",
     "project.restore",
     *_SETTINGS_PAGE_IDS,
-    "settings.measure_latency",
-    "settings.calibrate_tap_timing",
     "settings.manage_tags",
     "settings.rescan_presets",
     "settings.back_up_curation",
@@ -89,6 +87,8 @@ _STATIC_IDS = (
 )
 
 _OFF_MENU_IDS = (
+    "settings.measure_latency",
+    "settings.calibrate_tap_timing",
     "project.settings",
     "render.edit_overlays",
     "render.edit_post_fx",
@@ -248,9 +248,6 @@ def test_menus_list_taxonomy_ids_once() -> None:
         "page.settings.preview",
         "page.settings.ui",
         "page.settings.latency",
-        None,
-        "settings.measure_latency",
-        "settings.calibrate_tap_timing",
         None,
         "settings.manage_tags",
         "settings.rescan_presets",

@@ -172,7 +172,8 @@ def build_inspector_rows(
     empty until the next frame. Button rows, and leaf rows marked
     ``with_commands``, go to the bottom of the page in their page order, under
     a divider when other rows sit above them, unless the section sets
-    ``commands_divider=False``.
+    ``commands_divider=False``. A section with ``commands_in_place`` keeps
+    its buttons where it lists them.
     """
     section = page_section(state, node_id)
     if section is None:
@@ -182,6 +183,8 @@ def build_inspector_rows(
         return ()
     rows: list[InspectorRow] = []
     _append_section_children(rows, section, state, 0, slot)
+    if section.commands_in_place:
+        return tuple(rows)
     return _commands_last(rows, divider=section.commands_divider)
 
 

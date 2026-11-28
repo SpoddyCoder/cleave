@@ -81,7 +81,7 @@ The first time the editor opens a project, a **Set up audio latency** dialog off
 | Audio latency | Lines the preview up with the sound you hear, for outputs such as wireless headphones that play late. See [The visuals are out of time with the music](#the-visuals-are-out-of-time-with-the-music). |
 | Tap timing | Lines up song markers and recorded clips with the beat, allowing for how late your key presses land. See [Markers and recorded clips land late](#markers-and-recorded-clips-land-late). |
 
-Click **OK** to run the ones you left on, one after the other: **Measure audio latency** first, then **Calibrate tap timing**. **Cancel** skips both. The song stays paused until you are done, then starts playing. The dialog shows only once; either test is always on the **Settings** menu.
+Click **OK** to run the ones you left on, one after the other: **Measure audio latency** first, then **Calibrate tap timing**. **Cancel** skips both. The song stays paused until you are done, then starts playing. The dialog shows only once; either test is always on **Settings > Latency**.
 
 ---
 
@@ -821,9 +821,7 @@ The **Settings** menu holds preferences that apply to every project:
 
 - **Preview:** preview quality.
 - **UI:** the editor theme (Ultraviolet, Chocolate, Mint, or the light Daylight) and [custom themes](custom-themes.md), UI scale (first on the page; changing it puts the navigator and inspector column back at its width for that scale, which is wider above 100%), panel sides, tooltips, notification timing, what a click on a navigator row with pages under it does (navigator expand), whether a coloured bar swipes in behind the inspector title when a new page opens and stays there (highlight new page), and more.
-- **Latency:** audio latency and tap latency, with the tests that measure them. After a test, Cleave opens this page on the value it set.
-- **Measure audio latency:** see [The visuals are out of time with the music](#the-visuals-are-out-of-time-with-the-music).
-- **Calibrate tap timing:** see [Markers and recorded clips land late](#markers-and-recorded-clips-land-late).
+- **Latency:** audio latency, with the **Measure audio latency** button under it (see [The visuals are out of time with the music](#the-visuals-are-out-of-time-with-the-music)), and tap latency, with the **Calibrate tap timing** button under it (see [Markers and recorded clips land late](#markers-and-recorded-clips-land-late)). After a test, Cleave opens this page on the value it set.
 - **Manage tags:** see your favourite tags with how many presets each holds, and show, rename, delete, or add them. See [Tagging favourites](#tagging-favourites).
 - **Rescan presets:** re-reads the presets folder after you add presets to an existing pack, or while Cleave is open.
 - **Back up preset curation** and **Restore preset curation:** save your favourites and their tags, blacklist, and roles, and bring them back on this or another computer. See [Backing up your curation](#backing-up-your-curation).
@@ -888,11 +886,11 @@ Cleave needs Milkdrop presets to draw anything. Get the starter set from **Setti
 
 ### The visuals are out of time with the music
 
-Wireless headphones and some other outputs play sound late, so the preview runs ahead. Choose **Settings > Measure audio latency**, press Left/Right until the flash and the beep land together, then Apply. It only delays the preview, never the render.
+Wireless headphones and some other outputs play sound late, so the preview runs ahead. Open **Settings > Latency** and click **Measure audio latency**, press Left/Right until the flash and the beep land together, then Apply. It only delays the preview, never the render.
 
 ### Markers and recorded clips land late
 
-Markers and clips you tap in during playback can land a little off the beat, from sound and keyboard delay. Choose **Settings > Calibrate tap timing** and press Enter on each long, low tone until your timing settles, then Apply. Later taps move back by that much; anything already placed stays put.
+Markers and clips you tap in during playback can land a little off the beat, from sound and keyboard delay. Open **Settings > Latency**, click **Calibrate tap timing**, and press Enter on each long, low tone until your timing settles, then Apply. Later taps move back by that much; anything already placed stays put.
 
 ### Stem splitting is very slow
 
