@@ -824,8 +824,8 @@ The **Settings** menu holds preferences that apply to every project:
 - **Latency:** audio latency and tap latency, with the tests that measure them. After a test, Cleave opens this page on the value it set.
 - **Measure audio latency:** see [The visuals are out of time with the music](#the-visuals-are-out-of-time-with-the-music).
 - **Calibrate tap timing:** see [Markers and recorded clips land late](#markers-and-recorded-clips-land-late).
-- **Rescan presets:** re-reads the presets folder after you add presets to an existing pack, or while Cleave is open.
 - **Manage tags:** see your favourite tags with how many presets each holds, and show, rename, delete, or add them. See [Tagging favourites](#tagging-favourites).
+- **Rescan presets:** re-reads the presets folder after you add presets to an existing pack, or while Cleave is open.
 - **Back up preset curation** and **Restore preset curation:** save your favourites and their tags, blacklist, and roles, and bring them back on this or another computer. See [Backing up your curation](#backing-up-your-curation).
 - **Download packages:** fetches anything you skipped on first launch. Presets downloaded here are indexed immediately, ready to curate.
 - **Dev Tools:** a crash log for bug reports.
