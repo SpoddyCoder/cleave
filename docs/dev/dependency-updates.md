@@ -177,7 +177,7 @@ Cleave requires libprojectM 4.2+. A newer projectM does not have to raise that. 
 1. Push the pre-release branch. The tests workflow runs on push.
 2. Run the windows-freeze workflow by hand (workflow_dispatch). It covers the frozen `--version` / `--help` smoke, a CPU `separate` on the fixture, and the installer round trip.
 3. Download the dispatch zip or setup exe and check play and render on a Windows machine with a GPU. CI has no GPU.
-4. On an NVIDIA machine, if the CUDA wheels changed: run the CUDA download from Settings > Download packages and split a track.
+4. On an NVIDIA machine, if the CUDA wheels changed: run the CUDA download from File > Download packages and split a track.
 
 ## 9. Changelog
 

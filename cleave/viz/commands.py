@@ -888,7 +888,7 @@ _MANAGE_TAGS = Command(
 )
 
 _BACK_UP_CURATION = Command(
-    id="settings.back_up_curation",
+    id="file.back_up_curation",
     label="Back up preset curation…",
     kind="command",
     enabled=_enabled,
@@ -896,7 +896,7 @@ _BACK_UP_CURATION = Command(
 )
 
 _RESTORE_CURATION = Command(
-    id="settings.restore_curation",
+    id="file.restore_curation",
     label="Restore preset curation…",
     kind="command",
     enabled=_enabled,
@@ -904,7 +904,7 @@ _RESTORE_CURATION = Command(
 )
 
 _DOWNLOAD_PACKAGES = Command(
-    id="settings.download_packages",
+    id="file.download_packages",
     label="Download packages…",
     kind="command",
     enabled=_enabled,
@@ -1121,7 +1121,21 @@ def build_menus(
     """
     return MenuSet(
         (
-            Menu("File", (_NEW, _OPEN, _SAVE, SEPARATOR, _QUIT)),
+            Menu(
+                "File",
+                (
+                    _NEW,
+                    _OPEN,
+                    _SAVE,
+                    SEPARATOR,
+                    _BACK_UP_CURATION,
+                    _RESTORE_CURATION,
+                    SEPARATOR,
+                    _DOWNLOAD_PACKAGES,
+                    SEPARATOR,
+                    _QUIT,
+                ),
+            ),
             Menu(
                 "Edit",
                 (
@@ -1168,9 +1182,6 @@ def build_menus(
                     SEPARATOR,
                     _MANAGE_TAGS,
                     _RESCAN_PRESETS,
-                    _BACK_UP_CURATION,
-                    _RESTORE_CURATION,
-                    _DOWNLOAD_PACKAGES,
                     SEPARATOR,
                     _DEV_TOOLS_PAGE,
                 ),

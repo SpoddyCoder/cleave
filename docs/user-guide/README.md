@@ -72,7 +72,7 @@ Cleave opens on a short splash with its logo, credit, and version; press any key
 | Demucs HQ | A slower, higher-quality separation model. | No |
 | Demucs 6-stem | The model for 6-stem projects, which adds guitar and piano stems. | No |
 
-The five preset packs are grouped under **projectM curated preset packs**, one line each, so you can pick just the ones you want. Milkdrop Original and Milkdrop Textures show **Required** instead of Off and On: Cleave needs them, so they always download, even if you choose Skip. If they fail to download, the step comes back the next time Cleave starts. Each download reports its own progress. You can cancel at any point, and anything that fails is listed with a Retry button. Anything you skip is fetched automatically when it is first needed, or you can get it at any time from **Settings > Download packages**.
+The five preset packs are grouped under **projectM curated preset packs**, one line each, so you can pick just the ones you want. Milkdrop Original and Milkdrop Textures show **Required** instead of Off and On: Cleave needs them, so they always download, even if you choose Skip. If they fail to download, the step comes back the next time Cleave starts. Each download reports its own progress. You can cancel at any point, and anything that fails is listed with a Retry button. Anything you skip is fetched automatically when it is first needed, or you can get it at any time from **File > Download packages**.
 
 The first time the editor opens a project, a **Set up audio latency** dialog offers the two latency settings worth setting up for your computer, both switched on:
 
@@ -419,8 +419,8 @@ Tags sort your favourites into groups of your own, such as `a-tier`, `b-tier`, o
 
 Your favourites, tags, blacklist, and roles can take a long time to build up. Keep a copy, or carry them to a new computer or a fresh install of Cleave:
 
-1. Choose **Settings > Back up preset curation**. A dialog says how many favourites, roles, blacklist marks, and tags it will save, and the folder it saves to; nothing changes until you choose **Back up**. Cleave then saves a small file named like `cleave-curation-2026-11-28-140512.json` in the `backups` folder (see [Where your files live](#where-your-files-live)) and tells you what it holds. **Show in folder** opens the folder so you can copy the file.
-2. On the other computer, choose **Settings > Restore preset curation** and pick the file. The picker starts in the `backups` folder; use Home, Drives, or Windows files to find a copy saved elsewhere.
+1. Choose **File > Back up preset curation**. A dialog says how many favourites, roles, blacklist marks, and tags it will save, and the folder it saves to; nothing changes until you choose **Back up**. Cleave then saves a small file named like `cleave-curation-2026-11-28-140512.json` in the `backups` folder (see [Where your files live](#where-your-files-live)) and tells you what it holds. **Show in folder** opens the folder so you can copy the file.
+2. On the other computer, choose **File > Restore preset curation** and pick the file. The picker starts in the `backups` folder; use Home, Drives, or Windows files to find a copy saved elsewhere.
 3. Cleave shows what the backup holds, how many of its presets are in your presets folder, and how many would change role. Choose:
    - **Merge** to add the backup's favourites, tags, blacklist marks, and roles to yours. A tag in the backup joins your tag of the same name, ignoring capital letters. Where a preset already has a different role, the backup's role wins.
    - **Replace** to clear your current curation first, so you end up with exactly what the backup holds.
@@ -429,7 +429,7 @@ Before either one changes anything, Cleave saves your current curation as anothe
 
 Marks follow each preset's contents, not its file name or folder, so they still apply after a preset is renamed, moved, or copied to another computer, on Windows or Linux. A backup can be restored before you install the presets it names: their marks apply as soon as you add those packs.
 
-Backups hold only your marks, not the presets themselves, so install your preset packs on the new computer as well (**Settings > Download packages**, or copy your `presets` folder across).
+Backups hold only your marks, not the presets themselves, so install your preset packs on the new computer as well (**File > Download packages**, or copy your `presets` folder across).
 
 **From the command line.** On Linux, or from a script, the same backup and restore are available without opening the editor. Close the editor first, since it reads your curation when it starts:
 
@@ -824,9 +824,12 @@ The **Settings** menu holds preferences that apply to every project:
 - **Latency:** audio latency, with the **Measure audio latency** button under it (see [The visuals are out of time with the music](#the-visuals-are-out-of-time-with-the-music)), and tap latency, with the **Calibrate tap timing** button under it (see [Markers and recorded clips land late](#markers-and-recorded-clips-land-late)). After a test, Cleave opens this page on the value it set.
 - **Manage tags:** see your favourite tags with how many presets each holds, and show, rename, delete, or add them. See [Tagging favourites](#tagging-favourites).
 - **Rescan presets:** re-reads the presets folder after you add presets to an existing pack, or while Cleave is open.
+- **Dev Tools:** a crash log for bug reports.
+
+The **File** menu also holds two jobs that save or fetch files for every project:
+
 - **Back up preset curation** and **Restore preset curation:** save your favourites and their tags, blacklist, and roles, and bring them back on this or another computer. See [Backing up your curation](#backing-up-your-curation).
 - **Download packages:** fetches anything you skipped on first launch. Presets downloaded here are indexed immediately, ready to curate.
-- **Dev Tools:** a crash log for bug reports.
 
 The **Project** menu holds settings saved with the current song:
 
@@ -882,7 +885,7 @@ These work anywhere in the editor. Press H to see the keys for whatever you are 
 
 ### No visuals appear
 
-Cleave needs Milkdrop presets to draw anything. Get the starter set from **Settings > Download packages**, or add your own preset folders (see below).
+Cleave needs Milkdrop presets to draw anything. Get the starter set from **File > Download packages**, or add your own preset folders (see below).
 
 ### The visuals are out of time with the music
 
@@ -894,7 +897,7 @@ Markers and clips you tap in during playback can land a little off the beat, fro
 
 ### Stem splitting is very slow
 
-Separation is far faster on an NVIDIA GPU. On Windows, tick the CUDA Toolkit in **Settings > Download packages**.
+Separation is far faster on an NVIDIA GPU. On Windows, tick the CUDA Toolkit in **File > Download packages**.
 
 ### Where your files live
 

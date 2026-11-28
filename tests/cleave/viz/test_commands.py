@@ -57,6 +57,9 @@ _STATIC_IDS = (
     "file.new",
     "file.open",
     "file.save",
+    "file.back_up_curation",
+    "file.restore_curation",
+    "file.download_packages",
     "file.quit",
     "edit.undo",
     "edit.redo",
@@ -79,9 +82,6 @@ _STATIC_IDS = (
     *_SETTINGS_PAGE_IDS,
     "settings.manage_tags",
     "settings.rescan_presets",
-    "settings.back_up_curation",
-    "settings.restore_curation",
-    "settings.download_packages",
     "help.overlay",
     "help.about",
 )
@@ -212,6 +212,11 @@ def test_menus_list_taxonomy_ids_once() -> None:
         "file.open",
         "file.save",
         None,
+        "file.back_up_curation",
+        "file.restore_curation",
+        None,
+        "file.download_packages",
+        None,
         "file.quit",
     ]
     assert _row_ids(menus[1]) == [
@@ -251,9 +256,6 @@ def test_menus_list_taxonomy_ids_once() -> None:
         None,
         "settings.manage_tags",
         "settings.rescan_presets",
-        "settings.back_up_curation",
-        "settings.restore_curation",
-        "settings.download_packages",
         None,
         "page.settings.dev_tools",
     ]
@@ -460,9 +462,9 @@ def test_wired_run_calls_controllers() -> None:
     command_by_id("settings.measure_latency", menus).run(controls)
     command_by_id("settings.calibrate_tap_timing", menus).run(controls)
     command_by_id("settings.rescan_presets", menus).run(controls)
-    command_by_id("settings.back_up_curation", menus).run(controls)
-    command_by_id("settings.restore_curation", menus).run(controls)
-    command_by_id("settings.download_packages", menus).run(controls)
+    command_by_id("file.back_up_curation", menus).run(controls)
+    command_by_id("file.restore_curation", menus).run(controls)
+    command_by_id("file.download_packages", menus).run(controls)
     command_by_id("help.about", menus).run(controls)
     controls.prompt_save_config.assert_called_once_with()
     controls.request_quit.assert_called_once_with()

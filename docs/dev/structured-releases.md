@@ -24,7 +24,7 @@ The Windows product is one `cleave.exe`: CPU stem split in the zip and installer
 
 One setup exe and one zip, both CPU-only. CUDA torch is not baked in, and the installer does not offer it. Cleave does not build or host a CUDA payload.
 
-The editor's Welcome to Cleave step (first launch, and Settings > Download packages) lists a CUDA Toolkit download, off by default, when the NVIDIA driver supports CUDA 13.2 (driver 595 or newer) and it is not downloaded yet. It fetches pinned PyTorch cu132 wheels from download.pytorch.org into local app data, not the install folder, so no admin rights are needed. Skip or failure leaves stem split on CPU. CI does not download the wheels.
+The editor's Welcome to Cleave step (first launch, and File > Download packages) lists a CUDA Toolkit download, off by default, when the NVIDIA driver supports CUDA 13.2 (driver 595 or newer) and it is not downloaded yet. It fetches pinned PyTorch cu132 wheels from download.pytorch.org into local app data, not the install folder, so no admin rights are needed. Skip or failure leaves stem split on CPU. CI does not download the wheels.
 
 ### Phase 4 - Linux and macOS binaries
 
