@@ -417,7 +417,7 @@ The fastest way to get started is to let Cleave build an arrangement. Choose **G
 
 - **mode:** either bring whole layers in and out, or wipe them in and out through the [Pattern Mask](#pattern-mask) (see [Pattern mask mode](#pattern-mask-mode)).
 - **density:** how busy the arrangement is.
-- **conductor:** optionally lets the stems' audio decide which layer leads each phrase and give the layers roles, which set their blend modes. Without it, layers take turns leading and keep their own blend modes.
+- **conductor:** optionally lets the stems' audio decide which layer leads each phrase and give the layers roles, which set their blend modes. Without it, layers take turns leading and keep their own blend modes. The conductor does not choose presets: to have each clip's preset picked by its role, [give your presets roles](#curating-your-presets) and set **preset list** to **new, by clip roles**.
 - **snap** and **cut type:** how clip edges align to the beat grid and how layers transition.
 
 Under **Layer settings**, Generate can also change three settings on every unlocked layer, so its plan shows as planned. In pattern mask mode opacity is not offered, because the mask overrides it. Each starts where it leaves the layer's own setting in place (keep, or use current list):

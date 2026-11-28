@@ -123,7 +123,7 @@ _PRESET_LIST_OPTION_HELP = {
     "cue roles": "a new list with a preset picked for each clip's role.",
 }
 _CONDUCTOR_HELP = (
-    "Uses the stems' audio to decide which layer leads each phrase and to give layers roles, which set their blend modes. In layers mode a chorus or drop opens with an accent on one layer. It needs the song's audio analysis and is skipped without it.",
+    "Uses the stems' audio to decide which layer leads each phrase and to give layers roles, which set their blend modes. In layers mode a chorus or drop opens with an accent on one layer. It needs the song's audio analysis and is skipped without it. It does not choose presets: to pick each clip's preset by its role, give presets roles and set preset list to new, by clip roles.",
 )
 _CONDUCTOR_OPTION_HELP = {
     False: "layers take turns leading, and keep their own blend modes.",
