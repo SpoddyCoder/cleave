@@ -55,6 +55,7 @@ from cleave.viz.row_present_renderers import inspector_field_colors
 from cleave.viz.row_spec import (
     apply_field_double_click,
     format_row_markers,
+    row_marker_tags,
     format_row_position,
     format_row_value,
     row_available,
@@ -213,7 +214,9 @@ def marker_token_spans(markers: str, fitted: str) -> list[tuple[int, int, str]]:
     return spans
 
 
-def _marker_tooltip_at(markers: str, fitted: str, x: float, y: float) -> bool:
+def _marker_tooltip_at(
+    markers: str, fitted: str, x: float, y: float, tags: tuple[str, ...]
+) -> bool:
     """Tooltip for the marker token under the mouse; True when one is under it."""
     height = imgui.get_text_line_height()
     for start, end, token in marker_token_spans(markers, fitted):
@@ -223,7 +226,7 @@ def _marker_tooltip_at(markers: str, fitted: str, x: float, y: float) -> bool:
             imgui.ImVec2(token_x, y), imgui.ImVec2(token_end, y + height)
         ):
             continue
-        text = marker_tooltip(token)
+        text = marker_tooltip(token, tags=tags)
         if text is not None:
             show_tooltip(text)
         return True
@@ -259,6 +262,7 @@ def _draw_two_line_row_text(
     draw_value: bool = True,
     problem: str | None = None,
     cluster_reserve: float = 0.0,
+    marker_tags: tuple[str, ...] = (),
 ) -> bool:
     """Markers after the label, stopping short of the arrows, and the value below.
 
@@ -273,6 +277,7 @@ def _draw_two_line_row_text(
     *lead* is the drag-handle prefix of the label; the value lines up after it.
     *cluster_reserve* is the width of icon buttons drawn just left of the
     value cluster; the problem sign and markers stop short of them.
+    *marker_tags* are the preset's tags, named in the ``[F]`` tooltip.
     """
     origin_x, origin_y = selectable_label_origin()
     lead_x = imgui.calc_text_size(lead).x if lead else 0.0
@@ -313,7 +318,9 @@ def _draw_two_line_row_text(
             fitted,
         )
         if imgui.is_item_hovered() and not on_marker:
-            on_marker = _marker_tooltip_at(markers, fitted, marker_x, origin_y)
+            on_marker = _marker_tooltip_at(
+                markers, fitted, marker_x, origin_y, marker_tags
+            )
     if not draw_value:
         return on_marker
     _draw_path_value(
@@ -883,6 +890,7 @@ class InspectorPanel:
                 draw_value=not crumbs,
                 problem=preset_row_problem(state, desc),
                 cluster_reserve=buttons_reserve,
+                marker_tags=row_marker_tags(state, desc),
             )
             if on_marker:
                 self.values.control_hovered = True

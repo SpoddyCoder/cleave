@@ -1,4 +1,4 @@
-"""Back up and restore preset curation (favourites, blacklist, roles) as JSON.
+"""Back up and restore preset curation (favourites, tags, blacklist, roles) as JSON.
 
 Curation is keyed by each preset's content hash, so a backup works on another
 machine, another OS, and before the matching presets are installed. The file
@@ -16,10 +16,10 @@ from pathlib import Path
 
 from cleave import __version__
 from cleave.cue_roles import CUE_ROLES
-from cleave.preset_library import CurationEntry, PresetLibrary
+from cleave.preset_library import CurationEntry, PresetLibrary, clean_tag_name
 
 FORMAT = "cleave-preset-curation"
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
 BACKUP_SUFFIX = ".json"
 _FILENAME_PREFIX = "cleave-curation"
 _HASH_RE = re.compile(r"^[0-9a-f]{32}$")
@@ -30,34 +30,59 @@ class CurationBackupError(ValueError):
 
 
 @dataclass(frozen=True)
+class Curation:
+    """Curated presets plus every tag name (a tag may have no presets yet)."""
+
+    entries: tuple[CurationEntry, ...]
+    tags: tuple[str, ...] = ()
+
+    @property
+    def empty(self) -> bool:
+        return not self.entries and not self.tags
+
+
+def library_curation(library: PresetLibrary) -> Curation:
+    return Curation(entries=library.curation_entries(), tags=library.tags())
+
+
+@dataclass(frozen=True)
 class CurationCounts:
-    """How many presets a set of entries curates, by kind."""
+    """How many presets a curation covers, by kind, and how many tags it has."""
 
     presets: int
     favourites: int
     roles: int
     blacklisted: int
+    tags: int = 0
 
     def summary(self) -> str:
-        """Such as ``312 presets: 40 favourites, 242 roles, 30 blacklisted``."""
-        return (
+        """Such as ``312 presets: 40 favourites, 242 roles, 30 blacklisted, 4 tags``.
+
+        The tag count is left out when there are no tags.
+        """
+        text = (
             f"{_plural(self.presets, 'preset')}: "
             f"{_plural(self.favourites, 'favourite')}, "
             f"{_plural(self.roles, 'role')}, "
             f"{self.blacklisted:,} blacklisted"
         )
+        if self.tags:
+            text += f", {_plural(self.tags, 'tag')}"
+        return text
 
 
 def _plural(count: int, noun: str) -> str:
     return f"{count:,} {noun}" if count == 1 else f"{count:,} {noun}s"
 
 
-def count_entries(entries: tuple[CurationEntry, ...]) -> CurationCounts:
+def count_curation(curation: Curation) -> CurationCounts:
+    entries = curation.entries
     return CurationCounts(
         presets=len(entries),
         favourites=sum(entry.favourite for entry in entries),
         roles=sum(entry.role is not None for entry in entries),
         blacklisted=sum(entry.blacklisted for entry in entries),
+        tags=len(curation.tags),
     )
 
 
@@ -93,16 +118,17 @@ def _entry_json(entry: CurationEntry) -> dict[str, object]:
         "favourite": entry.favourite,
         "blacklisted": entry.blacklisted,
         "role": entry.role,
+        "tags": list(entry.tags),
     }
 
 
 def write_backup(
-    entries: tuple[CurationEntry, ...],
+    curation: Curation,
     dest: Path,
     *,
     now: datetime | None = None,
 ) -> Path:
-    """Write *entries* to *dest* and return the file written.
+    """Write *curation* to *dest* and return the file written.
 
     *dest* is a ``.json`` file path, or a folder that gets a dated file name.
     An existing file is never overwritten. Raises :class:`CurationBackupError`.
@@ -123,7 +149,8 @@ def write_backup(
         "version": FORMAT_VERSION,
         "created": stamp.isoformat(timespec="seconds"),
         "cleave_version": __version__,
-        "presets": [_entry_json(entry) for entry in entries],
+        "tags": list(curation.tags),
+        "presets": [_entry_json(entry) for entry in curation.entries],
     }
     tmp = path.with_name(f".{path.name}.tmp")
     try:
@@ -140,8 +167,8 @@ def back_up_library(
     library: PresetLibrary, dest: Path, *, now: datetime | None = None
 ) -> tuple[Path, CurationCounts]:
     """Write *library*'s curation to *dest* (see :func:`write_backup`)."""
-    entries = library.curation_entries()
-    return write_backup(entries, dest, now=now), count_entries(entries)
+    curation = library_curation(library)
+    return write_backup(curation, dest, now=now), count_curation(curation)
 
 
 def _parse_entry(index: int, raw: object) -> CurationEntry:
@@ -161,16 +188,36 @@ def _parse_entry(index: int, raw: object) -> CurationEntry:
     role = raw.get("role")
     if role is not None and role not in CUE_ROLES:
         raise CurationBackupError(f"{where} has an unknown role {role!r}")
+    tags = _parse_tags(raw.get("tags", []), where)
+    if tags and not favourite:
+        raise CurationBackupError(f"{where} has tags but is not a favourite")
     return CurationEntry(
         hash=digest,
         name=name or digest,
         favourite=favourite,
         blacklisted=blacklisted,
         role=role,
+        tags=tags,
     )
 
 
-def read_backup(path: Path) -> tuple[CurationEntry, ...]:
+def _parse_tags(raw: object, where: str) -> tuple[str, ...]:
+    """Cleaned tag names, first spelling kept, duplicates (ignoring case) dropped."""
+    if not isinstance(raw, list):
+        raise CurationBackupError(f"{where} has a tag list that is not a list")
+    out: dict[str, str] = {}
+    for item in raw:
+        if not isinstance(item, str):
+            raise CurationBackupError(f"{where} has a tag that is not text")
+        try:
+            name = clean_tag_name(item)
+        except ValueError as exc:
+            raise CurationBackupError(f"{where} has a bad tag {item!r}: {exc}") from exc
+        out.setdefault(name.casefold(), name)
+    return tuple(out.values())
+
+
+def read_backup(path: Path) -> Curation:
     """Read and validate a backup. Raises :class:`CurationBackupError`."""
     try:
         text = path.read_text(encoding="utf-8")
@@ -192,48 +239,56 @@ def read_backup(path: Path) -> tuple[CurationEntry, ...]:
     presets = payload.get("presets")
     if not isinstance(presets, list):
         raise CurationBackupError(f"{path.name} has no preset list")
+    tags = {
+        name.casefold(): name
+        for name in _parse_tags(payload.get("tags", []), "the tag list")
+    }
     by_hash: dict[str, CurationEntry] = {}
     for index, raw in enumerate(presets):
         entry = _parse_entry(index, raw)
         by_hash[entry.hash] = entry
-    return tuple(by_hash.values())
+        for name in entry.tags:
+            tags.setdefault(name.casefold(), name)
+    return Curation(
+        entries=tuple(by_hash.values()),
+        tags=tuple(sorted(tags.values(), key=str.casefold)),
+    )
 
 
-def preview_restore(
-    library: PresetLibrary, entries: tuple[CurationEntry, ...]
-) -> RestorePreview:
+def preview_restore(library: PresetLibrary, curation: Curation) -> RestorePreview:
+    entries = curation.entries
     installed = library.indexed_hashes()
-    current = library.curation_entries()
-    current_roles = {entry.hash: entry.role for entry in current if entry.role}
+    current = library_curation(library)
+    current_roles = {entry.hash: entry.role for entry in current.entries if entry.role}
     return RestorePreview(
-        counts=count_entries(entries),
+        counts=count_curation(curation),
         installed=sum(entry.hash in installed for entry in entries),
         role_changes=sum(
             entry.role is not None
             and current_roles.get(entry.hash) not in (None, entry.role)
             for entry in entries
         ),
-        current=count_entries(current),
+        current=count_curation(current),
     )
 
 
 def restore_into(
     library: PresetLibrary,
-    entries: tuple[CurationEntry, ...],
+    curation: Curation,
     *,
     replace: bool,
     safety_dir: Path,
     now: datetime | None = None,
 ) -> Path | None:
-    """Save the library's current curation to *safety_dir*, then apply *entries*.
+    """Save the library's current curation to *safety_dir*, then apply *curation*.
 
     Returns the safety backup, or None when there was nothing to save. Raises
     :class:`CurationBackupError` when the safety backup fails; nothing is
     applied then.
     """
     safety: Path | None = None
-    current = library.curation_entries()
-    if current:
+    current = library_curation(library)
+    if not current.empty:
         safety = write_backup(current, safety_dir, now=now)
-    library.apply_curation(entries, replace=replace)
+    library.apply_curation(curation.entries, tags=curation.tags, replace=replace)
     return safety

@@ -5,7 +5,7 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from cleave.preset_library import UNFILTERED_CATALOG
+from cleave.preset_library import UNFILTERED_CATALOG, FavouriteTag
 from cleave.viz.context_menu import ContextMenuItem, ContextSubmenu
 from cleave.viz.preset_context_menu import (
     preset_list_page_menu,
@@ -83,6 +83,7 @@ def test_list_item_menu_lists_its_items_in_order() -> None:
             "preset.remove",
             None,
             "preset.favourite",
+            "preset.tags",
             "preset.blacklist",
             "preset.role",
         ]
@@ -118,7 +119,10 @@ def test_list_item_menu_lists_its_items_in_order() -> None:
         ] == ["Ctrl+X", "Ctrl+C", "Ctrl+D"]
         assert items["preset.paste_over"].shortcut == "Ctrl+V"
         assert items["preset.paste_after"].shortcut == "Ctrl+Shift+V"
-        assert [items[i].shortcut for i in ("preset.favourite", "preset.blacklist", "preset.role")] == ["F", "B", "C"]
+        assert [
+            items[i].shortcut
+            for i in ("preset.favourite", "preset.tags", "preset.blacklist", "preset.role")
+        ] == ["F", "T", "B", "C"]
         assert items["preset.favourite"].label == "Favourite"
         assert items["preset.blacklist"].label == "Blacklist…"
         role = items["preset.role"]
@@ -159,6 +163,51 @@ def test_curation_items_undo_themselves() -> None:
         ]
         role.items[4].run()
         assert library.role_of(Path(a)) is None
+
+
+def test_tags_submenu_ticks_tags_and_offers_new_tag() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        controls, (a, _b, _c) = _controls_with_list(tmp)
+        library = controls.library
+        desc = _item_desc(0)
+        assert [item.id for item in _entries(controls, desc)["preset.tags"].items] == [
+            "preset.tags.new",
+        ]
+
+        library.add_tag("lots-of-black")
+        library.add_tag("a-tier")
+        tags = _entries(controls, desc)["preset.tags"]
+        assert [item.label for item in tags.items] == ["a-tier", "lots-of-black", "New tag…"]
+        assert [item.checked for item in tags.items[:2]] == [False, False]
+        assert tags.items[0].hint == "Also favourites the preset"
+
+        tags.items[0].run()
+        assert library.is_favourite(Path(a))
+        assert library.tags_of(Path(a)) == ("a-tier",)
+        tags = _entries(controls, desc)["preset.tags"]
+        assert [item.checked for item in tags.items[:2]] == [True, False]
+        assert tags.items[0].hint is None
+        tags.items[0].run()
+        assert library.tags_of(Path(a)) == ()
+        assert library.is_favourite(Path(a))
+
+        _entries(controls, desc)["preset.tags.new"].run()
+        assert controls.modal_host.active
+
+
+def test_jump_menu_lists_tags_after_favourites() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        controls, _paths = _controls_with_library(tmp)
+        controls.library.add_tag("b-tier")
+        jump = _entries(controls, _dir_desc())["preset.jump"]
+        labels = [item.label for item in jump.items]
+        assert labels[:2] == ["Favourites", "Favourites / b-tier"]
+        jump.items[1].run()
+        playlist = controls.session.layers["layer_1"].playlist
+        assert playlist.collection == FavouriteTag("b-tier")
+        # The view state (and its JSON structure signature) builds on a tag.
+        state = controls.build_view_state(paused=True, position_sec=0.0, fps=60.0)
+        assert state.tracks["layer_1"].preset_dir_crumbs[0].label == "Favourites / b-tier"
 
 
 def test_move_items_reorder_and_stop_at_the_ends() -> None:
@@ -203,7 +252,9 @@ def test_lock_disables_edits_but_not_audition() -> None:
         ):
             assert items[item_id].enabled is False, item_id
             assert items[item_id].hint == "Locked: unlock to change"
-        for item_id in ("preset.favourite", "preset.blacklist", "preset.role"):
+        for item_id in (
+            "preset.favourite", "preset.tags", "preset.blacklist", "preset.role"
+        ):
             assert items[item_id].enabled is False, item_id
             assert items[item_id].hint == "Locked: unlock to change"
 
@@ -363,6 +414,8 @@ def test_current_preset_row_offers_add_and_curate() -> None:
         "preset.paste_preview",
         "preset.add_current",
         "preset.favourite",
+        "preset.tags",
+        "preset.tags.new",
         "preset.blacklist",
         "preset.role",
     ]

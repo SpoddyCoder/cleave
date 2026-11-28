@@ -7,7 +7,7 @@ from pathlib import Path
 import pygame
 import pytest
 
-from cleave.preset_library import UNFILTERED_CATALOG, PresetLibrary
+from cleave.preset_library import UNFILTERED_CATALOG, FavouriteTag, PresetLibrary
 from cleave.viz import preset_browser
 from cleave.viz.preset_browser import (
     BrowserCrumb,
@@ -396,3 +396,48 @@ def test_missing_crumbs_start_at_the_first_folder_not_found(tmp_path: Path) -> N
     assert mark_missing_crumbs(crumbs[:1]) == crumbs[:1]
     # A collection has no folder, so it is never marked.
     assert not mark_missing_crumbs((BrowserCrumb("Favourites"),))[0].missing
+
+
+def test_favourites_lists_tags_then_every_favourite(tree: Path) -> None:
+    library = _indexed(tree)
+    beta = tree / "Pack B" / "beta.milk"
+    loose = tree / "Pack A" / "loose.milk"
+    library.add_tag("dark")
+    library.add_tag("bright")
+    library.set_tagged(beta, "dark", True)
+    library.set_favourite(loose, True)
+    browser = PresetBrowser(preset_root=tree, catalog=library)
+    browser.select_row(
+        next(i for i, row in enumerate(browser.rows) if row.collection == "favourites")
+    )
+    browser.open_selected()
+
+    assert _kinds(browser) == [
+        (BrowserRowKind.PARENT, "..", ""),
+        (BrowserRowKind.COLLECTION, "bright", "0 presets"),
+        (BrowserRowKind.COLLECTION, "dark", "1 preset"),
+        (BrowserRowKind.PRESET, "Pack A/loose.milk", ""),
+        (BrowserRowKind.PRESET, "Pack B/beta.milk", ""),
+    ]
+
+    browser.select_row(2)
+    browser.open_selected()
+    assert browser.collection == FavouriteTag("dark")
+    assert [row.label for row in browser.rows] == ["..", "Pack B/beta.milk"]
+    assert [crumb.label for crumb in browser.crumbs()] == ["presets", "Favourites", "dark"]
+
+    browser.go_parent()
+    assert browser.collection == "favourites"
+    assert browser.selected_row.collection == FavouriteTag("dark")
+
+    browser.select_row(1)
+    browser.open_selected()
+    assert [row.label for row in browser.rows] == ["..", "No presets with this tag"]
+    browser.goto_crumb(1)
+    assert browser.collection == "favourites"
+    assert browser.selected_row.collection == FavouriteTag("bright")
+    browser.select_row(2)
+    browser.open_selected()
+    browser.goto_crumb(0)
+    assert browser.at_top
+    assert browser.selected_row.collection == "favourites"

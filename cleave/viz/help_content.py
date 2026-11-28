@@ -274,6 +274,7 @@ _PRESET_CURATION_SHORTCUTS = (
     ("F", "favourite / unfavourite preset"),
     ("B", "blacklist / unblacklist preset"),
     ("C", "set preset role (bed/pulse/lead/accent/none)"),
+    ("T", "tag preset (tagging favourites it)"),
 )
 
 _PRESET_BROWSE_ENTRIES: tuple[HelpEntry, ...] = (

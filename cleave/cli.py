@@ -410,7 +410,7 @@ def _backup_presets(args: argparse.Namespace) -> None:
     dest = Path(args.project_dir) if args.project_dir is not None else backups_dir()
     library = _open_library()
     try:
-        if not library.curation_entries():
+        if not library.curation_entries() and not library.tags():
             _exit_error("error: no preset is curated yet; nothing to back up")
         path, counts = back_up_library(library, dest)
     except CurationBackupError as e:
@@ -432,17 +432,17 @@ def _restore_presets(args: argparse.Namespace) -> None:
     if args.as_slug is not None:
         _exit_error("error: --as applies to project archives, not preset backups")
     try:
-        entries = read_backup(Path(args.archive))
+        curation = read_backup(Path(args.archive))
     except CurationBackupError as e:
         _exit_error(f"error: {e}")
-    if not entries:
+    if curation.empty:
         _exit_error("error: this backup has no curated presets in it")
     library = _open_library()
     try:
         indexed = library.load_index(default_preset_root())
-        preview = preview_restore(library, entries)
+        preview = preview_restore(library, curation)
         safety = restore_into(
-            library, entries, replace=args.replace, safety_dir=backups_dir()
+            library, curation, replace=args.replace, safety_dir=backups_dir()
         )
     except (CurationBackupError, OSError, sqlite3.Error) as e:
         _exit_error(f"error: {e}")

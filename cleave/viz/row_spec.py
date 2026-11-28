@@ -104,6 +104,8 @@ class RowSpec:
     # the markers after the label. format_value is the second line.
     format_position: Callable[[TuningViewState, RowDescriptor], str] | None = None
     format_markers: Callable[[TuningViewState, RowDescriptor], str] | None = None
+    # The preset's tags, named in the ``[F]`` marker's tooltip.
+    marker_tags: Callable[[TuningViewState, RowDescriptor], tuple[str, ...]] | None = None
     nav_buttons: tuple[RowNavButton, ...] = ()
     # A second dropdown just after ``choice``, on a list item. It needs ``jump``.
     second_choice: RowChoice | None = None
@@ -375,6 +377,13 @@ def format_row_markers(state: TuningViewState, desc: RowDescriptor) -> str:
     if spec.format_markers is None:
         return ""
     return spec.format_markers(state, desc)
+
+
+def row_marker_tags(state: TuningViewState, desc: RowDescriptor) -> tuple[str, ...]:
+    spec = row_spec(desc.kind)
+    if spec.marker_tags is None:
+        return ()
+    return spec.marker_tags(state, desc)
 
 
 def row_dynamic_panel_label(desc: RowDescriptor) -> str:

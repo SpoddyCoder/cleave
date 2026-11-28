@@ -1,12 +1,12 @@
 """Right-click menu for a preset row in the inspector or the preset browser.
 
 The directory row offers Browse presets and a Jump to directory submenu of the
-library collections (favourites, roles, blacklisted). A preset list entry
+library collections (favourites and their tags, roles, blacklisted). A preset list entry
 offers Audition; Cut, Copy, a Paste submenu (over, before, after), and
 Duplicate; Replace with (the browser), a Current preset submenu (replace this
 entry, insert after it, add to the end of the list); Populate and Clear list
-(after a confirmation); Move up and down, and Remove; then Favourite,
-Blacklist, and a Role submenu. The layer's current preset row offers Browse
+(after a confirmation); Move up and down, and Remove; then Favourite, a Tags
+submenu, Blacklist, and a Role submenu. The layer's current preset row offers Browse
 presets, Copy and Paste, Add to preset list, and the same curation items. A
 preset in the browser offers Copy and the curation items. A right-click on the
 Preset List page away from any entry (the only way in while the list is
@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from cleave.cue_roles import CUE_ROLES, CueRole
-from cleave.preset_library import COLLECTION_LABEL
+from cleave.preset_library import PresetCollection, collection_label
 
 from cleave.viz.commands import COPY, CUT, DUPLICATE, PASTE, PASTE_AFTER
 from cleave.viz.context_menu import (
@@ -32,6 +32,7 @@ from cleave.viz.context_menu import (
     ContextSubmenu,
     join_groups,
 )
+from cleave.viz.preset_curation_controls import NEW_TAG_LABEL
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.clip_presets import clip_preset_list, clip_preset_lock_reason
 from cleave.viz.row_spec import section_lock_blocks_mutation
@@ -170,20 +171,29 @@ def _jump_items(
         return ()
     locked = section_lock_blocks_mutation(controls.session, desc)
     mutations = controls.layer_mutations
+    targets: list[PresetCollection] = []
+    for collection in collections:
+        targets.append(collection)
+        if collection == "favourites":
+            targets.extend(playlist.catalog.tag_collections())
     return (
         ContextSubmenu(
             id="preset.jump",
             label="Jump to directory",
             items=tuple(
                 ContextMenuItem(
-                    id=f"preset.jump.{collection}",
-                    label=COLLECTION_LABEL[collection],
+                    id=(
+                        f"preset.jump.{collection}"
+                        if isinstance(collection, str)
+                        else f"preset.jump.tag.{collection.name}"
+                    ),
+                    label=collection_label(collection, full=True),
                     run=lambda collection=collection: mutations.jump_to_collection(
                         slot, collection
                     ),
                     checked=playlist.collection == collection,
                 )
-                for collection in collections
+                for collection in targets
             ),
             enabled=not locked,
             hint=_LOCK_HINT if locked else None,
@@ -458,7 +468,7 @@ def _fill_hint(controls: TuningControls, desc: RowDescriptor) -> str | None:
 def _curate_items(
     controls: TuningControls, desc: RowDescriptor, slot: str
 ) -> tuple[ContextMenuEntry, ...]:
-    """Favourite, Blacklist, and Role for the row's preset file."""
+    """Favourite, Tags, Blacklist, and Role for the row's preset file."""
     src = controls.preset_list.resolve_file_path(slot, desc.kind, desc)
     return _curate_path_items(controls, desc, slot, src)
 
@@ -466,7 +476,7 @@ def _curate_items(
 def _curate_path_items(
     controls: TuningControls, desc: RowDescriptor, slot: str, src: Path | None
 ) -> tuple[ContextMenuEntry, ...]:
-    """Favourite, Blacklist, and Role for *src*; each one undoes itself."""
+    """Favourite, Tags, Blacklist, and Role for *src*; each one undoes itself."""
     curation = controls.preset_curation
     if section_lock_blocks_mutation(controls.session, desc):
         hint: str | None = _LOCK_HINT
@@ -478,6 +488,7 @@ def _curate_path_items(
     favourited = ready and curation.is_favourite(src)
     blacklisted = ready and curation.is_blacklisted(src)
     role = curation.role_of(src) if ready else None
+    tags_on = curation.tags_of(src) if ready else ()
 
     def act(run_with_src: Callable[[Path], None]) -> None:
         if src is not None:
@@ -491,6 +502,32 @@ def _curate_path_items(
             run=lambda: act(curation.toggle_favourite),
             enabled=ready,
             shortcut="F",
+            hint=hint,
+        ),
+        ContextSubmenu(
+            id="preset.tags",
+            label="Tags",
+            items=(
+                *(
+                    ContextMenuItem(
+                        id=f"preset.tags.{tag}",
+                        label=tag,
+                        run=lambda tag=tag: act(
+                            lambda path: curation.toggle_tag(path, tag)
+                        ),
+                        checked=tag in tags_on,
+                        hint=None if favourited else "Also favourites the preset",
+                    )
+                    for tag in curation.tags()
+                ),
+                ContextMenuItem(
+                    id="preset.tags.new",
+                    label=NEW_TAG_LABEL,
+                    run=lambda: act(lambda path: curation.prompt_new_tag(slot, path)),
+                ),
+            ),
+            enabled=ready,
+            shortcut="T",
             hint=hint,
         ),
         ContextMenuItem(

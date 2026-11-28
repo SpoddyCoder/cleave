@@ -10,10 +10,11 @@ from typing import TYPE_CHECKING
 from cleave.config import CleaveConfig
 from cleave.paths import config_anchor_path, config_relative_path
 from cleave.preset_library import (
-    COLLECTION_LABEL,
     UNFILTERED_CATALOG,
+    FavouriteTag,
     PresetCatalog,
     PresetCollection,
+    collection_label,
 )
 
 if TYPE_CHECKING:
@@ -271,6 +272,14 @@ class PresetPlaylist:
             )
         return self._empty_label
 
+    def _collection_siblings(
+        self, preset_root: Path
+    ) -> tuple[BrowseEntry, ...]:
+        """Left/Right peers of the collection: tags inside Favourites, else the top level."""
+        if isinstance(self.collection, FavouriteTag):
+            return self.catalog.tag_collections()
+        return top_level_entries(preset_root, self.catalog)
+
     def _at_top_level(self, preset_root: Path) -> bool:
         """True when Left/Right steps through collections and top-level folders."""
         if self.collection is not None:
@@ -288,13 +297,17 @@ class PresetPlaylist:
         browse_floor: Path | None = None,
     ) -> DirectoryDisplay:
         if self.collection is not None:
-            entries = top_level_entries(preset_root, self.catalog)
-            position = entries.index(self.collection) + 1
+            entries = self._collection_siblings(preset_root)
+            try:
+                position = entries.index(self.collection) + 1
+            except ValueError:
+                position = 1
             return DirectoryDisplay(
-                COLLECTION_LABEL[self.collection],
-                f"{position}/{len(entries)}",
-                False,
-                False,
+                collection_label(self.collection, full=True),
+                f"{position}/{max(len(entries), 1)}",
+                isinstance(self.collection, FavouriteTag),
+                self.collection == "favourites"
+                and bool(self.catalog.tag_collections()),
             )
         rel = config_relative_path(self.current_dir, preset_root).rstrip("/") + "/"
         can_go_up, can_go_down = directory_tree_moves(
@@ -427,11 +440,12 @@ class PresetPlaylist:
         return self.current
 
     def step_sibling(self, delta: int = 1, *, preset_root: Path) -> bool:
-        siblings: tuple[BrowseEntry, ...] = (
-            top_level_entries(preset_root, self.catalog)
-            if self._at_top_level(preset_root)
-            else list_browse_siblings(self.current_dir, preset_root)
-        )
+        if self.collection is not None:
+            siblings: tuple[BrowseEntry, ...] = self._collection_siblings(preset_root)
+        elif self._at_top_level(preset_root):
+            siblings = top_level_entries(preset_root, self.catalog)
+        else:
+            siblings = list_browse_siblings(self.current_dir, preset_root)
         if not siblings:
             return False
         try:
@@ -454,6 +468,10 @@ class PresetPlaylist:
         return True
 
     def enter_child(self, preset_root: Path) -> bool:
+        """Open the first subfolder, or the first tag from Favourites."""
+        if self.collection == "favourites":
+            tags = self.catalog.tag_collections()
+            return bool(tags) and self.enter_collection(tags[0])
         if self.collection is not None:
             return False
         children = list_navigable_dirs(self.current_dir)
@@ -468,6 +486,8 @@ class PresetPlaylist:
         *,
         browse_floor: Path | None = None,
     ) -> bool:
+        if isinstance(self.collection, FavouriteTag):
+            return self.enter_collection("favourites")
         if self.collection is not None:
             return False
         if not _can_go_parent(

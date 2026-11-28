@@ -234,3 +234,70 @@ def test_clearing_one_flag_keeps_the_other(tmp_path: Path) -> None:
             assert (library.is_favourite(a), library.is_blacklisted(a)) == (True, False)
         assert layer.playlist.current == a.resolve(), collection
         assert library.is_favourite(b) and library.is_blacklisted(b)
+
+
+def test_tag_picker_toggles_a_tag_and_favourites_the_preset(tmp_path: Path) -> None:
+    src = tmp_path / "pack" / "demo.milk"
+    _write(src, "milk")
+    notes: list[str] = []
+    controller, _session, modal, library = _make_controller(
+        tmp_path, notifications=notes
+    )
+    library.add_tag("a-tier")
+    library.add_tag("dark")
+
+    controller.prompt_tag("layer_1", src)
+    view = modal.view_state()
+    assert view is not None
+    assert view.options == ("a-tier", "dark", "New tag…", "Cancel")
+    assert view.labeled_lines == (ModalLabeledLine("tags", "none"),)
+    modal.handle_keydown(keydown(pygame.K_RETURN))
+    assert library.is_favourite(src)
+    assert library.tags_of(src) == ("a-tier",)
+    assert notes[-1] == "Favourited and tagged a-tier"
+
+    controller.prompt_tag("layer_1", src)
+    view = modal.view_state()
+    assert view is not None
+    assert view.options == ("Remove a-tier", "dark", "New tag…", "Cancel")
+    assert view.labeled_lines == (ModalLabeledLine("tags", "a-tier"),)
+    modal.handle_keydown(keydown(pygame.K_RIGHT))
+    modal.handle_keydown(keydown(pygame.K_RETURN))
+    assert library.tags_of(src) == ("a-tier", "dark")
+    assert notes[-1] == "Tagged dark"
+
+    controller.toggle_tag(src, "a-tier")
+    assert notes[-1] == "Removed tag a-tier"
+    controller.toggle_favourite(src)
+    assert notes[-1] == "Removed from favourites and 1 tag"
+    assert library.tags_of(src) == ()
+
+
+def test_new_tag_rejects_a_taken_name_then_tags_the_preset(tmp_path: Path) -> None:
+    src = tmp_path / "pack" / "demo.milk"
+    _write(src, "milk")
+    notes: list[str] = []
+    controller, _session, modal, library = _make_controller(
+        tmp_path, notifications=notes
+    )
+    library.add_tag("Dark")
+
+    controller.prompt_tag("layer_1", src)
+    modal.handle_keydown(keydown(pygame.K_RIGHT))
+    modal.handle_keydown(keydown(pygame.K_RETURN))
+    view = modal.view_state()
+    assert view is not None and view.kind == ModalKind.TEXT
+
+    modal.handle_text_input("dark")
+    modal.handle_keydown(keydown(pygame.K_RETURN))
+    view = modal.view_state()
+    assert view is not None and view.error == "There is already a tag named dark"
+
+    modal.handle_text_input(" wash")
+    modal.handle_keydown(keydown(pygame.K_RETURN))
+    # Enter leaves the field for the buttons; Enter again confirms.
+    modal.handle_keydown(keydown(pygame.K_RETURN))
+    assert modal.view_state() is None
+    assert library.tags() == ("Dark", "dark wash")
+    assert library.tags_of(src) == ("dark wash",)
+    assert notes[-1] == "Favourited and tagged dark wash"

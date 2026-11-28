@@ -7,7 +7,7 @@
 
 # Cleave - stem-driven visualizer for making music videos
 
-[![Version](https://img.shields.io/badge/version-v0.4.0--96%20%28dev%20build%29-orange)](https://github.com/SpoddyCoder/cleave/compare/v0.4.0...0.5.0) [![Tests](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml/badge.svg)](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml)
+[![Version](https://img.shields.io/badge/version-v0.4.0--97%20%28dev%20build%29-orange)](https://github.com/SpoddyCoder/cleave/compare/v0.4.0...0.5.0) [![Tests](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml/badge.svg)](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml)
 
 Layer together drums, bass, vocals and other stems (plus guitar and piano, if you like) - each driving Milkdrop presets to create your own unique visual masterpieces.
 
@@ -49,7 +49,7 @@ Available commands:
 * `play` - open a song in the editor. Accepts a source audio file or project slug/path. Omit the target to browse from the editor window. `--stems 4` or `--stems 6` picks the stem count without asking.
 * `separate` - run stem separation without opening the editor. Add `--stems 6` for guitar and piano stems (a different count splits an existing project again), `-hq` for the slower, higher quality 4-stem model, or `--force` to split again.
 * `render` - render a project to video. Accepts a project slug or path.
-* `backup` - archive a project directory to a `.cleave-tar.gz` file (projects are command line only for now). With `--presets`, it saves your preset curation (favourites, blacklist, and roles) to a `.json` file instead, the same as Settings > Back up preset curation in the editor. It goes in the `backups` folder unless you name a file or folder.
+* `backup` - archive a project directory to a `.cleave-tar.gz` file (projects are command line only for now). With `--presets`, it saves your preset curation (favourites and their tags, blacklist, and roles) to a `.json` file instead, the same as Settings > Back up preset curation in the editor. It goes in the `backups` folder unless you name a file or folder.
 * `restore` - unpack a `.cleave-tar.gz` archive into `projects/<slug>/`. Given a preset curation `.json` backup, it merges that into your curation instead, the same as Settings > Restore preset curation; add `--replace` to clear your current curation first. Your current curation is saved to the `backups` folder before anything changes.
 
 Moving your preset curation to a fresh install:
@@ -159,7 +159,7 @@ Cleave creates a project directory for each song, storing stems, configs and ren
 
 **Linux**: `~/.local/share/cleave/` (projects, presets, textures, themes, backups). Settings: `~/.config/cleave/config.yaml`.
 
-Preset curation (favourites, blacklist, roles) lives in `cleave.db` in the same folder. Settings > Back up preset curation, or `backup --presets`, saves it to `backups/` so it can move to another install.
+Preset curation (favourites and their tags, blacklist, roles) lives in `cleave.db` in the same folder. Settings > Back up preset curation, or `backup --presets`, saves it to `backups/` so it can move to another install.
 
 Override the data root with `CLEAVE_DATA` on any OS.
 

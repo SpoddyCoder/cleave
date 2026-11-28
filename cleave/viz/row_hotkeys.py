@@ -285,7 +285,7 @@ def _hotkey_for_descriptor(
             return True
         return False
 
-    if event.key in (pygame.K_f, pygame.K_b, pygame.K_c):
+    if event.key in (pygame.K_f, pygame.K_b, pygame.K_c, pygame.K_t):
         slot = desc.slot
         if slot is not None and kind in PRESET_FILE_ROW_KINDS:
             if section_lock_blocks_mutation(controls.session, desc):
@@ -297,6 +297,8 @@ def _hotkey_for_descriptor(
                 controls.preset_curation.toggle_favourite(src)
             elif event.key == pygame.K_b:
                 controls.preset_curation.toggle_blacklist(slot, src)
+            elif event.key == pygame.K_t:
+                controls.preset_curation.prompt_tag(slot, src)
             else:
                 controls.preset_curation.prompt_cast(slot, src)
             return True

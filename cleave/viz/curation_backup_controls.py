@@ -1,7 +1,7 @@
 """Settings > Back up / Restore preset curation.
 
 Back up says what it will save and where, then on confirm writes the
-library's favourites, blacklist, and roles to the backups folder (no file
+library's favourites, tags, blacklist, and roles to the backups folder (no file
 dialog) and says what it wrote. Restore picks a backup in the
 file picker, previews it, and applies it as Merge or Replace on the live
 library, after saving the current curation as a backup of its own.
@@ -13,21 +13,23 @@ from collections.abc import Callable
 from pathlib import Path
 
 from cleave.preset_curation import (
+    Curation,
     CurationBackupError,
     RestorePreview,
     back_up_library,
-    count_entries,
+    count_curation,
+    library_curation,
     preview_restore,
     read_backup,
     restore_into,
 )
-from cleave.preset_library import CurationEntry, PresetLibrary
+from cleave.preset_library import PresetLibrary
 from cleave.viz.modal import ButtonRole, ModalHost, ModalLabeledLine, ModalOption
 
 BACK_UP_TITLE = "Back up preset curation"
 BACK_UP_LABEL = "Back up"
 BACK_UP_BODY = (
-    "Saves your favourites, blacklist marks, and roles to a new file in the "
+    "Saves your favourites, tags, blacklist marks, and roles to a new file in the "
     "backups folder. Nothing in your presets or curation changes. Copy the "
     "file to another computer and use Restore preset curation there to bring "
     "them back."
@@ -55,8 +57,9 @@ def restore_body(preview: RestorePreview) -> str:
         else "You have no curation yet, so Merge and Replace do the same."
     )
     return (
-        "Merge adds this backup's favourites, blacklist marks, and roles to "
-        "yours; where a preset already has a different role, the backup's wins. "
+        "Merge adds this backup's favourites, tags, blacklist marks, and roles "
+        "to yours; a tag joins one of yours with the same name; where a preset "
+        "already has a different role, the backup's wins. "
         f"{replace} Your current curation is saved as a backup before anything "
         "changes."
     )
@@ -118,8 +121,8 @@ class CurationBackupController:
         """Say what a backup will hold and where it goes; Back up writes it."""
         if self._modal.active:
             return
-        entries = self._library.curation_entries()
-        if not entries:
+        curation = library_curation(self._library)
+        if curation.empty:
             self._modal.prompt_notice(NOTHING_TITLE, body=NOTHING_BODY)
             return
         self._modal.prompt_confirm(
@@ -128,7 +131,7 @@ class CurationBackupController:
             self._back_up,
             body=BACK_UP_BODY,
             labeled_lines=(
-                ModalLabeledLine("Contains", count_entries(entries).summary()),
+                ModalLabeledLine("Contains", count_curation(curation).summary()),
                 ModalLabeledLine("Folder", str(self._backups_dir())),
             ),
         )
@@ -159,24 +162,24 @@ class CurationBackupController:
     def restore_from(self, path: Path) -> None:
         """Preview *path* and ask Merge, Replace, or Cancel."""
         try:
-            entries = read_backup(path)
+            curation = read_backup(path)
         except CurationBackupError as exc:
             self._modal.prompt_notice(RESTORE_FAILED_TITLE, body=str(exc))
             return
-        if not entries:
+        if curation.empty:
             self._modal.prompt_notice(RESTORE_TITLE, body=EMPTY_BACKUP_BODY)
             return
-        preview = preview_restore(self._library, entries)
+        preview = preview_restore(self._library, curation)
         self._modal.prompt_buttons(
             RESTORE_TITLE,
             [
                 ModalOption(
                     MERGE_LABEL,
-                    lambda: self._apply(entries, preview, replace=False),
+                    lambda: self._apply(curation, preview, replace=False),
                     ButtonRole.PRIMARY,
                 ),
                 ModalOption(
-                    REPLACE_LABEL, lambda: self._apply(entries, preview, replace=True)
+                    REPLACE_LABEL, lambda: self._apply(curation, preview, replace=True)
                 ),
                 ModalOption("Cancel", lambda: None),
             ],
@@ -186,7 +189,7 @@ class CurationBackupController:
 
     def _apply(
         self,
-        entries: tuple[CurationEntry, ...],
+        curation: Curation,
         preview: RestorePreview,
         *,
         replace: bool,
@@ -194,7 +197,7 @@ class CurationBackupController:
         try:
             safety = restore_into(
                 self._library,
-                entries,
+                curation,
                 replace=replace,
                 safety_dir=self._backups_dir(),
             )

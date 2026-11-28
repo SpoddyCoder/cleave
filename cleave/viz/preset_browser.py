@@ -26,7 +26,13 @@ from dataclasses import dataclass, field, replace
 from enum import Enum
 from pathlib import Path
 
-from cleave.preset_library import COLLECTION_LABEL, PresetCatalog, PresetCollection
+from cleave.preset_library import (
+    FavouriteTag,
+    PresetCatalog,
+    PresetCollection,
+    collection_key,
+    collection_label,
+)
 from cleave.preset_playlist import list_navigable_dirs, milk_files_in_dir
 from cleave.viz.text_edit import (
     apply_text_edit_key,
@@ -107,10 +113,11 @@ class BrowserRow:
 
 @dataclass(frozen=True)
 class BrowserCrumb:
-    """One breadcrumb segment: a folder, or the collection being shown."""
+    """One breadcrumb segment: a folder, or a collection (Favourites, a tag)."""
 
     label: str
     path: Path | None = None
+    collection: PresetCollection | None = None
     # A folder that is not found, drawn in red.
     missing: bool = False
 
@@ -263,21 +270,35 @@ class PresetLister:
         if not at_top:
             rows.append(BrowserRow(BrowserRowKind.PARENT, PARENT_LABEL))
         if collection is not None:
+            if collection == "favourites":
+                for tag in self.catalog.tag_collections():
+                    count = len(self.catalog.collection_paths(tag))
+                    rows.append(
+                        BrowserRow(
+                            BrowserRowKind.COLLECTION,
+                            collection_label(tag),
+                            detail=preset_count_text(count),
+                            collection=tag,
+                        )
+                    )
             presets = tuple(
                 self._preset_row(path, _relative_label(path, self.preset_root))
                 for path in self.catalog.collection_paths(collection)
             )
-            if not presets:
-                rows.append(
-                    BrowserRow(BrowserRowKind.NOTE, "No presets in this collection")
+            if not presets and len(rows) == 1:
+                note = (
+                    "No presets with this tag"
+                    if isinstance(collection, FavouriteTag)
+                    else "No presets in this collection"
                 )
+                rows.append(BrowserRow(BrowserRowKind.NOTE, note))
             return (*rows, *presets)
         if at_top:
             for entry in self.catalog.collections():
                 rows.append(
                     BrowserRow(
                         BrowserRowKind.COLLECTION,
-                        COLLECTION_LABEL[entry],
+                        collection_label(entry),
                         collection=entry,
                     )
                 )
@@ -492,7 +513,13 @@ class PresetBrowser:
         assert self.folder is not None
         out = [BrowserCrumb(ROOT_LABEL, self.preset_root)]
         if self.collection is not None:
-            out.append(BrowserCrumb(COLLECTION_LABEL[self.collection]))
+            if isinstance(self.collection, FavouriteTag):
+                out.append(
+                    BrowserCrumb(collection_label("favourites"), collection="favourites")
+                )
+            out.append(
+                BrowserCrumb(collection_label(self.collection), collection=self.collection)
+            )
             return tuple(out)
         path = self.preset_root
         for part in self.folder.relative_to(self.preset_root).parts:
@@ -502,7 +529,7 @@ class PresetBrowser:
 
     def view_state(self) -> BrowserViewState:
         location = (
-            f"collection:{self.collection}"
+            f"collection:{collection_key(self.collection)}"
             if self.collection is not None
             else str(self.folder)
         )
@@ -604,8 +631,11 @@ class PresetBrowser:
         return BrowserOutcome.NONE
 
     def go_parent(self) -> None:
-        """Leave a collection for the top level, or go up one folder."""
+        """Leave a tag for Favourites, a collection for the top level, or go up."""
         assert self.folder is not None
+        if isinstance(self.collection, FavouriteTag):
+            self._show(collection="favourites", keep_collection=self.collection)
+            return
         if self.collection is not None:
             self._show(folder=self.preset_root, keep_collection=self.collection)
             return
@@ -618,10 +648,15 @@ class PresetBrowser:
         crumbs = self.crumbs()
         if not 0 <= index < len(crumbs) - 1:
             return
-        target = crumbs[index].path
-        if target is None:
+        crumb, below = crumbs[index], crumbs[index + 1]
+        if crumb.collection is not None:
+            self._show(collection=crumb.collection, keep_collection=below.collection)
             return
-        self._show(folder=target, keep=crumbs[index + 1].path)
+        if crumb.path is None:
+            return
+        self._show(
+            folder=crumb.path, keep=below.path, keep_collection=below.collection
+        )
 
     def _show(
         self,

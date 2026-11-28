@@ -10,6 +10,8 @@ import pytest
 
 from cleave import preset_library
 from cleave.preset_library import (
+    CurationEntry,
+    FavouriteTag,
     PresetLibrary,
     PresetLibraryError,
     marker_tooltip,
@@ -364,3 +366,113 @@ def test_preset_counts_by_dir_counts_below_and_drop_blacklisted(tmp_path: Path) 
     counts = library.preset_counts_by_dir()
     assert counts[resolved / "pack"] == 2
     assert counts[resolved / "pack" / "deep"] == 1
+
+
+def test_tags_favourite_the_preset_and_go_when_it_is_unfavourited(tmp_path: Path) -> None:
+    root = tmp_path / "presets"
+    a = _write(root / "pack" / "a.milk", "a")
+    b = _write(root / "pack" / "b.milk", "b")
+    db = tmp_path / "cleave.db"
+    library = PresetLibrary.open(db)
+    library.index(root)
+
+    assert library.add_tag("  lots  of black ") == "lots of black"
+    assert library.add_tag("A-tier") == "A-tier"
+    assert library.tags() == ("A-tier", "lots of black")
+    for bad, message in (
+        ("", "Enter a name"),
+        ("a-TIER", "already a tag named a-TIER"),
+        ("x/y", "cannot contain"),
+        ("x" * 41, "at most 40"),
+    ):
+        with pytest.raises(ValueError, match=message):
+            library.add_tag(bad)
+
+    library.set_tagged(a, "A-tier", True)
+    library.set_tagged(a, "lots of black", True)
+    library.set_tagged(b, "lots of black", True)
+    assert library.is_favourite(a) and library.is_favourite(b)
+    assert library.tags_of(a) == ("A-tier", "lots of black")
+    assert library.collection_paths(FavouriteTag("lots of black")) == (
+        a.resolve(),
+        b.resolve(),
+    )
+    assert library.tag_collections() == (
+        FavouriteTag("A-tier"),
+        FavouriteTag("lots of black"),
+    )
+    entry = next(e for e in library.curation_entries() if e.hash == preset_hash(a))
+    assert entry.tags == ("A-tier", "lots of black")
+    library.close()
+
+    library = PresetLibrary.open(db)
+    library.index(root)
+    assert library.tags_of(a) == ("A-tier", "lots of black")
+    library.set_tagged(b, "lots of black", False)
+    assert library.is_favourite(b) and library.tags_of(b) == ()
+    assert library.set_favourite(a, False) == 2
+    assert library.tags_of(a) == ()
+    assert library.tags() == ("A-tier", "lots of black")
+    assert library.collection_paths(FavouriteTag("A-tier")) == ()
+    library.close()
+
+
+def test_apply_curation_merges_tags_by_name_and_replace_clears_them(tmp_path: Path) -> None:
+    root = tmp_path / "presets"
+    a = _write(root / "pack" / "a.milk", "a")
+    b = _write(root / "pack" / "b.milk", "b")
+    library = PresetLibrary.in_memory()
+    library.index(root)
+    library.add_tag("A-tier")
+    library.set_tagged(a, "A-tier", True)
+
+    library.apply_curation(
+        (CurationEntry(hash=preset_hash(b), name="b.milk", favourite=True, tags=("a-tier",)),),
+        tags=("a-tier", "empty"),
+        replace=False,
+    )
+    assert library.tags() == ("A-tier", "empty")
+    assert library.collection_paths(FavouriteTag("A-tier")) == (a.resolve(), b.resolve())
+
+    library.apply_curation(
+        (CurationEntry(hash=preset_hash(b), name="b.milk", favourite=True),),
+        replace=True,
+    )
+    assert library.tags() == ()
+    assert library.tags_of(b) == ()
+    assert not library.is_favourite(a)
+
+
+def test_tag_playlist_steps_through_tags_and_goes_up_to_favourites(tmp_path: Path) -> None:
+    root = tmp_path / "presets"
+    a = _write(root / "pack" / "a.milk", "a")
+    b = _write(root / "pack" / "b.milk", "b")
+    library = PresetLibrary.in_memory()
+    library.index(root)
+    for tag, path in (("a-tier", a), ("b-tier", b)):
+        library.add_tag(tag)
+        library.set_tagged(path, tag, True)
+    playlist = playlist_at_collection("favourites", current_dir=root / "pack", catalog=library)
+
+    display = playlist.directory_display(root)
+    assert (display.can_go_up, display.can_go_down) == (False, True)
+    assert playlist.enter_child(root)
+    assert playlist.collection == FavouriteTag("a-tier")
+    assert playlist.paths == (a.resolve(),)
+    display = playlist.directory_display(root)
+    assert (display.path, display.position) == ("Favourites / a-tier", "1/2")
+    assert (display.can_go_up, display.can_go_down) == (True, False)
+
+    assert playlist.step_sibling(1, preset_root=root)
+    assert playlist.collection == FavouriteTag("b-tier")
+    assert playlist.step_sibling(1, preset_root=root)
+    assert playlist.collection == FavouriteTag("a-tier")
+
+    assert playlist.go_parent(root)
+    assert playlist.collection == "favourites"
+    assert playlist.config_preset_path(root) == "pack/a.milk"
+
+
+def test_marker_tooltip_lists_tags_on_the_favourite_marker() -> None:
+    assert marker_tooltip("[F]", tags=("a-tier", "dark")) == "Favourite. Tags: a-tier, dark"
+    assert marker_tooltip("[B]", tags=("a-tier",)) == "Blacklisted"

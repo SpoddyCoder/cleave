@@ -241,7 +241,7 @@ On a layer's **Milkdrop Preset** page:
 
 Many preset packs keep their presets in subfolders. When the folder you are in has none of its own, the **preset** row says how many subfolders are below and how many presets they hold: press Enter (or the down arrow) on **preset directory** to open the first one. Hover over either row, or the arrows, for a reminder of what they do.
 
-At the top level of the preset folders, Left/Right also reaches your collections: **Favourites**, one per **Role**, and **Blacklisted**. To go straight to one, right-click the preset directory row and choose **Jump to directory**. See [Curating your presets](#curating-your-presets).
+At the top level of the preset folders, Left/Right also reaches your collections: **Favourites**, one per **Role**, and **Blacklisted**. Your favourite tags sit inside Favourites: the down arrow goes from Favourites into its first tag, Left/Right then moves between tags, and the up arrow goes back to Favourites. To go straight to a collection or a tag, right-click the preset directory row and choose **Jump to directory**. See [Curating your presets](#curating-your-presets).
 
 ### Browsing presets
 
@@ -249,7 +249,7 @@ The preset browser shows every folder and preset at once, so you can see what a 
 
 ![The preset browser showing a folder's subfolders](images/preset-browser.png)
 
-The list starts in the layer's folder, with the current preset selected. It shows `..` (the folder above), then the subfolders with how many presets each holds, then the presets with their curation tags. At the top level your collections (Favourites, Roles, Blacklisted) come first. The path along the top shows where you are; click a part of it to jump back up. A large folder or a search across the whole library can take a moment to read; a spinner shows over the list until it is ready. When the column is too narrow for the whole path, the folders nearest the top fold into `...`, which takes you up to the nearest of them.
+The list starts in the layer's folder, with the current preset selected. It shows `..` (the folder above), then the subfolders with how many presets each holds, then the presets with their curation markers. At the top level your collections (Favourites, Roles, Blacklisted) come first. Favourites lists one folder per tag, with how many presets each holds, then every favourite. The path along the top shows where you are; click a part of it to jump back up. A large folder or a search across the whole library can take a moment to read; a spinner shows over the list until it is ready. When the column is too narrow for the whole path, the folders nearest the top fold into `...`, which takes you up to the nearest of them.
 
 Click a row to select it, or double-click a folder to open it. Moving to a preset plays it on the layer straight away, so you can step through a folder and watch each one. This works while the song is paused too: the preview shows each preset as it would look at the paused position. When you find one you like, press Enter (or double-click it) to keep it; the layer then browses that preset's folder. Esc puts back the preset and folder you started with. The back arrow at the right of the browser's title bar closes it and keeps the preset that is playing.
 
@@ -265,7 +265,7 @@ To search, click the **Filter** line under the path, or press Up from the top of
 
 The line along the bottom of the browser is a reminder of the main keys.
 
-Right-click a preset in the browser to favourite it, blacklist it, or give it a role. While you are not typing in the filter, Space still plays and pauses, H shows or hides help, and shortcuts such as Ctrl+S still work.
+Right-click a preset in the browser to favourite it, tag it, blacklist it, or give it a role. While you are not typing in the filter, Space still plays and pauses, H shows or hides help, and shortcuts such as Ctrl+S still work.
 
 ### Preset switching
 
@@ -362,7 +362,7 @@ A preset file that is missing (moved, renamed, or left out of a restored project
 
 ### Preset markers
 
-Tags after a preset's name show its curation status and role. Hover over one for a reminder.
+Markers after a preset's name show its curation status and role. Hover over one for a reminder; on a favourite, the `[F]` reminder also lists its tags.
 
 | Marker | Meaning |
 | --- | --- |
@@ -386,6 +386,7 @@ Curation mode reduces the editor to a single layer playing the full song, so eac
 | F | Toggle favourite. |
 | B | Toggle blacklist. Blacklisted presets are excluded from browsing, Populate, and random picks. |
 | C | Assign a role, or None to clear it. |
+| T | Tag the preset, or take a tag off. |
 
 The same actions are in the preset's context menu.
 
@@ -400,14 +401,25 @@ The same actions are in the preset's context menu.
 
 Curation never moves, copies, or deletes preset files, and your marks survive renaming or moving a preset. Choose **View > Preset curation mode** again to return to your project.
 
+### Tagging favourites
+
+Tags sort your favourites into groups of your own, such as `a-tier`, `b-tier`, or `lots-of-black`. A preset can have as many tags as you like, so one tag can say how good a preset is while another says what it looks like.
+
+- **Tag a preset:** right-click it and open **Tags**, then tick a tag, or choose **New tag…** to name a new one. Or press T: a dialog shows the preset's tags and has a button for each tag. A tag the preset already has reads **Remove** and its name. **New tag…** asks for a name.
+- **Tags are for favourites:** tagging a preset also makes it a favourite. Unfavouriting a preset (F) also takes off its tags, and the message says how many.
+- **Browse a tag:** in the preset browser, open **Favourites** to see one folder per tag, then every favourite. Open a tag to see just its presets. A layer can play a tag the same way it plays a folder, and **Populate list** fills the list from it.
+- **Names:** a tag name can be up to 40 characters, cannot contain `/` or `\`, and must differ from your other tags by more than capital letters.
+
+Tags cannot be renamed or deleted yet.
+
 ### Backing up your curation
 
-Your favourites, blacklist, and roles can take a long time to build up. Keep a copy, or carry them to a new computer or a fresh install of Cleave:
+Your favourites, tags, blacklist, and roles can take a long time to build up. Keep a copy, or carry them to a new computer or a fresh install of Cleave:
 
-1. Choose **Settings > Back up preset curation**. A dialog says how many favourites, roles, and blacklist marks it will save, and the folder it saves to; nothing changes until you choose **Back up**. Cleave then saves a small file named like `cleave-curation-2026-11-28-140512.json` in the `backups` folder (see [Where your files live](#where-your-files-live)) and tells you what it holds. **Show in folder** opens the folder so you can copy the file.
+1. Choose **Settings > Back up preset curation**. A dialog says how many favourites, roles, blacklist marks, and tags it will save, and the folder it saves to; nothing changes until you choose **Back up**. Cleave then saves a small file named like `cleave-curation-2026-11-28-140512.json` in the `backups` folder (see [Where your files live](#where-your-files-live)) and tells you what it holds. **Show in folder** opens the folder so you can copy the file.
 2. On the other computer, choose **Settings > Restore preset curation** and pick the file. The picker starts in the `backups` folder; use Home, Drives, or Windows files to find a copy saved elsewhere.
 3. Cleave shows what the backup holds, how many of its presets are in your presets folder, and how many would change role. Choose:
-   - **Merge** to add the backup's favourites, blacklist marks, and roles to yours. Where a preset already has a different role, the backup's role wins.
+   - **Merge** to add the backup's favourites, tags, blacklist marks, and roles to yours. A tag in the backup joins your tag of the same name, ignoring capital letters. Where a preset already has a different role, the backup's role wins.
    - **Replace** to clear your current curation first, so you end up with exactly what the backup holds.
 
 Before either one changes anything, Cleave saves your current curation as another backup in the same folder, so you can always go back by restoring that file.
@@ -810,7 +822,7 @@ The **Settings** menu holds preferences that apply to every project:
 - **Measure audio latency:** see [The visuals are out of time with the music](#the-visuals-are-out-of-time-with-the-music).
 - **Calibrate tap timing:** see [Markers and recorded clips land late](#markers-and-recorded-clips-land-late).
 - **Rescan presets:** re-reads the presets folder after you add presets to an existing pack, or while Cleave is open.
-- **Back up preset curation** and **Restore preset curation:** save your favourites, blacklist, and roles, and bring them back on this or another computer. See [Backing up your curation](#backing-up-your-curation).
+- **Back up preset curation** and **Restore preset curation:** save your favourites and their tags, blacklist, and roles, and bring them back on this or another computer. See [Backing up your curation](#backing-up-your-curation).
 - **Download packages:** fetches anything you skipped on first launch. Presets downloaded here are indexed immediately, ready to curate.
 - **Dev Tools:** a crash log for bug reports.
 

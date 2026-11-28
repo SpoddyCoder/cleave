@@ -80,7 +80,7 @@ from cleave.config_schema.timeline import (
     DEFAULT_TIMELINE_GLIDE,
     DEFAULT_TIMELINE_SHOW_PRESET_NAMES,
 )
-from cleave.preset_library import PresetLibrary
+from cleave.preset_library import PresetLibrary, collection_key
 from cleave.viz.preset_schedule import timer_first_times
 from cleave.viz.timeline_clip_edits import row_clips, selected_clip
 from cleave.viz.preset_browser import BrowserCrumb, mark_missing_crumbs
@@ -170,8 +170,10 @@ class TrackBlock:
     preset_dir_can_go_down: bool = False
     preset_position: str = ""
     preset_markers: str = ""
+    preset_tags: tuple[str, ...] = ()
     preset_list_labels: list[str] = field(default_factory=list)
     preset_list_markers: list[str] = field(default_factory=list)
+    preset_list_tags: list[tuple[str, ...]] = field(default_factory=list)
     # On a layer whose presets change on each clip: where each list entry's
     # clip starts, in list order. Empty otherwise.
     preset_list_clip_starts: tuple[float, ...] = ()
@@ -637,7 +639,7 @@ def view_state_structure_signature(
             "preset_list": _preset_list_identity(tuple(layer.preset_list)),
             "playlist": {
                 "current_dir": str(playlist.current_dir),
-                "collection": playlist.collection,
+                "collection": collection_key(playlist.collection),
                 "paths": _playlist_paths_identity(tuple(playlist.paths)),
                 "index": playlist.index,
             },
@@ -740,7 +742,8 @@ class TuningViewStateBuilder:
             tuple[PresetListEntry, ...], list[str]
         ] = {}
         self._preset_list_marker_cache: dict[
-            tuple[tuple[PresetListEntry, ...], int], list[str]
+            tuple[tuple[PresetListEntry, ...], int],
+            tuple[list[str], list[tuple[str, ...]]],
         ] = {}
         self._list_basenames_cache: dict[
             tuple[PresetListEntry, ...], frozenset[str]
@@ -856,16 +859,29 @@ class TuningViewStateBuilder:
             self._preset_list_label_cache[entries_key] = labels
         return labels
 
-    def _preset_list_markers(self, entries: list[PresetListEntry]) -> list[str]:
+    def _preset_tags(self, playlist: PresetPlaylist) -> tuple[str, ...]:
+        current = playlist.current
+        return () if current is None else self._library.tags_of(current)
+
+    def _preset_list_curation(
+        self, entries: list[PresetListEntry]
+    ) -> tuple[list[str], list[tuple[str, ...]]]:
+        """Each entry's markers and tags, cached until curation changes."""
         key = (tuple(entries), self._library.revision)
-        markers = self._preset_list_marker_cache.get(key)
-        if markers is None:
-            markers = [
-                self._library.marker(entry.file).strip()
-                for entry in entries
-            ]
-            self._preset_list_marker_cache[key] = markers
-        return markers
+        cached = self._preset_list_marker_cache.get(key)
+        if cached is None:
+            cached = (
+                [self._library.marker(entry.file).strip() for entry in entries],
+                [self._library.tags_of(entry.file) for entry in entries],
+            )
+            self._preset_list_marker_cache[key] = cached
+        return cached
+
+    def _preset_list_markers(self, entries: list[PresetListEntry]) -> list[str]:
+        return self._preset_list_curation(entries)[0]
+
+    def _preset_list_tags(self, entries: list[PresetListEntry]) -> list[tuple[str, ...]]:
+        return self._preset_list_curation(entries)[1]
 
     @staticmethod
     def _active_preset_list_index(layer: LayerRuntime) -> int | None:
@@ -941,10 +957,12 @@ class TuningViewStateBuilder:
                 preset_label=preset_filename_display(display),
                 preset_position=preset_position_display(display),
                 preset_markers=self._preset_markers(layer, display),
+                preset_tags=self._preset_tags(display),
                 preset_empty=not display.paths,
                 visible=layer.enabled,
                 preset_list_labels=self._preset_list_labels(list(layer.preset_list)),
                 preset_list_markers=self._preset_list_markers(list(layer.preset_list)),
+                preset_list_tags=self._preset_list_tags(list(layer.preset_list)),
                 preset_list_clip_starts=self._preset_list_clip_starts(slot),
                 preset_list_first_times=self._preset_list_first_times(slot),
                 preset_dir_problem=self.session.preset_health.dir_problem(
@@ -983,8 +1001,10 @@ class TuningViewStateBuilder:
                 preset_label=preset_filename_display(display),
                 preset_position=preset_position_display(display),
                 preset_markers=self._preset_markers(layer, display),
+                preset_tags=self._preset_tags(display),
                 preset_list_labels=self._preset_list_labels(list(layer.preset_list)),
                 preset_list_markers=self._preset_list_markers(list(layer.preset_list)),
+                preset_list_tags=self._preset_list_tags(list(layer.preset_list)),
                 preset_list_clip_starts=self._preset_list_clip_starts(slot),
                 preset_list_first_times=self._preset_list_first_times(slot),
                 preset_dir_problem=self.session.preset_health.dir_problem(

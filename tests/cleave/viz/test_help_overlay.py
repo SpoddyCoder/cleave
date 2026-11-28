@@ -410,7 +410,7 @@ def test_preset_file_help_titles() -> None:
     keyboard = _keyboard_section(sections)
     assert description is not None
     assert description.title == "Milkdrop Preset File"
-    assert _says(description.lines, 'tags after the name')
+    assert _says(description.lines, 'markers after the name')
     assert dict(description.entries) == {
         "[F]": "favourite",
         "[B]": "blacklisted",
@@ -511,7 +511,7 @@ def test_preset_list_entry_help() -> None:
     keyboard = _keyboard_section(sections)
     assert description is not None
     assert description.title == "Preset List Entry"
-    assert _says(description.lines, 'switching list', 'tags after the name')
+    assert _says(description.lines, 'switching list', 'markers after the name')
     assert description.entries == (
         ("[F]", "favourite"),
         ("[B]", "blacklisted"),
@@ -532,6 +532,7 @@ def test_preset_list_entry_help() -> None:
         "F": "favourite / unfavourite preset",
         "B": "blacklist / unblacklist preset",
         "C": "set preset role (bed/pulse/lead/accent/none)",
+        "T": "tag preset (tagging favourites it)",
     }
     assert dict(keyboard.mouse_entries) == {
         "Double-click": "replace from the preset browser",

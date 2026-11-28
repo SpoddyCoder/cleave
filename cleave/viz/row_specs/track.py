@@ -299,6 +299,10 @@ def _format_track_preset_markers(
 ) -> str:
     return _track_block(state, desc).preset_markers
 
+
+def _track_preset_tags(state: TuningViewState, desc: RowDescriptor) -> tuple[str, ...]:
+    return _track_block(state, desc).preset_tags
+
 def _format_track_preset_list_count(
     state: TuningViewState, desc: RowDescriptor
 ) -> str:
@@ -333,6 +337,14 @@ def _format_track_preset_list_item_markers(
 ) -> str:
     assert desc.preset_index is not None
     return _track_block(state, desc).preset_list_markers[desc.preset_index]
+
+
+def _track_preset_list_item_tags(
+    state: TuningViewState, desc: RowDescriptor
+) -> tuple[str, ...]:
+    assert desc.preset_index is not None
+    tags = _track_block(state, desc).preset_list_tags
+    return tags[desc.preset_index] if desc.preset_index < len(tags) else ()
 
 def _format_track_effect(state: TuningViewState, desc: RowDescriptor) -> str:
     assert desc.effect_id is not None and desc.driver_slug is not None
@@ -689,6 +701,7 @@ SPECS: dict[RowKind, RowSpec] = {
         format_value=_format_track_preset,
         format_position=_format_track_preset_position,
         format_markers=_format_track_preset_markers,
+        marker_tags=_track_preset_tags,
         nav_buttons=(
             RowNavButton(
                 ADD_GLYPH,
@@ -705,7 +718,7 @@ SPECS: dict[RowKind, RowSpec] = {
         fit_strategy=FitStrategy.NONE,
         help_title="Milkdrop Preset File",
         help_description=(
-            "The Milkdrop preset this layer is rendering. Enter or a double-click opens the preset browser, to see every folder and preset and filter them by name. While preset switching is on, the + button left of the arrows adds this preset to the layer's preset list (P does the same from any row of the layer); while previewing, that is the one you are previewing, and the file is copied into the project so it travels with it. Tags after the name mark its curation status and role; hover over one for a reminder:",
+            "The Milkdrop preset this layer is rendering. Enter or a double-click opens the preset browser, to see every folder and preset and filter them by name. While preset switching is on, the + button left of the arrows adds this preset to the layer's preset list (P does the same from any row of the layer); while previewing, that is the one you are previewing, and the file is copied into the project so it travels with it. Markers after the name show its curation status and role; hover over one for a reminder (a favourite's lists its tags):",
         ),
         help_mode_entries=_PRESET_MARKER_HELP_ENTRIES,
         repeatable=True,
@@ -771,6 +784,7 @@ SPECS: dict[RowKind, RowSpec] = {
         format_value=_format_track_preset_list_item,
         format_position=_format_track_preset_list_item_position,
         format_markers=_format_track_preset_list_item_markers,
+        marker_tags=_track_preset_list_item_tags,
         tooltip=_preset_list_item_tooltip,
         apply_action=_apply_preset_list_item_action,
         double_click_action=_open_preset_list_item_replace,
@@ -780,7 +794,7 @@ SPECS: dict[RowKind, RowSpec] = {
             "A preset in this layer's switching list. The highlighted entry is the one scheduled for this point in the song.",
             "On a timer, the time is when the entry first plays. On each clip, it is when its clip starts; a spare is on no clip.",
             "Right-click for more ways to edit the list.",
-            "Tags after the name mark its curation status and role; hover over one for a reminder:",
+            "Markers after the name show its curation status and role; hover over one for a reminder (a favourite's lists its tags):",
         ),
         help_mode_entries=_PRESET_LIST_MARKER_HELP_ENTRIES,
         can_enter_move_mode=True,

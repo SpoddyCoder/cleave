@@ -1,7 +1,7 @@
 """Preset library: content-hash index and curation state in a SQLite database.
 
-Curation (favourite, blacklist, cue role) is state keyed by a hash of each
-preset's contents. Nothing under the preset tree is moved, copied, or deleted.
+Curation (favourite, favourite tags, blacklist, cue role) is state keyed by a
+hash of each preset's contents. Nothing under the preset tree is moved, copied, or deleted.
 """
 
 from __future__ import annotations
@@ -24,11 +24,21 @@ from cleave.cue_roles import (
     CueRole,
 )
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
-PresetCollection = Literal["favourites", "bed", "pulse", "lead", "accent", "blacklisted"]
+BuiltinCollection = Literal["favourites", "bed", "pulse", "lead", "accent", "blacklisted"]
 
-PRESET_COLLECTIONS: tuple[PresetCollection, ...] = (
+
+@dataclass(frozen=True)
+class FavouriteTag:
+    """The favourites carrying one tag, browsed as a folder inside Favourites."""
+
+    name: str
+
+
+PresetCollection = BuiltinCollection | FavouriteTag
+
+PRESET_COLLECTIONS: tuple[BuiltinCollection, ...] = (
     "favourites",
     "bed",
     "pulse",
@@ -37,7 +47,7 @@ PRESET_COLLECTIONS: tuple[PresetCollection, ...] = (
     "blacklisted",
 )
 
-COLLECTION_LABEL: dict[PresetCollection, str] = {
+_BUILTIN_LABEL: dict[BuiltinCollection, str] = {
     "favourites": "Favourites",
     "bed": "Role: bed",
     "pulse": "Role: pulse",
@@ -45,6 +55,40 @@ COLLECTION_LABEL: dict[PresetCollection, str] = {
     "accent": "Role: accent",
     "blacklisted": "Blacklisted",
 }
+
+TAG_NAME_MAX = 40
+
+
+def collection_label(collection: PresetCollection, *, full: bool = False) -> str:
+    """Display name: ``Favourites``, ``Role: bed``, or a tag's name.
+
+    *full* names a tag with its parent, ``Favourites / a-tier``, for places
+    that show it away from the Favourites folder.
+    """
+    if isinstance(collection, FavouriteTag):
+        if full:
+            return f"{_BUILTIN_LABEL['favourites']} / {collection.name}"
+        return collection.name
+    return _BUILTIN_LABEL[collection]
+
+
+def collection_key(collection: PresetCollection | None) -> str | None:
+    """Plain-text identity for signatures and keys: ``favourites`` or ``tag:a-tier``."""
+    if isinstance(collection, FavouriteTag):
+        return f"tag:{collection.name}"
+    return collection
+
+
+def clean_tag_name(text: str) -> str:
+    """*text* trimmed, or :class:`ValueError` naming what is wrong with it."""
+    name = " ".join(text.split())
+    if not name:
+        raise ValueError("Enter a name for the tag")
+    if len(name) > TAG_NAME_MAX:
+        raise ValueError(f"Use at most {TAG_NAME_MAX} characters")
+    if "/" in name or "\\" in name:
+        raise ValueError("A tag name cannot contain / or \\")
+    return name
 
 ProgressCallback = Callable[[int, int], bool]
 
@@ -57,14 +101,16 @@ PRESET_FLAG_MARKERS: tuple[tuple[str, str], ...] = (
 _MARKER_MEANING: dict[str, str] = dict(PRESET_FLAG_MARKERS)
 
 
-def marker_tooltip(token: str) -> str | None:
+def marker_tooltip(token: str, *, tags: tuple[str, ...] = ()) -> str | None:
     """Hover text for one marker token from ``PresetLibrary.marker``.
 
-    ``"[F]"``, ``"[B]"``, and ``"[L]"`` name their flag; ``"[R:B]"`` names the
-    role. Unknown tokens give None.
+    ``"[F]"``, ``"[B]"``, and ``"[L]"`` name their flag, and ``"[F]"`` lists
+    the preset's *tags*; ``"[R:B]"`` names the role. Unknown tokens give None.
     """
     meaning = _MARKER_MEANING.get(token)
     if meaning is not None:
+        if token == "[F]" and tags:
+            return f"{meaning}. Tags: {', '.join(tags)}"
         return meaning
     for role in CUE_ROLES:
         if token == f"[R:{CUE_ROLE_MARKER_LETTER[role]}]":
@@ -88,10 +134,21 @@ CREATE TABLE roles (
     name TEXT NOT NULL
 );
 CREATE TABLE index_state (root TEXT PRIMARY KEY, fingerprint TEXT NOT NULL);
+CREATE TABLE tags (name TEXT PRIMARY KEY COLLATE NOCASE);
+CREATE TABLE favourite_tags (
+    hash TEXT NOT NULL,
+    tag TEXT NOT NULL COLLATE NOCASE,
+    PRIMARY KEY (hash, tag)
+);
 """
 
 _UPGRADES: dict[int, str] = {
     1: "CREATE TABLE index_state (root TEXT PRIMARY KEY, fingerprint TEXT NOT NULL);",
+    2: (
+        "CREATE TABLE tags (name TEXT PRIMARY KEY COLLATE NOCASE); "
+        "CREATE TABLE favourite_tags (hash TEXT NOT NULL, "
+        "tag TEXT NOT NULL COLLATE NOCASE, PRIMARY KEY (hash, tag));"
+    ),
 }
 """Script that takes a database from the keyed version to the next one."""
 
@@ -113,12 +170,16 @@ class CurationEntry:
     favourite: bool = False
     blacklisted: bool = False
     role: CueRole | None = None
+    tags: tuple[str, ...] = ()
+    """Tag names; only a favourite carries tags."""
 
 
 class PresetCatalog(Protocol):
     """What preset browsing needs: blacklist filtering and virtual collections."""
 
     def collections(self) -> tuple[PresetCollection, ...]: ...
+
+    def tag_collections(self) -> tuple[FavouriteTag, ...]: ...
 
     def visible(self, paths: Iterable[Path]) -> tuple[Path, ...]: ...
 
@@ -133,6 +194,9 @@ class UnfilteredCatalog:
     """Catalog for headless callers (render, CI): no filter, no collections."""
 
     def collections(self) -> tuple[PresetCollection, ...]:
+        return ()
+
+    def tag_collections(self) -> tuple[FavouriteTag, ...]:
         return ()
 
     def visible(self, paths: Iterable[Path]) -> tuple[Path, ...]:
@@ -300,7 +364,7 @@ def _is_under(path: Path, root: Path) -> bool:
 
 
 class PresetLibrary:
-    """Hash index of presets plus favourite / blacklist / role state.
+    """Hash index of presets plus favourite / tag / blacklist / role state.
 
     ``database_uri`` opens another connection to the same database, for a
     worker thread running :func:`build_index`.
@@ -318,6 +382,8 @@ class PresetLibrary:
         self._favourites: set[str] = set()
         self._blacklist: set[str] = set()
         self._roles: dict[str, CueRole] = {}
+        self._tags: tuple[str, ...] = ()
+        self._tag_members: dict[str, set[str]] = {}
         self.revision = 0
         self._sorted_paths: tuple[Path, ...] = ()
         self._sorted_paths_source: dict[str, str] | None = None
@@ -385,6 +451,18 @@ class PresetLibrary:
             row[0]: row[1]
             for row in self._conn.execute("SELECT hash, role FROM roles")
         }
+        self._tags = tuple(
+            sorted(
+                (row[0] for row in self._conn.execute("SELECT name FROM tags")),
+                key=str.casefold,
+            )
+        )
+        canonical = {name.casefold(): name for name in self._tags}
+        self._tag_members = {name: set() for name in self._tags}
+        for digest, tag in self._conn.execute("SELECT hash, tag FROM favourite_tags"):
+            name = canonical.get(tag.casefold())
+            if name is not None:
+                self._tag_members[name].add(digest)
 
     def index(
         self,
@@ -493,8 +571,81 @@ class PresetLibrary:
                 members.discard(digest)
         self.revision += 1
 
-    def set_favourite(self, path: Path, on: bool) -> None:
+    def set_favourite(self, path: Path, on: bool) -> int:
+        """Favourite or unfavourite *path*; returns how many tags that removed."""
+        removed = 0
+        if not on:
+            digest = self.hash_of(path)
+            if digest is not None:
+                removed = len(self._tags_of_hash(digest))
+                with self._db_lock, self._conn:
+                    self._conn.execute(
+                        "DELETE FROM favourite_tags WHERE hash = ?", (digest,)
+                    )
+                for members in self._tag_members.values():
+                    members.discard(digest)
         self._set_flag("favourites", self._favourites, path, on)
+        return removed
+
+    def tags(self) -> tuple[str, ...]:
+        """Every tag, sorted by name ignoring case."""
+        return self._tags
+
+    def _tags_of_hash(self, digest: str) -> tuple[str, ...]:
+        return tuple(name for name in self._tags if digest in self._tag_members[name])
+
+    def tags_of(self, path: Path) -> tuple[str, ...]:
+        """Tags on *path*, sorted by name."""
+        digest = self.hash_of(path)
+        if digest is None:
+            return ()
+        return self._tags_of_hash(digest)
+
+    def tag_count(self, tag: str) -> int:
+        return len(self._tag_members.get(tag, ()))
+
+    def new_tag_name(self, text: str) -> str:
+        """*text* as a new tag's name; :class:`ValueError` when invalid or taken."""
+        name = clean_tag_name(text)
+        folded = name.casefold()
+        if any(existing.casefold() == folded for existing in self._tags):
+            raise ValueError(f"There is already a tag named {name}")
+        return name
+
+    def add_tag(self, text: str) -> str:
+        """Create a tag (see :meth:`new_tag_name`) and return its name."""
+        name = self.new_tag_name(text)
+        with self._db_lock, self._conn:
+            self._conn.execute("INSERT INTO tags (name) VALUES (?)", (name,))
+        self._tags = tuple(sorted((*self._tags, name), key=str.casefold))
+        self._tag_members[name] = set()
+        self.revision += 1
+        return name
+
+    def set_tagged(self, path: Path, tag: str, on: bool) -> None:
+        """Put the tag *tag* on *path*, favouriting it, or take it off."""
+        digest = self.hash_of(path)
+        if digest is None or tag not in self._tag_members:
+            return
+        with self._db_lock, self._conn:
+            if on:
+                self._conn.execute(
+                    "INSERT OR REPLACE INTO favourites (hash, name) VALUES (?, ?)",
+                    (digest, path.name),
+                )
+                self._conn.execute(
+                    "INSERT OR IGNORE INTO favourite_tags (hash, tag) VALUES (?, ?)",
+                    (digest, tag),
+                )
+                self._favourites.add(digest)
+                self._tag_members[tag].add(digest)
+            else:
+                self._conn.execute(
+                    "DELETE FROM favourite_tags WHERE hash = ? AND tag = ?",
+                    (digest, tag),
+                )
+                self._tag_members[tag].discard(digest)
+        self.revision += 1
 
     def set_blacklisted(self, path: Path, on: bool) -> None:
         self._set_flag("blacklist", self._blacklist, path, on)
@@ -531,6 +682,7 @@ class PresetLibrary:
                 favourite=digest in self._favourites,
                 blacklisted=digest in self._blacklist,
                 role=self._roles.get(digest),
+                tags=self._tags_of_hash(digest),
             )
             for digest, name in names.items()
         ]
@@ -542,19 +694,31 @@ class PresetLibrary:
         return frozenset(self._path_hash.values())
 
     def apply_curation(
-        self, entries: Iterable[CurationEntry], *, replace: bool
+        self,
+        entries: Iterable[CurationEntry],
+        *,
+        tags: Iterable[str] = (),
+        replace: bool,
     ) -> None:
-        """Write *entries* in one transaction.
+        """Write *entries* and the tag names *tags* in one transaction.
 
-        *replace* clears every favourite, blacklist mark, and role first.
-        Otherwise flags are added (never cleared) and an entry's role replaces
-        the preset's current one.
+        *replace* clears every favourite, tag, blacklist mark, and role first.
+        Otherwise flags and tags are added (never cleared), a tag matches an
+        existing one ignoring case, and an entry's role replaces the preset's
+        current one.
         """
         favourites: list[tuple[str, str]] = []
         blacklist: list[tuple[str, str]] = []
         roles: list[tuple[str, str, str]] = []
+        tag_names: dict[str, str] = {}
+        memberships: list[tuple[str, str]] = []
+        for name in tags:
+            tag_names.setdefault(name.casefold(), name)
         for entry in entries:
-            if entry.favourite:
+            for name in entry.tags:
+                tag_names.setdefault(name.casefold(), name)
+                memberships.append((entry.hash, name))
+            if entry.favourite or entry.tags:
                 favourites.append((entry.hash, entry.name))
             if entry.blacklisted:
                 blacklist.append((entry.hash, entry.name))
@@ -562,8 +726,16 @@ class PresetLibrary:
                 roles.append((entry.hash, entry.role, entry.name))
         with self._db_lock, self._conn:
             if replace:
-                for table in ("favourites", "blacklist", "roles"):
+                for table in ("favourites", "blacklist", "roles", "tags", "favourite_tags"):
                     self._conn.execute(f"DELETE FROM {table}")
+            self._conn.executemany(
+                "INSERT OR IGNORE INTO tags (name) VALUES (?)",
+                [(name,) for name in tag_names.values()],
+            )
+            self._conn.executemany(
+                "INSERT OR IGNORE INTO favourite_tags (hash, tag) VALUES (?, ?)",
+                memberships,
+            )
             self._conn.executemany(
                 "INSERT OR REPLACE INTO favourites (hash, name) VALUES (?, ?)",
                 favourites,
@@ -580,6 +752,8 @@ class PresetLibrary:
         self.revision += 1
 
     def _in_collection(self, digest: str, collection: PresetCollection) -> bool:
+        if isinstance(collection, FavouriteTag):
+            return digest in self._tag_members.get(collection.name, ())
         if collection == "favourites":
             return digest in self._favourites
         if collection == "blacklisted":
@@ -589,6 +763,10 @@ class PresetLibrary:
     def collections(self) -> tuple[PresetCollection, ...]:
         """Collections offered beside top-level preset folders."""
         return PRESET_COLLECTIONS
+
+    def tag_collections(self) -> tuple[FavouriteTag, ...]:
+        """One collection per tag, inside Favourites, sorted by name."""
+        return tuple(FavouriteTag(name) for name in self._tags)
 
     def collection_paths(self, collection: PresetCollection) -> tuple[Path, ...]:
         """Indexed files in ``collection``, one path per hash, sorted by path."""
