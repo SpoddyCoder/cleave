@@ -103,6 +103,7 @@ def test_composite_uses_masked_path_when_enabled() -> None:
 def test_composite_passes_transition_and_inactive_slots() -> None:
     session = _session(("layer_1", "layer_2", "layer_3"))
     session.pattern_mask.enabled = True
+    session.pattern_mask.transition_unit = "seconds"
     session.pattern_mask.transition = 1.2
     layers_by_slot = {
         "layer_1": _stem_layer("layer_1"),
@@ -256,6 +257,7 @@ def _effect_runtime_for(slots: tuple[str, ...]) -> MagicMock:
 def test_render_frame_feeds_pcm_for_live_disabled_slot() -> None:
     session = _session(("layer_1", "layer_2"))
     session.pattern_mask.enabled = True
+    session.pattern_mask.transition_unit = "seconds"
     session.pattern_mask.transition = 1.0
     session.post_fx = post_fx_runtime_all_off()
     live = _stem_layer("layer_1")
@@ -305,6 +307,7 @@ def test_render_frame_feeds_pcm_for_live_disabled_slot() -> None:
 def test_render_frame_skips_disabled_slot_that_is_not_live() -> None:
     session = _session(("layer_1", "layer_2"))
     session.pattern_mask.enabled = True
+    session.pattern_mask.transition_unit = "seconds"
     session.pattern_mask.transition = 1.0
     session.post_fx = post_fx_runtime_all_off()
     live = _stem_layer("layer_1")

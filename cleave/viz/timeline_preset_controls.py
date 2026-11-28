@@ -24,6 +24,14 @@ from cleave.timeline_presets.layer_setup import (
 )
 from cleave.timeline_presets.pattern_mask_arrange import compose_pattern_mask_timeline
 from cleave.timeline_presets.conductor import timeline_preset_conductor_display
+from cleave.pattern_mask_transition import transition_seconds
+from cleave.timeline_presets.mask_options import (
+    KEEP,
+    TIMELINE_PRESET_MASK_CHANGES_OPTIONS,
+    TIMELINE_PRESET_MASK_PATTERN_OPTIONS,
+    timeline_preset_mask_changes_display,
+    timeline_preset_mask_pattern_display,
+)
 from cleave.timeline_presets.mode import (
     TIMELINE_PRESET_MODE_OPTIONS,
     timeline_preset_mode_display,
@@ -63,7 +71,6 @@ from cleave.viz.timeline_clip_edits import row_clips
 from cleave.viz.timeline_cut_controls import apply_cut_to_lanes
 from cleave.viz.clip_presets import (
     is_each_clip,
-    layers_label,
     locked_each_clip_reason,
 )
 from cleave.viz.edit_history import EditHistory
@@ -72,16 +79,17 @@ _GENERATE_TITLE = "Generate timeline"
 _RESET_TITLE = "Reset timeline?"
 _CONDUCTOR_OPTIONS = (False, True)
 _RESET_LAYER_OPTIONS = ("off", "on")
-_PATTERN_MASK_TRANSITION_SEC = 1.0
 # Generate dialog sections: what the arrangement is, then how its cues are
 # tidied, then which layer settings it overrides.
 _ARRANGEMENT_SECTION = "Arrangement"
+_PATTERN_MASK_SECTION = "Pattern mask"
 _CUES_SECTION = "Clip timing and cuts"
 _LAYER_SETTINGS_SECTION = "Layer settings"
 
 _GENERATE_HELP = (
     "Builds a new timeline from these settings, replacing the current clips. Arrangement decides which layers play when, clip timing and cuts then tidy every generated clip, and each layer whose presets change on each clip gets a preset for every new clip, dealt from its preset list.",
     "Each section is arranged to suit its song marker's type and intensity: how many layers play, which one leads, how bright each is, and how often presets change. Back-to-back markers of one type make one longer section, such as a build that rises across all of them. Settings are kept for the rest of the session.",
+    "In pattern mask mode every change of layers is a wipe. Two or more layers are on, though a calm section can drop to one, every song marker changes them, and between markers they change as often as the section's intensity asks.",
     "Layer settings change the same settings on each layer's own pages, so the plan shows as planned. keep leaves them as they are. Locked layers are always left as they are, and Ctrl+Z undoes the changes with the rest of Generate.",
 )
 _DENSITY_HELP = (
@@ -125,9 +133,28 @@ _MODE_HELP = ("How the arrangement brings layers in and out.",)
 _MODE_OPTION_HELP = {
     "layers": "clips bring whole layers in and out, at the opacity each section calls for.",
     "pattern_mask": (
-        "short sections swap layers through the pattern mask; "
-        "turns the mask on with strips."
+        "layers wipe in and out through the pattern mask, at every song marker "
+        "and as often as each section's intensity asks; turns the mask on."
     ),
+}
+_MASK_PATTERN_HELP = (
+    "The Pattern Mask page's pattern, which shapes the regions and how they wipe.",
+)
+_MASK_PATTERN_OPTION_HELP = {
+    "keep": "the pattern the Pattern Mask page has now.",
+    "strips": "vertical strips that slide to make room.",
+    "bars": "horizontal bars that slide to make room.",
+    "radial": "slices of a circle that turn to make room.",
+    "checker": "a checkerboard that dissolves from one layout to the next.",
+    "plasma": "flowing blobs that dissolve from one layout to the next.",
+}
+_MASK_CHANGES_HELP = (
+    "How often layers come and go between song markers. The section's intensity sets the pace, calm sections slower and intense ones faster; this sets how busy every section is. Markers always change, and each change waits for the last wipe to finish, so a long Pattern Mask transition spaces them out.",
+)
+_MASK_CHANGES_OPTION_HELP = {
+    "fewer": "long holds: every eight bars or more when very calm, every bar or two when very intense.",
+    "normal": "every two or three bars when very calm, down to every half bar when intense.",
+    "more": "every bar or two when very calm, down to every beat or two when intense.",
 }
 _ON_OFF = (False, True)
 _OPACITY_HELP = (
@@ -178,6 +205,11 @@ def _choice_field(
         visible=visible,
         vertical=vertical,
     )
+
+
+def _pattern_mask_mode(values: FormValues) -> bool:
+    """Whether the draft dialog is set to pattern mask mode."""
+    return TIMELINE_PRESET_MODE_OPTIONS[values["mode"]] == "pattern_mask"
 
 
 def _clips_label(count: int) -> str:
@@ -266,6 +298,28 @@ class TimelinePresetController:
                         section=_ARRANGEMENT_SECTION,
                     ),
                     _choice_field(
+                        "mask_pattern",
+                        "pattern",
+                        TIMELINE_PRESET_MASK_PATTERN_OPTIONS,
+                        tl.timeline_preset_mask_pattern,
+                        timeline_preset_mask_pattern_display,
+                        help=_MASK_PATTERN_HELP,
+                        option_help=_MASK_PATTERN_OPTION_HELP,
+                        section=_PATTERN_MASK_SECTION,
+                        visible=_pattern_mask_mode,
+                    ),
+                    _choice_field(
+                        "mask_changes",
+                        "layer changes",
+                        TIMELINE_PRESET_MASK_CHANGES_OPTIONS,
+                        tl.timeline_preset_mask_changes,
+                        timeline_preset_mask_changes_display,
+                        help=_MASK_CHANGES_HELP,
+                        option_help=_MASK_CHANGES_OPTION_HELP,
+                        section=_PATTERN_MASK_SECTION,
+                        visible=_pattern_mask_mode,
+                    ),
+                    _choice_field(
                         "cue_snap",
                         "snap to grid",
                         TIMELINE_PRESET_CUE_SNAP_OPTIONS,
@@ -303,6 +357,7 @@ class TimelinePresetController:
                         help=_OPACITY_HELP,
                         option_help=_OPACITY_OPTION_HELP,
                         section=_LAYER_SETTINGS_SECTION,
+                        visible=lambda values: not _pattern_mask_mode(values),
                     ),
                     _choice_field(
                         "change_presets",
@@ -331,10 +386,7 @@ class TimelinePresetController:
                 on_confirm=lambda values: self._confirm_generate(
                     values, duration_sec, repopulate_options
                 ),
-                info=lambda values: self._generate_info(
-                    duration_sec,
-                    full_opacity=_ON_OFF[values["opacity"]],
-                ),
+                info=lambda _values: self._generate_info(duration_sec),
                 help=_GENERATE_HELP,
             )
         )
@@ -347,28 +399,10 @@ class TimelinePresetController:
         self._notify(reason)
         return True
 
-    def _generate_info(
-        self,
-        duration_sec: float,
-        *,
-        full_opacity: bool = False,
-    ) -> str | None:
-        """What Generate would change, one sentence per line."""
-        session = self.session
-        notes: list[str] = []
+    def _generate_info(self, duration_sec: float) -> str | None:
+        """How many clips Generate would replace."""
         count = self._clip_count(duration_sec)
-        if count:
-            notes.append(f"Replaces {_clips_label(count)} on the timeline")
-        dim = [
-            slot
-            for slot in session.layer_z_order
-            if session.layers[slot].opacity_pct < FULL_OPACITY_PCT
-            and not (full_opacity and not session.layers[slot].locked)
-        ]
-        if dim:
-            label = layers_label(session, dim)
-            notes.append(f"{label[0].upper()}{label[1:]} below 100%")
-        return "\n".join(notes) if notes else None
+        return f"Replaces {_clips_label(count)} on the timeline" if count else None
 
     def _preset_list_used(self, values: FormValues) -> bool:
         """Whether any layer would change presets on each clip after Generate."""
@@ -392,7 +426,8 @@ class TimelinePresetController:
             layer = self.session.layers[slot]
             if layer.locked:
                 continue
-            if tl.timeline_preset_full_opacity:
+            # The pattern mask overrides opacity, so only layers mode sets it.
+            if tl.timeline_preset_full_opacity and tl.timeline_preset_mode == "layers":
                 layer.opacity_pct = FULL_OPACITY_PCT
         if not tl.timeline_preset_each_clip:
             return
@@ -433,6 +468,12 @@ class TimelinePresetController:
         tl.timeline_preset_repopulate = repopulate_options[values["preset_list"]]
         tl.timeline_preset_conductor = _CONDUCTOR_OPTIONS[values["conductor"]]
         tl.timeline_preset_mode = TIMELINE_PRESET_MODE_OPTIONS[values["mode"]]
+        tl.timeline_preset_mask_pattern = TIMELINE_PRESET_MASK_PATTERN_OPTIONS[
+            values["mask_pattern"]
+        ]
+        tl.timeline_preset_mask_changes = TIMELINE_PRESET_MASK_CHANGES_OPTIONS[
+            values["mask_changes"]
+        ]
         tl.timeline_preset_full_opacity = _ON_OFF[values["opacity"]]
         tl.timeline_preset_each_clip = _ON_OFF[values["change_presets"]]
         before = self._history.begin("Generate timeline")
@@ -512,7 +553,12 @@ class TimelinePresetController:
                 duration_sec,
                 rng,
                 beat_times=self._beat_times,
-                transition_duration=self.session.pattern_mask.transition,
+                transition_duration=transition_seconds(
+                    self.session.pattern_mask.transition,
+                    self.session.pattern_mask.transition_unit,
+                    self.session.song_tempo,
+                ),
+                changes=tl.timeline_preset_mask_changes,
                 **builder_kwargs,
             )
             message = "Generated pattern mask timeline"
@@ -538,11 +584,12 @@ class TimelinePresetController:
             self._notify(message)
 
     def _enable_pattern_mask(self) -> None:
+        """Turn the mask on with the dialog's pattern."""
+        tl = self.session.timeline
         pm = self.session.pattern_mask
         pm.enabled = True
-        pm.type = "strips"
-        pm.feather_pct = 0
-        pm.transition = _PATTERN_MASK_TRANSITION_SEC
+        if tl.timeline_preset_mask_pattern != KEEP:
+            pm.type = tl.timeline_preset_mask_pattern
 
     def _cue_snap_grid(self, bar_grid: Sequence[float]) -> Sequence[float]:
         """The grid clip edges snap to; empty when snap to grid is off."""

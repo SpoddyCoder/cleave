@@ -16,6 +16,15 @@ from cleave.config_schema.descriptors import (
 
 PatternMaskType = Literal["strips", "bars", "radial", "checker", "plasma"]
 
+# What the transition is counted in: beats or bars of the song, or seconds.
+PatternMaskTransitionUnit = Literal["beats", "bars", "seconds"]
+
+PATTERN_MASK_TRANSITION_UNITS: tuple[PatternMaskTransitionUnit, ...] = (
+    "beats",
+    "bars",
+    "seconds",
+)
+
 PATTERN_MASK_TYPES: tuple[PatternMaskType, ...] = (
     "strips",
     "bars",
@@ -30,7 +39,8 @@ DEFAULT_RENDER_PATTERN_MASK_FEATHER_PCT = 0
 DEFAULT_RENDER_PATTERN_MASK_DENSITY = 1.0
 DEFAULT_RENDER_PATTERN_MASK_INVERT = False
 DEFAULT_RENDER_PATTERN_MASK_SEED = 0
-DEFAULT_RENDER_PATTERN_MASK_TRANSITION = 0.0
+DEFAULT_RENDER_PATTERN_MASK_TRANSITION = 1.0
+DEFAULT_RENDER_PATTERN_MASK_TRANSITION_UNIT: PatternMaskTransitionUnit = "beats"
 DEFAULT_RENDER_PATTERN_MASK_LOCKED = False
 PATTERN_MASK_DENSITY_MIN = 1.0
 PATTERN_MASK_DENSITY_MAX = 10.0
@@ -40,6 +50,9 @@ PATTERN_MASK_TRANSITION_MIN = 0.0
 PATTERN_MASK_TRANSITION_MAX = 5.0
 PATTERN_MASK_TRANSITION_STEP = 0.1
 PATTERN_MASK_TRANSITION_STEP_LARGE = 1.0
+# The lengths a transition counted in beats or bars can take.
+PATTERN_MASK_TRANSITION_BEATS: tuple[float, ...] = (0.0, 0.25, 0.5, 1.0, 2.0, 3.0, 4.0)
+PATTERN_MASK_TRANSITION_BARS: tuple[float, ...] = (0.0, 0.5, 1.0, 2.0)
 PATTERN_MASK_FEATHER_PCT_MIN = 0
 PATTERN_MASK_FEATHER_PCT_MAX = 100
 PATTERN_MASK_FEATHER_PCT_STEP = 1
@@ -53,7 +66,24 @@ def clamp_pattern_mask_density(value: float) -> float:
     )
 
 
-def clamp_pattern_mask_transition(value: float) -> float:
+def pattern_mask_transition_steps(
+    unit: PatternMaskTransitionUnit,
+) -> tuple[float, ...] | None:
+    """The lengths a beats or bars transition can take; None for seconds."""
+    if unit == "beats":
+        return PATTERN_MASK_TRANSITION_BEATS
+    if unit == "bars":
+        return PATTERN_MASK_TRANSITION_BARS
+    return None
+
+
+def clamp_pattern_mask_transition(
+    value: float, unit: PatternMaskTransitionUnit = "seconds"
+) -> float:
+    """*value* as a length *unit* allows: the nearest step for beats or bars."""
+    steps = pattern_mask_transition_steps(unit)
+    if steps is not None:
+        return min(steps, key=lambda step: abs(step - float(value)))
     return round(
         max(
             PATTERN_MASK_TRANSITION_MIN,
@@ -79,6 +109,17 @@ def _parse_pattern_mask_type(
         raise ValueError(f"{label} must be a string")
     if value not in PATTERN_MASK_TYPES:
         allowed = ", ".join(f"'{item}'" for item in PATTERN_MASK_TYPES)
+        raise ValueError(f"{label} must be one of: {allowed}")
+    return value  # type: ignore[return-value]
+
+
+def _parse_pattern_mask_transition_unit(
+    value: Any,
+    _ctx: ParseCtx,
+    label: str = "render.pattern_mask.transition_unit",
+) -> PatternMaskTransitionUnit:
+    if value not in PATTERN_MASK_TRANSITION_UNITS:
+        allowed = ", ".join(f"'{item}'" for item in PATTERN_MASK_TRANSITION_UNITS)
         raise ValueError(f"{label} must be one of: {allowed}")
     return value  # type: ignore[return-value]
 
@@ -134,11 +175,15 @@ RENDER_PATTERN_MASK_FIELDS: tuple[SchemaField, ...] = (
         dump_scalar,
     ),
     FieldDescriptor(
+        "transition_unit",
+        DEFAULT_RENDER_PATTERN_MASK_TRANSITION_UNIT,
+        _parse_pattern_mask_transition_unit,
+        dump_scalar,
+    ),
+    FieldDescriptor(
         "transition",
         DEFAULT_RENDER_PATTERN_MASK_TRANSITION,
-        lambda raw, _ctx, label: clamp_pattern_mask_transition(
-            float(require_non_negative_number(raw, label))
-        ),
+        lambda raw, _ctx, label: float(require_non_negative_number(raw, label)),
         dump_scalar,
     ),
     FieldDescriptor(
@@ -153,6 +198,10 @@ RENDER_PATTERN_MASK_FIELDS: tuple[SchemaField, ...] = (
 def _build_render_pattern_mask_config(parsed: dict[str, Any]) -> Any:
     from cleave.config import RenderPatternMaskConfig
 
+    # The transition's steps depend on its unit, so it is clamped once both are read.
+    parsed["transition"] = clamp_pattern_mask_transition(
+        parsed["transition"], parsed["transition_unit"]
+    )
     return RenderPatternMaskConfig(**parsed)
 
 
@@ -175,6 +224,7 @@ def pattern_mask_persist_values(ctx: PersistCtx) -> dict[str, Any]:
         "density": runtime.density,
         "feather_pct": runtime.feather_pct,
         "invert": runtime.invert,
+        "transition_unit": runtime.transition_unit,
         "transition": runtime.transition,
         "seed": runtime.seed,
     }
@@ -187,6 +237,7 @@ def default_render_pattern_mask_runtime_values() -> dict[str, Any]:
         "density": DEFAULT_RENDER_PATTERN_MASK_DENSITY,
         "feather_pct": DEFAULT_RENDER_PATTERN_MASK_FEATHER_PCT,
         "invert": DEFAULT_RENDER_PATTERN_MASK_INVERT,
+        "transition_unit": DEFAULT_RENDER_PATTERN_MASK_TRANSITION_UNIT,
         "transition": DEFAULT_RENDER_PATTERN_MASK_TRANSITION,
         "seed": DEFAULT_RENDER_PATTERN_MASK_SEED,
         "locked": DEFAULT_RENDER_PATTERN_MASK_LOCKED,

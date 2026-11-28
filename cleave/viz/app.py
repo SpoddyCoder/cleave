@@ -26,6 +26,7 @@ from cleave.gl_post_process import GlPostProcess
 from cleave.preset_library import PresetLibrary
 from cleave.preset_playlist import PresetPlaylist
 from cleave.signals import Signals
+from cleave.song_tempo import song_tempo_from_signals
 from cleave.pcm_io import load_mix_pcm
 from cleave.stem_pcm import StemPcmBank, load_stem_pcm, LIVE_PROJECTM_FPS
 from cleave.open_target import OpenTarget
@@ -145,6 +146,8 @@ def build_runtime_base(
     session.silent_stems = pcm_bank.silent_stems()
     session.preset_health.check_on_disk(session)
     session.song_markers.markers = list(load_manifest(project_dir).song_markers)
+    signals = load_stem_signals(project_dir)
+    session.song_tempo = song_tempo_from_signals(signals)
     content_w, content_h = project_resolution(cfg)
     return VisualizerSeed(
         project_dir=project_dir,
@@ -156,7 +159,7 @@ def build_runtime_base(
         cfg=cfg,
         pcm_bank=pcm_bank,
         duration_sec=pcm_bank.duration_sec,
-        signals=load_stem_signals(project_dir),
+        signals=signals,
         effect_runtime=EffectRuntime(),
         preset_root=cfg.paths.preset_root,
         library=library,

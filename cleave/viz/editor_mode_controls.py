@@ -92,6 +92,7 @@ def _merge_session_state(
     skip_tracker = target.preset_skip_notify_tracker
     log_tracker = target.projectm_log_notify_tracker
     silent_stems = target.silent_stems
+    song_tempo = target.song_tempo
     preset_health = target.preset_health
 
     target.layer_z_order = list(fresh.layer_z_order)
@@ -116,6 +117,7 @@ def _merge_session_state(
     target.preset_skip_notify_tracker = skip_tracker
     target.projectm_log_notify_tracker = log_tracker
     target.silent_stems = silent_stems
+    target.song_tempo = song_tempo
     target.preset_health = preset_health
 
     if panel_open is not None:

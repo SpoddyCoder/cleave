@@ -165,6 +165,7 @@ def test_pattern_mask_child_pages_split_the_settings() -> None:
     ]
     assert _kinds(build_inspector_rows(state, "pattern_mask.edges")) == [
         RowKind.PATTERN_MASK_FEATHER,
+        RowKind.PATTERN_MASK_TRANSITION_UNIT,
         RowKind.PATTERN_MASK_TRANSITION,
     ]
 

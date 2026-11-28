@@ -121,6 +121,7 @@ from cleave.config_schema.render import (
     DEFAULT_RENDER_OVERLAYS_LOCKED,
     DEFAULT_RENDER_PATTERN_MASK_LOCKED,
     DEFAULT_RENDER_PATTERN_MASK_TRANSITION,
+    DEFAULT_RENDER_PATTERN_MASK_TRANSITION_UNIT,
     DEFAULT_RENDER_POST_FX_LOCKED,
     DEFAULT_VISUAL_LIMITER_ENABLED,
     DEFAULT_VISUAL_LIMITER_RATIO,
@@ -136,6 +137,7 @@ from cleave.config_schema.render import (
     FadeCurve,
     HighlightRolloffApplyMode,
     HighlightRolloffCurve,
+    PatternMaskTransitionUnit,
     PatternMaskType,
     RenderOverlayAnimationType,
     RenderOverlayPosition,
@@ -345,6 +347,9 @@ class RenderPatternMaskConfig:
     invert: bool
     seed: int
     transition: float = DEFAULT_RENDER_PATTERN_MASK_TRANSITION
+    transition_unit: PatternMaskTransitionUnit = (
+        DEFAULT_RENDER_PATTERN_MASK_TRANSITION_UNIT
+    )
     locked: bool = DEFAULT_RENDER_PATTERN_MASK_LOCKED
 
 

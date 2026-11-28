@@ -14,9 +14,23 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from cleave.config_schema.render.pattern_mask import PatternMaskTransitionUnit
+from cleave.song_tempo import SongTempo
+
 HARD_LAYOUT_MASK_TYPES = frozenset({"strips", "bars", "radial"})
 
 MaskTransitionKind = Literal["hard_layout", "weight_field", "clear"]
+
+
+def transition_seconds(
+    amount: float, unit: PatternMaskTransitionUnit, tempo: SongTempo
+) -> float:
+    """How long a wipe of *amount* beats, bars, or seconds takes at *tempo*."""
+    if unit == "beats":
+        return amount * tempo.beat_sec
+    if unit == "bars":
+        return amount * tempo.bar_sec
+    return amount
 
 
 def uses_hard_layout_morph(mask_type: str) -> bool:

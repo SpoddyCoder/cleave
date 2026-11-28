@@ -413,12 +413,12 @@ In the screenshot at the top of this guide, the strip (number 7) has a clip on l
 
 The fastest way to get started is to let Cleave build an arrangement. Choose **Generate timeline** on the Timeline page, and the dialog offers:
 
-- **mode:** either bring whole layers in and out, or swap them through the [Pattern Mask](#pattern-mask).
+- **mode:** either bring whole layers in and out, or wipe them in and out through the [Pattern Mask](#pattern-mask) (see [Pattern mask mode](#pattern-mask-mode)).
 - **density:** how busy the arrangement is.
 - **conductor:** optionally lets the stems' audio decide which layer leads each phrase and give the layers roles, which set their blend modes. Without it, layers take turns leading and keep their own blend modes.
 - **snap** and **cut type:** how clip edges align to the beat grid and how layers transition.
 
-Under **Layer settings**, Generate can also change three settings on every unlocked layer, so its plan shows as planned. Each starts where it leaves the layer's own setting in place (keep, or use current list):
+Under **Layer settings**, Generate can also change three settings on every unlocked layer, so its plan shows as planned. In pattern mask mode opacity is not offered, because the mask overrides it. Each starts where it leaves the layer's own setting in place (keep, or use current list):
 
 | Setting | Changes the layer's | Choices |
 |---|---|---|
@@ -426,11 +426,43 @@ Under **Layer settings**, Generate can also change three settings on every unloc
 | **change presets** | Preset Switching > change presets | keep, or each clip. Generate plans new presets at song markers and every few bars, and they play only on layers set to each clip. |
 | **preset list** | Preset List | use current list (the default) deals the layer's own presets onto the clips in order, starting again from the top when there are more clips than presets; an empty list gets a new shuffled one. The other choices build a new list: shuffled or in order from the layer's folder, or by clip roles (offered once at least one preset in your library has a role). Shown only when some layer changes presets on each clip. |
 
-The lines under the dialog's title say how many clips Generate replaces and which layers will still be below 100%. Locked layers keep their opacity and presets. Press H in the dialog for a full description of each option. You will get much better results if you [mark the song's sections](#song-markers) and [assign roles to your presets](#curating-your-presets) first.
+The line under the dialog's title says how many clips Generate replaces. Locked layers keep their opacity and presets. Press H in the dialog for a full description of each option. You will get much better results if you [mark the song's sections](#song-markers) and [assign roles to your presets](#curating-your-presets) first.
 
 In layers mode one layer leads at full opacity and the others sit back, so the picture stays clear rather than washing out. Layers come in, leave, brighten, and dim one at a time, a bar or two apart, except at song markers, where several may change together. Layers that stay on change preset at markers and every few bars, each on its own beat. The section types and intensities below set how many layers play and how bright they are.
 
 Generate replaces the current timeline and, on layers whose presets change on each clip, the whole preset list, including presets you picked by hand and spares. The dialog says which layers' lists it replaces, and Ctrl+Z undoes it all. If one of those layers is locked, unlock it first; the same goes for Reset timeline. If Generate fails, a message says why and the timeline stays as it was.
+
+#### Pattern mask mode
+
+Under the pattern mask each layer gets its own region of the frame, and every time a layer comes in or goes out the regions wipe to make room. Pattern mask mode is built around those wipes:
+
+- Two or more layers are on, so the frame is split. A calm or very calm section can drop to a single layer filling the frame, most often in a breakdown, at the start of an intro, or as an outro ends (and with only two layers, one is on at a time).
+- With four layers, a very calm section shows one or two, calm one to three, normal two or three, and intense or very intense three or four. With six or more, the busier intensities show one or two more.
+- Every song marker changes the layers, and the wipe starts on the marker.
+- Between markers, layers come and go as often as the section's intensity asks: with layer changes at normal, every two or three bars when very calm, every bar or so when normal, and every half bar when intense or very intense. Only an intense or very intense section shows every layer at once; otherwise one is kept out for the next wipe to bring in.
+- Each change waits until the last wipe has finished, so a longer Pattern Mask transition means fewer changes in a fast section. Generate uses the transition the Pattern Mask page has; set it there before you generate.
+
+The marker type sets how the layers move:
+
+| Type | Under the pattern mask |
+| --- | --- |
+| intro | Opens out, adding layers as it goes. |
+| verse | Steady, mostly trading one layer for another. |
+| build | Starts with fewer changes than a plain section, then adds layers faster and faster; its last bar shows every layer. |
+| chorus | Opens with a big change, bringing in two or more new layers when there are enough left out. |
+| drop | A big change on the marker, then fast changes at the most layers. Straight after a build's full stack, it takes two layers out. |
+| breakdown | Holds near the fewest layers, changing slowly; when calm, often just one. |
+| bridge | Brings in layers that were out before it. |
+| outro | Thins out, one layer at a time. |
+
+A plain marker follows the music's loudness when the conductor is on, and sits in the middle of its intensity's range otherwise. Layers that stay on through a marker often change preset there, and a layer held for a long time changes preset partway through; these play on layers whose presets change on each clip.
+
+The dialog's **Pattern mask** section, shown in this mode, offers:
+
+- **pattern:** keep the Pattern Mask page's pattern, or choose strips, bars, radial, checker, or plasma.
+- **layer changes:** how often layers come and go between markers. fewer gives long holds, every eight bars or more in a calm section; normal changes every bar or two in most sections; more changes as often as every beat or two in an intense one. Markers always change.
+
+**density** moves the number of layers up or down by about one, as in layers mode.
 
 ### Reading the strip
 
@@ -589,7 +621,7 @@ A marker also has an **intensity**, so a small first chorus and a huge last one 
 | intense | 2 to 4 | Two layers at full, the rest close behind. |
 | very intense | 3 or 4 | Three layers at full. The only time most of the stack is. |
 
-These are for four layers; with six or more, very intense can use five. In a build, a calm marker lowers the rise for its stretch and the next marker carries on from where the build has got to. Under a hard-edged pattern mask every layer shows at full opacity, so there intensity changes only how many layers play.
+These are for four layers; with six or more, very intense can use five. In a build, a calm marker lowers the rise for its stretch and the next marker carries on from where the build has got to. Under the pattern mask every layer shows at full opacity, so there intensity sets how many layers play and how often they change; see [Pattern mask mode](#pattern-mask-mode).
 
 Set it with the second dropdown on a marker's row on **Timeline > Song Markers**, by pressing **I** on the row, or from **Intensity** in the marker's right-click menu. It takes effect the next time you generate.
 
@@ -620,6 +652,16 @@ For bulk clean-up of clips, use **Snap clips** on this page, **Snap clips to mar
 Layers normally stack on top of one another. **Pattern Mask** instead divides the frame into regions, one per visible layer, using a pattern such as strips, bars, radial slices, or a flowing plasma. As the timeline brings layers in and out, the regions resize to make room.
 
 Enable it with the on/off icon on the **Pattern Mask** row. Its pages control the pattern, how often it repeats, edge softness, and how quickly regions reshape.
+
+On the edges & motion page, **transition** sets how long the regions take to reshape when a layer comes or goes, and **transition in** sets what it is counted in:
+
+| transition in | transition |
+| --- | --- |
+| beats (the default) | 1/4, 1/2, 1 (the default), 2, 3, or 4 beats of the song |
+| bars | 1/2, 1, or 2 bars |
+| time | 0.0 to 5.0 seconds |
+
+Beats and bars follow the song's tempo, so a wipe keeps time with the music. Switching between them keeps the length as close as it can. At 0 the regions snap with no wipe.
 
 While Pattern Mask is on, it overrides each layer's blend mode and opacity.
 

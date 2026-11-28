@@ -480,6 +480,7 @@ PATTERN_MASK_EDGES_SECTION = SectionDef(
     context="global",
     children=(
         SectionNode(leaf_kind=RowKind.PATTERN_MASK_FEATHER),
+        SectionNode(leaf_kind=RowKind.PATTERN_MASK_TRANSITION_UNIT),
         SectionNode(leaf_kind=RowKind.PATTERN_MASK_TRANSITION),
     ),
 )

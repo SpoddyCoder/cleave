@@ -1699,28 +1699,7 @@ def test_generate_names_the_cues_it_replaces_under_the_title() -> None:
     _press_focused(controls, keydown(pygame.K_RETURN))
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
-    assert modal_view.form_info == (
-        "Replaces 1 clip on the timeline\nLayer 1 below 100%"
-    )
-
-
-def test_generate_names_the_layers_below_full_opacity() -> None:
-    controls = make_controls(("layer_1", "layer_2", "layer_3"))
-    controls.session.timeline.lanes["layer_1"] = TimelineLane(
-        baseline=0.0, cues=[SlotCue(t=1.0, level=1.0)]
-    )
-    for slot in ("layer_1", "layer_3"):
-        layer = controls.session.layers[slot]
-        layer.preset_switching = "on"
-        layer.preset_switching_trigger = "timeline"
-        layer.preset_list = entries("a.milk")
-    _focus_timeline_presets(controls)
-    _press_focused(controls, keydown(pygame.K_RETURN))
-    modal_view = controls.modal_host.view_state()
-    assert modal_view is not None
-    assert modal_view.form_info == (
-        "Replaces 1 clip on the timeline\nLayers 1, 2 and 3 below 100%"
-    )
+    assert modal_view.form_info == "Replaces 1 clip on the timeline"
 
 
 def test_generate_can_set_up_every_layer_for_its_plan() -> None:
@@ -1738,9 +1717,7 @@ def test_generate_can_set_up_every_layer_for_its_plan() -> None:
     _press_focused(controls, keydown(pygame.K_RETURN))
     _set_form_field(controls, "opacity", "set to 100%")
     _set_form_field(controls, "change presets", "each clip")
-    assert controls.modal_host.view_state().form_info == (
-        "Layer 3 below 100%"
-    )
+    assert controls.modal_host.view_state().form_info is None
     choose_modal_option(controls, "Generate")
     for slot in ("layer_1", "layer_2"):
         layer = session.layers[slot]
@@ -1791,6 +1768,31 @@ def test_generate_hides_character_in_pattern_mask_mode() -> None:
     labels = [row.label for row in modal_view.form_rows]
     assert "character" not in labels
     assert modal_view.form_rows[0].heading == "Arrangement"
+
+
+def test_generate_shows_pattern_mask_options_only_in_pattern_mask_mode() -> None:
+    controls = make_controls(("layer_1", "layer_2"))
+    _focus_timeline_presets(controls)
+    _press_focused(controls, keydown(pygame.K_RETURN))
+
+    def labels() -> list[str]:
+        modal_view = controls.modal_host.view_state()
+        assert modal_view is not None
+        return [row.label for row in modal_view.form_rows]
+
+    mask_fields = {"pattern", "layer changes"}
+    assert not mask_fields & set(labels())
+    assert "opacity" in labels()
+    _set_form_field(controls, "mode", "pattern mask")
+    assert mask_fields <= set(labels())
+    # The pattern mask overrides layer opacity.
+    assert "opacity" not in labels()
+    _set_form_field(controls, "pattern", "plasma")
+    _set_form_field(controls, "layer changes", "fewer")
+    choose_modal_option(controls, "Generate")
+    tl = controls.session.timeline
+    assert tl.timeline_preset_mask_pattern == "plasma"
+    assert tl.timeline_preset_mask_changes == "fewer"
 
 
 def test_generate_writes_values_only_on_confirm() -> None:

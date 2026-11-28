@@ -994,7 +994,7 @@ def test_write_session_snapshot_persists_pattern_mask(tmp_path: Path) -> None:
     pm.density = 3.5
     pm.feather_pct = 100
     pm.invert = True
-    pm.transition = 1.2
+    pm.transition = 1.0
     pm.seed = 77
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
@@ -1007,7 +1007,8 @@ def test_write_session_snapshot_persists_pattern_mask(tmp_path: Path) -> None:
         "density": 3.5,
         "feather_pct": 100,
         "invert": True,
-        "transition": 1.2,
+        "transition_unit": "beats",
+        "transition": 1.0,
         "seed": 77,
     }
 
@@ -1020,7 +1021,8 @@ def test_write_session_snapshot_persists_pattern_mask(tmp_path: Path) -> None:
     assert round_trip.pattern_mask.density == 3.5
     assert round_trip.pattern_mask.feather_pct == 100
     assert round_trip.pattern_mask.invert is True
-    assert round_trip.pattern_mask.transition == 1.2
+    assert round_trip.pattern_mask.transition == 1.0
+    assert round_trip.pattern_mask.transition_unit == "beats"
     assert round_trip.pattern_mask.seed == 77
 
 
@@ -1070,6 +1072,7 @@ def test_write_session_snapshot_overwrites_stale_pattern_mask(tmp_path: Path) ->
         "density": 1.5,
         "feather_pct": 0,
         "invert": False,
+        "transition_unit": "beats",
         "transition": 0.0,
         "seed": 0,
     }

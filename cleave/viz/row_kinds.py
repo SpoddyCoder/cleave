@@ -110,6 +110,7 @@ class RowKind(Enum):
     PATTERN_MASK_DENSITY = auto()
     PATTERN_MASK_FEATHER = auto()
     PATTERN_MASK_INVERT = auto()
+    PATTERN_MASK_TRANSITION_UNIT = auto()
     PATTERN_MASK_TRANSITION = auto()
     PATTERN_MASK_SEED = auto()
     TIMELINE_HEADER = auto()

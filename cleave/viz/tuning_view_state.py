@@ -59,6 +59,7 @@ from cleave.config_schema.render import (
     DEFAULT_VISUAL_LIMITER_RATIO,
     DEFAULT_VISUAL_LIMITER_RELEASE,
     DEFAULT_VISUAL_LIMITER_THRESHOLD,
+    PatternMaskTransitionUnit,
     PatternMaskType,
     default_render_overlays_runtime_values,
     default_render_pattern_mask_runtime_values,
@@ -348,6 +349,9 @@ class PatternMaskBlock:
     feather_pct: int = _RO_PATTERN_MASK_DEFAULTS["feather_pct"]
     invert: bool = _RO_PATTERN_MASK_DEFAULTS["invert"]
     transition: float = _RO_PATTERN_MASK_DEFAULTS["transition"]
+    transition_unit: PatternMaskTransitionUnit = _RO_PATTERN_MASK_DEFAULTS[
+        "transition_unit"
+    ]
     seed: int = _RO_PATTERN_MASK_DEFAULTS["seed"]
     locked: bool = _RO_PATTERN_MASK_DEFAULTS["locked"]
 
@@ -360,6 +364,7 @@ class PatternMaskBlock:
             feather_pct=pm.feather_pct,
             invert=pm.invert,
             transition=pm.transition,
+            transition_unit=pm.transition_unit,
             seed=pm.seed,
             locked=pm.locked,
         )

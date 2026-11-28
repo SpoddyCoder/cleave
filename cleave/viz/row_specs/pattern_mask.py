@@ -9,8 +9,8 @@ from cleave.config_schema.render import (
     PATTERN_MASK_DENSITY_STEP_LARGE,
     PATTERN_MASK_FEATHER_PCT_STEP,
     PATTERN_MASK_FEATHER_PCT_STEP_LARGE,
-    PATTERN_MASK_TRANSITION_STEP,
-    PATTERN_MASK_TRANSITION_STEP_LARGE,
+    PATTERN_MASK_TRANSITION_UNITS,
+    PatternMaskTransitionUnit,
 )
 from cleave.pattern_mask import pattern_mask_invert_display
 from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
@@ -43,10 +43,40 @@ def _format_pattern_mask_invert(
 ) -> str:
     return pattern_mask_invert_display(state.pattern_mask.invert)
 
+_TRANSITION_UNIT_LABELS: dict[PatternMaskTransitionUnit, str] = {
+    "beats": "beats",
+    "bars": "bars",
+    "seconds": "time",
+}
+_FRACTIONS = {0.25: "1/4", 0.5: "1/2"}
+
+
+def transition_unit_display(unit: PatternMaskTransitionUnit) -> str:
+    return _TRANSITION_UNIT_LABELS[unit]
+
+
+def transition_display(amount: float, unit: PatternMaskTransitionUnit) -> str:
+    """*amount* of *unit* as the inspector shows it: 1/2 beat, 2 bars, 0.5s."""
+    if unit == "seconds":
+        return f"{amount:.1f}s"
+    if amount <= 0.0:
+        return "0 (instant)"
+    word = "beat" if unit == "beats" else "bar"
+    count = _FRACTIONS.get(amount, f"{amount:g}")
+    return f"{count} {word}" if amount <= 1.0 else f"{count} {word}s"
+
+
 def _format_pattern_mask_transition(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{state.pattern_mask.transition:.1f}s"
+    pm = state.pattern_mask
+    return transition_display(pm.transition, pm.transition_unit)
+
+
+def _format_pattern_mask_transition_unit(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return transition_unit_display(state.pattern_mask.transition_unit)
 
 def _format_pattern_mask_seed(
     state: TuningViewState, _desc: RowDescriptor
@@ -110,13 +140,22 @@ def _apply_pattern_mask_transition(
     forward: bool,
     large: bool,
 ) -> None:
-    step = (
-        PATTERN_MASK_TRANSITION_STEP_LARGE if large else PATTERN_MASK_TRANSITION_STEP
-    )
-    delta = step if forward else -step
-    controls.pattern_mask.set_transition(
-        controls.session.pattern_mask.transition + delta
-    )
+    controls.pattern_mask.step_transition(forward=forward, large=large)
+
+
+def _apply_pattern_mask_transition_unit(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _large: bool,
+) -> None:
+    controls.pattern_mask.step_transition_unit(delta=1 if forward else -1)
+
+
+def _jump_pattern_mask_transition_unit(
+    controls: TuningControls, _desc: RowDescriptor, delta: int
+) -> None:
+    controls.pattern_mask.step_transition_unit(delta=delta)
 
 def _apply_pattern_mask_seed(
     controls: TuningControls,
@@ -288,6 +327,26 @@ SPECS: dict[RowKind, RowSpec] = {
         repeatable=True,
         parent_group="pattern_mask",
     ),
+    RowKind.PATTERN_MASK_TRANSITION_UNIT: RowSpec(
+        affordance=RowAffordance.VALUE_STEP,
+        panel_label="transition in",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_pattern_mask_transition_unit,
+        apply_horizontal=_apply_pattern_mask_transition_unit,
+        choice=options_choice(
+            PATTERN_MASK_TRANSITION_UNITS,
+            lambda s, _d: s.pattern_mask.transition_unit,
+            transition_unit_display,
+            jump=_jump_pattern_mask_transition_unit,
+        ),
+        help_title="Transition In",
+        help_entries=(("Left/Right", "beats / bars / time"),),
+        help_description=(
+            "What the transition is counted in. beats and bars follow the song's tempo, so a wipe keeps time with the music; time sets it in seconds. Switching keeps the length as close as it can.",
+        ),
+        repeatable=True,
+        parent_group="pattern_mask",
+    ),
     RowKind.PATTERN_MASK_TRANSITION: RowSpec(
         affordance=RowAffordance.VALUE_STEP,
         panel_label="transition",
@@ -295,8 +354,12 @@ SPECS: dict[RowKind, RowSpec] = {
         format_value=_format_pattern_mask_transition,
         apply_horizontal=_apply_pattern_mask_transition,
         help_title="Transition",
+        help_entries=(
+            ("Left/Right", "next / previous length"),
+            ("PgUp/PgDn", "+/- 1s, in time"),
+        ),
         help_description=(
-            "How long, in seconds, regions take to reshape when a layer turns on or off. 0.0s snaps instantly.",
+            "How long regions take to reshape when a layer turns on or off: 1/4, 1/2, 1, 2, 3, or 4 beats; 1/2, 1, or 2 bars; or up to 5.0s in time. 0 snaps instantly.",
         ),
         repeatable=True,
         parent_group="pattern_mask",

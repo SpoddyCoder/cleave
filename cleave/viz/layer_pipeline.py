@@ -14,6 +14,7 @@ from cleave.gl_masked_compositor import GlMaskedCompositor
 from cleave.gl_post_process import BLOOM_BLUR_RADIUS, GlPostProcess
 from cleave.layer_composite import LayerCompositeRequest
 from cleave.pattern_mask import PatternMaskParams
+from cleave.pattern_mask_transition import transition_seconds
 from cleave.preset_playlist import PresetPlaylist
 from cleave.projectm import ProjectM, pcm_max_samples_per_channel
 from cleave.projectm_health import (
@@ -129,7 +130,9 @@ def _pattern_mask_live_slots(
     transition = masked_compositor.transitions.peek(
         active_slots,
         song_time_sec=song_time_sec,
-        duration=pm.transition,
+        duration=transition_seconds(
+            pm.transition, pm.transition_unit, session.song_tempo
+        ),
         mask_type=pm.type,
     )
     flags = masked_compositor.live_slots(
@@ -633,7 +636,9 @@ class LayerFramePipeline:
             transition = masked_compositor.transitions.peek(
                 active_slots,
                 song_time_sec=song_time_sec,
-                duration=pm.transition,
+                duration=transition_seconds(
+                    pm.transition, pm.transition_unit, session.song_tempo
+                ),
                 mask_type=pm.type,
             )
         request = LayerCompositeRequest(

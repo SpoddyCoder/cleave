@@ -47,6 +47,7 @@ from cleave.config_schema.render import (
     DEFAULT_RENDER_OVERLAYS_LOCKED,
     DEFAULT_RENDER_PATTERN_MASK_LOCKED,
     DEFAULT_RENDER_PATTERN_MASK_TRANSITION,
+    DEFAULT_RENDER_PATTERN_MASK_TRANSITION_UNIT,
     DEFAULT_RENDER_POST_FX_LOCKED,
     DEFAULT_VISUAL_LIMITER_ENABLED,
     DEFAULT_VISUAL_LIMITER_RATIO,
@@ -55,6 +56,7 @@ from cleave.config_schema.render import (
     FadeCurve,
     HighlightRolloffApplyMode,
     HighlightRolloffCurve,
+    PatternMaskTransitionUnit,
     PatternMaskType,
     default_chroma_boost_runtime_values,
     default_highlight_rolloff_runtime_values,
@@ -91,7 +93,14 @@ from cleave.timeline import ClipGrip, SlotCue, TimelineLane, copy_lane, empty_la
 from cleave.viz.layer_problems import PresetHealth
 from cleave.viz.timeline_view import StripView
 from cleave.blend_modes import BlendMode
+from cleave.song_tempo import SongTempo
 from cleave.timeline_presets.conductor import DEFAULT_TIMELINE_PRESET_CONDUCTOR
+from cleave.timeline_presets.mask_options import (
+    DEFAULT_TIMELINE_PRESET_MASK_CHANGES,
+    DEFAULT_TIMELINE_PRESET_MASK_PATTERN,
+    TimelinePresetMaskChanges,
+    TimelinePresetMaskPattern,
+)
 from cleave.timeline_presets.mode import (
     DEFAULT_TIMELINE_PRESET_MODE,
     TimelinePresetMode,
@@ -307,6 +316,9 @@ class PatternMaskRuntime:
     invert: bool
     seed: int
     transition: float = DEFAULT_RENDER_PATTERN_MASK_TRANSITION
+    transition_unit: PatternMaskTransitionUnit = (
+        DEFAULT_RENDER_PATTERN_MASK_TRANSITION_UNIT
+    )
     locked: bool = DEFAULT_RENDER_PATTERN_MASK_LOCKED
 
 
@@ -388,6 +400,12 @@ class TimelineRuntime:
     timeline_preset_full_opacity: bool = DEFAULT_TIMELINE_PRESET_FULL_OPACITY
     timeline_preset_each_clip: bool = DEFAULT_TIMELINE_PRESET_EACH_CLIP
     timeline_preset_mode: TimelinePresetMode = DEFAULT_TIMELINE_PRESET_MODE
+    timeline_preset_mask_pattern: TimelinePresetMaskPattern = (
+        DEFAULT_TIMELINE_PRESET_MASK_PATTERN
+    )
+    timeline_preset_mask_changes: TimelinePresetMaskChanges = (
+        DEFAULT_TIMELINE_PRESET_MASK_CHANGES
+    )
     hard_cut_fades: TimelineFadeGroupRuntime = field(
         default_factory=default_hard_timeline_fade_group_runtime
     )
@@ -566,6 +584,8 @@ class TuningSession:
     # Stems with no sound in this project's audio; not persisted.
     silent_stems: frozenset[StemSource] = frozenset()
     preset_health: PresetHealth = field(default_factory=PresetHealth)
+    # The song's beat and bar, for the mask's transition in beats or bars; not persisted.
+    song_tempo: SongTempo = field(default_factory=SongTempo)
 
 
 def _card_runtime_from_cfg(card: Any) -> OverlayCardRuntime:
@@ -700,6 +720,7 @@ def pattern_mask_runtime_from_cfg(
             density=pattern_mask.density,
             invert=pattern_mask.invert,
             transition=pattern_mask.transition,
+            transition_unit=pattern_mask.transition_unit,
             seed=pattern_mask.seed,
         )
     return default_pattern_mask_runtime()

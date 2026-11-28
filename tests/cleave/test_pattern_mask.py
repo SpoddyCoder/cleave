@@ -548,6 +548,7 @@ def test_parse_pattern_mask_explicit() -> None:
                     "feather_pct": 100,
                     "density": 2.5,
                     "invert": True,
+                    "transition_unit": "seconds",
                     "transition": 1.5,
                     "seed": 42,
                     "locked": True,
@@ -563,6 +564,7 @@ def test_parse_pattern_mask_explicit() -> None:
     assert render.pattern_mask.density == 2.5
     assert render.pattern_mask.invert is True
     assert render.pattern_mask.transition == 1.5
+    assert render.pattern_mask.transition_unit == "seconds"
     assert render.pattern_mask.seed == 42
     assert render.pattern_mask.locked is True
 
@@ -584,11 +586,26 @@ def test_parse_pattern_mask_clamps_density() -> None:
 
 def test_parse_pattern_mask_clamps_transition() -> None:
     high = parse_render_section(
-        {"render": {"pattern_mask": {"transition": 9.0}}}
+        {"render": {"pattern_mask": {"transition_unit": "seconds", "transition": 9.0}}}
     )
     assert high is not None
     assert high.pattern_mask is not None
     assert high.pattern_mask.transition == 5.0
+    # In beats or bars the transition takes the nearest step.
+    beats = parse_render_section(
+        {"render": {"pattern_mask": {"transition_unit": "beats", "transition": 0.3}}}
+    )
+    assert beats is not None and beats.pattern_mask is not None
+    assert beats.pattern_mask.transition == 0.25
+    bars = parse_render_section(
+        {"render": {"pattern_mask": {"transition_unit": "bars", "transition": 9.0}}}
+    )
+    assert bars is not None and bars.pattern_mask is not None
+    assert bars.pattern_mask.transition == 2.0
+    with pytest.raises(ValueError, match="transition_unit"):
+        parse_render_section(
+            {"render": {"pattern_mask": {"transition_unit": "minutes"}}}
+        )
     with pytest.raises(ValueError, match="non-negative"):
         parse_render_section(
             {"render": {"pattern_mask": {"transition": -1.0}}}
@@ -645,6 +662,7 @@ def test_persist_pattern_mask_round_trip() -> None:
                     "feather_pct": 0,
                     "density": 2.5,
                     "invert": True,
+                    "transition_unit": "seconds",
                     "transition": 0.8,
                     "seed": 99,
                     "locked": True,
@@ -671,6 +689,7 @@ def test_persist_pattern_mask_round_trip() -> None:
         "density": 2.5,
         "feather_pct": 0,
         "invert": True,
+        "transition_unit": "seconds",
         "transition": 0.8,
         "seed": 99,
     }
@@ -684,6 +703,7 @@ def test_persist_pattern_mask_round_trip() -> None:
         invert=True,
         seed=99,
         transition=0.8,
+        transition_unit="seconds",
         locked=True,
     )
 

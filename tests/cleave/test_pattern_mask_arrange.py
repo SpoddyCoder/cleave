@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import random
-from collections import Counter
 from pathlib import Path
 from unittest.mock import patch
 
@@ -12,8 +11,7 @@ import numpy as np
 from cleave.stems import StemSource
 from cleave.preset_playlist import PresetPlaylist
 from cleave.signals import Signals
-from cleave.song_markers import SongMarker, resolve_sections
-from cleave.timeline_presets.shapes import section_parts
+from cleave.song_markers import SongMarker
 from cleave.timeline import (
     LEVEL_EPS,
     TimelineFadeGroup,
@@ -22,13 +20,10 @@ from cleave.timeline import (
     lane_level_at,
     lane_on_transition_cues,
 )
+from cleave.timeline_presets.mask_options import TimelinePresetMaskChanges
 from cleave.timeline_presets.pattern_mask_arrange import (
-    SECTION_BARS_MAX,
-    SECTION_LONG_BARS_MAX,
-    SECTION_LONG_BARS_MIN,
     compose_pattern_mask_timeline,
-    partition_pattern_mask_sections,
-    section_target_range,
+    mask_layer_range,
 )
 from cleave.viz.modal import ModalHost
 from cleave.viz.session import LayerRuntime, TimelineRuntime, TuningSession
@@ -71,7 +66,8 @@ def _compose(
     song_markers: list[SongMarker] | None = None,
     signals: Signals | None = None,
     slot_stems: dict[str, StemSource] | None = None,
-    transition_duration: float = 0.0,
+    transition_duration: float = 1.0,
+    changes: TimelinePresetMaskChanges = "normal",
 ) -> dict[str, TimelineLane]:
     return compose_pattern_mask_timeline(
         slots,
@@ -84,6 +80,7 @@ def _compose(
         slot_stems=slot_stems,
         beat_times=_beat_times(duration_sec),
         transition_duration=transition_duration,
+        changes=changes,
     )
 
 
@@ -126,269 +123,233 @@ def _sample_counts(
     return counts
 
 
+def _change_times(lanes: dict[str, TimelineLane]) -> list[float]:
+    """Times the set of layers on changes: the wipes."""
+    return sorted({cue.t for lane in lanes.values() for cue in lane.cues if not cue.recast})
+
+
+def _changes_between(lanes: dict[str, TimelineLane], t0: float, t1: float) -> int:
+    return sum(1 for t in _change_times(lanes) if t0 < t < t1)
+
+
+_SONG = [
+    SongMarker(0.0, "intro", "calm"),
+    SongMarker(16.0, "verse"),
+    SongMarker(32.0, "build"),
+    SongMarker(40.0, "build", "intense"),
+    SongMarker(48.0, "drop", "very intense"),
+    SongMarker(64.0, "breakdown", "very calm"),
+    SongMarker(80.0, "bridge"),
+    SongMarker(88.0, "chorus", "intense"),
+    SongMarker(104.0, "outro"),
+]
+
+
+
 def test_single_slot_stays_on() -> None:
     slots = _slots(1)
-    lanes = _compose(slots, seed=3, duration_sec=30.0)
-    assert set(lanes) == set(slots)
-    for t in (0.0, 10.0, 29.9):
-        assert _active_at(lanes, slots, t) == frozenset(slots)
+    lanes = _compose(slots)
+    assert _active_at(lanes, slots, 0.0) == frozenset(slots)
+    assert _active_at(lanes, slots, _DUR - 1.0) == frozenset(slots)
 
 
 def test_empty_slots_or_duration_returns_empty() -> None:
-    assert compose_pattern_mask_timeline([], 30.0, random.Random(0), [0.0, 2.0]) == {}
-    assert compose_pattern_mask_timeline(_slots(4), 0.0, random.Random(0), [0.0]) == {}
+    assert _compose([]) == {}
+    assert _compose(_slots(3), duration_sec=0.0) == {}
 
 
-def _slot_set_change_times(
-    lanes: dict[str, TimelineLane], slots: list[str]
-) -> list[float]:
-    times = sorted({0.0, *_all_cue_times(lanes)})
-    changes: list[float] = []
-    prev: frozenset[str] | None = None
-    for t in times:
-        active = _active_at(lanes, slots, t + 1e-6 if t > 0.0 else 0.0)
-        if prev is not None and active != prev:
-            changes.append(t)
-        prev = active
-    return changes
+def test_layer_range_drops_to_one_only_when_calm() -> None:
+    for intensity in ("very calm", "calm", "normal", "intense", "very intense"):
+        floor = 1 if intensity in ("very calm", "calm") else 2
+        for n in range(3, 9):
+            for bias in range(-2, 3):
+                lo, hi = mask_layer_range(intensity, n, bias)  # type: ignore[arg-type]
+                assert floor <= lo <= hi <= n
+    assert mask_layer_range("calm", 4) == (1, 3)
+    assert mask_layer_range("very calm", 2) == (1, 2)
+    # Only intense sections may show every layer.
+    assert mask_layer_range("normal", 3)[1] == 2
+    assert mask_layer_range("very intense", 4)[1] == 4
+    assert mask_layer_range("very intense", 8)[0] > mask_layer_range("very intense", 4)[0]
 
 
-def _mutation_events(
-    lanes: dict[str, TimelineLane], slots: list[str]
-) -> list[tuple[float, frozenset[str], frozenset[str]]]:
-    events: list[tuple[float, frozenset[str], frozenset[str]]] = []
-    for t in _slot_set_change_times(lanes, slots):
-        prev = _active_at(lanes, slots, t - 1e-6)
-        after = _active_at(lanes, slots, t + 1e-6)
-        events.append((t, after - prev, prev - after))
-    return events
+def test_two_or_more_layers_on_outside_calm_sections() -> None:
+    for n in (3, 4, 6, 8):
+        slots = _slots(n)
+        for seed in range(6):
+            lanes = _compose(slots, seed=seed)
+            assert min(_sample_counts(lanes, slots, _DUR)) >= 2, (n, seed)
+            lanes = _compose(slots, seed=seed, song_markers=_SONG)
+            # The drop: very intense, straight after a build.
+            counts = [len(_active_at(lanes, slots, 48.0 + 0.25 * i + 0.01)) for i in range(64)]
+            assert min(counts) >= 2, (n, seed)
 
 
-def _isolated_add_remove_times(
-    lanes: dict[str, TimelineLane], slots: list[str]
-) -> list[tuple[float, frozenset[str], frozenset[str]]]:
-    events = _mutation_events(lanes, slots)
-    isolated: list[tuple[float, frozenset[str], frozenset[str]]] = []
-    for index, (t, added, removed) in enumerate(events):
-        if added and removed:
-            continue
-        if added and not removed:
-            if index + 1 < len(events):
-                _t2, added2, removed2 = events[index + 1]
-                if removed2 and not added2 and added.isdisjoint(removed2):
-                    continue
-            isolated.append((t, added, removed))
-            continue
-        if removed and not added:
-            if index > 0:
-                _t1, added1, removed1 = events[index - 1]
-                if added1 and not removed1 and added1.isdisjoint(removed):
-                    continue
-            isolated.append((t, added, removed))
-    return isolated
-
-
-def _overlap_pairs(
-    lanes: dict[str, TimelineLane], slots: list[str]
-) -> list[tuple[float, float]]:
-    events = _mutation_events(lanes, slots)
-    pairs: list[tuple[float, float]] = []
-    for index, (t_on, added, removed) in enumerate(events):
-        if not added or removed:
-            continue
-        for t_off, added2, removed2 in events[index + 1 :]:
-            if added2:
-                break
-            if removed2 and added.isdisjoint(removed2):
-                mid = _active_at(lanes, slots, (t_on + t_off) * 0.5)
-                if added <= mid:
-                    pairs.append((t_on, t_off))
-                break
-    return pairs
-
-
-def test_overlap_when_add_then_remove() -> None:
-    """With no wipe duration, 1-2 beat add-then-remove windows still appear."""
+def test_a_calm_section_sometimes_shows_one_layer() -> None:
     slots = _slots(4)
-    found = False
-    for seed in range(20):
-        lanes = _compose(slots, seed=seed, transition_duration=0.0)
-        if _overlap_pairs(lanes, slots):
-            found = True
-            break
-    assert found, "expected a 1-2 beat window where an added layer overlaps a departing one"
-
-
-def test_transition_duration_keeps_consecutive_changes_apart() -> None:
-    """Add-then-remove overlap stays at least one wipe; isolated gaps may be closer."""
-    slots = _slots(4)
-    duration = 1.0
-    for seed in range(20):
-        lanes = _compose(slots, seed=seed, transition_duration=duration)
-        for t_on, t_off in _overlap_pairs(lanes, slots):
-            assert t_off - t_on >= duration - 1e-9, (
-                f"seed={seed} overlap {t_off - t_on:.4f}s inside transition_duration"
+    for kind in ("intro", "breakdown", "outro"):
+        counts: list[int] = []
+        for seed in range(10):
+            lanes = _compose(
+                slots,
+                seed=seed,
+                song_markers=[SongMarker(0.0), SongMarker(16.0, kind, "calm"), SongMarker(80.0)],
             )
+            counts += [len(_active_at(lanes, slots, 16.0 + 0.25 * i + 0.01)) for i in range(256)]
+        assert 1 in counts, kind
+        assert any(n >= 2 for n in counts), kind
 
 
-def test_transition_duration_overlap_has_wipe_plus_hold() -> None:
+def test_two_layers_take_turns() -> None:
+    slots = _slots(2)
+    lanes = _compose(slots, seed=1)
+    counts = _sample_counts(lanes, slots, _DUR)
+    assert min(counts) >= 1
+    assert len(_change_times(lanes)) > 5
+
+
+def test_normal_sections_leave_a_layer_out() -> None:
     slots = _slots(4)
-    duration = 1.0
-    hold = _BEAT_SEC
-    saw_overlap = False
-    for seed in range(30):
-        lanes = _compose(slots, seed=seed, transition_duration=duration)
-        for t_on, t_off in _overlap_pairs(lanes, slots):
-            saw_overlap = True
-            assert t_off - t_on >= duration + hold - 1e-9, (
-                f"seed={seed} overlap {t_off - t_on:.4f}s shorter than "
-                f"transition plus one beat"
-            )
-    assert saw_overlap, "expected at least one add-then-remove that still fits"
-
-
-def test_isolated_add_remove_times_ignore_transition_duration() -> None:
-    slots = _slots(4)
-    for seed in range(12):
-        zero = _compose(slots, seed=seed, transition_duration=0.0)
-        wipe = _compose(slots, seed=seed, transition_duration=1.0)
-        assert _isolated_add_remove_times(zero, slots) == _isolated_add_remove_times(
-            wipe, slots
-        )
-
-
-def test_count_distribution_two_three_mode() -> None:
-    slots = _slots(4)
-    histogram: Counter[int] = Counter()
-    for seed in range(30):
+    for seed in range(6):
         lanes = _compose(slots, seed=seed)
-        for n in _sample_counts(lanes, slots, _DUR):
-            histogram[n] += 1
-            assert n >= 1, f"active count {n} dropped below 1"
-            assert n <= 4
-    two_three = histogram[2] + histogram[3]
-    assert two_three > histogram[4]
-    assert two_three > histogram[1]
-    assert histogram[2] > 0 and histogram[3] > 0
-    mode = max((1, 2, 3, 4), key=lambda k: histogram[k])
-    assert mode in (2, 3)
-
-
-def test_five_plus_rare_without_markers() -> None:
-    slots = _slots(6)
-    histogram: Counter[int] = Counter()
-    for seed in range(20):
-        lanes = _compose(slots, seed=seed)
-        for n in _sample_counts(lanes, slots, _DUR, step=1.0):
-            histogram[n] += 1
-            assert n >= 1
-    five_plus = sum(histogram[k] for k in histogram if k >= 5)
-    two_three = histogram[2] + histogram[3]
-    assert two_three > histogram[1]
-    assert five_plus < two_three * 0.35
-
-
-def test_unmarked_one_layer_is_rare_minority() -> None:
-    slots = _slots(4)
-    ones = 0
-    total = 0
-    saw_one = False
-    for seed in range(30):
-        lanes = _compose(slots, seed=seed)
-        counts = _sample_counts(lanes, slots, _DUR)
-        if 1 in counts:
-            saw_one = True
-        ones += sum(1 for n in counts if n == 1)
-        total += len(counts)
-    assert saw_one, "expected at least one 1-layer sample across unmarked seeds"
-    assert ones < total * 0.5, "1-layer samples should be the minority"
-
-
-def test_interior_markers_change_slot_set_at_marker_time() -> None:
-    slots = _slots(4)
-    markers = [
-        SongMarker(12.0, "standard"),
-        SongMarker(36.0, "verse"),
-        SongMarker(60.0, "bridge"),
-    ]
-    for seed in range(15):
-        lanes = _compose(slots, seed=seed, song_markers=markers)
-        changes = _slot_set_change_times(lanes, slots)
-        for marker in markers:
-            prev = _active_at(lanes, slots, marker.time - 1e-6)
-            after = _active_at(lanes, slots, marker.time + 1e-6)
-            assert prev != after, (
-                f"seed={seed} marker {marker.marker_type}@{marker.time} "
-                "had no slot-set change"
-            )
-            assert any(abs(t - marker.time) <= 1e-6 for t in changes), (
-                f"seed={seed} marker {marker.time} mutation was not on the marker"
-            )
-
-
-def test_typed_sections_stay_in_their_layer_range() -> None:
-    slots = _slots(6)
-    markers = [
-        SongMarker(0.0, "intro"),
-        SongMarker(12.0, "verse"),
-        SongMarker(30.0, "chorus"),
-        SongMarker(48.0, "breakdown"),
-    ]
-    parts = section_parts(resolve_sections(markers, _DUR))
-    for seed in range(10):
-        lanes = _compose(slots, seed=seed, song_markers=markers)
-        for part in parts:
-            t = part.section.start + 1e-6
-            while t < part.section.end:
-                raw, lo, hi = section_target_range(part, t, len(slots), 0)
-                # Each stretch takes the count either side of the shape's.
-                low, high = max(lo, int(raw) - 1), min(hi, int(raw) + 1)
-                assert low <= len(_active_at(lanes, slots, t)) <= high, (seed, t)
-                t += 0.5
-
-
-def test_build_rises_into_a_full_drop() -> None:
-    slots = _slots(6)
-    markers = [SongMarker(16.0, "build"), SongMarker(40.0, "drop")]
-    for seed in range(10):
-        lanes = _compose(slots, seed=seed, song_markers=markers)
-        counts = [
-            len(_active_at(lanes, slots, t + 0.01)) for t in range(16, 40)
-        ]
-        assert counts[0] == 1
-        assert counts[-1] == 4
-        assert counts == sorted(counts), seed
-        assert len(_active_at(lanes, slots, 40.0 + 1e-6)) >= 3
-
-
-def test_role_bias_lead_then_pulse_then_accent_bed() -> None:
-    slots = _slots(4)
-    roles: Counter[str] = Counter()
-    for seed in range(25):
-        lanes = _compose(slots, seed=seed)
-        for lane in lanes.values():
-            for cue in lane.cues:
-                if cue.level > LEVEL_EPS and cue.role is not None:
-                    roles[cue.role] += 1
-    assert roles["lead"] > roles["pulse"] > roles["accent"] > roles["bed"]
-    assert roles["bed"] > 0
+        assert max(_sample_counts(lanes, slots, _DUR)) <= 3, seed
 
 
 def test_active_levels_are_full() -> None:
     slots = _slots(4)
-    lanes = _compose(slots, seed=7)
-    for t in _all_cue_times(lanes) + [0.0, 60.0]:
-        for level in _level_at(lanes, slots, t).values():
-            if level > LEVEL_EPS:
-                assert abs(level - 1.0) <= LEVEL_EPS
+    lanes = _compose(slots, seed=3, song_markers=_SONG)
+    for lane in lanes.values():
+        for cue in lane.cues:
+            assert cue.level <= LEVEL_EPS or abs(cue.level - 1.0) <= LEVEL_EPS
+
+
+def test_every_marker_changes_the_layers() -> None:
+    slots = _slots(4)
+    for seed in range(10):
+        lanes = _compose(slots, seed=seed, song_markers=_SONG)
+        for marker in _SONG[1:]:
+            before = _active_at(lanes, slots, marker.time - 1e-3)
+            after = _active_at(lanes, slots, marker.time + 1e-3)
+            assert before != after, (seed, marker)
+
+
+def test_wipes_have_room_to_play_out() -> None:
+    slots = _slots(4)
+    for transition in (0.5, 1.0, 2.0):
+        for seed in range(6):
+            lanes = _compose(
+                slots, seed=seed, song_markers=_SONG, transition_duration=transition
+            )
+            times = _change_times(lanes)
+            gaps = [b - a for a, b in zip(times, times[1:])]
+            assert min(gaps) >= transition + _BEAT_SEC - 1e-6, (transition, seed)
+
+
+def test_intensity_sets_how_often_layers_change() -> None:
+    slots = _slots(4)
+    calm = loud = 0
+    for seed in range(8):
+        lanes = _compose(
+            slots,
+            seed=seed,
+            song_markers=[SongMarker(0.0, intensity="very calm"), SongMarker(60.0, intensity="very intense")],
+        )
+        calm += _changes_between(lanes, 0.0, 60.0)
+        loud += _changes_between(lanes, 60.0, _DUR)
+    assert loud > 2 * calm
+    assert calm > 0
+
+
+def test_layer_changes_option_scales_the_pace() -> None:
+    slots = _slots(4)
+    totals = {}
+    for changes in ("fewer", "normal", "more"):
+        totals[changes] = sum(
+            len(_change_times(_compose(slots, seed=seed, changes=changes)))  # type: ignore[arg-type]
+            for seed in range(8)
+        )
+    # Each step is a clear change, not a nudge.
+    assert 2 * totals["fewer"] < totals["normal"]
+    assert 1.3 * totals["normal"] < totals["more"]
+
+
+def test_a_build_starts_sparser_than_a_plain_section_and_ends_busier() -> None:
+    slots = _slots(4)
+    build_start = build_end = plain_start = plain_end = 0
+    for seed in range(8):
+        # A 32-bar section after an opening, so neither starts the song.
+        for kind in ("build", None):
+            lanes = _compose(
+                slots,
+                seed=seed,
+                song_markers=[SongMarker(0.0), SongMarker(8.0, kind), SongMarker(72.0)],
+            )
+            start = _changes_between(lanes, 8.0, 24.0)
+            end = _changes_between(lanes, 56.0, 72.0)
+            if kind == "build":
+                build_start, build_end = build_start + start, build_end + end
+            else:
+                plain_start, plain_end = plain_start + start, plain_end + end
+    assert build_start < plain_start
+    assert build_end > plain_end
+
+
+def test_a_build_rises_across_its_markers_to_every_layer() -> None:
+    slots = _slots(4)
+    early = late = 0
+    for seed in range(10):
+        lanes = _compose(slots, seed=seed, song_markers=_SONG)
+        counts = [len(_active_at(lanes, slots, 32.0 + 0.25 * i + 0.01)) for i in range(64)]
+        assert counts == sorted(counts), seed
+        # Every layer only on its last bar.
+        assert counts[-1] == 4 and counts[-9] < 4, seed
+        early += _changes_between(lanes, 32.0, 40.0)
+        late += _changes_between(lanes, 40.0, 48.0)
+    # Changes come faster as it goes.
+    assert late > early
+
+
+def test_drop_and_chorus_open_with_a_big_change() -> None:
+    slots = _slots(6)
+    for seed in range(10):
+        lanes = _compose(slots, seed=seed, song_markers=_SONG)
+        for t in (48.0, 88.0):
+            before = _active_at(lanes, slots, t - 1e-3)
+            after = _active_at(lanes, slots, t + 1e-3)
+            assert len(after ^ before) >= 2, (seed, t)
+
+
+def test_bridge_brings_in_layers_that_were_out() -> None:
+    slots = _slots(6)
+    for seed in range(10):
+        lanes = _compose(slots, seed=seed, song_markers=_SONG)
+        before = _active_at(lanes, slots, 80.0 - 1e-3)
+        after = _active_at(lanes, slots, 80.0 + 1e-3)
+        assert len(after - before) >= min(len(after), 6 - len(before)), seed
+
+
+def test_breakdown_holds_the_fewest() -> None:
+    slots = _slots(4)
+    for seed in range(10):
+        lanes = _compose(slots, seed=seed, song_markers=_SONG)
+        counts = [len(_active_at(lanes, slots, 64.0 + 0.25 * i + 0.01)) for i in range(64)]
+        assert sum(n <= 2 for n in counts) >= 0.75 * len(counts), seed
+
+
+def test_an_outro_only_thins_out() -> None:
+    slots = _slots(4)
+    for seed in range(10):
+        lanes = _compose(slots, seed=seed, song_markers=_SONG)
+        counts = [len(_active_at(lanes, slots, 104.0 + 0.25 * i + 0.01)) for i in range(60)]
+        assert counts == sorted(counts, reverse=True), seed
 
 
 def test_continuing_slot_recast_is_on_transition() -> None:
     slots = _slots(4)
     fade_off = TimelineFadeGroup(enabled=False)
     found = 0
-    for seed in range(40):
-        lanes = _compose(slots, seed=seed)
+    for seed in range(20):
+        lanes = _compose(slots, seed=seed, song_markers=_SONG)
         for slot, lane in lanes.items():
             pairs = lane_on_transition_cues(
                 lane, hard_cut_fades=fade_off, soft_cut_fades=fade_off
@@ -398,22 +359,8 @@ def test_continuing_slot_recast_is_on_transition() -> None:
                 if not cue.recast:
                     continue
                 assert abs(cue.level - 1.0) <= LEVEL_EPS
-                prev = lane_level_at(lane, cue.t - 1e-6, inherit=0.0)
-                after = lane_level_at(lane, cue.t + 1e-6, inherit=0.0)
-                assert prev > LEVEL_EPS
-                assert after > LEVEL_EPS
-                assert slot in _active_at(lanes, slots, cue.t - 1e-6)
+                assert lane_level_at(lane, cue.t - 1e-6, inherit=0.0) > LEVEL_EPS
                 assert slot in _active_at(lanes, slots, cue.t + 1e-6)
-                cues_at_t = [
-                    other
-                    for other_lane in lanes.values()
-                    for other in other_lane.cues
-                    if abs(other.t - cue.t) <= 1e-9
-                ]
-                if cues_at_t and all(other.recast for other in cues_at_t):
-                    assert _active_at(lanes, slots, cue.t - 1e-6) == _active_at(
-                        lanes, slots, cue.t + 1e-6
-                    )
                 assert cue.t in on_transition_times
                 found += 1
     assert found > 0, "expected recast cues on continuing slots"
@@ -465,27 +412,25 @@ def _airtime(
     return on
 
 
+def _roles(lanes: dict[str, TimelineLane]) -> set[str | None]:
+    return {cue.role for lane in lanes.values() for cue in lane.cues if cue.level > LEVEL_EPS}
+
+
+_SLOT_STEMS: dict[str, StemSource] = {
+    "layer_1": "drums",
+    "layer_2": "bass",
+    "layer_3": "vocals",
+    "layer_4": "other",
+}
+
+
 def test_conductor_biases_busy_stems() -> None:
     slots = _slots(4)
-    slot_stems: dict[str, StemSource] = {
-        "layer_1": "drums",
-        "layer_2": "bass",
-        "layer_3": "vocals",
-        "layer_4": "other",
-    }
     signals = _make_signals()
-    drums_first = 0.0
-    vocals_first = 0.0
-    drums_second = 0.0
-    vocals_second = 0.0
+    drums_first = vocals_first = drums_second = vocals_second = 0.0
     mid = _DUR * 0.5
     for seed in range(8):
-        lanes = _compose(
-            slots,
-            seed=seed,
-            signals=signals,
-            slot_stems=slot_stems,
-        )
+        lanes = _compose(slots, seed=seed, signals=signals, slot_stems=_SLOT_STEMS)
         drums_first += _airtime(lanes, "layer_1", 0.0, mid)
         vocals_first += _airtime(lanes, "layer_3", 0.0, mid)
         drums_second += _airtime(lanes, "layer_1", mid, _DUR)
@@ -494,47 +439,13 @@ def test_conductor_biases_busy_stems() -> None:
     assert vocals_second > drums_second
 
 
-def _section_bar_counts(
-    sections: list[tuple[float, float]], bars: list[float]
-) -> list[int]:
-    return [sum(1 for b in bars if start <= b < end) for start, end in sections]
-
-
-def test_sections_shorter_than_layers_phrases() -> None:
-    bars = _bar_times()
-    rng = random.Random(4)
-    sections = partition_pattern_mask_sections(bars, _DUR, rng, ())
-    assert sections
-    bar_counts = _section_bar_counts(sections, bars)
-    core = bar_counts[:-1]
-    assert core
-    short = sum(1 for n in core if n <= 2)
-    assert short > len(core) - short
-    assert sum(1 for n in bar_counts if SECTION_LONG_BARS_MIN <= n <= SECTION_LONG_BARS_MAX) <= 1
-    # Shorter than the four-bar phrases layers mode uses at its fastest.
-    assert sum(core) / len(core) < 4
-    for seed in range(40):
-        seeded = partition_pattern_mask_sections(
-            bars, _DUR, random.Random(seed), ()
-        )
-        counts = _section_bar_counts(seeded, bars)
-        long_n = sum(
-            1
-            for n in counts
-            if SECTION_LONG_BARS_MIN <= n <= SECTION_LONG_BARS_MAX
-        )
-        assert long_n <= 1, f"seed={seed} had {long_n} long sections"
-
-
-def test_song_markers_start_sections() -> None:
-    bars = _bar_times(60.0)
-    markers = [12.0, 36.0]
-    sections = partition_pattern_mask_sections(
-        bars, 60.0, random.Random(0), markers
+def test_roles_only_with_the_conductor() -> None:
+    slots = _slots(4)
+    assert _roles(_compose(slots, seed=2)) == {None}
+    with_conductor = _compose(
+        slots, seed=2, signals=_make_signals(), slot_stems=_SLOT_STEMS
     )
-    starts = [start for start, _end in sections]
-    assert 12.0 in starts
-    assert 36.0 in starts
+    assert "lead" in _roles(with_conductor)
 
 
 def _playlist(slot: str) -> PresetPlaylist:
@@ -581,6 +492,8 @@ def _controller(
 def test_apply_pattern_mask_calls_builder_and_enables_mask() -> None:
     slots = ("layer_1", "layer_2", "layer_3", "layer_4")
     session = _session(slots, mode="pattern_mask")
+    session.pattern_mask.type = "radial"
+    session.timeline.timeline_preset_mask_changes = "more"
     controller, notes = _controller(session)
     fake = {slot: TimelineLane(baseline=0.0, cues=[]) for slot in slots}
     with (
@@ -597,13 +510,44 @@ def test_apply_pattern_mask_calls_builder_and_enables_mask() -> None:
     kwargs = mock_pm.call_args.kwargs
     assert "song_markers" in kwargs
     assert "beat_times" in kwargs
-    assert kwargs["transition_duration"] == 1.0
+    # The Pattern Mask page's default transition: 1 beat, at 120 bpm.
+    assert kwargs["transition_duration"] == 0.5
+    assert kwargs["changes"] == "more"
     mock_layers.assert_not_called()
     assert session.pattern_mask.enabled is True
-    assert session.pattern_mask.type == "strips"
-    assert session.pattern_mask.feather_pct == 0
+    # keep leaves the Pattern Mask page's pattern.
+    assert session.pattern_mask.type == "radial"
     assert session.pattern_mask.transition == 1.0
+    assert session.pattern_mask.transition_unit == "beats"
     assert notes == ["Generated pattern mask timeline"]
+
+
+def test_apply_pattern_mask_sets_the_pattern_and_keeps_the_transition() -> None:
+    slots = ("layer_1", "layer_2", "layer_3")
+    session = _session(slots, mode="pattern_mask")
+    session.timeline.timeline_preset_mask_pattern = "checker"
+    session.pattern_mask.transition_unit = "bars"
+    session.pattern_mask.transition = 1.0
+    controller, _notes = _controller(session)
+    with patch(
+        "cleave.viz.timeline_preset_controls.compose_pattern_mask_timeline",
+        return_value={slot: TimelineLane(baseline=0.0, cues=[]) for slot in slots},
+    ) as mock_pm:
+        controller._apply(_DUR)
+    assert session.pattern_mask.type == "checker"
+    assert (session.pattern_mask.transition_unit, session.pattern_mask.transition) == ("bars", 1.0)
+    assert mock_pm.call_args.kwargs["transition_duration"] == _BAR_SEC
+
+
+def test_pattern_mask_mode_leaves_layer_opacity() -> None:
+    slots = ("layer_1", "layer_2", "layer_3")
+    session = _session(slots, mode="pattern_mask")
+    session.timeline.timeline_preset_full_opacity = True
+    for slot in slots:
+        session.layers[slot].opacity_pct = 50
+    controller, _notes = _controller(session)
+    controller._apply(_DUR)
+    assert all(session.layers[slot].opacity_pct == 50 for slot in slots)
 
 
 def test_apply_pattern_mask_passes_conductor_kwargs() -> None:
@@ -655,36 +599,3 @@ def test_apply_layers_mode_uses_the_planner() -> None:
     assert session.pattern_mask.enabled is False
     assert session.pattern_mask.transition == 0.0
     assert notes == ["Generated timeline"]
-
-
-def test_a_build_rises_across_all_of_its_markers() -> None:
-    slots = _slots(4)
-    markers = [
-        SongMarker(16.0, "build"),
-        SongMarker(28.0, "build"),
-        SongMarker(40.0, "build"),
-        SongMarker(52.0, "drop"),
-    ]
-    for seed in range(10):
-        lanes = _compose(slots, seed=seed, song_markers=markers)
-        counts = [len(_active_at(lanes, slots, t + 0.01)) for t in range(16, 52)]
-        # One rise over the whole run, not one per marker.
-        assert counts == sorted(counts), seed
-        assert counts[0] == 1 and counts[-1] == 4
-
-
-def test_intensity_bounds_every_section() -> None:
-    slots = _slots(4)
-    markers = [
-        SongMarker(0.0, intensity="very calm"),
-        SongMarker(30.0, "chorus", "very calm"),
-        SongMarker(60.0, intensity="very intense"),
-        SongMarker(90.0, "verse", "very intense"),
-    ]
-    for seed in range(10):
-        lanes = _compose(slots, seed=seed, song_markers=markers)
-        # Swaps overlap for a beat or so; outside those the bounds hold.
-        calm = [len(_active_at(lanes, slots, 0.25 * i)) for i in range(1, 240)]
-        loud = [len(_active_at(lanes, slots, 0.25 * i)) for i in range(241, 480)]
-        assert sum(n == 1 for n in calm) >= 0.8 * len(calm), seed
-        assert sum(n >= 3 for n in loud) >= 0.8 * len(loud), seed
