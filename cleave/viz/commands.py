@@ -37,6 +37,8 @@ if TYPE_CHECKING:
 CommandKind = Literal["command", "jump", "check"]
 LabelRole = tuple[int, int, int]
 
+HELP_OVERLAY_ID = "help.overlay"
+
 _RESOLVED_SHORTCUT_IDS = frozenset(
     {
         "file.new",
@@ -44,7 +46,7 @@ _RESOLVED_SHORTCUT_IDS = frozenset(
         "file.save",
         "file.quit",
         "project.render",
-        "help.overlay",
+        HELP_OVERLAY_ID,
         "view.fullscreen_editor",
         "view.play_fullscreen",
         "page.settings.preview",
@@ -898,7 +900,7 @@ _RELOAD_THEMES = Command(
 )
 
 _HELP_OVERLAY = Command(
-    id="help.overlay",
+    id=HELP_OVERLAY_ID,
     label="Help",
     kind="check",
     shortcut="H",

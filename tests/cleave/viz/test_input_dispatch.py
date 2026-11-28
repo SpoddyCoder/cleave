@@ -31,7 +31,7 @@ from cleave.viz.controls import SEEK_LONG, SEEK_TINY, TuningControls
 from cleave.viz.layer_visibility import armed_recording_level
 from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.session import LayerRuntime, TuningSession
-from cleave.viz.modal import ModalHost, ModalKind
+from cleave.viz.modal import FormField, FormSpec, ModalHost, ModalKind
 from cleave.viz.timeline_controls import TimelineControls
 from tests.support.compositor_mock import recording_compositor
 from tests.support.viz import (
@@ -454,6 +454,59 @@ def test_h_does_not_toggle_help_while_text_editing() -> None:
     assert view is not None
     assert view.draft == "abh"
     assert runtime.seed.session.help_visible is False
+
+
+def test_h_toggles_help_while_form_open() -> None:
+    runtime = _make_runtime(
+        submenu_focused=False, panel_open=False, help_visible=False
+    )
+    confirmed: list = []
+    runtime.modal_host.prompt_form(
+        FormSpec(
+            title="Snap clips",
+            fields=(FormField("target", "snap to", ("a", "b"), 0),),
+            confirm_label="Go",
+            on_confirm=confirmed.append,
+        )
+    )
+    assert dispatch_keydown(keydown(pygame.K_h), runtime) is True
+    assert runtime.seed.session.help_visible is True
+    assert runtime.modal_host.active is True
+    assert dispatch_keydown(keydown(pygame.K_h), runtime) is True
+    assert runtime.seed.session.help_visible is False
+    assert runtime.modal_host.active is True
+    assert confirmed == []
+
+
+def test_ctrl_h_does_not_toggle_help_while_form_open() -> None:
+    runtime = _make_runtime(
+        submenu_focused=False, panel_open=False, help_visible=False
+    )
+    runtime.modal_host.prompt_form(
+        FormSpec(
+            title="Snap clips",
+            fields=(FormField("target", "snap to", ("a", "b"), 0),),
+            confirm_label="Go",
+            on_confirm=lambda _values: None,
+        )
+    )
+    dispatch_keydown(keydown(pygame.K_h, mod=pygame.KMOD_CTRL), runtime)
+    assert runtime.seed.session.help_visible is False
+
+
+def test_h_toggles_help_from_text_dialog_buttons() -> None:
+    runtime = _make_runtime(
+        submenu_focused=False, panel_open=False, help_visible=False
+    )
+    runtime.modal_host.prompt_text(
+        "Edit text",
+        "ab",
+        on_confirm=lambda _s: None,
+    )
+    assert dispatch_keydown(keydown(pygame.K_RETURN), runtime) is True
+    assert runtime.modal_host.typing_text is False
+    assert dispatch_keydown(keydown(pygame.K_h), runtime) is True
+    assert runtime.seed.session.help_visible is True
 
 
 def test_f10_toggles_bar_focus() -> None:

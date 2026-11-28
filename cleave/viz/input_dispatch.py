@@ -6,7 +6,11 @@ from typing import TYPE_CHECKING
 
 import pygame
 
-from cleave.viz.commands import command_context, command_for_shortcut
+from cleave.viz.commands import (
+    HELP_OVERLAY_ID,
+    command_context,
+    command_for_shortcut,
+)
 from cleave.viz.controls import SEEK_LONG, SEEK_TINY, TuningControls
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.key_repeat import delete_key_pressed, mod_alt, mod_ctrl, mod_shift
@@ -424,6 +428,19 @@ def _play_fullscreen_keydown(
     return True
 
 
+def _toggle_help_over_modal(
+    event: pygame.event.Event, runtime: LiveVisualizerRuntime
+) -> bool:
+    """H shows or hides help over an open dialog, unless its field takes text."""
+    if event.key != pygame.K_h or runtime.modal_host.typing_text:
+        return False
+    command = command_for_shortcut(event.key, event.mod)
+    if command is None or command.id != HELP_OVERLAY_ID:
+        return False
+    command.run(runtime.controls)
+    return True
+
+
 def dispatch_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) -> bool:
     """Handle a key-down event. Return False when the app should quit."""
     if event.type != pygame.KEYDOWN:
@@ -431,6 +448,8 @@ def dispatch_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) 
 
     if runtime.modal_host.active:
         runtime.menu_bar.cancel_alt_tap()
+        if _toggle_help_over_modal(event, runtime):
+            return True
         return runtime.controls.handle_modal_keydown(event)
 
     if runtime.controls.context_menu.handle_keydown(event):

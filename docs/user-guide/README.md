@@ -32,6 +32,8 @@ You don't need to read this guide cover to cover before starting. Open a song, p
 
 Press **H**, or tick **Help > Help** in the menu bar, to toggle the help column.
 
+H works with a dialog open too, so you can read about each option while you fill it in. The only time H does not toggle help is while you are typing in a text box.
+
 The help column tracks your focus: move to another row, page, or panel and it updates to describe what is highlighted, what each of its options does, and which keys and mouse actions apply there, listed under **Mouse** and **Keyboard**.
 
 ![Help follows the highlighted row](images/help-follows-focus.png)
@@ -798,7 +800,7 @@ These work anywhere in the editor. Press H to see the keys for whatever you are 
 
 | Key | What it does |
 | --- | --- |
-| H | Show or hide help. |
+| H | Show or hide help, also with a dialog open. |
 | Space | Play or pause. |
 | Shift+Left / Shift+Right | Skip 2 seconds. |
 | Ctrl+Left / Ctrl+Right | Skip 30 seconds. |

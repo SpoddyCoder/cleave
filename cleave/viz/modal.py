@@ -331,6 +331,17 @@ class ModalHost:
         return self._request is not None
 
     @property
+    def typing_text(self) -> bool:
+        """A text dialog's field is taking typed characters."""
+        state = self._text_state
+        return (
+            self._request is not None
+            and self._request.kind == ModalKind.TEXT
+            and state is not None
+            and state.editing
+        )
+
+    @property
     def text_key_repeat_armed(self) -> bool:
         return self._text_key_repeat.is_armed
 

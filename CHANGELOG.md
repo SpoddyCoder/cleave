@@ -95,6 +95,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- H shows and hides the help column while a dialog is open, so you can turn on help partway through a dialog such as Generate. It still types an h in a text box.
 - Set cut type on clips, and the cut type option in Generate timeline, no longer take away clips' presets or make a clip that should change preset carry on with the one before.
 - An error in Generate timeline no longer ends the session. A message says why it failed, and the timeline and preset lists stay as they were.
 - The transport bar's bar number, and dragging it or typing a bar, follow bar phase.
